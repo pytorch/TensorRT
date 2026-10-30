@@ -5,13 +5,15 @@ import torch
 
 
 def restore_reshape(gm: torch.fx.GraphModule) -> None:
-    """Turn ``aten._reshape_copy`` back into ``aten.reshape`` wherever PyTorch runs it.
+    """Turn ``aten._reshape_copy`` into ``aten.clone(aten.reshape)`` wherever PyTorch runs it.
 
     ``view_decomposition`` rewrites every ``aten.view`` before partitioning, so a view
     TensorRT does not take stays in PyTorch as ``aten._reshape_copy``. That is not a
     core ATen op, and AOTInductor has no lowering for it, so it becomes a fallback
-    kernel, which the ExecuTorch CUDA backend cannot run. ``aten.reshape`` decomposes
-    into core ops wherever it goes.
+    kernel, which the ExecuTorch CUDA backend cannot run. ``aten.reshape`` and
+    ``aten.clone`` decompose into core ops wherever they go. The clone keeps the copy:
+    lowering may already have dropped a user's clone of an input, and a reshape alone
+    could then return the caller's input or an engine's reused output buffer.
     """
     for name, module in gm.named_modules():
         if "_run_on_acc" in name or not isinstance(module, torch.fx.GraphModule):
@@ -23,5 +25,11 @@ def restore_reshape(gm: torch.fx.GraphModule) -> None:
         ]
         for node in nodes:
             node.target = torch.ops.aten.reshape.default
+            users = list(node.users)
+            with module.graph.inserting_after(node):
+                copy = module.graph.call_function(torch.ops.aten.clone.default, (node,))
+            copy.meta = dict(node.meta)
+            for user in users:
+                user.replace_input_with(node, copy)
         if nodes:
             module.recompile()
