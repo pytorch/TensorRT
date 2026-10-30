@@ -151,6 +151,10 @@ jobs:
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
       PYTHON_ONLY: ${{ inputs.python-only && '1' || '0' }}
+      # Sign ARM64 cross-built wheels only on release tag pushes (including RCs).
+      # SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      # Temporary: allow PR signing tests. Restore both release-only conditions after testing.
+      SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
     name: build-${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
@@ -649,13 +653,18 @@ jobs:
             artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
           fi
           echo "ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
+          if [[ "${SIGN_ARM64_WHEELS}" == "true" ]]; then
+            # Only the signing job uploads the name consumed by publication.
+            echo "ARTIFACT_NAME=${artifact_name}-unsigned-${{ matrix.build_name }}-${{ inputs.build-flavor }}-${{ inputs.use-rtx }}-${{ inputs.python-only }}" >> "${GITHUB_ENV}"
+          fi
       - name: Upload wheel to GitHub
         if: ${{ inputs.is-release-tarball == false }}
-        continue-on-error: true
+        continue-on-error: ${{ !inputs.cross-compile }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
+          if-no-files-found: error
       - name: Upload zip artifact to GitHub
         if: ${{ inputs.is-release-tarball == true }}
         continue-on-error: true
@@ -667,11 +676,126 @@ jobs:
         if: inputs.architecture == 'x64' || inputs.cross-compile
         name: Teardown Windows
 
+  sign-arm64:
+    needs: build
+    # if: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    # Temporary: allow PR signing tests. Restore both release-only conditions after testing.
+    if: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
+    name: sign-${{ matrix.build_name }}
+    runs-on: windows-latest
+    environment: artifact-signing
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    env:
+      UNSIGNED_SUFFIX: -unsigned-${{ matrix.build_name }}-${{ inputs.build-flavor }}-${{ inputs.use-rtx }}-${{ inputs.python-only }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # Do not check out or execute build-repository code in the signing job.
+      - name: Download unsigned ARM64 wheel
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*${{ env.UNSIGNED_SUFFIX }}'
+          path: unsigned-wheels
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Unpack wheel for signing
+        id: wheel
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install wheel
+          if ($LASTEXITCODE -ne 0) { throw 'Installing wheel failed' }
+
+          $artifacts = @(Get-ChildItem unsigned-wheels -Directory)
+          if ($artifacts.Count -ne 1) { throw "Expected one unsigned artifact, found $($artifacts.Count)" }
+          $artifactName = $artifacts[0].Name
+          if (-not $artifactName.EndsWith($env:UNSIGNED_SUFFIX)) { throw 'Unexpected artifact name' }
+          $signedName = $artifactName.Substring(0, $artifactName.Length - $env:UNSIGNED_SUFFIX.Length)
+          "artifact-name=$signedName" >> $env:GITHUB_OUTPUT
+
+          $wheels = @(Get-ChildItem $artifacts[0].FullName -Recurse -Filter '*.whl' -File)
+          if ($wheels.Count -ne 1 -or $wheels[0].Name -notlike '*-win_arm64.whl') {
+            throw 'Expected exactly one win_arm64 wheel'
+          }
+          "filename=$($wheels[0].Name)" >> $env:GITHUB_OUTPUT
+          $unpack = Join-Path $env:RUNNER_TEMP 'arm64-wheel-signing'
+          python -m wheel unpack $wheels[0].FullName -d $unpack
+          if ($LASTEXITCODE -ne 0) { throw 'Unpacking wheel failed' }
+          $roots = @(Get-ChildItem $unpack -Directory)
+          if ($roots.Count -ne 1) { throw 'Expected one unpacked wheel directory' }
+          "root=$($roots[0].FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Log in to Azure using GitHub OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign ARM64 native binaries
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          signing-account-name: NvArtifactSigning01
+          certificate-profile-name: TorchTensorRTGitHub
+          files-folder: ${{ steps.wheel.outputs.root }}
+          files-folder-filter: dll,pyd,exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          exclude-environment-credential: true
+          exclude-workload-identity-credential: true
+          exclude-managed-identity-credential: true
+          exclude-shared-token-cache-credential: true
+          exclude-visual-studio-credential: true
+          exclude-visual-studio-code-credential: true
+          exclude-azure-cli-credential: false
+          exclude-azure-powershell-credential: true
+          exclude-azure-developer-cli-credential: true
+          exclude-interactive-browser-credential: true
+      - name: Verify signatures and repack wheel
+        env:
+          WHEEL_ROOT: ${{ steps.wheel.outputs.root }}
+          WHEEL_FILENAME: ${{ steps.wheel.outputs.filename }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(Get-ChildItem $env:WHEEL_ROOT -Recurse -File |
+            Where-Object { $_.Extension -in @('.dll', '.pyd', '.exe') })
+          if ($files.Count -eq 0) { throw 'No native binaries found' }
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
+            if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate) {
+              throw "Missing valid timestamped signature: $($file.FullName): $($signature.Status)"
+            }
+          }
+          # Signing changes binary hashes; wheel pack regenerates RECORD.
+          New-Item -ItemType Directory -Path 'dist-signed' -Force | Out-Null
+          python -m wheel pack $env:WHEEL_ROOT -d dist-signed
+          if ($LASTEXITCODE -ne 0) { throw 'Repacking signed wheel failed' }
+          $signedWheel = Join-Path 'dist-signed' $env:WHEEL_FILENAME
+          if (-not (Test-Path -LiteralPath $signedWheel -PathType Leaf)) {
+            throw 'Repacking changed the wheel filename or platform tag'
+          }
+          # wheel unpack verifies the final archive against its RECORD hashes.
+          python -m wheel unpack $signedWheel -d (Join-Path $env:RUNNER_TEMP 'arm64-wheel-signed-validation')
+          if ($LASTEXITCODE -ne 0) { throw 'Signed wheel RECORD validation failed' }
+      - name: Upload signed wheel for publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.wheel.outputs.artifact-name }}
+          path: dist-signed/*.whl
+          if-no-files-found: error
+
   upload:
-    needs: [build, prepare-upload]
+    needs: [build, prepare-upload, sign-arm64]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
-    if: ${{ inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    if: ${{ always() && !cancelled() && needs.build.result == 'success' && needs.prepare-upload.result == 'success' && (needs.sign-arm64.result == 'success' || needs.sign-arm64.result == 'skipped') && inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}

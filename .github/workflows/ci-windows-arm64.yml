@@ -33,6 +33,7 @@ jobs:
     needs: decide
     if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: ./.github/workflows/build_windows.yml
+    secrets: inherit
     with:
       repository: ${{ github.repository }}
       ref: ""
