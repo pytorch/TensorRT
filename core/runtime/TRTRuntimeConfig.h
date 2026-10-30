@@ -12,11 +12,31 @@
 #include <utility>
 
 #include "NvInfer.h"
+#include "NvInferVersion.h"
 #include "core/runtime/RuntimeSettings.h"
 
+// nvinfer1::IRuntimeConfig, with ICudaEngine::createRuntimeConfig() and
+// createExecutionContext(IRuntimeConfig*), is in TensorRT 10.11 and later and in
+// TensorRT-RTX since 1.0. Decide from TensorRT's own version macros, so that all
+// code built against the same TensorRT agrees, whether built by Bazel or not.
+// TensorRT-RTX defines NV_TENSORRT_MAJOR as TRT_MAJOR_RTX, so test it first.
+// Test with `#if TORCHTRT_HAS_IRUNTIME_CONFIG()`: where this header is missing,
+// that fails to compile instead of reading as false, as `#ifdef` would.
+#if defined(TRT_MAJOR_RTX)
+#define TORCHTRT_HAS_IRUNTIME_CONFIG() 1
+#elif NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 11)
+#define TORCHTRT_HAS_IRUNTIME_CONFIG() 1
+#else
+#define TORCHTRT_HAS_IRUNTIME_CONFIG() 0
+#endif
+
+#if !TORCHTRT_HAS_IRUNTIME_CONFIG()
+// Declared only where TensorRT lacks it, so that a later TensorRT may redefine
+// it (as an alias, say) without conflicting. See TRTRuntimeConfig::config.
 namespace nvinfer1 {
-class IRuntimeConfig; // TensorRT 10.11 and later; see TRTRuntimeConfig::config
+class IRuntimeConfig;
 } // namespace nvinfer1
+#endif
 
 namespace torch_tensorrt {
 namespace core {
@@ -61,8 +81,8 @@ struct TRTRuntimeConfig {
       cudaStream_t stream) const;
 
   // Lazy-constructed live config. `nullptr` until first `ensure_initialized`,
-  // and always without TRT_HAS_IRUNTIME_CONFIG. Declared in every build, so
-  // that TRTEngine's layout does not depend on that macro (see TRTEngine.h).
+  // and always when TORCHTRT_HAS_IRUNTIME_CONFIG() is 0. Declared in every
+  // build, so that TRTEngine's layout does not depend on it (see TRTEngine.h).
   std::shared_ptr<nvinfer1::IRuntimeConfig> config;
 
  private:
