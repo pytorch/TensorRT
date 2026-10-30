@@ -8,6 +8,10 @@ import tempfile
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    force_causal_efficient_attention,
+)
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -548,48 +552,32 @@ class TestPreserveAttentionOutputLayout(TestCase):
 
 class TestRewriteEfficientAttention(TestCase):
     def test_force_causal_efficient_attention(self):
-        class RewriteEfficientAttention(torch.nn.Module):
-            def forward(
-                self,
-                query,
-                key,
-                value,
-                attn_bias=None,
-                compute_log_sumexp=False,
-                dropout_p=0.0,
-                is_causal=False,
-                scale=None,
-            ):
+        class CausalEfficientAttention(torch.nn.Module):
+            def forward(self, query, key, value):
+                position = torch.arange(query.size(-2), device=query.device)
+                attn_bias = torch.zeros(
+                    query.size(-2), query.size(-2), device=query.device
+                ).masked_fill(position[:, None] < position[None], float("-inf"))
                 out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
-                    query,
-                    key,
-                    value,
-                    attn_bias,
-                    compute_log_sumexp,
-                    dropout_p,
-                    is_causal,
-                    scale=scale,
+                    query, key, value, attn_bias.expand(4, 8, -1, -1), False
                 )
                 return out[0]
 
-        attn_bias = torch.zeros(4, 8, 32, 32, device="cuda")
-        upper = torch.triu(
-            torch.ones((32, 32), dtype=torch.bool, device="cuda"), diagonal=1
-        )
-        attn_bias = attn_bias.masked_fill(upper, float("-inf"))
-
-        inputs = [
-            torch.randn(4, 8, 32, 16).cuda(),
-            torch.randn(4, 8, 32, 16).cuda(),
-            torch.randn(4, 8, 32, 16).cuda(),
-            attn_bias,
-            True,
-            0.0,
-            True,
-        ]
-        model = RewriteEfficientAttention().cuda()
-        pytorch_out = model(*inputs)
+        inputs = [torch.randn(4, 8, 32, 16).cuda() for _ in range(3)]
+        model = CausalEfficientAttention().cuda()
         ep = torch.export.export(model, tuple(inputs))
+        gm = force_causal_efficient_attention(
+            ep.module(), CompilationSettings(attn_bias_is_causal=True)
+        )
+        (attention,) = [
+            node
+            for node in gm.graph.nodes
+            if node.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        ]
+        self.assertIsNone(attention.args[3])
+        self.assertTrue(attention.args[6])
+
         trt_module = torch_tensorrt.dynamo.compile(
             ep,
             inputs,
@@ -597,8 +585,40 @@ class TestRewriteEfficientAttention(TestCase):
             decompose_attention=False,
             attn_bias_is_causal=True,
         )
-        trt_out = trt_module(*inputs)
-        torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+        torch.testing.assert_close(
+            model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    def test_force_causal_efficient_attention_keeps_block_causal_mask(self):
+        # Complex RoPE makes the complex lowering retrace scaled_dot_product_attention
+        # into efficient attention, with the block-causal mask as its attn_bias.
+        seq, block = 98, 49
+
+        class RopeBlockCausalAttention(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "freqs", torch.polar(torch.ones(seq, 8), torch.randn(seq, 8))
+                )
+
+            def forward(self, x):
+                q = torch.view_as_complex(x.reshape(seq, 8, 2)) * self.freqs
+                q = torch.view_as_real(q).reshape(1, 1, seq, 16)
+                frame = torch.arange(seq, device=x.device) // block
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, q, q, attn_mask=frame[:, None] >= frame[None]
+                )
+
+        x = torch.randn(seq, 16).cuda()
+        model = RopeBlockCausalAttention().cuda().eval()
+        trt_module = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            [x],
+            min_block_size=1,
+            disable_tf32=True,
+            attn_bias_is_causal=True,
+        )
+        torch.testing.assert_close(model(x), trt_module(x), rtol=1e-3, atol=1e-3)
 
     def test_force_causal_efficient_attention_with_non_causal_attn_bias(self):
         class RewriteEfficientAttention(torch.nn.Module):

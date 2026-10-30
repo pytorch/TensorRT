@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+from typing import Dict, Optional, Set
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -17,8 +18,10 @@ def force_causal_efficient_attention(
 ) -> torch.fx.GraphModule:
     """Force efficient-attention calls to causal mode when enabled in settings.
 
-    For square attention (seq_q == seq_k): replaces attn_bias with is_causal=True
-    so IAttentionLayer can use its native causal path.
+    For square attention (seq_q == seq_k) whose attn_bias is proven to be a causal
+    mask: replaces attn_bias with is_causal=True so IAttentionLayer can use its
+    native causal path. Any other attn_bias, such as a block-causal or padding mask,
+    is kept as it is.
 
     For decode-phase attention (seq_q != seq_k): skip the transformation.
     Applying is_causal=True is semantically wrong because it creates a lower-triangular
@@ -53,6 +56,12 @@ def force_causal_efficient_attention(
             )
             continue
 
+        if not _is_proven_causal(gm, attn_bias, query_meta, key_meta):
+            logger.debug(
+                f"Keeping attn_bias of node {node} because it is not proven to be a causal mask"
+            )
+            continue
+
         node.args = (
             node.args[0],
             node.args[1],
@@ -70,3 +79,62 @@ def force_causal_efficient_attention(
 
     logger.debug(f"After forcing causal efficient attention pass:\n{gm.graph}")
     return gm
+
+
+def _is_proven_causal(
+    gm: torch.fx.GraphModule,
+    attn_bias: torch.fx.Node,
+    query_meta: Optional[torch.Tensor],
+    key_meta: Optional[torch.Tensor],
+) -> bool:
+    """Whether attn_bias is a causal mask for every input.
+
+    That holds only when the bias depends on no graph input, so its value can be
+    computed here once, and that value keeps exactly the lower triangle (0) and
+    blocks the rest (-inf, or the dtype's lowest value as Hugging Face uses).
+    """
+    if query_meta is None or key_meta is None:
+        return False
+    seq_len = query_meta.size(-2)
+    if not isinstance(seq_len, int) or seq_len != key_meta.size(-2):
+        return False
+
+    producers: Set[torch.fx.Node] = set()
+    to_visit = [attn_bias]
+    while to_visit:
+        current = to_visit.pop()
+        if current in producers:
+            continue
+        if current.op not in ("call_function", "get_attr") or current.is_impure():
+            return False
+        producers.add(current)
+        to_visit.extend(current.all_input_nodes)
+
+    graph = torch.fx.Graph()
+    copies: Dict[torch.fx.Node, torch.fx.Node] = {}
+    for current in gm.graph.nodes:
+        if current in producers:
+            copies[current] = graph.node_copy(current, lambda n: copies[n])
+    graph.output(copies[attn_bias])
+    try:
+        bias = torch.fx.GraphModule(gm, graph)()
+    except Exception as e:
+        logger.debug(f"Could not compute attn_bias {attn_bias}: {e}")
+        return False
+
+    if not isinstance(bias, torch.Tensor) or not bias.is_floating_point():
+        return False
+    try:
+        shape = torch.broadcast_shapes(bias.shape, (seq_len, seq_len))
+    except RuntimeError:
+        return False
+    if shape[-2:] != (seq_len, seq_len):
+        return False
+    # A broadcast dimension repeats one slice, so checking that slice is enough.
+    bias = bias[tuple(slice(0, 1) if st == 0 else slice(None) for st in bias.stride())]
+    keep = torch.ones(seq_len, seq_len, dtype=torch.bool, device=bias.device).tril()
+    keep = keep.expand(torch.broadcast_shapes(bias.shape, keep.shape))
+    bias = bias.expand(keep.shape)
+    return torch.equal(bias == 0, keep) and torch.equal(
+        bias <= torch.finfo(bias.dtype).min, ~keep
+    )
