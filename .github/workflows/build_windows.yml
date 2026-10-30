@@ -162,8 +162,6 @@ jobs:
           if ($missing.Count -gt 0) {
             throw "Missing or empty Azure secrets: $($missing -join ', ')"
           }
-          # GitHub masks this value because it is stored as a secret.
-          Write-Host "Azure tenant ID: $env:AZURE_TENANT_ID"
 
       - name: Log in to Azure using GitHub OIDC
         uses: azure/login@v3
