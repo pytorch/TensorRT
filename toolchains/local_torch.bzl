@@ -6,8 +6,12 @@
 This avoids hardcoding torch's install path in MODULE.bazel, making the build
 portable across machines regardless of Python version or venv location.
 
+The `package` attribute selects the pip package to locate (default "torch");
+e.g. package = "torch_tensorrt" with its own `build_file` for a prebuilt
+torch_tensorrt install.
+
 Discovery order:
-  1. TORCH_PATH env var  — absolute path to the torch package directory
+  1. TORCH_PATH env var (package = "torch" only)  — absolute path to the torch package directory
   2. VIRTUAL_ENV env var  — virtualenv / uv venv ($VIRTUAL_ENV/bin/python3)
   3. CONDA_PREFIX env var — conda environment ($CONDA_PREFIX/bin/python3)
   4. .venv/bin/python3 relative to the workspace root (uv / virtualenv default)
@@ -58,8 +62,10 @@ def _find_python(ctx):
     return None
 
 def _local_torch_impl(ctx):
+    package = ctx.attr.package
+
     # 1. Env-var override (takes priority over auto-detection)
-    torch_dir = ctx.os.environ.get("TORCH_PATH", "").strip()
+    torch_dir = ctx.os.environ.get("TORCH_PATH", "").strip() if package == "torch" else ""
 
     if not torch_dir:
         python = _find_python(ctx)
@@ -70,20 +76,20 @@ def _local_torch_impl(ctx):
                 "directory containing torch (e.g. /path/to/.venv/lib/pythonX.Y/site-packages/torch).",
             )
         result = ctx.execute(
-            [python, "-c", "import torch, os; print(os.path.dirname(torch.__file__))"],
+            [python, "-c", "import importlib.util; print(importlib.util.find_spec('%s').submodule_search_locations[0])" % package],
         )
         if result.return_code != 0:
-            fail("Failed to get torch path from python: " + result.stderr)
+            fail("Failed to get " + package + " path from python: " + result.stderr)
         torch_dir = result.stdout.strip()
 
     if not torch_dir:
-        fail("Torch path is empty. Set TORCH_PATH or ensure torch is installed in the active Python.")
+        fail(package + " path is empty. Set TORCH_PATH or ensure torch is installed in the active Python.")
 
     torch_path = ctx.path(torch_dir)
 
     # Validate that the installation has the expected C++ headers.
     c10_include = torch_path.get_child("include").get_child("c10")
-    if not c10_include.exists:
+    if package == "torch" and not c10_include.exists:
         fail(
             "torch at '" + torch_dir + "' is missing include/c10/ C++ headers. " +
             "Install a full PyTorch wheel (pip install torch) that includes dev headers, " +
@@ -96,9 +102,13 @@ def _local_torch_impl(ctx):
         if child.exists:
             ctx.symlink(child, sub)
 
-    ctx.file("BUILD", ctx.read(Label("@//third_party/libtorch:BUILD")))
+    ctx.file("BUILD", ctx.read(ctx.attr.build_file))
 
 local_torch = repository_rule(
     implementation = _local_torch_impl,
+    attrs = {
+        "build_file": attr.label(default = "@//third_party/libtorch:BUILD"),
+        "package": attr.string(default = "torch"),
+    },
     environ = ["TORCH_PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "PATH", "HOME"],
 )
