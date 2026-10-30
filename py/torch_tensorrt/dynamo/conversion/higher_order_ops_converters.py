@@ -51,10 +51,16 @@ def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
     """True if every computational node in ``gm`` (and nested cond branches) can run in TensorRT.
 
     A node needs a converter, and must not make a uint8 tensor, which the partitioners
-    keep in PyTorch for nodes outside a branch.
+    keep in PyTorch for nodes outside a branch. A branch input must not be uint8 either.
     """
     for node in gm.graph.nodes:
-        if node.op in ("placeholder", "output"):
+        if node.op == "placeholder":
+            # A branch input comes from an IIfConditional input layer, and TensorRT
+            # allows uint8 only at engine inputs and outputs.
+            if getattr(node.meta.get("val"), "dtype", None) == torch.uint8:
+                return False
+            continue
+        if node.op == "output":
             continue
         if node.op == "get_attr":
             try:
