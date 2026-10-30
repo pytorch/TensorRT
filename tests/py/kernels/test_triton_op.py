@@ -697,6 +697,93 @@ class TestTritonOpIntegration:
             # The plugin is declined, so this runs in PyTorch — and is correct.
             assert torch.allclose(trt(x), x + 1, atol=1e-2, rtol=1e-2)
 
+    def test_registering_after_an_engine_build_is_silent_in_fresh_process(
+        self, tmp_path
+    ):
+        """Name-availability probes must not log TensorRT "Cannot find plugin" errors.
+
+        Once an engine has been built TensorRT has a logger, and ``get_creator`` logs an API usage error on every
+        miss, which is what registering a not-yet-registered op does.
+        """
+        child = tmp_path / "register_after_build.py"
+        child.write_text(textwrap.dedent("""
+            import tensorrt.plugin as trtp
+            import torch
+            import triton
+            import triton.language as tl
+
+            import torch_tensorrt
+            import torch_tensorrt.kernels as ttk
+
+
+            @triton.jit
+            def add_one_kernel(x_ptr, n, y_ptr, BLOCK: tl.constexpr):
+                off = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+                mask = off < n
+                tl.store(y_ptr + off, tl.load(x_ptr + off, mask=mask) + 1, mask=mask)
+
+
+            def meta(x: torch.Tensor) -> torch.Tensor:
+                return torch.empty_like(x)
+
+
+            def register(name):
+                ttk.triton_op(
+                    f"ttk_test::{name}",
+                    kernel=add_one_kernel,
+                    signature={"x_ptr": "*fp32", "n": "i32", "y_ptr": "*fp32"},
+                    constexprs={"BLOCK": 256},
+                    grid=lambda i, o: (trtp.cdiv(i[0].shape_expr.numel(), 256),),
+                    meta_fn=meta,
+                    extra_args_fn=lambda i, o: [trtp.SymInt32(i[0].shape_expr.numel())],
+                )
+                return getattr(torch.ops.ttk_test, name)
+
+
+            class Wrap(torch.nn.Module):
+                def __init__(self, op):
+                    super().__init__()
+                    self.op = op
+
+                def forward(self, x):
+                    return self.op(x)
+
+
+            x = torch.randn(4, 256, device="cuda")
+            first = register("add_one_first")
+            torch_tensorrt.compile(Wrap(first).cuda().eval(), inputs=[x], min_block_size=1)
+            # Only now does TensorRT have a logger, so a failed creator lookup would be reported.
+            second = register("add_one_second")
+            compiled = torch_tensorrt.compile(
+                Wrap(second).cuda().eval(), inputs=[x], min_block_size=1
+            )
+            torch.testing.assert_close(compiled(x), x + 1)
+            print("late-registration-ok")
+            """))
+        result = subprocess.run(
+            [sys.executable, str(child)],
+            text=True,
+            capture_output=True,
+            timeout=300,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"fresh-process stdout:\n{result.stdout}\n"
+            f"fresh-process stderr:\n{result.stderr}"
+        )
+        assert "late-registration-ok" in result.stdout
+        assert "Cannot find plugin" not in result.stdout + result.stderr
+
+    def test_native_creator_finds_only_registered_plugins(self):
+        from torch_tensorrt.kernels._qdp import _native_creator
+
+        _register_add_one("ttk_test::triton_add_one_lookup")
+        creator = _native_creator("triton_add_one_lookup", "ttk_test")
+        assert creator is not None
+        assert creator.name == "triton_add_one_lookup"
+        assert creator.plugin_namespace == "ttk_test"
+        assert _native_creator("triton_add_one_unregistered", "ttk_test") is None
+
     def test_serialized_engine_runs_without_triton_in_fresh_process(self, tmp_path):
         """The AOT engine embeds PTX and needs no Triton/Python callback at runtime."""
         op_name = "ttk_test::triton_add_one_serialized"
