@@ -189,7 +189,59 @@ def fmod(
         input,
         prod_value,
     )
-    return sub_value
+    if sub_value.dtype not in (trt.float32, trt.float16, trt.bfloat16):
+        return sub_value
+
+    # trunc_div rounds input / other before truncating it, so a quotient just below a
+    # whole number comes out one too large and the result takes the sign opposite to
+    # input: fmod(4.2, 1.4) gave -1.2e-07 instead of 1.4. Add |other| back in that case.
+    dtype = _enums.dtype._from(sub_value.dtype).to(torch.dtype)
+    input = get_trt_tensor(ctx, input, f"{name}_input_tensor", dtype=dtype)
+    other = get_trt_tensor(ctx, other, f"{name}_other_tensor", dtype=dtype)
+    input_sign = sign(ctx, target, source_ir, f"{name}_input_sign", input)
+    sub_sign = sign(ctx, target, source_ir, f"{name}_sub_sign", sub_value)
+    signs = convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_signs",
+        trt.ElementWiseOperation.PROD,
+        input_sign,
+        sub_sign,
+    )
+    overshoot = convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_overshoot",
+        trt.ElementWiseOperation.LESS,
+        signs,
+        0,
+    )
+    abs_other = convert_unary(
+        ctx, target, source_ir, f"{name}_abs_other", trt.UnaryOperation.ABS, other
+    )
+    step = convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_step",
+        trt.ElementWiseOperation.PROD,
+        input_sign,
+        abs_other,
+    )
+    corrected = convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_corrected",
+        trt.ElementWiseOperation.SUM,
+        sub_value,
+        step,
+    )
+    return impl.condition.where(
+        ctx, target, source_ir, f"{name}_where", corrected, sub_value, overshoot
+    )
 
 
 def remainder(
