@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=761e1aad"></script>
+    <script src="../../../_static/documentation_options.js?v=8d39718d"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -701,8 +701,9 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
@@ -904,12 +905,16 @@ document.write(`
 
     <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
+    <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="c1"># Complex lowering can return a new module without the weights that only</span>
+        <span class="c1"># constant folding read, so offload the module lowering started from too.</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">unlowered_gm</span><span class="p">)</span>
         <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
@@ -1115,8 +1120,9 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
@@ -1387,6 +1393,7 @@ document.write(`
 
     <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
+    <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
@@ -1399,6 +1406,9 @@ document.write(`
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="c1"># Complex lowering can return a new module without the weights that only</span>
+        <span class="c1"># constant folding read, so offload the module lowering started from too.</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">unlowered_gm</span><span class="p">)</span>
         <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
@@ -2583,8 +2593,9 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>

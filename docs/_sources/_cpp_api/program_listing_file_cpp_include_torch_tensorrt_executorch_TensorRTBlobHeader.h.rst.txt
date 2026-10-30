@@ -46,6 +46,7 @@ Program Listing for File TensorRTBlobHeader.h
      bool hardware_compatible = false; 
      int device_id = 0; 
      std::string engine_key; 
+     std::string tensorrt_version; 
    
      static const void* engine_data(const void* blob, const TensorRTBlobHeader& h);
    
