@@ -1,0 +1,158 @@
+
+.. _program_listing_file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h:
+
+Program Listing for File OptimizationProfileSelection.h
+=======================================================
+
+|exhale_lsh| :ref:`Return to documentation for file <file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h>` (``cpp/include/torch_tensorrt/executorch/OptimizationProfileSelection.h``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. code-block:: cpp
+
+   /*
+    * Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+    *
+    * This source code is licensed under the BSD-style license found in the
+    * LICENSE file in the root directory of this source tree.
+    */
+   
+   #pragma once
+   
+   #include <NvInfer.h>
+   
+   #include <cstdint>
+   #include <limits>
+   #include <type_traits>
+   #include <vector>
+   
+   namespace torch_tensorrt {
+   namespace executorch_backend {
+   
+   struct InputProfileBounds {
+     nvinfer1::Dims min{}; 
+     nvinfer1::Dims max{}; 
+   };
+   
+   struct ProfileTable {
+     std::vector<std::vector<InputProfileBounds>> bounds;
+     int32_t active = 0;
+   
+     int32_t size() const {
+       return static_cast<int32_t>(bounds.size());
+     }
+   };
+   
+   enum class ProfileRequest {
+     kUnset, 
+     kPinned, 
+     kAuto, 
+   };
+   
+   enum class ProfileSelection {
+     kOk, 
+   
+     kPinIgnoredSingleProfile,
+     kRequestedProfileUnavailable,
+     kNoProfileMatchesInputs,
+   };
+   
+   template <typename T>
+   constexpr int32_t to_profile_index(T index) {
+     static_assert(std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>);
+     constexpr auto kMax = std::numeric_limits<int32_t>::max();
+     if constexpr (std::is_signed_v<T>) {
+       return index >= std::numeric_limits<int32_t>::min() && index <= kMax ? static_cast<int32_t>(index) : -1;
+     } else {
+       return index <= static_cast<std::make_unsigned_t<int32_t>>(kMax) ? static_cast<int32_t>(index) : -1;
+     }
+   }
+   
+   inline bool dims_fit(const nvinfer1::Dims& dims, const InputProfileBounds& bounds) {
+     // Both bounds, not just min: the loop below reads max.d up to dims.nbDims, and
+     // a max of a different rank leaves those extents holding whatever the Dims was
+     // built with rather than a bound this profile ever declared.
+     if (dims.nbDims != bounds.min.nbDims || dims.nbDims != bounds.max.nbDims) {
+       return false;
+     }
+     for (int d = 0; d < dims.nbDims; ++d) {
+       if (dims.d[d] < bounds.min.d[d] || dims.d[d] > bounds.max.d[d]) {
+         return false;
+       }
+     }
+     return true;
+   }
+   
+   inline bool profile_fits(const ProfileTable& table, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
+     if (profile < 0 || profile >= table.size()) {
+       return false;
+     }
+     const auto& bounds = table.bounds[static_cast<size_t>(profile)];
+     if (bounds.size() < input_dims.size()) {
+       return false;
+     }
+     for (size_t i = 0; i < input_dims.size(); ++i) {
+       if (!dims_fit(input_dims[i], bounds[i])) {
+         return false;
+       }
+     }
+     return true;
+   }
+   
+   inline ProfileSelection select_profile(
+       const ProfileTable& table,
+       ProfileRequest request,
+       int32_t index,
+       const std::vector<nvinfer1::Dims>& input_dims,
+       int32_t& selected) {
+     // init() rejects an engine reporting no profiles, so this is unreachable in the
+     // backend. Checked here so the policy is safe to call on its own rather than on
+     // the strength of a guard in another translation unit.
+     if (table.bounds.empty()) {
+       return ProfileSelection::kNoProfileMatchesInputs;
+     }
+   
+     if (request == ProfileRequest::kUnset) {
+       selected = 0;
+       return ProfileSelection::kOk;
+     }
+   
+     if (request == ProfileRequest::kAuto) {
+       // Sticky first-fit: keep the loaded profile while it still fits, so shapes
+       // that alternate between two equally valid profiles don't thrash the
+       // context. Only rescan from 0 once it stops fitting. Overlapping profiles
+       // therefore resolve by history, not by lowest index; pin explicitly when
+       // that matters.
+       if (profile_fits(table, table.active, input_dims)) {
+         selected = table.active;
+         return ProfileSelection::kOk;
+       }
+       for (int32_t p = 0; p < table.size(); ++p) {
+         if (profile_fits(table, p, input_dims)) {
+           selected = p;
+           return ProfileSelection::kOk;
+         }
+       }
+       return ProfileSelection::kNoProfileMatchesInputs;
+     }
+   
+     if (index >= 0 && index < table.size()) {
+       selected = index;
+       return ProfileSelection::kOk;
+     }
+   
+     // A single-profile engine has no choice to get wrong: profile 0 is the only
+     // thing it can run, whether or not its shapes are dynamic. So a pin aimed at a
+     // multi-profile sibling in the same method must not fail it. An engine with
+     // several profiles is different -- substituting one would be a guess -- so an
+     // index it lacks stays an error there.
+     if (index > 0 && table.size() == 1) {
+       selected = 0;
+       return ProfileSelection::kPinIgnoredSingleProfile;
+     }
+   
+     return ProfileSelection::kRequestedProfileUnavailable;
+   }
+   
+   } // namespace executorch_backend
+   } // namespace torch_tensorrt

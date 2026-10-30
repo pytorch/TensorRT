@@ -83,8 +83,8 @@ cc_library(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-        ":rtx_win_arm64": "lib/tensorrt_rtx_1_6.lib",
-        ":rtx_win_x86_64": "lib/tensorrt_rtx_1_6.lib",
+        ":rtx_win_arm64": "lib/tensorrt_rtx_1_7.lib",
+        ":rtx_win_x86_64": "lib/tensorrt_rtx_1_7.lib",
     }),
     visibility = ["//visibility:private"],
 )
@@ -93,8 +93,8 @@ cc_import(
     name = "nvinfer_lib",
     shared_library = select({
         ":rtx_sbsa": "lib/libtensorrt_rtx.so",
-        ":rtx_win_arm64": "bin/tensorrt_rtx_1_6.dll",
-        ":rtx_win_x86_64": "bin/tensorrt_rtx_1_6.dll",
+        ":rtx_win_arm64": "bin/tensorrt_rtx_1_7.dll",
+        ":rtx_win_x86_64": "bin/tensorrt_rtx_1_7.dll",
         ":rtx_x86_64": "lib/libtensorrt_rtx.so",
     }),
     visibility = ["//visibility:private"],

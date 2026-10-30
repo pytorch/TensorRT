@@ -9,6 +9,10 @@ File TensorRTBlobHeader.h
 .. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
 
 
+
+The TR01/TR02/TR03 processed-blob layout the ExecuTorch delegate is handed. 
+ 
+
 .. contents:: Contents
    :local:
    :backlinks: none
@@ -23,6 +27,11 @@ Definition (``cpp/include/torch_tensorrt/executorch/TensorRTBlobHeader.h``)
    program_listing_file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h.rst
 
 
+
+Detailed Description
+--------------------
+
+Written by py/torch_tensorrt/executorch/serialization.py: a 32-byte fixed header carrying a magic and four offset/size fields, then JSON metadata, then the serialized TensorRT engine. The magic is ``TR03`` when the engine is stored as named data (``engine_key``) and the blob carries none, otherwise ``TR02`` when the metadata carries ``aliased_io`` entries and ``TR01`` when it does not; the layout is the same. Deliberately standalone, so loading a ``.pte`` needs neither the legacy Torch-TensorRT C++ runtime nor libtorch. 
 
 
 

@@ -9,6 +9,7 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     scaled_dot_product_attention_validator,
 )
 from torch_tensorrt.dynamo.lowering._decompositions import (
+    get_decompositions,
     scaled_dot_product_attention_decomposition,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -47,18 +48,29 @@ def _inline_traced_decomp(
     gm: torch.fx.GraphModule,
     node: torch.fx.Node,
     decomp_fn: Callable[..., Any],
-    use_fp32_acc: bool,
+    settings: CompilationSettings,
 ) -> None:
     """Replace ``node`` with the aten subgraph from tracing ``decomp_fn``."""
 
     example_args = tuple(_example_val(a) for a in node.args)
     example_kwargs = {k: _example_val(v) for k, v in node.kwargs.items()}
-    example_kwargs["use_fp32_acc"] = use_fp32_acc
+    example_kwargs["use_fp32_acc"] = settings.use_fp32_acc
 
     def wrapped(*args: Any) -> Any:
         return decomp_fn(*args, **example_kwargs)
 
-    traced = make_fx(wrapped, tracing_mode="fake")(*example_args)
+    # Lowered with the same table as the rest of the graph: this pass runs after decomposition, and ops such
+    # as aten.transpose.int have no converter of their own, so they would be left to PyTorch.
+    traced = make_fx(
+        wrapped,
+        decomposition_table=get_decompositions(
+            settings.enable_experimental_decompositions,
+            settings.decompose_attention,
+            settings.use_distributed_mode_trace,
+            settings.use_fp32_acc,
+        ),
+        tracing_mode="fake",
+    )(*example_args)
 
     arg_nodes = list(node.args)
     env: Dict[torch.fx.Node, Any] = {}
@@ -108,8 +120,10 @@ def decompose_unsupported_attention(
     if settings.decompose_attention:
         return gm
 
-    changed = False
-    for node in list(gm.graph.nodes):
+    # Decide for every node before changing the graph: whether a node is supported can depend on the other
+    # attention nodes, such as two that read the same query.
+    declined = []
+    for node in gm.graph.nodes:
         if node.op != "call_function" or node.target not in _ATTENTION_FALLBACKS:
             continue
 
@@ -119,16 +133,16 @@ def decompose_unsupported_attention(
             continue
 
         validator, decomp = _ATTENTION_FALLBACKS[node.target]
-        if validator(node, settings):
-            continue
+        if not validator(node, settings):
+            declined.append((node, decomp))
 
+    for node, decomp in declined:
         logger.info(
-            "Attention converter declined %s; decomposing that node in place "
-            "(native IAttention kept for other attention nodes)",
+            "Attention converter declined %s; decomposing that node in place",
             node.name,
         )
-        _inline_traced_decomp(gm, node, decomp, settings.use_fp32_acc)
-        changed = True
+        _inline_traced_decomp(gm, node, decomp, settings)
+    changed = bool(declined)
 
     if changed:
         gm = clean_up_graph_after_modifications(gm)

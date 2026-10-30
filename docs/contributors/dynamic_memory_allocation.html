@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=d9553575"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -532,9 +532,10 @@ PyTorch module. When multiple TRT-accelerated submodules are loaded simultaneous
 resident GPU memory can exceed the device limit even if each module runs
 sequentially.</p>
 <p>The solution is <strong>dynamic memory allocation</strong>: instead of allocating device memory
-for an engine when it is loaded, allocation is deferred to execution time. The
-memory is released immediately after inference completes, so only one engine holds
-GPU activation memory at a time.</p>
+for an engine when it is loaded, allocation is deferred to execution time. In the
+C++ runtime, the memory is released when the call returns, so engines that run one
+after another do not hold activation memory at the same time. See Limitations for
+the cases that keep memory between calls.</p>
 </section>
 <section id="user-api">
 <h2>User API<a class="headerlink" href="#user-api" title="Link to this heading">#</a></h2>
@@ -553,9 +554,9 @@ GPU activation memory at a time.</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;static&quot;</span></code> (default) — device memory is allocated when the engine is loaded
 (via <code class="docutils literal notranslate"><span class="pre">createExecutionContext</span></code>). Memory is held for the lifetime of the engine.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;dynamic&quot;</span></code> — device memory is allocated on each forward pass
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;dynamic&quot;</span></code> — device memory is allocated at execution time instead of load time
 (via <code class="docutils literal notranslate"><span class="pre">createExecutionContextWithoutDeviceMemory</span></code> + manual device-memory
-assignment), and released immediately after the call returns.</p></li>
+assignment). See Limitations for how long each runtime keeps it.</p></li>
 </ul>
 </section>
 <section id="internal-implementation">
@@ -590,7 +591,7 @@ context is created <em>without</em> device memory:</p>
 <span class="w">        </span><span class="n">exec_ctx_</span><span class="o">-&gt;</span><span class="n">setDeviceMemory</span><span class="p">(</span><span class="n">dynamic_workspace</span><span class="p">.</span><span class="n">data_ptr</span><span class="p">());</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="c1">// ... run inference ...</span>
-<span class="w">    </span><span class="c1">// dynamic_workspace freed here (goes out of scope)</span>
+<span class="w">    </span><span class="c1">// dynamic_workspace is freed here, unless a captured CUDA graph keeps it</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -610,6 +611,11 @@ during inference — it only reduces the memory that is <em>resident</em> when t
 engine is idle.</p></li>
 <li><p>The per-inference allocation/free overhead is small but non-zero; avoid dynamic
 allocation for latency-critical paths where <code class="docutils literal notranslate"><span class="pre">static</span></code> would fit in memory.</p></li>
+<li><p>With CUDA graphs on, the C++ runtime keeps an engine’s memory for as long as its
+captured graph, because a replay writes to the memory the graph was recorded with.</p></li>
+<li><p>The Python runtime keeps each engine’s memory from its last call, with or without
+CUDA graphs, until a later call replaces it or a settings change drops it.</p></li>
+<li><p>So in both cases, several engines can hold their memory at the same time.</p></li>
 </ul>
 </section>
 <section id="related">

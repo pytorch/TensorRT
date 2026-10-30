@@ -9,6 +9,7 @@
 // every SharedEnginesTest case skips, and TORCHTRT_EXECUTORCH_REQUIRE_CUDA=1 turns that skip into a
 // failure. If TensorRT cannot build the engines, every fixture case fails. The other suites need no device.
 
+#include "torch_tensorrt/executorch/EngineHandle.h"
 #include "torch_tensorrt/executorch/SharedEngineKey.h"
 #include "torch_tensorrt/executorch/SharedEngineTestHooks.h"
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
@@ -16,6 +17,7 @@
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/runtime/core/named_data_map.h>
 #include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
 
@@ -26,6 +28,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <future>
+#include <map>
 #include <thread>
 
 namespace {
@@ -53,7 +56,6 @@ constexpr char kRequireCudaEnvVar[] = "TORCHTRT_EXECUTORCH_REQUIRE_CUDA";
 // A square matmul against a constant matrix: the constant is the weights the engines share, and
 // it is large enough for weight streaming to have something to stream.
 constexpr int kDim = 512;
-constexpr std::size_t kMatElems = static_cast<std::size_t>(kDim) * kDim;
 constexpr int kMaxBatch = 64;
 
 // Bounds every wait for another thread, so a partner that never arrives fails the case by name
@@ -109,11 +111,89 @@ std::vector<std::uint8_t> rewrap(const std::vector<std::uint8_t>& blob, const st
   return wrap_engine_plan(blob.data() + offset, blob.size() - offset, metadata);
 }
 
+// An engine stored as named data: a TR03 blob that names the entry and carries no engine bytes.
+std::vector<std::uint8_t> named_engine_blob(const std::string& key) {
+  static constexpr std::uint8_t kNoEngine = 0;
+  const std::string metadata = blob_metadata(0);
+  auto blob =
+      wrap_engine_plan(&kNoEngine, 0, metadata.substr(0, metadata.size() - 1) + R"(,"engine_key":")" + key + "\"}");
+  std::memcpy(blob.data(), "TR03", 4);
+  return blob;
+}
+
+// A program's named data, held in memory. Counts the buffers it handed out that were freed, so a case
+// can check that init releases its host copy of an engine once the engine is loaded. A read error
+// other than Ok fails every read with it, like a .ptd file that cannot be read.
+class InMemoryNamedData : public NamedDataMap {
+ public:
+  explicit InMemoryNamedData(Error read_error = Error::Ok) : read_error_(read_error) {}
+  void add(const std::string& key, std::vector<std::uint8_t> bytes) {
+    entries_[key] = std::move(bytes);
+  }
+  int freed() const {
+    return freed_.load();
+  }
+
+  Result<const TensorLayout> get_tensor_layout(std::string_view) const override {
+    return Error::NotImplemented;
+  }
+  Result<FreeableBuffer> get_data(std::string_view key) const override {
+    if (read_error_ != Error::Ok) {
+      return read_error_;
+    }
+    const auto it = entries_.find(std::string(key));
+    if (it == entries_.end()) {
+      return Error::NotFound;
+    }
+    return FreeableBuffer(
+        it->second.data(),
+        it->second.size(),
+        [](void* context, void*, size_t) { static_cast<std::atomic<int>*>(context)->fetch_add(1); },
+        &freed_);
+  }
+  Error load_data_into(std::string_view, void*, size_t) const override {
+    return Error::NotImplemented;
+  }
+  Result<uint32_t> get_num_keys() const override {
+    return static_cast<uint32_t>(entries_.size());
+  }
+  Result<const char*> get_key(uint32_t index) const override {
+    if (index >= entries_.size()) {
+      return Error::InvalidArgument;
+    }
+    return std::next(entries_.begin(), index)->first.c_str();
+  }
+
+ private:
+  std::map<std::string, std::vector<std::uint8_t>> entries_;
+  Error read_error_;
+  mutable std::atomic<int> freed_{0};
+};
+
 struct BuildOptions {
   float weight_scale = 1.0f;
   bool dynamic_batch = false;
   bool weight_streaming = false;
+  bool strip_weights = false;
+  int dim = kDim;
+  // False builds relu(input) alone: an engine with no weights at all.
+  bool weights = true;
+  // The refit flag that strip_weights or refittable sets. kREFIT_INDIVIDUAL with no weight marked refittable
+  // leaves nothing to strip.
+  nvinfer1::BuilderFlag refit = nvinfer1::BuilderFlag::kREFIT;
+  // Sets refit without kSTRIP_PLAN, so the plan can be saved again without its weights.
+  bool refittable = false;
 };
+
+std::vector<float> matmul_weights(float weight_scale, int dim = kDim) {
+  std::vector<float> w(static_cast<std::size_t>(dim) * dim);
+  for (int i = 0; i < dim; ++i) {
+    for (int j = 0; j < dim; ++j) {
+      w[static_cast<std::size_t>(i) * dim + j] = weight_scale * static_cast<float>((i * 7 + j * 3) % 17 - 8) / 64.0f;
+    }
+  }
+  return w;
+}
 
 // output[b] = relu(input[b] x W), W[i][j] = weight_scale * ((i * 7 + j * 3) % 17 - 8) / 64.
 // Two engines that differ only in weight_scale differ only in their weight bytes, so they are the
@@ -131,24 +211,27 @@ std::vector<std::uint8_t> build_matmul_blob(const BuildOptions& options) {
     return {};
   }
   const std::int64_t batch = options.dynamic_batch ? -1 : 1;
-  nvinfer1::ITensor* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{batch, kDim});
-  // Read by buildSerializedNetwork, so it lives until this returns.
-  std::vector<float> w(kMatElems);
-  for (int i = 0; i < kDim; ++i) {
-    for (int j = 0; j < kDim; ++j) {
-      w[static_cast<std::size_t>(i) * kDim + j] =
-          options.weight_scale * static_cast<float>((i * 7 + j * 3) % 17 - 8) / 64.0f;
-    }
-  }
-  nvinfer1::IConstantLayer* weights = network->addConstant(
-      nvinfer1::Dims2{kDim, kDim},
-      nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(kMatElems)});
-  if (input == nullptr || weights == nullptr) {
+  nvinfer1::ITensor* input =
+      network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{batch, options.dim});
+  if (input == nullptr) {
     return {};
   }
-  nvinfer1::IMatrixMultiplyLayer* mm = network->addMatrixMultiply(
-      *input, nvinfer1::MatrixOperation::kNONE, *weights->getOutput(0), nvinfer1::MatrixOperation::kNONE);
-  nvinfer1::IActivationLayer* relu = network->addActivation(*mm->getOutput(0), nvinfer1::ActivationType::kRELU);
+  // Read by buildSerializedNetwork, so it lives until this returns.
+  const std::vector<float> w =
+      options.weights ? matmul_weights(options.weight_scale, options.dim) : std::vector<float>{};
+  nvinfer1::ITensor* product = input;
+  if (options.weights) {
+    nvinfer1::IConstantLayer* weights = network->addConstant(
+        nvinfer1::Dims2{options.dim, options.dim},
+        nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(w.size())});
+    if (weights == nullptr) {
+      return {};
+    }
+    nvinfer1::IMatrixMultiplyLayer* mm = network->addMatrixMultiply(
+        *input, nvinfer1::MatrixOperation::kNONE, *weights->getOutput(0), nvinfer1::MatrixOperation::kNONE);
+    product = mm->getOutput(0);
+  }
+  nvinfer1::IActivationLayer* relu = network->addActivation(*product, nvinfer1::ActivationType::kRELU);
   relu->getOutput(0)->setName("output_0");
   network->markOutput(*relu->getOutput(0));
 
@@ -164,6 +247,12 @@ std::vector<std::uint8_t> build_matmul_blob(const BuildOptions& options) {
   }
   if (options.weight_streaming) {
     config->setFlag(nvinfer1::BuilderFlag::kWEIGHT_STREAMING);
+  }
+  if (options.strip_weights || options.refittable) {
+    config->setFlag(options.refit);
+  }
+  if (options.strip_weights) {
+    config->setFlag(nvinfer1::BuilderFlag::kSTRIP_PLAN);
   }
   if (options.dynamic_batch) {
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
@@ -290,13 +379,15 @@ class Handle {
   // `budget` is a weight_streaming_budget compile spec, as export bakes it, or null for none.
   // The blob is copied first and the copy overwritten once init returns, so a handle that kept
   // pointing at the bytes it was loaded from would fail.
+  // `named_data` is the program's named data map, for a blob whose engine is stored there.
   Error load(
       const std::vector<std::uint8_t>& blob,
       const char* budget = nullptr,
-      Span<const BackendOption> options = {}) {
+      Span<const BackendOption> options = {},
+      const NamedDataMap* named_data = nullptr) {
     std::vector<std::uint8_t> bytes = blob;
     FreeableBuffer processed(bytes.data(), bytes.size(), nullptr);
-    BackendInitContext init_context(&arena_, nullptr, nullptr, nullptr, options);
+    BackendInitContext init_context(&arena_, nullptr, nullptr, named_data, options);
     CompileSpec spec{"weight_streaming_budget", {nullptr, 0}};
     if (budget != nullptr) {
       spec.value.buffer = const_cast<char*>(budget);
@@ -404,6 +495,7 @@ class SharedEnginesTest : public ::testing::Test {
     other_weights_blob_ = build_matmul_blob({0.5f, false, false});
     dynamic_blob_ = build_matmul_blob({1.0f, true, false});
     streaming_blob_ = build_matmul_blob({1.0f, false, true});
+    stripped_blob_ = build_matmul_blob({1.0f, false, false, true});
   }
 
   void SetUp() override {
@@ -418,7 +510,9 @@ class SharedEnginesTest : public ::testing::Test {
     last_trt_error.clear();
     load_error.clear();
     reported_trt_error.clear();
-    ASSERT_FALSE(blob_.empty() || other_weights_blob_.empty() || dynamic_blob_.empty() || streaming_blob_.empty())
+    ASSERT_FALSE(
+        blob_.empty() || other_weights_blob_.empty() || dynamic_blob_.empty() || streaming_blob_.empty() ||
+        stripped_blob_.empty())
         << "TensorRT could not build the fixture engines";
   }
 
@@ -426,12 +520,14 @@ class SharedEnginesTest : public ::testing::Test {
   static std::vector<std::uint8_t> other_weights_blob_;
   static std::vector<std::uint8_t> dynamic_blob_;
   static std::vector<std::uint8_t> streaming_blob_;
+  static std::vector<std::uint8_t> stripped_blob_;
 };
 
 std::vector<std::uint8_t> SharedEnginesTest::blob_;
 std::vector<std::uint8_t> SharedEnginesTest::other_weights_blob_;
 std::vector<std::uint8_t> SharedEnginesTest::dynamic_blob_;
 std::vector<std::uint8_t> SharedEnginesTest::streaming_blob_;
+std::vector<std::uint8_t> SharedEnginesTest::stripped_blob_;
 
 // Runs without a GPU, so a key that ignored the bytes, the device or the budget fails there too.
 // The size changes the hashed bytes as well, so dropping it alone cannot show without a collision.
@@ -510,6 +606,172 @@ TEST_F(SharedEnginesTest, EnginesWithDifferentWeightsOfTheSameSizeAreNotShared) 
   ASSERT_FALSE(out.empty());
   ASSERT_FALSE(out_other.empty());
   EXPECT_NE(out, out_other);
+}
+
+// A plan without its weights runs without an error and returns wrong results, so it has to fail the
+// load. Sharing on and off are two paths into the deserializer, and both must refuse it. The same
+// engine serialized with its weights is the control: it loads and matches the ordinary engine.
+TEST_F(SharedEnginesTest, APlanSerializedWithoutItsWeightsIsRefused) {
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(stripped_blob_), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(stripped_blob_, nullptr, {&private_load, 1}), Error::InvalidProgram);
+
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(stripped_blob_);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(stripped_blob_.data() + offset, stripped_blob_.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_GE(engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE), 0);
+  TRTUniquePtr<nvinfer1::IRefitter> refitter(nvinfer1::createInferRefitter(*engine, logger));
+  ASSERT_NE(refitter, nullptr);
+  const char* name = nullptr;
+  ASSERT_EQ(refitter->getAllWeights(1, &name), 1) << "the matmul has one refittable weight";
+  const std::vector<float> w = matmul_weights(1.0f);
+  ASSERT_TRUE(refitter->setNamedWeights(
+      name, nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(w.size())}));
+  ASSERT_TRUE(refitter->refitCudaEngine());
+  TRTUniquePtr<nvinfer1::ISerializationConfig> config(engine->createSerializationConfig());
+  config->clearFlag(nvinfer1::SerializationFlag::kEXCLUDE_WEIGHTS);
+  config->setFlag(nvinfer1::SerializationFlag::kINCLUDE_REFIT);
+  TRTUniquePtr<nvinfer1::IHostMemory> full(engine->serializeWithConfig(*config));
+  ASSERT_NE(full, nullptr);
+  const auto with_weights =
+      wrap_engine_plan(static_cast<const std::uint8_t*>(full->data()), full->size(), blob_metadata(0));
+
+  // Two builds may pick different kernels, so they agree only within rounding. A plan computing with
+  // placeholder weights misses by whole units.
+  Handle reference;
+  Handle restored;
+  ASSERT_EQ(reference.load(blob_), Error::Ok);
+  ASSERT_EQ(restored.load(with_weights), Error::Ok);
+  const auto expected = reference.run(1, 7);
+  const auto actual = restored.run(1, 7);
+  ASSERT_FALSE(expected.empty());
+  ASSERT_EQ(actual.size(), expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_NEAR(actual[i], expected[i], 1e-2f * (1.0f + std::abs(expected[i]))) << "element " << i;
+  }
+}
+
+// A small stripped matmul keeps 0 of its weight bytes, so it lacks its weights. Its total weight size
+// is not 0, which is what tells it apart from a plan with nothing to restore.
+TEST_F(SharedEnginesTest, AStrippedPlanThatReportsZeroIsRefused) {
+  const auto stripped = build_matmul_blob({1.0f, false, false, true, 64});
+  ASSERT_FALSE(stripped.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(stripped);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(stripped.data() + offset, stripped.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_EQ(engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE), 0);
+  ASSERT_GT(engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE), 0);
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(stripped), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(stripped, nullptr, {&private_load, 1}), Error::InvalidProgram);
+}
+
+// A stripped plan with no weights at all has nothing to restore and computes correctly, so it loads.
+TEST_F(SharedEnginesTest, AStrippedPlanWithNoWeightsLoads) {
+  const auto stripped = build_matmul_blob({1.0f, false, false, true, kDim, false});
+  ASSERT_FALSE(stripped.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(stripped);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(stripped.data() + offset, stripped.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_GE(engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE), 0);
+  ASSERT_EQ(engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE), 0);
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  ASSERT_EQ(shared.load(stripped), Error::Ok);
+  ASSERT_EQ(unshared.load(stripped, nullptr, {&private_load, 1}), Error::Ok);
+  const auto out = shared.run(1, 9);
+  ASSERT_EQ(out.size(), static_cast<std::size_t>(kDim));
+  for (std::size_t i = 0; i < out.size(); ++i) {
+    const float x = input_value(i, 9);
+    ASSERT_EQ(out[i], x > 0.0f ? x : 0.0f) << "element " << i;
+  }
+  EXPECT_EQ(unshared.run(1, 9), out);
+}
+
+// A stripped plan that had nothing to strip still holds all its weights and computes correctly, so it
+// loads. TensorRT reports its kept weight bytes as the total, not -1.
+TEST_F(SharedEnginesTest, AStrippedPlanThatKeptAllItsWeightsLoads) {
+  BuildOptions options;
+  options.strip_weights = true;
+  options.refit = nvinfer1::BuilderFlag::kREFIT_INDIVIDUAL;
+  const auto kept = build_matmul_blob(options);
+  ASSERT_FALSE(kept.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(kept);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(kept.data() + offset, kept.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_GT(engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE), 0);
+  ASSERT_EQ(
+      engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE),
+      engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE));
+  const BackendOption private_load = sharing_option(false);
+  Handle reference;
+  Handle shared;
+  Handle unshared;
+  ASSERT_EQ(reference.load(blob_), Error::Ok);
+  ASSERT_EQ(shared.load(kept), Error::Ok);
+  ASSERT_EQ(unshared.load(kept, nullptr, {&private_load, 1}), Error::Ok);
+  const auto expected = reference.run(1, 7);
+  const auto actual = shared.run(1, 7);
+  ASSERT_FALSE(expected.empty());
+  ASSERT_EQ(actual.size(), expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_NEAR(actual[i], expected[i], 1e-2f * (1.0f + std::abs(expected[i]))) << "element " << i;
+  }
+  EXPECT_EQ(unshared.run(1, 7), actual);
+}
+
+// A refittable plan saved with EXCLUDE_WEIGHTS, as Torch-TensorRT writes its engine cache, lacks its
+// weights just like a plan built with STRIP_PLAN.
+TEST_F(SharedEnginesTest, ARefittablePlanSavedWithoutItsWeightsIsRefused) {
+  BuildOptions options;
+  options.refittable = true;
+  const auto refittable = build_matmul_blob(options);
+  ASSERT_FALSE(refittable.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(refittable);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(refittable.data() + offset, refittable.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  TRTUniquePtr<nvinfer1::ISerializationConfig> config(engine->createSerializationConfig());
+  ASSERT_TRUE(config->setFlag(nvinfer1::SerializationFlag::kEXCLUDE_WEIGHTS));
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(engine->serializeWithConfig(*config));
+  ASSERT_NE(plan, nullptr);
+  const auto without_weights =
+      wrap_engine_plan(static_cast<const std::uint8_t*>(plan->data()), plan->size(), blob_metadata(0));
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(without_weights), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(without_weights, nullptr, {&private_load, 1}), Error::InvalidProgram);
+}
+
+// A .pte stores each engine as named data, which is where an exported stripped plan arrives from.
+TEST_F(SharedEnginesTest, AStrippedEngineStoredAsNamedDataIsRefused) {
+  InMemoryNamedData named;
+  named.add(
+      "tensorrt_engine_stripped",
+      std::vector<std::uint8_t>(stripped_blob_.begin() + plan_offset(stripped_blob_), stripped_blob_.end()));
+  Handle handle;
+  EXPECT_EQ(handle.load(named_engine_blob("tensorrt_engine_stripped"), nullptr, {}, &named), Error::InvalidProgram);
+  EXPECT_EQ(named.freed(), 1) << "refused before the engine was read, so the guard never ran";
 }
 
 TEST_F(SharedEnginesTest, TheEngineIsFreedWithItsLastHandle) {
@@ -1173,6 +1435,40 @@ TEST_F(SharedEnginesTest, AFailedRacingLoadSharesTheEnginePublishedWhileItWaited
   const auto reference = winner.run(1, 12);
   ASSERT_FALSE(reference.empty());
   EXPECT_EQ(loser.run(1, 12), reference);
+}
+
+// A .pte saved with each engine as named data: init reads the engine from the program's named data,
+// it runs like the same plan inline, and the host copy is released once the engine is loaded.
+TEST_F(SharedEnginesTest, AnEngineStoredAsNamedDataLoadsAndItsHostCopyIsFreed) {
+  InMemoryNamedData named;
+  named.add("tensorrt_engine_test", std::vector<std::uint8_t>(blob_.begin() + plan_offset(blob_), blob_.end()));
+  Handle inline_handle;
+  Handle named_handle;
+  ASSERT_EQ(inline_handle.load(blob_), Error::Ok);
+  ASSERT_EQ(named_handle.load(named_engine_blob("tensorrt_engine_test"), nullptr, {}, &named), Error::Ok);
+  EXPECT_EQ(named.freed(), 1) << "init kept its host copy of the engine";
+  EXPECT_EQ(named_handle.engine(), inline_handle.engine()) << "the same plan bytes should share one engine";
+  const auto reference = inline_handle.run(1, 3);
+  ASSERT_FALSE(reference.empty());
+  EXPECT_EQ(named_handle.run(1, 3), reference);
+}
+
+// The key comes from the blob, so a program whose named data lacks it, or that has none, fails at load.
+// With external_engine_data that is a program loaded without its .ptd file, hence InvalidExternalData.
+TEST_F(SharedEnginesTest, ANamedEngineTheProgramDoesNotHoldFailsToLoad) {
+  InMemoryNamedData named;
+  Handle missing_key;
+  EXPECT_EQ(
+      missing_key.load(named_engine_blob("tensorrt_engine_absent"), nullptr, {}, &named), Error::InvalidExternalData);
+  Handle no_named_data;
+  EXPECT_EQ(no_named_data.load(named_engine_blob("tensorrt_engine_absent")), Error::InvalidExternalData);
+}
+
+// Any other read failure keeps its own error, so the caller learns what actually went wrong.
+TEST_F(SharedEnginesTest, ANamedEngineKeepsItsReadError) {
+  InMemoryNamedData unreadable(Error::AccessFailed);
+  Handle handle;
+  EXPECT_EQ(handle.load(named_engine_blob("tensorrt_engine_test"), nullptr, {}, &unreadable), Error::AccessFailed);
 }
 
 } // namespace
