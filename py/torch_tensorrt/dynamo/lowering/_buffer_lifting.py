@@ -177,6 +177,13 @@ def _kv_write_will_alias(
     # copied back like any other non-aliasing write.
     if _write_op_is_torch_executed(value_node, settings):
         return False
+    # The partitioners keep a write that makes a uint8 tensor in PyTorch, too.
+    from torch_tensorrt.dynamo.partitioning._global_partitioner import (
+        TorchTensorRTOperatorSupport,
+    )
+
+    if TorchTensorRTOperatorSupport._makes_uint8_tensor(value_node):
+        return False
     # The KV layer aliases the cache only if it is a direct network input; after
     # lifting, the mutated buffer is a placeholder the write op reads from.
     if not (args and isinstance(args[0], torch.fx.Node)):

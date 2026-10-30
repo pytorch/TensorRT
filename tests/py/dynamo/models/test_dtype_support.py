@@ -294,6 +294,9 @@ class TestUInt8Support(TestCase):
             "unsqueeze": lambda image: image.unsqueeze(0),
             "slice": lambda image: image[2:6],
             "stack": lambda image: torch.stack([image, image]),
+            "partial slice_scatter": lambda image: torch.slice_scatter(
+                image, image[:2], 0, 2, 4
+            ),
         }
 
         class ImageModule(nn.Module):
@@ -317,6 +320,31 @@ class TestUInt8Support(TestCase):
                     reuse_cached_engines=False,
                 )
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
+
+    def test_uint8_buffer_write(self):
+        class Cache(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "cache", torch.zeros(1, 2, 8, 4, dtype=torch.uint8)
+                )
+
+            def forward(self, update):
+                self.cache[:, :, 2:4] = update
+                return self.cache.float() * 2
+
+        update = torch.randint(0, 256, (1, 2, 2, 4), dtype=torch.uint8, device="cuda")
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(Cache().cuda(), (update,)),
+            arg_inputs=[update],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(update)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, Cache().cuda()(update))
 
     def test_uint8_output(self):
         trt_mod = _build_engine(

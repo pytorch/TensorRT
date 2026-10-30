@@ -23,6 +23,10 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+    KVWriteStatus,
+    resolve_slice_scatter_write,
+)
 from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
@@ -206,11 +210,23 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         constants are packed FP4 weights that the quantization converters read
         themselves.
         """
-        if node.op not in CALLABLE_NODE_OPS or node.target in (
-            torch.ops.aten.clone.default,
-            torch.ops.aten.slice_scatter.default,
-        ):
+        if node.op not in CALLABLE_NODE_OPS:
             return False
+        if node.target == torch.ops.aten.clone.default:
+            return False
+        if node.target == torch.ops.aten.slice_scatter.default:
+            destination = getattr(node.args[0], "meta", {}).get("val")
+            if destination is not None:
+                args = node.args
+                *_, status = resolve_slice_scatter_write(
+                    tuple(destination.shape),
+                    args[2] if len(args) > 2 else 0,
+                    args[3] if len(args) > 3 else None,
+                    args[4] if len(args) > 4 else None,
+                    args[5] if len(args) > 5 else None,
+                )
+                if status is KVWriteStatus.FULL_OVERWRITE:
+                    return False
         leaves, _ = tree_flatten(node.meta.get("val"))
         return any(
             isinstance(leaf, torch.Tensor) and leaf.dtype == torch.uint8
