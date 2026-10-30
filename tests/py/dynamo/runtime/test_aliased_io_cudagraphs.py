@@ -43,7 +43,7 @@ class TestCudagraphsAliasedIO(TestCase):
     def tearDown(self):
         torch_tensorrt.runtime.set_cudagraphs_mode(False)
 
-    def _compile(self, model, args):
+    def _compile(self, model, args, **kwargs):
         ep = export(model, tuple(args))
         return torch_tensorrt.compile(
             ep,
@@ -52,6 +52,7 @@ class TestCudagraphsAliasedIO(TestCase):
             enabled_precisions={torch.float32},
             min_block_size=1,
             use_python_runtime=False,
+            **kwargs,
         )
 
     def test_user_input_kv_capture_and_replay(self):
@@ -89,6 +90,33 @@ class TestCudagraphsAliasedIO(TestCase):
             # Step 3: replay again. cache[3, :] becomes all 0s — sum = 0.
             cg(cache, torch.zeros(1, 4, 1, 8, device="cuda"))
             self.assertAlmostEqual(cache.sum().item(), 0.0, places=3)
+
+    def test_user_input_kv_whole_graph_capture_and_replay(self):
+        """With a graph break, enable_cudagraphs records the whole module in
+        one CUDA graph. The engine's in-place cache update must still land on
+        the caller's tensor at every replay, and an output in the cache must
+        be that tensor."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                cache[:, :, 3:4, :] = update
+                return cache, torch.relu(cache.sum() * 0.5)
+
+        cache_sample = torch.zeros(1, 4, 16, 8, device="cuda")
+        update_sample = torch.ones(1, 4, 1, 8, device="cuda")
+        compiled = self._compile(
+            M().cuda(),
+            (cache_sample.clone(), update_sample.clone()),
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+
+        with torch_tensorrt.runtime.enable_cudagraphs(compiled) as cg:
+            cache = torch.zeros(1, 4, 16, 8, device="cuda")
+            for value in (1.0, 5.0, 0.0):
+                out_cache, out = cg(cache, torch.full((1, 4, 1, 8), value).cuda())
+                self.assertAlmostEqual(cache.sum().item(), 32.0 * value, places=3)
+                self.assertAlmostEqual(out.item(), 16.0 * value, places=3)
+                self.assertEqual(out_cache.data_ptr(), cache.data_ptr())
 
     def test_buffer_kv_capture_and_replay(self):
         """Buffer-backed KV cache: the buffer lives on the compiled
