@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -470,6 +470,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/executorch.html">ExecuTorch Deployment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
@@ -964,6 +965,20 @@ converters. When combined with <code class="docutils literal notranslate"><span 
 keeps its intermediate calculation in FP32 and casts only the final output back
 to FP16.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>For attention where all query heads share one key/value head (multi-query
+attention), compute it against that one head instead of the copies that
+Hugging Face models make for each query head. TensorRT then runs two plain
+matrix products instead of its fused attention kernel. This can be faster or
+slower depending on the GPU, so measure it. In FP16 the result can round
+differently; <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> reduces that. Only static shapes are
+rewritten, and <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code> also needs
+<code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>. Both preserved matmuls and the reshape/<code class="docutils literal notranslate"><span class="pre">bmm</span></code>
+form produced by AOT tracing under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> are supported for
+<code class="docutils literal notranslate"><span class="pre">repeat_kv</span></code> style graphs. In the <code class="docutils literal notranslate"><span class="pre">bmm</span></code> form, broadcasting a single KV
+head with <code class="docutils literal notranslate"><span class="pre">enable_gqa=True</span></code> is not folded.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1094,7 +1109,8 @@ rebuilt from scratch:</p>
 <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_autocast</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>
 </section>

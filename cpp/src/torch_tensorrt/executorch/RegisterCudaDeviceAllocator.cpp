@@ -14,11 +14,14 @@ namespace {
 // that from inside the CUDA/AOTI delegate, which an application that delegates
 // to TensorRT alone has no reason to link. Register it here instead.
 //
-// Deliberately unguarded. If the CUDA/AOTI delegate is ever linked into the
-// same binary it registers the same singleton a second time, and the registry
-// is meant to abort on that rather than silently pick one.
+// A C++ consumer may have already loaded the CUDA backend or registered its
+// own allocator. Keep that registration: registering the device type twice
+// aborts, even when both callers use the same singleton.
 [[maybe_unused]] const bool cuda_device_allocator_registered = [] {
-  executorch::runtime::register_device_allocator(&executorch::backends::cuda::CudaAllocator::instance());
+  auto& allocator = executorch::backends::cuda::CudaAllocator::instance();
+  if (executorch::runtime::get_device_allocator(allocator.device_type()) == nullptr) {
+    executorch::runtime::register_device_allocator(&allocator);
+  }
   return true;
 }();
 

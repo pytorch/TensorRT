@@ -4,8 +4,12 @@
 import torch
 import torch_tensorrt
 from parameterized import parameterized
-from torch.testing._internal.common_utils import run_tests
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.replace_fused_rms_norm import (
+    replace_fused_rms_norm,
+)
 
 from ..conversion.harness import DispatchTestCase
 
@@ -309,6 +313,35 @@ class TestFusedRMSNormLoweringPass(DispatchTestCase):
         self.assertTrue(torch.allclose(trt_gm(*inputs)[1], RMSNorm()(*inputs)[1]))
 
         torch._dynamo.reset()
+
+
+class TestFusedRMSNormLoweringPassMeta(TestCase):
+    @parameterized.expand([("with_weight", True), ("without_weight", False)])
+    def test_new_nodes_carry_fake_values(self, _, with_weight):
+        class RMSNorm(torch.nn.Module):
+            def forward(self, x, weight):
+                weight = weight if with_weight else None
+                return torch.ops.aten._fused_rms_norm.default(x, [8], weight, 1e-5)[0]
+
+        gm = torch.export.export(
+            RMSNorm(), (torch.randn(2, 4, 8), torch.randn(8))
+        ).module()
+
+        gm = replace_fused_rms_norm(gm, CompilationSettings())
+
+        nodes = [n for n in gm.graph.nodes if n.op == "call_function"]
+        self.assertNotIn(
+            torch.ops.aten._fused_rms_norm.default, [n.target for n in nodes]
+        )
+        self.assertEqual(
+            {n.target: tuple(n.meta["val"].shape) for n in nodes},
+            {
+                torch.ops.aten.mul.Tensor: (2, 4, 8),
+                torch.ops.aten.mean.dim: (2, 4, 1),
+                torch.ops.aten.add.Tensor: (2, 4, 1),
+                torch.ops.aten.rsqrt.default: (2, 4, 1),
+            },
+        )
 
 
 if __name__ == "__main__":

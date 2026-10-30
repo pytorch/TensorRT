@@ -18,12 +18,21 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import (
     filter_decomposition_table,
     get_decompositions,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
+# Ways code reaches aten.alias: called directly, from indexing, from a decomposition.
+ALIASES = [
+    ("alias", lambda t: torch.ops.aten.alias.default(t)),
+    ("ellipsis", lambda t: t[...]),
+    ("no_op_transpose", lambda t: t.transpose(1, 1)),
+    ("detach", lambda t: t.detach()),
+]
 
 
 class TestLowering(TestCase):
@@ -61,7 +70,7 @@ class TestLowering(TestCase):
             f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
 
-    def test_lowering_alias_replacement(self):
+    def test_lowering_alias_removed(self):
         class Alias(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
                 super().__init__(*args, **kwargs)
@@ -70,7 +79,7 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.alias.default(x) + 1
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
+        # The remove_alias pass in post_lowering is expected to drop the alias
         unexpected_ops = {torch.ops.aten.alias.default}
 
         inputs = [
@@ -89,6 +98,104 @@ class TestLowering(TestCase):
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_written_in_place_torch_compile(self, _, make_alias):
+        class AliasWrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = make_alias(x + 1)
+                y[:, 0] = 0
+                return y
+
+        model = AliasWrittenInPlace().cuda()
+        x = torch.rand(2, 3, device="cuda")
+        # Selects the backend's aot_autograd path, where this write used to fail.
+        compiled = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            options={
+                "min_block_size": 1,
+                "pass_through_build_failures": True,
+                "use_distributed_mode_trace": True,
+            },
+        )
+
+        torch.testing.assert_close(compiled(x), model(x))
+        torch._dynamo.reset()
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_written_in_place(self, _, make_alias):
+        class AliasWrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = make_alias(x + 1)
+                y[:, 0] = 0
+                return y
+
+        class WrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = x + 1
+                y[:, 0] = 0
+                return y
+
+        def lower(model, x):
+            exported = torch.export.export(model, (x,))
+            decomposed = exported.run_decompositions(get_decompositions(False))
+            lowered = remove_alias_from_exported_program(decomposed)
+            # The output specs have to follow the edited graph.
+            lowered.validate()
+            return lowered.module()
+
+        def targets(gm):
+            return [
+                node.target for node in gm.graph.nodes if node.op == "call_function"
+            ]
+
+        x = torch.rand(2, 3)
+        lowered = lower(AliasWrittenInPlace(), x)
+
+        self.assertEqual(targets(lowered), targets(lower(WrittenInPlace(), x)))
+        torch.testing.assert_close(lowered(x), AliasWrittenInPlace()(x), rtol=0, atol=0)
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_input_written_through_returned_alias(self, _, make_alias):
+        class InputWrittenThroughAlias(torch.nn.Module):
+            def forward(self, x):
+                return make_alias(x).add_(1)
+
+        x = torch.rand(2, 3, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(InputWrittenThroughAlias(), (x.clone(),)),
+            inputs=[x.clone()],
+            min_block_size=1,
+        )
+        x_eager, x_trt = x.clone(), x.clone()
+
+        torch.testing.assert_close(compiled(x_trt), InputWrittenThroughAlias()(x_eager))
+        torch.testing.assert_close(x_trt, x_eager)
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_in_cond_branch(self, _, make_alias):
+        class AliasInCondBranch(torch.nn.Module):
+            def forward(self, x):
+                return torch.cond(
+                    x.sum() > 0, lambda t: make_alias(t) + 1, lambda t: t - 1, (x,)
+                )
+
+        x = torch.rand(2, 3, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(AliasInCondBranch(), (x,)),
+            inputs=[x],
+            min_block_size=1,
+        )
+        segments = [name for name, _ in compiled.named_children()]
+
+        # An alias left in a branch has no converter, so the cond would run in PyTorch.
+        self.assertFalse(
+            any("_run_on_gpu" in segment for segment in segments),
+            msg=f"segments: {segments}",
+        )
+        for value in (x, -x):
+            torch.testing.assert_close(compiled(value), AliasInCondBranch()(value))
 
     def test_lowering_rsqrt(self):
         class Rsqrt(torch.nn.Module):
@@ -640,8 +747,9 @@ class TestLowering(TestCase):
                 return y
 
         # slice_scatter is no longer decomposed — the converter handles it
-        # directly (emits IKVCacheUpdateLayer when KV-eligible, scatter
-        # otherwise). select_scatter is still decomposed via slice_scatter.
+        # directly (emits IKVCacheUpdateLayer when KV-eligible, a concatenation
+        # or a scatter otherwise). select_scatter is still decomposed via
+        # slice_scatter.
         expected_ops = {torch.ops.aten.slice_scatter.default}
         unexpected_ops = {torch.ops.aten.select_scatter}
 
@@ -1254,17 +1362,14 @@ class TestLowering(TestCase):
         model = ScatterAdd().eval()
         base = torch.zeros((16, 8))
         index = torch.zeros((4, 8), dtype=torch.int64)
-        src = torch.ones((4, 8))
-        src_rows = torch.export.Dim("src_rows", min=1, max=16)
+        src = torch.ones((16, 8))
+        index_rows = torch.export.Dim("index_rows", min=1, max=16)
 
+        # The decomposition loops over index, so only its extent matters.
         dynamic_export = torch.export.export(
             model,
             (base, index, src),
-            dynamic_shapes={
-                "base": {},
-                "index": {0: src_rows},
-                "src": {0: src_rows},
-            },
+            dynamic_shapes={"base": {}, "index": {0: index_rows}, "src": {}},
         )
         base_decompositions = get_decompositions()
         dynamic_decompositions = filter_decomposition_table(
@@ -1287,9 +1392,9 @@ class TestLowering(TestCase):
             for node in dynamic_export.graph_module.graph.nodes
             if node.target == torch.ops.aten.scatter_add.default
         )
-        dynamic_src = dynamic_scatter.args[3]
-        self.assertIsInstance(dynamic_src, torch.fx.Node)
-        dynamic_src.meta["example_value"] = dynamic_src.meta.pop("val")
+        dynamic_index = dynamic_scatter.args[2]
+        self.assertIsInstance(dynamic_index, torch.fx.Node)
+        dynamic_index.meta["example_value"] = dynamic_index.meta.pop("val")
         dynamo_decompositions = filter_decomposition_table(
             get_decompositions(), dynamic_export.graph_module
         )
@@ -1300,6 +1405,95 @@ class TestLowering(TestCase):
             get_decompositions(), static_export.graph_module
         )
         self.assertIn(torch.ops.aten.scatter_add.default, static_decompositions)
+
+    @parameterized.expand(
+        [
+            ("rule_enabled", (), 1, "input", True),
+            ("rule_disabled", {"scatter_add_positions"}, 1, "input", False),
+            ("decomposed_twice", (), 2, "input", True),
+            ("constant_src_folds", (), 1, "ones", False),
+            ("random_src", (), 1, "randint", True),
+            # Constant src that constant folding still leaves in the graph.
+            ("attention_mask_src", (), 1, "attention_mask_arange", True),
+            ("returned_src_view", (), 1, "returned_view", True),
+        ]
+    )
+    def test_scatter_add_constant_index_positions_not_folded(
+        self,
+        _,
+        disabled_constant_fold_exclusions,
+        decompositions_runs,
+        src_kind,
+        positions_kept,
+    ):
+        class ConstantIndexScatterAdd(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("index", torch.randint(0, 64, (16, 8)))
+
+            def forward(self, input, src):
+                if src_kind == "ones":
+                    src = torch.ones_like(self.index)
+                elif src_kind == "randint":
+                    src = torch.randint_like(self.index, 5)
+                elif src_kind == "attention_mask_arange":
+                    sequence = torch.arange(8, device=input.device)
+                    src = sequence.expand_as(self.index)
+                elif src_kind == "returned_view":
+                    src = self.index.t().t()
+                result = input.scatter_add(0, self.index, src)
+                if src_kind == "attention_mask_arange":
+                    # The attention comes after the scatter_add positions in the graph.
+                    mask = sequence.unsqueeze(0) <= sequence.unsqueeze(1)
+                    query = input[:8].float().view(1, 1, 8, 8)
+                    attention = torch.ops.aten.scaled_dot_product_attention.default(
+                        query, query, query, mask
+                    )
+                    return result, attention
+                if src_kind == "returned_view":
+                    return result, src
+                return result
+
+        exported = torch.export.export(
+            ConstantIndexScatterAdd().cuda(),
+            (
+                torch.zeros(64, 8, dtype=torch.int64).cuda(),
+                torch.ones(16, 8, dtype=torch.int64).cuda(),
+            ),
+        )
+        for _ in range(decompositions_runs):
+            exported = exported.run_decompositions(get_decompositions())
+        gm = post_lowering(
+            exported.module(),
+            CompilationSettings(
+                disabled_constant_fold_exclusions=disabled_constant_fold_exclusions
+            ),
+        )
+        has_positions = any(
+            getattr(node.target, "overloadpacket", None) is torch.ops.aten.arange
+            and node.meta["val"].shape == (64,)
+            for node in gm.graph.nodes
+        )
+        self.assertEqual(has_positions, positions_kept)
+
+    def test_scatter_add_large_comparison_keeps_loop(self):
+        class ScatterAdd(torch.nn.Module):
+            def forward(self, input, index, src):
+                return input.scatter_add(0, index, src)
+
+        def lowered_targets(updates):
+            inputs = (
+                torch.zeros(2**20, dtype=torch.int64),
+                torch.zeros(updates, dtype=torch.int64),
+                # src longer than index also exercises the loop above the bound.
+                torch.ones(updates + 1, dtype=torch.int64),
+            )
+            exported = torch.export.export(ScatterAdd(), inputs)
+            lowered = exported.run_decompositions(get_decompositions())
+            return {node.target for node in lowered.graph.nodes}
+
+        self.assertNotIn(torch.ops.aten.scatter.src, lowered_targets(64))
+        self.assertIn(torch.ops.aten.scatter.src, lowered_targets(128))
 
     @parameterized.expand(
         [
@@ -1340,11 +1534,21 @@ class TestLowering(TestCase):
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1], [3, 2, 1, 2]]).cuda(),
                 torch.tensor(
-                    [[1, 2, 3, 1], [5, 6, 5, 5], [2, 4, 3, 2]], dtype=torch.int32
+                    [[1, 2, 3, 1], [5, 6, 5, 5], [2, 4, 3, 2]], dtype=torch.float32
                 ).cuda(),
                 {
                     torch.ops.aten.add.Tensor,
                 },
+            ),
+            (
+                "scatter_add_zero_dim_src_larger_than_index",
+                0,
+                torch.tensor([[0, 1, 2, 0], [2, 2, 0, 1]]).cuda(),
+                torch.tensor(
+                    [[1, 2, 3, 4, 5], [6, 2**40, 8, 9, 10], [11, 12, 13, 14, 15]],
+                    dtype=torch.int64,
+                ).cuda(),
+                {torch.ops.aten.add.Tensor},
             ),
         ]
     )
@@ -1359,8 +1563,11 @@ class TestLowering(TestCase):
         # Operations expected to be included in the traced graph after decompositions
         expected_ops = expected_ops_param
         unexpected_ops = {torch.ops.aten.scatter_add.default}
+        if not src.is_floating_point():
+            unexpected_ops.add(torch.ops.aten.scatter.src)
 
-        input = torch.zeros(3, 5, dtype=torch.int32).cuda()
+        # Nonzero, so cells without updates must keep their values.
+        input = torch.arange(15).reshape(3, 5).to(src.dtype).cuda()
         inputs = [input]
 
         fx_graph = torch.fx.symbolic_trace(TestModule())
@@ -2852,6 +3059,106 @@ class TestLowering(TestCase):
             decimals_of_agreement,
             f"baddbmm TRT outputs don't match with the original model. (diff={max_diff})",
         )
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSelectScatterEndToEnd(TestCase):
+    """``out[index] = src`` on an int index exports as select_scatter, which is
+    decomposed into a one-wide slice_scatter."""
+
+    def _assert_matches_eager(
+        self, mod, inputs, dynamic_shapes=None, full_compilation=True, more_inputs=()
+    ):
+        mod = mod.eval().cuda()
+        inputs = tuple(t.cuda() for t in inputs)
+        ep = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep,
+            list(inputs),
+            min_block_size=1,
+            require_full_compilation=full_compilation,
+        )
+        for args in (inputs, *more_inputs):
+            args = tuple(t.cuda() for t in args)
+            torch.testing.assert_close(trt_mod(*args), mod(*args))
+
+    class Write(torch.nn.Module):
+        def __init__(self, index):
+            super().__init__()
+            self.index = index
+
+        def forward(self, x, src):
+            out = x.clone()
+            out[self.index] = src
+            return out
+
+    @parameterized.expand(
+        [
+            ("last_column", (slice(None), -1), (6,)),
+            ("last_row", -1, (8,)),
+        ]
+    )
+    def test_write_matches_eager(self, _, index, src_shape):
+        self._assert_matches_eager(
+            self.Write(index), (torch.randn(6, 8), torch.randn(src_shape))
+        )
+
+    def test_last_row_of_a_dynamic_dim(self):
+        """The index is counted from the end of a size known only at run time."""
+        rows = torch.export.Dim("rows", min=2, max=16)
+        self._assert_matches_eager(
+            self.Write(-1),
+            (torch.randn(6, 8), torch.randn(8)),
+            dynamic_shapes={"x": {0: rows}, "src": None},
+            more_inputs=[(torch.randn(3, 8), torch.randn(8))],
+        )
+
+    def test_src_of_another_dtype_on_a_dynamic_dim(self):
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.select_scatter(x, src, 1, -2)
+
+        width = torch.export.Dim("width", min=4, max=16)
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(6, 8), torch.randn(6).half()),
+            dynamic_shapes={"x": {1: width}, "src": None},
+            more_inputs=[(torch.randn(6, 12), torch.randn(6).half())],
+        )
+
+    def test_index_read_from_a_tensor(self):
+        """The index is only known at run time, so the decomposition must not branch
+        on its sign in Python."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src, index):
+                i = index.item()
+                torch._check(i >= -8)
+                torch._check(i < 8)
+                return torch.select_scatter(x, src, 1, i)
+
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(6, 8), torch.randn(6), torch.tensor(3)),
+            full_compilation=False,
+            more_inputs=[
+                (torch.randn(6, 8), torch.randn(6), torch.tensor(i))
+                for i in (0, -1, -8)
+            ],
+        )
+
+    @parameterized.expand([("below", -10), ("above", 8)])
+    def test_out_of_range_index_raises(self, _, index):
+        """On a static dim, as in torch, rather than wrapping or clamping into range."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.select_scatter(x, src, 1, index)
+
+        x, src = torch.randn(6, 8).cuda(), torch.randn(6).cuda()
+        ep = torch.export.export(M(), (x, src))
+        with self.assertRaisesRegex(IndexError, f"index {index} is out of range"):
+            torch_tensorrt.dynamo.compile(ep, [x, src], min_block_size=1)
 
 
 if __name__ == "__main__":
