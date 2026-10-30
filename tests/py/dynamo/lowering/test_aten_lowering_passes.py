@@ -7,6 +7,7 @@ import tempfile
 
 import torch
 import torch_tensorrt
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
@@ -566,9 +567,11 @@ class TestRewriteEfficientAttention(TestCase):
         inputs = [torch.randn(4, 8, 32, 16).cuda() for _ in range(3)]
         model = CausalEfficientAttention().cuda()
         ep = torch.export.export(model, tuple(inputs))
-        gm = force_causal_efficient_attention(
-            ep.module(), CompilationSettings(attn_bias_is_causal=True)
-        )
+        # torch.compile runs the lowering passes under a fake mode.
+        with FakeTensorMode():
+            gm = force_causal_efficient_attention(
+                ep.module(), CompilationSettings(attn_bias_is_causal=True)
+            )
         (attention,) = [
             node
             for node in gm.graph.nodes
