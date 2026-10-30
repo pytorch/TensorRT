@@ -294,6 +294,7 @@ class TestUInt8Support(TestCase):
             "unsqueeze": lambda image: image.unsqueeze(0),
             "slice": lambda image: image[2:6],
             "stack": lambda image: torch.stack([image, image]),
+            "split": lambda image: torch.split(image, 4)[1],
             "partial slice_scatter": lambda image: torch.slice_scatter(
                 image, image[:2], 0, 2, 4
             ),
@@ -319,6 +320,8 @@ class TestUInt8Support(TestCase):
                     cache_built_engines=False,
                     reuse_cached_engines=False,
                 )
+                engines = [n for n, _ in trt_mod.named_children() if "_run_on_acc" in n]
+                self.assertEqual(len(engines), 1)
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
     def test_uint8_shape_op_in_cond_branch(self):
