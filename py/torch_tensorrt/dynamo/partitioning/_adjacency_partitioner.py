@@ -17,6 +17,7 @@ from torch.fx.passes.splitter_base import (
     _SplitterSettingBase,
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
+
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
@@ -30,7 +31,10 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
-from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
+from torch_tensorrt.dynamo.partitioning.common import (
+    get_node_module_types,
+    node_in_torch_executed_module,
+)
 from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -509,7 +513,7 @@ def partition(
         all_module_types = {
             module_type
             for node in gm.graph.nodes
-            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+            for module_type in get_node_module_types(node)
         }
         unmatched = set(torch_executed_modules) - all_module_types
         if unmatched:

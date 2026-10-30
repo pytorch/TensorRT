@@ -18,6 +18,7 @@ from torch.export.graph_signature import InputKind
 from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
+
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -1763,6 +1764,13 @@ def compile_module(
                 if "_run_on_acc" not in str(target):
                     continue
                 getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+
+    if settings.offload_module_to_cpu:
+        # Global partitioning leaves fallback operations in the root graph, so
+        # restoring only PyTorch child modules misses their parameters/buffers.
+        # Pin the state read by the assembled graph without moving unused source
+        # weights that are already embedded in TensorRT engines.
+        pin_torch_executed_state(partitioned_module, to_torch_device(settings.device))
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:

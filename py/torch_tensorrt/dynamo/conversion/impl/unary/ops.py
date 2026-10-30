@@ -6,10 +6,11 @@ from typing import Optional, Union
 import numpy as np
 import tensorrt as trt
 import torch
-import torch_tensorrt.dynamo.conversion.impl as impl
 from tensorrt import DataType as TRTDataType
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -598,7 +599,9 @@ def scalar_tensor(
     scalar: Union[int, float, bool],
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
 ) -> TRTTensor:
-    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
+    # aten.scalar_tensor returns a rank-0 tensor. Preserve that rank so an
+    # output crossing an engine boundary matches its FX input metadata.
+    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype, min_rank=0)
     identity_layer = ctx.net.add_identity(tensor)
     set_layer_name(identity_layer, target, name, source_ir)
     return identity_layer.get_output(0)
