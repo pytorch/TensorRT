@@ -5,6 +5,7 @@
 (torch_tensorrt.dynamo._exporter). These run on plain fx graphs and need neither a
 GPU nor a TensorRT build."""
 
+import io
 import operator
 
 import pytest
@@ -418,6 +419,44 @@ def test_create_trt_exp_program_handles_a_program_without_inputs():
     out = ep.module()()
     out = out[0] if isinstance(out, (tuple, list)) else out
     assert torch.equal(out, torch.arange(4.0) * 3)
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_keeps_the_range_of_an_int_input():
+    """A program whose only input is an int must keep that input's range.
+
+    Regression: the range lookup took its fake mode only from tensor inputs, so it
+    found none here. The program saved, but torch.export.load then failed with
+    "vr must not be None".
+    """
+
+    class Prefix(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("c", torch.arange(8.0))
+
+        def forward(self, n: int):
+            return self.c[:n] * 2
+
+    gm = torch.export.export(
+        Prefix().eval(),
+        (5,),
+        dynamic_shapes={"n": torch.export.Dim.DYNAMIC(min=2, max=8)},
+    ).module()
+    _drop_guards_fn(gm)
+    gm.graph.lint()
+    gm.recompile()
+
+    ep = create_trt_exp_program(gm, arg_inputs=())
+
+    buffer = io.BytesIO()
+    torch.export.save(ep, buffer)
+    buffer.seek(0)
+    loaded = torch.export.load(buffer)
+    assert [(r.lower, r.upper) for r in loaded.range_constraints.values()] == [(2, 8)]
+    out = loaded.module()(3)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert torch.equal(out, torch.arange(3.0) * 2)
 
 
 @pytest.mark.unit
