@@ -25,7 +25,7 @@ def force_causal_efficient_attention(
     attention (seq_q == seq_k) to replace:
 
     * None: a bias proven causal (see _prove_causal).
-    * True: also a bias the pass cannot check, which the caller asserts is causal. A
+    * True: also a bias the pass cannot prove, which the caller asserts is causal. A
       bias the pass checks and finds not causal, such as a block-causal mask, is kept.
     * False: none.
 
