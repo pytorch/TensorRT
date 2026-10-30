@@ -386,6 +386,41 @@ def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
 
 
 @pytest.mark.unit
+def test_create_trt_exp_program_handles_a_program_without_inputs():
+    """create_trt_exp_program must lift the constants of a program with no inputs.
+
+    Regression: lift() took its fake mode only from the placeholders and asserted
+    that it found one, so torch_tensorrt.save(retrace=False) failed for such a
+    program. Two constants also check that the lifted placeholders keep the order
+    of their input specs, which the ExportedProgram verifier compares.
+    """
+
+    class Constants(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.w = torch.nn.Parameter(torch.full((4,), 3.0))
+            self.register_buffer("c", torch.arange(4.0))
+
+        def forward(self):
+            return self.w * self.c
+
+    gm = torch.export.export(Constants().eval(), ()).module()
+    _drop_guards_fn(gm)
+    gm.graph.lint()
+    gm.recompile()
+
+    ep = create_trt_exp_program(gm, arg_inputs=())
+
+    assert sorted((s.kind.name, s.target) for s in ep.graph_signature.input_specs) == [
+        ("BUFFER", "c"),
+        ("PARAMETER", "w"),
+    ]
+    out = ep.module()()
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert torch.equal(out, torch.arange(4.0) * 3)
+
+
+@pytest.mark.unit
 def test_create_trt_exp_program_handles_write_only_copyback_buffer():
     """create_trt_exp_program must build range_constraints after the copy-back
     block adds a get_attr for a write-only buffer.
