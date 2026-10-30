@@ -913,6 +913,28 @@ def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+def test_program_without_inputs_exports_a_pte(tmp_path):
+    """With no user inputs, lift() has only the TensorRT engine to turn into an input."""
+
+    class Noise(torch.nn.Module):
+        def forward(self):
+            # The random draw stays in PyTorch, so the engine gets its result as input.
+            return torch.randn(50, 32, device="cuda") * 2 + 1
+
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(Noise().eval(), ()), arg_inputs=(), min_block_size=1
+    )
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+    output = tmp_path / "noise.pte"
+
+    torch_tensorrt.save(
+        compiled, str(output), output_format="executorch", retrace=False
+    )
+
+    assert b"TensorRTBackend" in output.read_bytes()
+
+
+@pytest.mark.unit
 def test_lowering_stores_the_staged_engine_bytes_as_named_data(monkeypatch, caplog):
     """The rewrite stages each engine as ``bytes``, and lowering must hand that same
     object to named data. A ``detach()`` or ``state_dict()`` on the way drops it,
