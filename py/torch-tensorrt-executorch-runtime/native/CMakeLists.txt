@@ -38,8 +38,8 @@ foreach(_torch_tensorrt_required_target executorch::runtime executorch::extensio
   if(NOT TARGET ${_torch_tensorrt_required_target})
     message(FATAL_ERROR
       "The installed ExecuTorch does not provide ${_torch_tensorrt_required_target}. A CUDA "
-      "wheel from the pinned nightly channel is required; the CPU wheel ships no CUDA "
-      "extension, and releases up to 1.4.1 ship no linkable runtime at all.")
+      "wheel of the pinned version from its PyTorch CUDA channel is required; the CPU wheel "
+      "ships no CUDA extension, and releases up to 1.4.1 ship no linkable runtime at all.")
   endif()
 endforeach()
 

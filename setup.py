@@ -209,15 +209,10 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Everything below that ceiling resolves: later
-# nightlies of the pinned minor, its release candidate, and its patch releases alike, since the
-# exact pin belongs in the runtime package, which does derive it. Where a wheel's extras also
-# require that package, they admit only the one ExecuTorch build it pins.
-# The floor currently names a dev build, because the runtime split the delegate needs does not
-# exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
-# runtime, and no CUDA wheel at all.
-# That also makes this range prefer a release as soon as one exists, since a release sorts above
-# every development build of the same version, so nothing here changes on the day it ships.
+# minor against a backend built for this one. Everything from the pin up to that ceiling
+# resolves, later patch releases included, since the exact pin belongs in the runtime package,
+# which does derive it. Where a wheel's extras also require that package, they admit only the one
+# ExecuTorch build it pins.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
 # ExecuTorch CUDA wheels support Linux and Windows x86-64. Windows ARM64 is
 # excluded until ExecuTorch publishes a matching runtime wheel.
