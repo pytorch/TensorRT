@@ -133,26 +133,29 @@ Error report_load_error(const char* operation) {
 // TensorRT reads an engine only with the version that built it, unless it was built version
 // compatible, and its own error then names internal serialization tags rather than versions.
 void log_tensorrt_versions(const std::string& exported_version) {
-  // TensorRT 10 and later encode the version as major * 10000 + minor * 100 + patch.
-  const int32_t version = getInferLibVersion();
-  const int major = version / 10000;
-  const int minor = version / 100 % 100;
-  const int patch = version % 100;
+  // The exporter records tensorrt.__version__, which includes the build number, so print the
+  // runtime's build number too. Otherwise equal versions read as different.
+  const int major = getInferLibMajorVersion();
+  const int minor = getInferLibMinorVersion();
+  const int patch = getInferLibPatchVersion();
+  const int build = getInferLibBuildVersion();
   if (exported_version.empty()) {
     ET_LOG(
         Error,
-        "TensorRTBackend::init: this runtime is TensorRT %d.%d.%d, and the program does not record which TensorRT exported the engine",
+        "TensorRTBackend::init: this runtime is TensorRT %d.%d.%d.%d, and the program does not record which TensorRT exported the engine",
         major,
         minor,
-        patch);
+        patch,
+        build);
   } else {
     ET_LOG(
         Error,
-        "TensorRTBackend::init: the engine was exported with TensorRT %s, and this runtime is TensorRT %d.%d.%d",
+        "TensorRTBackend::init: the engine was exported with TensorRT %s, and this runtime is TensorRT %d.%d.%d.%d",
         exported_version.c_str(),
         major,
         minor,
-        patch);
+        patch,
+        build);
   }
 }
 

@@ -113,6 +113,6 @@ def test_an_engine_tensorrt_cannot_read_names_both_tensorrt_versions(tmp_path, c
     with pytest.raises(RuntimeError, match="0x:?23") as raised:
         program.load_method("forward")
     log = str(raised.value) + capfd.readouterr().err
-    runtime_version = ".".join(tensorrt.__version__.split(".")[:3])
     assert f"exported with TensorRT {stand_in.decode()}" in log, log
+    runtime_version = ".".join(tensorrt.__version__.split(".")[:4])
     assert f"this runtime is TensorRT {runtime_version}" in log, log
