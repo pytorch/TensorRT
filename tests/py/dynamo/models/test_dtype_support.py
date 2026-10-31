@@ -324,6 +324,40 @@ class TestUInt8Support(TestCase):
                 self.assertEqual(len(engines), 1)
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
+    def test_uint8_where(self):
+        # The where converter casts uint8 inputs to int32, but cannot hold a uint8 constant.
+        class Select(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b).float() * 2
+
+        class SelectBackground(nn.Module):
+            def __init__(self, background):
+                super().__init__()
+                self.register_buffer("background", background)
+
+            def forward(self, mask, a):
+                return torch.where(mask, a, self.background).float() * 2
+
+        mask = torch.rand(8, 8, 3, device="cuda") > 0.5
+        a, b = (
+            torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+            for _ in range(2)
+        )
+        for mod, inputs, full in (
+            (Select(), (mask, a, b), True),
+            (SelectBackground(b), (mask, a), False),
+        ):
+            with self.subTest(type(mod).__name__):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, inputs),
+                    inputs=list(inputs),
+                    min_block_size=1,
+                    require_full_compilation=full,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
     def test_uint8_full_overwrite_from_float(self):
         class Overwrite(nn.Module):
             def forward(self, image, values):
