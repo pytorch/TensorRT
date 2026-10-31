@@ -404,6 +404,14 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([1.0], dtype=torch.float32),
                 accumulate=True,
             ),
+            # A trailing None selects every column, so ScatterAdd still takes it.
+            param(
+                test_name="accumulate_trailing_none",
+                source_tensor=torch.zeros([6, 3], dtype=torch.float32),
+                indices_tensor=(torch.tensor([1, 3, 3], dtype=torch.int64), None),
+                value_tensor=torch.ones([3, 3], dtype=torch.float32),
+                accumulate=True,
+            ),
         ]
     )
     def test_index_put(
