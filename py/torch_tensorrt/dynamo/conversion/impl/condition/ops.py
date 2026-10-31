@@ -80,10 +80,11 @@ def _widen_uint8(
 ) -> Union[TRTTensor, np.ndarray, torch.Tensor]:
     if isinstance(value, TRTTensor) and value.dtype == trt.uint8:
         return cast_trt_tensor(ctx, value, trt.int32, name)
-    if isinstance(value, torch.Tensor) and value.dtype == torch.uint8:
-        return value.to(torch.int32)
-    if isinstance(value, np.ndarray) and value.dtype == np.uint8:
-        return value.astype(np.int32)
+    # get_trt_tensor converts the constant outside the fake mode of torch.compile.
+    if (isinstance(value, torch.Tensor) and value.dtype == torch.uint8) or (
+        isinstance(value, np.ndarray) and value.dtype == np.uint8
+    ):
+        return get_trt_tensor(ctx, value, name, dtype=torch.int32)
     return value
 
 
