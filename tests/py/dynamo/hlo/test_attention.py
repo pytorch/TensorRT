@@ -20,7 +20,7 @@ Notes on attn_bias_is_causal
 -----------------------------
   Default None: the force_causal_efficient_attention lowering pass strips an
     attn_bias proven to be a causal mask and sets is_causal=True before reaching
-    the converter.  True also strips one the pass cannot check.
+    the converter.  True also strips one the pass cannot prove.
   Set False: attn_bias is always forwarded to IAttentionLayer.mask.
 
 Test classes

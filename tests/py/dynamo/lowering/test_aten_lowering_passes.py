@@ -588,7 +588,7 @@ class TestRewriteEfficientAttention(TestCase):
             model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
         )
 
-    def test_force_causal_efficient_attention_trusts_an_unchecked_bias_only_when_asked(
+    def test_force_causal_efficient_attention_trusts_an_unproven_bias_only_when_asked(
         self,
     ):
         upper = torch.ones(32, 32, dtype=torch.bool, device="cuda").triu(1)

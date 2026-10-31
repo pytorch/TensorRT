@@ -127,9 +127,10 @@ def _prove_causal(
     The value of a bias that depends on no graph input can be computed here once.
     It is causal when it keeps exactly the lower triangle (0) and blocks the rest
     (-inf, or the dtype's lowest value as Hugging Face uses). It is not causal when
-    its zeros are anywhere else, or when it does not block a position above the
-    diagonal. A bias whose check fails counts as not causal, so that a failed check
-    never replaces a mask that is not causal.
+    its zeros are anywhere else, or when a position above the diagonal is above
+    -1e4. A bias in between, such as a -1e9 fill, is unknown: the default keeps it
+    and True replaces it. A bias whose check fails counts as not causal, so that a
+    failed check never replaces a mask that is not causal.
     """
     if not isinstance(seq_len, int):
         return None
@@ -161,6 +162,7 @@ def _prove_causal(
 
 
 def _check_causal(bias: Any, seq_len: int) -> Optional[bool]:
+    """True if bias is causal, False if it is not, None if unknown (see _prove_causal)."""
     if (
         not isinstance(bias, torch.Tensor)
         or isinstance(bias, FakeTensor)
