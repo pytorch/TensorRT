@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import operator
 import sys
 import unittest.mock as mock
 
@@ -150,6 +151,39 @@ class TestResourcePartitioning(TestCase):
         )
         assert subgraphs[0].nodes == nodes
         assert subgraphs[1].nodes == []
+
+    def test_getitems_stay_with_the_node_they_unpack(self):
+        # After decomposition, batch norm returns three values and only the first is read.
+        gm = (
+            torch.export.export(nn.BatchNorm1d(4).eval(), (torch.randn(2, 4),))
+            .run_decompositions()
+            .module(check_guards=False)
+        )
+        partitioner = ResourcePartitioner(
+            gm, cpu_memory_budget=None, submodule_name="m"
+        )
+        nodes = partitioner.put_nodes_into_subgraphs()[0].nodes
+        (batch_norm,) = [
+            n for n in nodes if any(u.target == operator.getitem for u in n.users)
+        ]
+        # One copy of the group, so memory grows with the number of outputs, not its square.
+        assert partitioner.fusion_patterns == {
+            batch_norm: {batch_norm, *batch_norm.users}
+        }
+        # Split right after the batch norm, which would make the first engine output a tuple.
+        cut = nodes.index(batch_norm) + 1
+        subgraphs = [
+            Subgraph(is_acc=True, nodes=nodes[:cut]),
+            Subgraph(is_acc=True, nodes=nodes[cut:]),
+        ]
+        leaf_node = partitioner.get_leaf_node(subgraphs[0].nodes)
+        assert partitioner.step_if_break_fusion(
+            subgraphs,
+            leaf_node,
+            set(subgraphs[0].nodes),
+            set(subgraphs[1].nodes),
+        )
+        assert set(batch_norm.users) <= set(subgraphs[0].nodes)
 
 
 if __name__ == "__main__":
