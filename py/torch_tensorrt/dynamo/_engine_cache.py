@@ -91,10 +91,8 @@ class BaseEngineCache(ABC):
                     canonical_nodes.append(f"placeholder_input_{input_counter}")
                     input_counter += 1
                 else:
-                    # Arguments are part of the engine (an attention bias the
-                    # lowering kept or dropped, a permutation), unlike weights,
-                    # which a refit replaces. Nodes go in by position, so the
-                    # key does not depend on node names.
+                    # A refit replaces weights, not arguments. Nodes go in by
+                    # position, so node names do not change the key.
                     arguments = torch.fx.node.map_arg(
                         (node.args, node.kwargs), lambda n: f"%{positions[n]}"
                     )

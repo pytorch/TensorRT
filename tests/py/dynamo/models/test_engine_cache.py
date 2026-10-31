@@ -661,7 +661,7 @@ class TestEngineCache(TestCase):
                 self.dims = dims
 
             def forward(self, x):
-                return x.permute(self.dims) + 1
+                return x.permute(self.dims)
 
         x = torch.randn(3, 3, device="cuda")
         hashes = {
