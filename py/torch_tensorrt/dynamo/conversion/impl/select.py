@@ -873,8 +873,8 @@ def _broadcast_index_put_values(
         values = impl.slice.expand(
             ctx, target, source_ir, f"{name}_repeat", values, (repeats, values.shape[1])
         )
-    # The scatter coordinates list the index dims first. Pass every size, since TensorRT
-    # cannot infer one when the index is empty at runtime.
+    # The scatter coordinates list the index dims first. The index can be empty at runtime,
+    # so pass every size and keep a size of 0 as 0 rather than as "copy the input dim".
     if start and index_shape:
         values = impl.shuffle.reshape(
             ctx,
@@ -887,6 +887,7 @@ def _broadcast_index_put_values(
                 _volume(ctx, target, source_ir, f"{name}_indexed", index_shape),
                 _volume(ctx, target, source_ir, f"{name}_after", free_shape[start:]),
             ),
+            zero_is_placeholder=False,
         )
         values = impl.permutation.permute(
             ctx, target, source_ir, f"{name}_index_dims_first", values, (1, 0, 2)
@@ -938,9 +939,12 @@ def index_put_converter(
     K = len(I)
     N = _volume(ctx, target, source_ir, f"{name}_index_volume", index_shape)
 
-    if isinstance(N, int) and N == 0:
-        # Empty index -> no-op. Building the scatter path anyway trips a
-        # TensorRT squeezeDims assertion on DGX Spark (GB10, SM 12.1).
+    if not isinstance(values, ITensor):
+        values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
+    if (isinstance(N, int) and N == 0) or 0 in tuple(values.shape):
+        # An empty index or empty values write nothing. Building the scatter path anyway
+        # trips TensorRT: a squeezeDims assertion on DGX Spark (GB10, SM 12.1) for an empty
+        # index, and a failed engine build for empty values.
         identity_layer = ctx.net.add_identity(input_tensor)
         set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
         return identity_layer.get_output(0)
@@ -1120,9 +1124,6 @@ def index_put_converter(
         indices_cat,
         (-1, rank),
     )
-
-    if not isinstance(values, ITensor):
-        values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
 
     flattened_values = _broadcast_index_put_values(
         ctx, target, source_ir, f"{name}_values", values, I, index_shape, F_shape_values

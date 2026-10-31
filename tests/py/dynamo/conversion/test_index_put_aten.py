@@ -642,6 +642,11 @@ class TestIndexPutConverter(DispatchTestCase):
                     data, [None, index, column], values[values > 0]
                 )
 
+        class SetPlanes(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [None, index], values)
+
         class SetPairs(torch.nn.Module):
             def forward(self, data, rows, columns, values):
                 return torch.ops.aten.index_put.default(
@@ -656,9 +661,22 @@ class TestIndexPutConverter(DispatchTestCase):
         values = torch.tensor([7.0, -1.0], device="cuda")
         data_1d = torch.zeros(4, device="cuda")
         data_3d = torch.zeros(3, 4, 5, device="cuda")
+        scalar = torch.tensor(7.0, device="cuda")
         cases = [
             (SetRows(), [(data_1d, mask, values), (data_1d, no_mask, values)]),
             (SetColumns(), [(data_3d, mask, values), (data_3d, no_mask, values)]),
+            (SetPlanes(), [(data_3d, mask, scalar), (data_3d, no_mask, scalar)]),
+            # Values with no elements write nothing.
+            (
+                SetPlanes(),
+                [
+                    (
+                        torch.zeros(3, 4, device="cuda"),
+                        no_mask,
+                        torch.zeros(3, 0, device="cuda"),
+                    )
+                ],
+            ),
             # One row and two columns broadcast to two pairs.
             (
                 SetPairs(),
@@ -672,14 +690,22 @@ class TestIndexPutConverter(DispatchTestCase):
                 ],
             ),
         ]
-        for model, runs in cases:
-            with self.subTest(type(model).__name__):
+        for case, (model, runs) in enumerate(cases):
+            with self.subTest(type(model).__name__, case=case):
                 compiled = torchtrt.dynamo.compile(
                     torch.export.export(model, runs[0]),
                     arg_inputs=runs[0],
                     min_block_size=1,
                     pass_through_build_failures=True,
                 )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(left, [])
                 for inputs in runs:
                     torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
