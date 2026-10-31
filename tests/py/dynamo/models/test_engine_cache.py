@@ -654,7 +654,7 @@ class TestEngineCache(TestCase):
 
         assertions.assertEqual(hash1, hash2)
 
-    def test_graphs_that_differ_in_more_than_weights_are_not_equal(self):
+    def test_graphs_that_differ_in_more_than_weight_values_are_not_equal(self):
         class Permute(torch.nn.Module):
             def __init__(self, dims):
                 super().__init__()

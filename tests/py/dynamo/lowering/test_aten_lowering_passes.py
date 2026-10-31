@@ -745,7 +745,7 @@ class TestRewriteEfficientAttention(TestCase):
         for model in (ReadsLogSumExp(), Dropout()):
             with self.subTest(type(model).__name__):
                 gm = torch.export.export(model, (query, attn_bias)).module()
-                # Export keeps unused outputs of a dropout; lowering drops them.
+                # Lowering drops the unused getitems that export keeps.
                 gm.graph.eliminate_dead_code()
                 gm = force_causal_efficient_attention(gm, CompilationSettings())
                 (attention,) = [
