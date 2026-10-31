@@ -869,6 +869,29 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
+def test_refit_rejects_weights_of_another_shape():
+    inputs = (torch.randn(4, 8, device="cuda"),)
+    trt_gm = torchtrt.dynamo.compile(
+        torch.export.export(torch.nn.Linear(8, 16).cuda(), inputs),
+        inputs,
+        min_block_size=1,
+        immutable_weights=False,
+    )
+    with pytest.raises(AssertionError, match="does not fit"):
+        refit_module_weights(
+            compiled_module=trt_gm,
+            new_weight_module=torch.export.export(
+                torch.nn.Linear(8, 32).cuda(), inputs
+            ),
+            arg_inputs=inputs,
+        )
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
 def test_refit_multiple_engine_without_weightmap():
     class net(nn.Module):
         def __init__(self):
