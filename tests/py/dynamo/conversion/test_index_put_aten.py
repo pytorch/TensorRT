@@ -876,6 +876,58 @@ class TestIndexPutConverter(DispatchTestCase):
                 self.assertEqual(len(left), left_to_pytorch)
                 torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
 
+    def test_accumulate_scatter_add_leaves_mask_and_leading_none_to_pytorch(self):
+        """ScatterAdd drops None and casts a bool mask to indices, so these run in PyTorch."""
+        import tensorrt
+
+        if (
+            tensorrt.get_plugin_registry().get_creator(
+                "ScatterAdd", "1", "torch_tensorrt"
+            )
+            is None
+        ):
+            pytest.skip("needs Torch-TensorRT's ScatterAdd plugin")
+
+        class ColumnAccumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return torch.ops.aten.index_put.default(x, [None, index], values, True)
+
+        class MaskAccumulate(torch.nn.Module):
+            def forward(self, x, mask, values):
+                return x.index_put((mask,), values, accumulate=True)
+
+        cases = {
+            "None before the index": (
+                ColumnAccumulate(),
+                torch.zeros(4, 8, device="cuda"),
+                torch.tensor([1, 1, 5], device="cuda"),
+                torch.ones(4, 3, device="cuda"),
+            ),
+            "bool mask": (
+                MaskAccumulate(),
+                torch.zeros(6, 4, device="cuda"),
+                torch.tensor([True, False, True, True, False, True], device="cuda"),
+                torch.ones(4, 4, device="cuda"),
+            ),
+        }
+        for name, (model, *inputs) in cases.items():
+            with self.subTest(name):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                )
+                # Checked before running, since ScatterAdd aborts the process on these.
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), 1)
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
     def test_accumulate_expanded_values_3d(self):
         """accumulate=True with 3-D source and broadcast mesh indices — mirrors the
         second half of PyTorch's test_index_put_accumulate_expanded_values.
