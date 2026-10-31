@@ -241,18 +241,22 @@ class TestConstantFolding(TestCase):
         self.assertEqual(model.scale.device.type, "cpu")
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
-    def test_offloaded_constant_moves_to_its_device_only_next_to_device_tensors(
+    def test_offloaded_constant_moves_to_its_device_only_for_an_op_that_fails(
         self,
     ):
         class Model(torch.nn.Module):
             def __init__(self):
                 super().__init__()
                 self.register_buffer("c", torch.randn(4096))
+                self.register_buffer("d", torch.randn(4096))
 
             def forward(self, x):
                 zero = torch.zeros((), device=x.device)
                 one = torch.ones((), device=x.device)
-                return x * self.c.sin() + torch.where(self.c > 0, zero, one)
+                # Takes a source on another device and keeps the device of c.
+                copied = torch.ops.aten.copy.default(self.c, self.d)
+                bias = torch.where(self.c > 0, zero, one)
+                return x * self.c.sin() + bias + copied.sin()
 
         example_input = torch.randn(4096, device="cuda")
         gm = torch.export.export(Model().cuda(), (example_input,)).module()
@@ -260,14 +264,18 @@ class TestConstantFolding(TestCase):
         # CPU, its metadata on the device.
         c = gm.c.cpu()
         gm.c = c
+        d = gm.d.cpu()
         gm = constant_fold(gm, CompilationSettings(offload_module_to_cpu=True))
 
-        folded = [getattr(gm, n.target) for n in gm.graph.nodes if n.op == "get_attr"]
-        # sin still runs on the CPU, where it rounds differently than on the GPU.
-        self.assertTrue(any(torch.equal(t, c.sin()) for t in folded))
+        folded = [
+            getattr(gm, n.target).cpu() for n in gm.graph.nodes if n.op == "get_attr"
+        ]
         self.assertTrue(
             any(torch.equal(t, torch.where(c > 0, 0.0, 1.0)) for t in folded)
         )
+        # sin rounds differently on the GPU, so these show both still ran on the CPU.
+        self.assertTrue(any(torch.equal(t, c.sin()) for t in folded))
+        self.assertTrue(any(torch.equal(t, d.sin()) for t in folded))
 
     @unittest.skipIf(
         not torch.cuda.is_available()

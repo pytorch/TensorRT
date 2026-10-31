@@ -5,7 +5,6 @@ import logging
 from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
-import torch.utils._pytree as pytree
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
@@ -308,39 +307,31 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         # empty once every rule that claimed it has been disabled.
         return bool(node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY))
 
-    def fetch_args_kwargs_from_env(
-        self, n: torch.fx.Node
-    ) -> tuple[tuple[Any, ...], dict[str, Any]]:
-        args, kwargs = super().fetch_args_kwargs_from_env(n)
-        # offload_module_to_cpu leaves folded constants on the CPU while their
-        # metadata keeps the device that computed them. Most ops reject such a
-        # constant next to a tensor on that device unless it is 0-dim, as when the
-        # complex lowering's retrace created a scalar there. Only such an op gets
-        # the constant on that device, so ops that read CPU constants alone
-        # compute on the CPU as before.
-        offloaded = [
-            inp
-            for inp in n.all_input_nodes
-            if isinstance(value := self.env.get(inp), torch.Tensor)
-            and value.device.type == "cpu"
-            and value.dim() > 0
-            and isinstance(meta := inp.meta.get("val"), torch.Tensor)
-            and meta.device.type != "cpu"
-        ]
-        if not offloaded:
-            return args, kwargs
-        devices = {
-            leaf.device
-            for leaf in pytree.tree_leaves((args, kwargs))
-            if isinstance(leaf, torch.Tensor)
-        }
-        moved = {
-            id(self.env[inp]): self.env[inp].to(inp.meta["val"].device)
-            for inp in offloaded
-            if inp.meta["val"].device in devices
-        }
-        if moved:
-            args, kwargs = pytree.tree_map_only(
-                torch.Tensor, lambda leaf: moved.get(id(leaf), leaf), (args, kwargs)
-            )
-        return args, kwargs
+    def run_node(self, node: torch.fx.Node) -> Any:
+        try:
+            return super().run_node(node)
+        except RuntimeError:
+            # offload_module_to_cpu leaves folded constants on the CPU while their
+            # metadata keeps the device that computed them. An op that also reads a
+            # tensor on that device, such as a scalar the complex lowering's retrace
+            # created there, can fail on the mix. Only then does it run again with
+            # those constants on their device, so every op that ran before still
+            # computes where it did.
+            inputs = {inp: self.env.get(inp) for inp in node.all_input_nodes}
+            devices = {v.device for v in inputs.values() if isinstance(v, torch.Tensor)}
+            moved = {
+                inp: value.to(meta.device)
+                for inp, value in inputs.items()
+                if isinstance(value, torch.Tensor)
+                and value.device.type == "cpu"
+                and isinstance(meta := inp.meta.get("val"), torch.Tensor)
+                and meta.device.type != "cpu"
+                and meta.device in devices
+            }
+            if not moved:
+                raise
+            self.env.update(moved)
+            try:
+                return super().run_node(node)
+            finally:
+                self.env.update({inp: inputs[inp] for inp in moved})
