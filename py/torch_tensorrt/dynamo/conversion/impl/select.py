@@ -909,6 +909,19 @@ def _broadcast_index_put_values(
     )
 
 
+def _index_ranks_in_graph(ctx: ConversionContext) -> List[Optional[int]]:
+    """The rank of each index of the index_put being converted, None where unknown."""
+    node = ctx.current_node
+    indices = node.args[1] if node is not None and len(node.args) > 1 else None
+    if not isinstance(indices, (list, tuple)):
+        return []
+    ranks: List[Optional[int]] = []
+    for index in indices:
+        val = index.meta.get("val") if isinstance(index, torch.fx.Node) else None
+        ranks.append(val.dim() if isinstance(val, torch.Tensor) else None)
+    return ranks
+
+
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
@@ -918,6 +931,22 @@ def index_put_converter(
     input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
     values: ITensor,
 ) -> ITensor:
+    # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
+    # would move the values in input[indices]. Give such an index its rank in the graph.
+    ranks = _index_ranks_in_graph(ctx)
+    input_indices = [
+        (
+            impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_index_{i}_0d", idx, ()
+            )
+            if isinstance(idx, ITensor)
+            and tuple(idx.shape) == (1,)
+            and i < len(ranks)
+            and ranks[i] == 0
+            else idx
+        )
+        for i, idx in enumerate(input_indices)
+    ]
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )

@@ -709,24 +709,45 @@ class TestIndexPutConverter(DispatchTestCase):
                 for inputs in runs:
                     torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
-    def test_computed_scalar_value_with_0d_index(self):
-        # TensorRT holds value + 1 as a 1-D tensor of one element, a dim more than x[index].
+    def test_computed_0d_index_and_value(self):
+        # TensorRT holds a computed 0-d tensor, such as value + 1, as a 1-D tensor of one
+        # element, a dim more than PyTorch gives it.
         class AddOne(torch.nn.Module):
             def forward(self, data, index, value):
                 return torch.ops.aten.index_put.default(data, [index], value + 1)
 
-        inputs = (
-            torch.arange(4.0, device="cuda"),
-            torch.tensor(2, device="cuda"),
-            torch.tensor(7.0, device="cuda"),
-        )
-        compiled = torchtrt.dynamo.compile(
-            torch.export.export(AddOne(), inputs),
-            arg_inputs=inputs,
-            min_block_size=1,
-            pass_through_build_failures=True,
-        )
-        torch.testing.assert_close(compiled(*inputs), AddOne()(*inputs))
+        class NextColumn(torch.nn.Module):
+            def forward(self, data, index, values):
+                return torch.ops.aten.index_put.default(data, [None, index + 1], values)
+
+        index = torch.tensor(1, device="cuda")
+        cases = [
+            (
+                AddOne(),
+                (
+                    torch.arange(4.0, device="cuda"),
+                    index,
+                    torch.tensor(7.0, device="cuda"),
+                ),
+            ),
+            (
+                NextColumn(),
+                (
+                    torch.zeros(3, 4, 5, device="cuda"),
+                    index,
+                    torch.arange(15.0, device="cuda").reshape(3, 5),
+                ),
+            ),
+        ]
+        for model, inputs in cases:
+            with self.subTest(type(model).__name__):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
