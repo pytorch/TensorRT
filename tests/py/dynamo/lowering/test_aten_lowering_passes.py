@@ -647,6 +647,21 @@ class TestRewriteEfficientAttention(TestCase):
                 CompilationSettings(attn_bias_is_causal=True),
                 False,
             ),
+            # Blocked only to -1e9: unknown, so kept by default and replaced with True.
+            (
+                BufferBias(causal.nan_to_num(neginf=-1e9)),
+                (query,),
+                None,
+                CompilationSettings(),
+                False,
+            ),
+            (
+                BufferBias(causal.nan_to_num(neginf=-1e9)),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                True,
+            ),
             # Zeros on the lower triangle, but positions above it are not blocked.
             (
                 BufferBias(causal.nan_to_num(neginf=5.0)),
