@@ -325,7 +325,8 @@ class TestUInt8Support(TestCase):
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
     def test_uint8_where(self):
-        # The where converter casts uint8 inputs to int32, but cannot hold a uint8 constant.
+        # The where converter casts uint8 inputs to int32, but cannot reshape a uint8
+        # value of lower rank or hold a uint8 constant.
         class Select(nn.Module):
             def forward(self, mask, a, b):
                 return torch.where(mask, a, b).float() * 2
@@ -345,9 +346,12 @@ class TestUInt8Support(TestCase):
         )
         for mod, inputs, full in (
             (Select(), (mask, a, b), True),
+            (Select(), (mask, a, b.bool()), True),
+            (Select(), (mask, a, b[0, 0]), False),
             (SelectBackground(b), (mask, a), False),
         ):
-            with self.subTest(type(mod).__name__):
+            last = inputs[-1]
+            with self.subTest(type(mod).__name__, last=(last.dtype, tuple(last.shape))):
                 trt_mod = torch_tensorrt.dynamo.compile(
                     torch.export.export(mod, inputs),
                     inputs=list(inputs),
