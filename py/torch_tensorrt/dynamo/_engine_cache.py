@@ -108,6 +108,9 @@ class BaseEngineCache(ABC):
                         # of the engine.
                         if isinstance(attr, torch.fx.GraphModule):
                             canonical += f"{{{canonicalize_graph(attr.graph)}}}"
+                        # A refit replaces the values of a weight, not its shape.
+                        elif isinstance(attr, torch.Tensor):
+                            canonical += f"{tuple(attr.shape)}{attr.dtype}"
                     canonical_nodes.append(canonical)
                 positions[node] = len(positions)
 

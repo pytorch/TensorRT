@@ -675,6 +675,10 @@ class TestEngineCache(TestCase):
         pairs = {
             "argument": (Permute((0, 1)), Permute((1, 0))),
             "cond branch": (Cond(lambda t: t.sin()), Cond(lambda t: t.cos())),
+            "weight shape": (
+                torch.nn.Linear(3, 4).cuda(),
+                torch.nn.Linear(3, 5).cuda(),
+            ),
         }
         for name, models in pairs.items():
             with self.subTest(name):
