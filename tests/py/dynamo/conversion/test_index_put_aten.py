@@ -412,6 +412,32 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.ones([3, 3], dtype=torch.float32),
                 accumulate=True,
             ),
+            # Values broadcast to input[indices] as in PyTorch, even where one of their
+            # dims happens to have the index length.
+            param(
+                test_name="values_dim_equal_to_index_length",
+                source_tensor=torch.zeros([5, 3, 4], dtype=torch.float32),
+                indices_tensor=(torch.tensor([4, 0, 3, 1]),),
+                value_tensor=torch.arange(4, dtype=torch.float32),
+            ),
+            param(
+                test_name="values_without_leading_free_dim",
+                source_tensor=torch.zeros([4, 4, 3], dtype=torch.float32),
+                indices_tensor=(None, torch.tensor([3, 1, 0, 2])),
+                value_tensor=torch.arange(12, dtype=torch.float32).reshape(4, 3),
+            ),
+            param(
+                test_name="2d_index_before_free_dim",
+                source_tensor=torch.zeros([6, 4], dtype=torch.float32),
+                indices_tensor=(torch.tensor([[0, 2, 5], [4, 1, 3]]),),
+                value_tensor=torch.arange(24, dtype=torch.float32).reshape(2, 3, 4),
+            ),
+            param(
+                test_name="0d_index_after_none",
+                source_tensor=torch.zeros([3, 4], dtype=torch.float32),
+                indices_tensor=(None, torch.tensor(2)),
+                value_tensor=torch.arange(3, dtype=torch.float32),
+            ),
         ]
     )
     def test_index_put(
@@ -597,12 +623,30 @@ class TestIndexPutConverter(DispatchTestCase):
                     data, [None, index, column], values[values > 0]
                 )
 
+        class SetPairs(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                return torch.ops.aten.index_put.default(
+                    data,
+                    [rows.nonzero().squeeze(1), columns.nonzero().squeeze(1)],
+                    values,
+                )
+
         # Two indices and one value here.
         mask = torch.tensor([1, 0, 1, 0], device="cuda")
         values = torch.tensor([7.0, -1.0], device="cuda")
         cases = [
             (SetRows(), (torch.zeros(4, device="cuda"), mask, values)),
             (SetColumns(), (torch.zeros(3, 4, 5, device="cuda"), mask, values)),
+            # One row and two columns broadcast to two pairs.
+            (
+                SetPairs(),
+                (
+                    torch.zeros(4, 5, device="cuda"),
+                    torch.tensor([0, 0, 1, 0], device="cuda"),
+                    torch.tensor([1, 0, 0, 1, 0], device="cuda"),
+                    torch.tensor([3.0, 4.0], device="cuda"),
+                ),
+            ),
         ]
         for model, inputs in cases:
             with self.subTest(type(model).__name__):

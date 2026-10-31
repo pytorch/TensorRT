@@ -780,6 +780,121 @@ def index_put_scatter_elements(
     )
 
 
+def _broadcast_shape(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    tensors: Sequence[ITensor],
+) -> List[Union[int, ITensor]]:
+    """The shape that ``tensors`` broadcast to, with an ITensor for each runtime size.
+
+    In each dim the sizes other than 1 agree, so a static one is the answer whenever there
+    is one, and otherwise the first runtime size that is not 1.
+    """
+    rank = max((len(t.shape) for t in tensors), default=0)
+    shape: List[Union[int, ITensor]] = []
+    for d in range(rank):
+        dims = [(t, len(t.shape) - rank + d) for t in tensors]
+        dims = [(t, k) for t, k in dims if k >= 0]
+        static = [t.shape[k] for t, k in dims if t.shape[k] not in (1, DYNAMIC_DIM)]
+        if static:
+            shape.append(static[0])
+            continue
+        size: Union[int, ITensor] = 1
+        for j, (t, k) in enumerate(dims):
+            if t.shape[k] != DYNAMIC_DIM:
+                continue
+            runtime = get_shape(ctx, target, source_ir, f"{name}_dim_{d}_{j}", t, k)
+            if isinstance(size, int):
+                size = runtime
+            else:
+                keep = impl.elementwise.ne(
+                    ctx, target, source_ir, f"{name}_keep_{d}_{j}", size, 1
+                )
+                size = impl.condition.select(
+                    ctx, target, source_ir, f"{name}_pick_{d}_{j}", size, runtime, keep
+                )
+        shape.append(size)
+    return shape
+
+
+def _volume(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    shape: Sequence[Union[int, ITensor]],
+) -> Union[int, ITensor]:
+    """The product of ``shape``, an ITensor when any size is an ITensor."""
+    volume: Union[int, ITensor] = 1
+    for i, size in enumerate(shape):
+        if isinstance(volume, int) and isinstance(size, int):
+            volume *= size
+        else:
+            volume = impl.elementwise.mul(
+                ctx, target, source_ir, f"{name}_{i}", volume, size
+            )
+    return volume
+
+
+def _broadcast_index_put_values(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    values: ITensor,
+    positions: Sequence[int],
+    index_shape: Sequence[Union[int, ITensor]],
+    free_shape: Sequence[Union[int, ITensor]],
+) -> ITensor:
+    """``values`` broadcast to ``input[indices]`` as in PyTorch, flat with the index dims first.
+
+    In ``input[indices]``, the broadcast index shape takes the place of the indexed dims at
+    ``positions`` when they are adjacent, and comes before the free dims otherwise.
+    """
+    adjacent = bool(positions) and positions[-1] - positions[0] + 1 == len(positions)
+    start = positions[0] if adjacent else 0
+    result_shape = (*free_shape[:start], *index_shape, *free_shape[start:])
+    # input[indices] can have more dims than TensorRT allows, so broadcast within the values'
+    # own dims, then repeat the values over the leading dims they lack.
+    lead = len(result_shape) - len(values.shape)
+    if tuple(values.shape) != result_shape[lead:]:
+        values = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_expand", values, result_shape[lead:]
+        )
+    values = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_row", values, (1, -1)
+    )
+    if lead:
+        repeats = _volume(
+            ctx, target, source_ir, f"{name}_repeats", result_shape[:lead]
+        )
+        values = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_repeat", values, (repeats, values.shape[1])
+        )
+    # The scatter coordinates list the index dims first.
+    if start and index_shape:
+        values = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_split",
+            values,
+            (
+                _volume(ctx, target, source_ir, f"{name}_before", free_shape[:start]),
+                _volume(ctx, target, source_ir, f"{name}_indexed", index_shape),
+                -1,
+            ),
+        )
+        values = impl.permutation.permute(
+            ctx, target, source_ir, f"{name}_index_dims_first", values, (1, 0, 2)
+        )
+    return impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_flatten", values, (-1,)
+    )
+
+
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
@@ -789,73 +904,27 @@ def index_put_converter(
     input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
     values: ITensor,
 ) -> ITensor:
-    # Convert 'input_indices' to TRT tensors (or keep None as is)
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )
-    indices: List[Optional[Union[ITensor, None]]] = []
-    for i, idx in enumerate(input_indices):
-        if idx is None:
-            indices.append(None)
-        else:
-            if not isinstance(idx, ITensor):
-                idx = get_trt_tensor(ctx, idx, f"{name}_index_{i}", min_rank=1)
-            if len(idx.shape) == 0 or not idx.shape:  # Reshape a scalar to (1,)
-                idx = impl.shuffle.reshape(
-                    ctx, target, source_ir, f"{name}_reshape_idx_{i}", idx, (1,)
-                )
-            indices.append(idx)
-
-    # Normalize multi-dimensional index tensors.
-    # PyTorch allows mesh-style indices like [arange(3)[:,None], arange(2)[None,:]]
-    # which broadcast together before scattering.  The rest of the converter
-    # pipeline assumes every non-None index is 1-D, so we broadcast all
-    # non-None indices to their common shape and flatten each to (N,) here.
-    _non_none_idx = [(pos, idx) for pos, idx in enumerate(indices) if idx is not None]
-    if _non_none_idx and any(len(idx.shape) > 1 for _, idx in _non_none_idx):
-        _max_ndim = max(len(idx.shape) for _, idx in _non_none_idx)
-        # Compute the static broadcast shape (dynamic mesh indices unsupported).
-        _bcast: List[int] = [1] * _max_ndim
-        for _, idx in _non_none_idx:
-            _padded = (1,) * (_max_ndim - len(idx.shape)) + tuple(
-                int(s) for s in idx.shape
-            )
-            for j, (a, b) in enumerate(zip(_bcast, _padded)):
-                if a == 1:
-                    _bcast[j] = b
-                elif b != 1 and b != a:
-                    raise ValueError(
-                        f"index_put: cannot broadcast index shapes {[idx.shape for _, idx in _non_none_idx]}"
-                    )
-        # Expand each non-None index to _bcast then flatten to 1-D.
-        for pos, idx in _non_none_idx:
-            if len(idx.shape) < _max_ndim:
-                for _d in range(_max_ndim - len(idx.shape)):
-                    idx = impl.unsqueeze.unsqueeze(
-                        ctx, target, source_ir, f"{name}_idx_ndpad_{pos}_{_d}", idx, 0
-                    )
+    indices: List[Optional[ITensor]] = [
+        None if idx is None else get_trt_tensor(ctx, idx, f"{name}_index_{i}")
+        for i, idx in enumerate(input_indices)
+    ]
+    # The index tensors broadcast together, as in PyTorch. The scatter below wants 1-D
+    # indices, so expand each one to that shape and flatten it, unless both are 1-D.
+    index_shape = _broadcast_shape(
+        ctx, target, source_ir, f"{name}_index", [i for i in indices if i is not None]
+    )
+    for i, idx in enumerate(indices):
+        if idx is None or (len(idx.shape) == 1 and len(index_shape) == 1):
+            continue
+        if index_shape:
             idx = impl.slice.expand(
-                ctx, target, source_ir, f"{name}_idx_ndbcast_{pos}", idx, tuple(_bcast)
+                ctx, target, source_ir, f"{name}_index_expand_{i}", idx, index_shape
             )
-            idx = impl.shuffle.reshape(
-                ctx, target, source_ir, f"{name}_idx_ndflat_{pos}", idx, (-1,)
-            )
-            indices[pos] = idx
-
-        # Also pre-broadcast values to the mesh shape and flatten so they match N.
-        # e.g. values (2,) + mesh (3,2) → expand to (3,2) → flatten to (6,).
-        if not isinstance(values, ITensor):
-            values = get_trt_tensor(ctx, values, f"{name}_values_nd", min_rank=0)
-        if len(values.shape) < _max_ndim:
-            for _d in range(_max_ndim - len(values.shape)):
-                values = impl.unsqueeze.unsqueeze(
-                    ctx, target, source_ir, f"{name}_val_ndpad_{_d}", values, 0
-                )
-        values = impl.slice.expand(
-            ctx, target, source_ir, f"{name}_val_ndbcast", values, tuple(_bcast)
-        )
-        values = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_val_ndflat", values, (-1,)
+        indices[i] = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_flatten_{i}", idx, (-1,)
         )
 
     rank = len(input_tensor.shape)
@@ -866,34 +935,7 @@ def index_put_converter(
     F = [i for i in range(rank) if indices[i] is None]  # Free dimensions
     I = [i for i in range(rank) if indices[i] is not None]  # Indexed dimensions
     K = len(I)
-    # Determine the maximum size 'N' among the index tensors
-    if K > 0:
-        index_shapes = (
-            []
-        )  # [tensor.shape[0] for tensor in indices if tensor is not None]
-        for _ni, idx_tensor in enumerate(indices):
-            if idx_tensor is not None:
-                if idx_tensor.shape[0] != DYNAMIC_DIM:
-                    index_shapes.append(idx_tensor.shape[0])
-                else:
-                    index_shapes.append(
-                        get_shape(
-                            ctx,
-                            target,
-                            source_ir,
-                            name + f"idx_shape_dim_0_{_ni}",
-                            idx_tensor,
-                            0,
-                        )
-                    )
-        # Index lengths broadcast together. A dynamic length must be 1 or equal a
-        # static length larger than 1, so that static length is N. Otherwise use
-        # the first dynamic length, since Python's max() cannot compare ITensors.
-        static_n = max((s for s in index_shapes if isinstance(s, int)), default=1)
-        dynamic_n = [s for s in index_shapes if isinstance(s, ITensor)]
-        N = dynamic_n[0] if dynamic_n and static_n == 1 else static_n
-    else:
-        N = 1
+    N = _volume(ctx, target, source_ir, f"{name}_index_volume", index_shape)
 
     if isinstance(N, int) and N == 0:
         # Empty index -> no-op. Building the scatter path anyway trips a
@@ -903,10 +945,8 @@ def index_put_converter(
         return identity_layer.get_output(0)
 
     # Compute shapes and volume for the free dimensions.
-    # F_shapes: static ints (-1 for dynamic dims), used where static ints are required.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
     # F_volume: product of F_shape_values, int if all static else ITensor.
-    F_shapes = [input_tensor.shape[i] for i in F]
     F_shape_values: List[Union[int, ITensor]] = []
     for _fi, _fdim in enumerate(F):
         _s = input_tensor.shape[_fdim]
@@ -923,17 +963,7 @@ def index_put_converter(
             )
         else:
             F_shape_values.append(_s)
-    _has_dynamic_f = any(isinstance(_s, ITensor) for _s in F_shape_values)
-    # Can't figure out a better way to calculate the volume at runtime
-    if _has_dynamic_f:
-        _fvol: Union[int, ITensor] = 1
-        for _i, _s in enumerate(F_shape_values):
-            _fvol = impl.elementwise.mul(
-                ctx, target, source_ir, f"{name}_fvol_{_i}", _fvol, _s
-            )
-        F_volume: Union[int, ITensor] = _fvol
-    else:
-        F_volume = trt.volume(F_shapes) if F_shapes else 1
+    F_volume = _volume(ctx, target, source_ir, f"{name}_fvol", F_shape_values)
 
     # Process indexed dimensions (I)
     I_tensors = []
@@ -1093,150 +1123,8 @@ def index_put_converter(
     if not isinstance(values, ITensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
 
-    # Define the expected shape based on (N,) + F_shape_values.
-    # N may be a ITensor when it comes from a dynamic source (e.g. nonzero).
-    expected_shape = (N,) + tuple(F_shape_values)
-
-    # Broadcast 'values' to match the expected shape
-    if len(values.shape) == 0 or values.shape == (1,):  # Scalar case
-        values_reshaped = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_reshape_scalar", values, (1,)
-        )
-        values_expanded = impl.slice.expand(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_expand_values_scalar",
-            values_reshaped,
-            expected_shape,
-        )
-    else:  # Non-scalar case
-        values_shape = list(values.shape)
-        if K == 1 and len(values.shape) == rank:
-            # For a single indexed dimension where values has the same rank as
-            # the input, permute values from input layout
-            # (dim0, ..., I[0], ..., dimN-1) → (I[0], F[0], ..., F[k-1]).
-            # This gives expected_shape = (N, *F_shape_values) directly and
-            # correctly handles non-contiguous free dims and dynamic batch dims.
-            # When values has fewer dims than rank it is being broadcast, so
-            # fall through to the discontinuous path which handles that via padding.
-            perm_order = I + F
-            values_permuted = impl.permutation.permute(
-                ctx, target, source_ir, f"{name}_permute_values", values, perm_order
-            )
-            # Expand any size-1 dims to match expected_shape (handles broadcasting).
-            values_expanded = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_values",
-                values_permuted,
-                expected_shape,
-            )
-        elif K == 1 and len(values.shape) == 1 and F and I[0] > max(F):
-            # For data[..., idx] = values, a 1-D values tensor carries the
-            # index extent and broadcasts across the preceding free dims.
-            # The converter's internal layout is (N, *F), so make that
-            # index axis explicit before expanding. This is essential when N
-            # is dynamic: using -1 for both axes would keep the original N
-            # extent instead of broadcasting the free dimensions.
-            values_reshaped = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_reshape_index_values",
-                values,
-                (N,) + (1,) * len(F),
-            )
-            values_expanded = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_values",
-                values_reshaped,
-                expected_shape,
-            )
-        elif (
-            K > 0
-            and N in values_shape
-            and (len(F) > 1 and max(F) - min(F) + 1 == len(F))
-        ):
-            # Continuous case (K > 1, F dims contiguous)
-            n_idx = values_shape.index(N)
-            permute_order = [n_idx] + [
-                i for i in range(len(values_shape)) if i != n_idx
-            ]
-            values_permuted = impl.permutation.permute(
-                ctx, target, source_ir, f"{name}_permute_values", values, permute_order
-            )
-            remaining_shape = [
-                values_shape[i] for i in range(len(values_shape)) if i != n_idx
-            ]
-            target_f_dims = len(F)
-            current_f_dims = len(remaining_shape)
-            if current_f_dims < target_f_dims:
-                values_expanded_shape = (
-                    [N] + [1] * (target_f_dims - current_f_dims) + remaining_shape
-                )
-            else:
-                values_expanded_shape = [N] + remaining_shape[:target_f_dims]
-            values_expanded = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_unsqueeze_values",
-                values_permuted,
-                tuple(values_expanded_shape),
-            )
-            broadcast_shape = []
-            for exp_dim, val_dim in zip(expected_shape, values_expanded_shape):
-                if val_dim == 1:
-                    broadcast_shape.append(exp_dim)
-                elif val_dim == exp_dim:
-                    broadcast_shape.append(val_dim)
-                else:
-                    raise ValueError(
-                        f"Cannot broadcast {values_expanded_shape} to {expected_shape}"
-                    )
-            values_expanded = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_values",
-                values_expanded,
-                tuple(broadcast_shape),
-            )
-        else:
-            # Discontinuous case (K > 1 or K == 0)
-            values_shape_padded = [1] * (
-                len(expected_shape) - len(values.shape)
-            ) + list(values.shape)
-            for exp_dim, val_dim in zip(expected_shape, values_shape_padded):
-                if not (
-                    isinstance(exp_dim, ITensor)
-                    or DYNAMIC_DIM in (exp_dim, val_dim)
-                    or val_dim in (1, exp_dim)
-                ):
-                    raise ValueError(
-                        f"Cannot broadcast {values.shape} to {expected_shape}"
-                    )
-            values_expanded = impl.slice.expand(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_expand_values",
-                values,
-                expected_shape,
-            )
-
-    # Flatten values to (N * F_volume,)
-    flattened_values = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_flatten_values",
-        values_expanded,
-        (-1,),
+    flattened_values = _broadcast_index_put_values(
+        ctx, target, source_ir, f"{name}_values", values, I, index_shape, F_shape_values
     )
     if flattened_values.dtype != input_tensor.dtype:
         flattened_values = cast_trt_tensor(
