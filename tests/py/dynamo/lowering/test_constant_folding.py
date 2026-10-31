@@ -209,12 +209,14 @@ class TestConstantFolding(TestCase):
             def forward(self, x):
                 freqs = self.freqs[: x.shape[0]] * self.scale.mean()
                 z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
-                y = torch.view_as_real(z * freqs).flatten(1)[None, None]
+                y = torch.view_as_real(z * freqs).flatten(1)
+                q = y[None, None]
                 # The retrace expands the attention, turning the folded mask into
                 # a bias with scalars it creates on the device.
-                return torch.nn.functional.scaled_dot_product_attention(
-                    y, y, y, attn_mask=self.causal > 0
+                attended = torch.nn.functional.scaled_dot_product_attention(
+                    q, q, q, attn_mask=self.causal > 0
                 )
+                return y, attended
 
         model = Rotary().eval().cuda()
         example_input = torch.randn(8, 8, device="cuda")
@@ -236,8 +238,9 @@ class TestConstantFolding(TestCase):
             )
             actual = compiled_model(example_input)
 
+        torch.testing.assert_close(actual[0], expected[0])
         # TensorRT may run the attention's matrix multiplies in TF32.
-        torch.testing.assert_close(actual, expected, rtol=0.02, atol=0.02)
+        torch.testing.assert_close(actual[1], expected[1], rtol=0.02, atol=0.02)
         self.assertEqual(model.scale.device.type, "cpu")
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
