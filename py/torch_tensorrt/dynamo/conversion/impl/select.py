@@ -859,6 +859,18 @@ def _broadcast_index_put_values(
     # input[indices] can have more dims than TensorRT allows, so broadcast within the values'
     # own dims, then repeat the values over the leading dims they lack.
     lead = len(result_shape) - len(values.shape)
+    if lead < 0:
+        # TensorRT can hold a 0-d value, such as value + 1, as a 1-D tensor of one element,
+        # which has a dim more than input[indices] when every index is 0-d.
+        values = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_squeeze",
+            values,
+            tuple(values.shape)[-lead:],
+        )
+        lead = 0
     if tuple(values.shape) != result_shape[lead:]:
         values = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand", values, result_shape[lead:]

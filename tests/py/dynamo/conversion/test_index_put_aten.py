@@ -709,6 +709,25 @@ class TestIndexPutConverter(DispatchTestCase):
                 for inputs in runs:
                     torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
+    def test_computed_scalar_value_with_0d_index(self):
+        # TensorRT holds value + 1 as a 1-D tensor of one element, a dim more than x[index].
+        class AddOne(torch.nn.Module):
+            def forward(self, data, index, value):
+                return torch.ops.aten.index_put.default(data, [index], value + 1)
+
+        inputs = (
+            torch.arange(4.0, device="cuda"),
+            torch.tensor(2, device="cuda"),
+            torch.tensor(7.0, device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(AddOne(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*inputs), AddOne()(*inputs))
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):
