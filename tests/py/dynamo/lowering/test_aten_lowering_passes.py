@@ -727,6 +727,35 @@ class TestRewriteEfficientAttention(TestCase):
             model(query, attn_bias), trt_module(query, attn_bias), rtol=1e-2, atol=1e-2
         )
 
+        # A log_sumexp that is read, or a dropout, keeps the flag and the node in PyTorch.
+        class ReadsLogSumExp(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True
+                )
+                return out[0], out[1]
+
+        class Dropout(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True, 0.5
+                )
+                return out[0]
+
+        for model in (ReadsLogSumExp(), Dropout()):
+            with self.subTest(type(model).__name__):
+                gm = torch.export.export(model, (query, attn_bias)).module()
+                # Export keeps unused outputs of a dropout; lowering drops them.
+                gm.graph.eliminate_dead_code()
+                gm = force_causal_efficient_attention(gm, CompilationSettings())
+                (attention,) = [
+                    node
+                    for node in gm.graph.nodes
+                    if node.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                ]
+                self.assertTrue(attention.args[4])
+
     def test_force_causal_efficient_attention_keeps_block_causal_mask(self):
         # Complex RoPE makes the complex lowering retrace scaled_dot_product_attention
         # into efficient attention, with the block-causal mask as its attn_bias.
