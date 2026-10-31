@@ -115,7 +115,12 @@ def _refit_single_trt_engine_with_gm(
             if not refitter.set_named_weights(
                 layer_name, trt_wt_tensor, trt_wt_location
             ):
-                raise AssertionError(f"The new weight for {layer_name} does not fit")
+                expected = refitter.get_weights_prototype(layer_name)
+                raise AssertionError(
+                    f"TensorRT refused the new weight for {layer_name}: the engine "
+                    f"holds {expected.size} {expected.dtype}, the new weight is "
+                    f"{trt_wt_tensor.size} {trt_dtype}"
+                )
             refitted.add(layer_name)
 
         if len(refitted) != len(weight_list):

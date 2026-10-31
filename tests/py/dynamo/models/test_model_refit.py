@@ -877,7 +877,7 @@ def test_refit_rejects_weights_of_another_shape():
         min_block_size=1,
         immutable_weights=False,
     )
-    with pytest.raises(AssertionError, match="does not fit"):
+    with pytest.raises(AssertionError, match=r"holds \d+ DataType.FLOAT, the new"):
         refit_module_weights(
             compiled_module=trt_gm,
             new_weight_module=torch.export.export(
