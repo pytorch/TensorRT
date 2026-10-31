@@ -110,16 +110,18 @@ Optimization Tuning
        Ampere and newer GPUs and provides FP32-range with FP16-speed for matmul/conv.
        Disable only when you need strict IEEE FP32 semantics.
    * - ``attn_bias_is_causal``
-     - ``None``
+     - ``True``
      - Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal
-       mask, which is faster and more accurate. ``None``: only a bias proven causal,
-       one that depends on no graph input and holds 0 on and below the diagonal and
-       -inf (or the dtype's lowest value) above. ``True``: also a bias that cannot be
-       proven, such as one built from an input, with a dynamic sequence length, or
-       from a module buffer under ``torch.compile``; you assert that it is causal. A
-       bias that is computed and found not causal, or whose check fails, is always
-       kept. ``False``: never replace. A replaced bias is not read again, so refitting the weights it came
-       from does not change the engine.
+       mask, which is faster and more accurate. ``True``: a bias proven causal, one
+       that depends on no graph input and holds 0 on and below the diagonal and -inf
+       (or the dtype's lowest value) above, and also a bias that cannot be proven,
+       such as one built from an input, with a dynamic sequence length, or from a
+       module buffer under ``torch.compile``; you assert that it is causal. ``None``:
+       only a bias proven causal, for models whose input-built masks may not be
+       causal, such as masks with padding. A bias that is computed and found not
+       causal, or whose check fails, is always kept. ``False``: never replace. A
+       replaced bias is not read again, so refitting the weights it came from does
+       not change the engine.
 
 ----
 
