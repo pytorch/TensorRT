@@ -871,6 +871,24 @@ def _broadcast_index_put_values(
             tuple(values.shape)[-lead:],
         )
         lead = 0
+    # PyTorch rejects a runtime size that is neither 1 nor the size it broadcasts to, while
+    # expand would drop the values past that size, so check such sizes at runtime.
+    for k, (size, want) in enumerate(zip(tuple(values.shape), result_shape[lead:])):
+        if size != DYNAMIC_DIM:
+            continue
+        got = get_shape(ctx, target, source_ir, f"{name}_size_{k}", values, k)
+        fits = impl.elementwise.logical_or(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_fits_{k}",
+            impl.elementwise.eq(ctx, target, source_ir, f"{name}_one_{k}", got, 1),
+            impl.elementwise.eq(ctx, target, source_ir, f"{name}_same_{k}", got, want),
+        )
+        check = ctx.net.add_assertion(
+            fits, "index_put: values do not broadcast to input[indices]"
+        )
+        set_layer_name(check, target, f"{name}_check_{k}", source_ir)
     if tuple(values.shape) != result_shape[lead:]:
         values = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand", values, result_shape[lead:]

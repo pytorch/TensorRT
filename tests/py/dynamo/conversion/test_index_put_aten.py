@@ -715,6 +715,17 @@ class TestIndexPutConverter(DispatchTestCase):
         with self.assertRaises((RuntimeError, IndexError)):
             compiled(empty[0], mask, empty[2])
 
+        # Two values for one selected column raise as in PyTorch rather than lose one.
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(SetColumns(), (data_3d, mask, values)),
+            arg_inputs=(data_3d, mask, values),
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        one_column = torch.tensor([1, 0, 0, 0], device="cuda")
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(data_3d, one_column, torch.tensor([5.0, 6.0], device="cuda"))
+
     def test_computed_0d_index_and_value(self):
         # TensorRT holds a computed 0-d tensor, such as value + 1, as a 1-D tensor of one
         # element, a dim more than PyTorch gives it.
