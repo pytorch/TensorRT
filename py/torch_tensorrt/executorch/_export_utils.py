@@ -131,18 +131,37 @@ def validate_engine_info(
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
+        SERIALIZED_METADATA_IDX,
+        TorchTensorRTModule,
     )
 
+    node_suffix = f" for node '{node_name}'" if node_name else ""
     if (
         len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
         and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
     ):
-        node_suffix = f" for node '{node_name}'" if node_name else ""
         raise RuntimeError(
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
         ) from cause
+    serialized_metadata = (
+        engine_info[SERIALIZED_METADATA_IDX]
+        if len(engine_info) > SERIALIZED_METADATA_IDX
+        else ""
+    )
+    if serialized_metadata and TorchTensorRTModule.decode_metadata(
+        serialized_metadata
+    ).get("requires_libtorch_plugin", False):
+        raise RuntimeError(
+            "ExecuTorch export does not support TensorRT engines that use "
+            "Torch-TensorRT's ScatterAdd plugin, which runs on libtorch. "
+            f"aten.index_put with accumulate=True converts to it{node_suffix}. The "
+            "ExecuTorch TensorRT runtime does not load libtorch, so it cannot load "
+            "this engine. "
+            "Compile with torch_executed_ops={torch.ops.aten.index_put.default} to "
+            "run index_put outside TensorRT."
+        )
 
 
 def _schema_name(node: Any) -> str:

@@ -4,6 +4,7 @@
 """Load real TensorRT programs in ways that have to fail, and check each fails with a clear error."""
 
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -116,3 +117,69 @@ def test_an_engine_tensorrt_cannot_read_names_both_tensorrt_versions(tmp_path, c
     assert f"exported with TensorRT {stand_in.decode()}" in log, log
     runtime_version = ".".join(tensorrt.__version__.split(".")[:4])
     assert f"this runtime is TensorRT {runtime_version}" in log, log
+
+
+def test_an_engine_with_a_libtorch_plugin_is_refused_at_save_and_the_advice_loads(
+    tmp_path,
+):
+    """ScatterAdd calls libtorch, which the runtime does not load, so the program could never load."""
+    import tensorrt
+    import torch_tensorrt
+
+    if (
+        tensorrt.get_plugin_registry().get_creator("ScatterAdd", "1", "torch_tensorrt")
+        is None
+    ):
+        pytest.skip("needs Torch-TensorRT's ScatterAdd plugin")
+
+    class AccumulateRows(torch.nn.Module):
+        def forward(self, x, index, values):
+            return x.index_put((index,), values * 2, accumulate=True) + 1
+
+    inputs = (
+        torch.zeros(16, 8, device="cuda"),
+        torch.tensor([1, 3, 3, 7], device="cuda"),
+        torch.ones(4, 8, device="cuda"),
+    )
+    exported = torch.export.export(AccumulateRows(), inputs)
+    pte = tmp_path / "model.pte"
+
+    def compile_and_save(**settings):
+        compiled = torch_tensorrt.dynamo.compile(
+            exported, arg_inputs=inputs, min_block_size=1, **settings
+        )
+        torch_tensorrt.save(
+            compiled,
+            str(pte),
+            output_format="executorch",
+            retrace=False,
+            arg_inputs=inputs,
+        )
+
+    with pytest.raises(RuntimeError, match="runs on libtorch"):
+        compile_and_save()
+    assert not pte.exists()
+
+    compile_and_save(torch_executed_ops={torch.ops.aten.index_put.default})
+    script = (
+        "import json\n"
+        "import sys\n"
+        "import numpy as np\n"
+        "import torch_tensorrt_executorch_runtime\n"
+        "from executorch.runtime import Runtime\n"
+        "method = Runtime.get().load_program(sys.argv[1]).load_method('forward')\n"
+        "inputs = [np.zeros((16, 8), np.float32), np.array([1, 3, 3, 7]),"
+        " np.ones((4, 8), np.float32)]\n"
+        "assert 'torch' not in sys.modules\n"
+        "print(json.dumps(np.asarray(method.execute(inputs)[0]).tolist()))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(pte)],
+        env={**os.environ, "EXECUTORCH_PYBINDINGS_TENSOR_OUTPUT": "executorch"},
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    expected = AccumulateRows()(*inputs).cpu().tolist()
+    assert json.loads(result.stdout.strip().splitlines()[-1]) == expected

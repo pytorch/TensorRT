@@ -240,6 +240,7 @@ def _empty_trial_result(
         "symbolic_shape_expressions": {},
         "requires_native_multidevice": False,
         "aliased_io": {},
+        "requires_libtorch_plugin": False,
     }
 
 
@@ -259,6 +260,7 @@ def _serialized_result_from_trial(
             trial.get("requires_native_multidevice", False)
         ),
         aliased_io=dict(trial.get("aliased_io") or {}),
+        requires_libtorch_plugin=bool(trial.get("requires_libtorch_plugin", False)),
     )
 
 
@@ -296,7 +298,11 @@ def _trial_result_validation_error(result: Dict[str, Any]) -> Optional[str]:
             not isinstance(name, str) for name in names
         ):
             return f"'{field}' is not a list of strings"
-    for field in ("requires_output_allocator", "requires_native_multidevice"):
+    for field in (
+        "requires_output_allocator",
+        "requires_native_multidevice",
+        "requires_libtorch_plugin",
+    ):
         if not isinstance(result.get(field), bool):
             return f"'{field}' is not a bool"
     symbolic_shapes = result.get("symbolic_shape_expressions")
@@ -399,6 +405,7 @@ def _execute_route_trial(payload: Dict[str, Any]) -> Dict[str, Any]:
         "symbolic_shape_expressions": result.symbolic_shape_expressions,
         "requires_native_multidevice": result.requires_native_multidevice,
         "aliased_io": result.aliased_io,
+        "requires_libtorch_plugin": result.requires_libtorch_plugin,
         "route": route,
         "iter_idx": iter_idx,
     }
@@ -964,6 +971,7 @@ def tune_subgraph(
                         requires_output_allocator=best_result.requires_output_allocator,
                         requires_native_multidevice=best_result.requires_native_multidevice,
                         aliased_io=best_result.aliased_io,
+                        requires_libtorch_plugin=best_result.requires_libtorch_plugin,
                     ),
                     engine_cache,
                     winner_settings,
