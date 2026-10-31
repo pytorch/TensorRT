@@ -16,6 +16,10 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 logger = logging.getLogger(__name__)
 
+# Checking a mask computes it at compile time, which takes a few times its size in
+# memory, so only masks up to this sequence length are checked.
+_MAX_CHECKED_SEQ_LEN = 4096
+
 
 def force_causal_efficient_attention(
     gm: torch.fx.GraphModule, settings: CompilationSettings
@@ -28,8 +32,7 @@ def force_causal_efficient_attention(
 
     * None: a bias proven causal (see _prove_causal).
     * True: also a bias the pass cannot prove, which the caller asserts is causal. A
-      bias the pass checks and finds not causal, such as a block-causal mask, is kept,
-      and so is one whose check fails, for example by running out of memory.
+      bias the pass checks and finds not causal, such as a block-causal mask, is kept.
     * False: none.
 
     When the lengths are not known to be equal (decode-phase attention, or dynamic lengths that are
@@ -128,11 +131,11 @@ def _prove_causal(
     It is causal when it keeps exactly the lower triangle (0) and blocks the rest
     (-inf, or the dtype's lowest value as Hugging Face uses). It is not causal when
     its zeros are anywhere else, or when a position above the diagonal is above
-    -1e4. A bias in between, such as a -1e9 fill, is unknown: the default keeps it
-    and True replaces it. A bias whose check fails counts as not causal, so that a
-    failed check never replaces a mask that is not causal.
+    -1e4. A bias in between, such as a -1e9 fill, is unknown. So is a bias longer
+    than _MAX_CHECKED_SEQ_LEN, which would take a lot of memory at compile time, and
+    one whose check fails: True replaces these as it always did, and None keeps them.
     """
-    if not isinstance(seq_len, int):
+    if not isinstance(seq_len, int) or seq_len > _MAX_CHECKED_SEQ_LEN:
         return None
 
     producers: Set[torch.fx.Node] = set()
@@ -157,8 +160,8 @@ def _prove_causal(
         try:
             return _check_causal(torch.fx.GraphModule(gm, graph)(), seq_len)
         except Exception as e:
-            logger.warning(f"Keeping attn_bias {attn_bias}, could not check it: {e}")
-            return False
+            logger.warning(f"Could not check attn_bias {attn_bias}: {e}")
+            return None
 
 
 def _check_causal(bias: Any, seq_len: int) -> Optional[bool]:

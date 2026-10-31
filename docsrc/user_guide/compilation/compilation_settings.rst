@@ -119,9 +119,10 @@ Optimization Tuning
        module buffer under ``torch.compile``; you assert that it is causal. ``None``:
        only a bias proven causal, for models whose input-built masks may not be
        causal, such as masks with padding. A bias that is computed and found not
-       causal, or whose check fails, is always kept. ``False``: never replace. A
-       replaced bias is not read again, so refitting the weights it came from does
-       not change the engine.
+       causal is always kept. A mask longer than 4096, or one whose check fails, is
+       not proven: ``True`` replaces it and ``None`` keeps it. ``False``: never
+       replace. A replaced bias is not read again, so refitting the weights it came
+       from does not change the engine.
 
 ----
 

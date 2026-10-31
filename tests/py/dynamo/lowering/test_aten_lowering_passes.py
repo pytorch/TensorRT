@@ -696,22 +696,38 @@ class TestRewriteEfficientAttention(TestCase):
                 ]
                 self.assertEqual(attention.args[3] is None, replaced)
 
-        # A check that fails, for example by running out of memory, keeps the bias.
-        ep = torch.export.export(BufferBias(causal), (query,))
-        with mock.patch(
-            "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
-            side_effect=torch.OutOfMemoryError,
-        ):
-            gm = force_causal_efficient_attention(
-                ep.module(), CompilationSettings(attn_bias_is_causal=True)
-            )
-        (attention,) = [
-            node
-            for node in gm.graph.nodes
-            if node.target
-            == torch.ops.aten._scaled_dot_product_efficient_attention.default
-        ]
-        self.assertIsNotNone(attention.args[3])
+        # A check that fails, for example by running out of memory, and a mask too long
+        # to check are not proven: True replaces them, as before, and None keeps them.
+        long_seq = 4097
+        long_causal = torch.zeros(1, 1, long_seq, long_seq, device="cuda").masked_fill(
+            torch.ones(long_seq, long_seq, dtype=torch.bool, device="cuda").triu(1),
+            float("-inf"),
+        )
+        unproven = {
+            "failed check": (BufferBias(causal), query),
+            "long mask": (
+                BufferBias(long_causal),
+                torch.randn(1, 1, long_seq, 16, device="cuda"),
+            ),
+        }
+        for name, (model, inputs) in unproven.items():
+            for setting, replaced in ((True, True), (None, False)):
+                with self.subTest(name, attn_bias_is_causal=setting), mock.patch(
+                    "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
+                    side_effect=torch.OutOfMemoryError,
+                ) as check:
+                    gm = force_causal_efficient_attention(
+                        torch.export.export(model, (inputs,)).module(),
+                        CompilationSettings(attn_bias_is_causal=setting),
+                    )
+                    (attention,) = [
+                        node
+                        for node in gm.graph.nodes
+                        if node.target
+                        == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                    ]
+                    self.assertEqual(attention.args[3] is None, replaced)
+                    self.assertEqual(check.called, name == "failed check")
 
     def test_causal_check_memory(self):
         seq = 4096
