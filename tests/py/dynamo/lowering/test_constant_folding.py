@@ -193,7 +193,8 @@ class TestConstantFolding(TestCase):
     )
     def test_offloaded_constants_reach_the_complex_decomposition(self):
         # offload_module_to_cpu leaves folded constants on the CPU; the complex
-        # decomposition retraces the graph and must not fall back over them.
+        # decomposition retraces the graph and folds it again, and must neither
+        # fall back over them nor mix them with the device tensors it adds.
         class Rotary(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -203,11 +204,17 @@ class TestConstantFolding(TestCase):
                 )
                 # Read only by constant folding, so the retraced module drops it.
                 self.scale = torch.nn.Parameter(torch.ones(4))
+                self.register_buffer("causal", torch.ones(8, 8).tril())
 
             def forward(self, x):
                 freqs = self.freqs[: x.shape[0]] * self.scale.mean()
                 z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
-                return torch.view_as_real(z * freqs).flatten(1)
+                y = torch.view_as_real(z * freqs).flatten(1)[None, None]
+                # The retrace expands the attention, turning the folded mask into
+                # a bias with scalars it creates on the device.
+                return torch.nn.functional.scaled_dot_product_attention(
+                    y, y, y, attn_mask=self.causal > 0
+                )
 
         model = Rotary().eval().cuda()
         example_input = torch.randn(8, 8, device="cuda")
@@ -229,8 +236,38 @@ class TestConstantFolding(TestCase):
             )
             actual = compiled_model(example_input)
 
-        torch.testing.assert_close(actual, expected)
+        # The attention's matrix multiplies run in TF32 by default.
+        torch.testing.assert_close(actual, expected, rtol=0.02, atol=0.02)
         self.assertEqual(model.scale.device.type, "cpu")
+
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+    def test_offloaded_constant_moves_to_its_device_only_next_to_device_tensors(
+        self,
+    ):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("c", torch.randn(4096))
+
+            def forward(self, x):
+                zero = torch.zeros((), device=x.device)
+                one = torch.ones((), device=x.device)
+                return x * self.c.sin() + torch.where(self.c > 0, zero, one)
+
+        example_input = torch.randn(4096, device="cuda")
+        gm = torch.export.export(Model().cuda(), (example_input,)).module()
+        # What an earlier fold leaves with offload_module_to_cpu: the value on the
+        # CPU, its metadata on the device.
+        c = gm.c.cpu()
+        gm.c = c
+        gm = constant_fold(gm, CompilationSettings(offload_module_to_cpu=True))
+
+        folded = [getattr(gm, n.target) for n in gm.graph.nodes if n.op == "get_attr"]
+        # sin still runs on the CPU, where it rounds differently than on the GPU.
+        self.assertTrue(any(torch.equal(t, c.sin()) for t in folded))
+        self.assertTrue(
+            any(torch.equal(t, torch.where(c > 0, 0.0, 1.0)) for t in folded)
+        )
 
     @unittest.skipIf(
         not torch.cuda.is_available()

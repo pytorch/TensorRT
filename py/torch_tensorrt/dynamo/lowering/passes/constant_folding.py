@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
+import torch.utils._pytree as pytree
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
@@ -306,3 +307,40 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         # The meta value holds the IDs of the rules that marked this node; it is
         # empty once every rule that claimed it has been disabled.
         return bool(node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY))
+
+    def fetch_args_kwargs_from_env(
+        self, n: torch.fx.Node
+    ) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        args, kwargs = super().fetch_args_kwargs_from_env(n)
+        # offload_module_to_cpu leaves folded constants on the CPU while their
+        # metadata keeps the device that computed them. Most ops reject such a
+        # constant next to a tensor on that device unless it is 0-dim, as when the
+        # complex lowering's retrace created a scalar there. Only such an op gets
+        # the constant on that device, so ops that read CPU constants alone
+        # compute on the CPU as before.
+        offloaded = [
+            inp
+            for inp in n.all_input_nodes
+            if isinstance(value := self.env.get(inp), torch.Tensor)
+            and value.device.type == "cpu"
+            and value.dim() > 0
+            and isinstance(meta := inp.meta.get("val"), torch.Tensor)
+            and meta.device.type != "cpu"
+        ]
+        if not offloaded:
+            return args, kwargs
+        devices = {
+            leaf.device
+            for leaf in pytree.tree_leaves((args, kwargs))
+            if isinstance(leaf, torch.Tensor)
+        }
+        moved = {
+            id(self.env[inp]): self.env[inp].to(inp.meta["val"].device)
+            for inp in offloaded
+            if inp.meta["val"].device in devices
+        }
+        if moved:
+            args, kwargs = pytree.tree_map_only(
+                torch.Tensor, lambda leaf: moved.get(id(leaf), leaf), (args, kwargs)
+            )
+        return args, kwargs
