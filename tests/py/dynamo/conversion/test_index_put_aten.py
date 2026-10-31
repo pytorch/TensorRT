@@ -438,6 +438,21 @@ class TestIndexPutConverter(DispatchTestCase):
                 indices_tensor=(None, torch.tensor(2)),
                 value_tensor=torch.arange(3, dtype=torch.float32),
             ),
+            param(
+                test_name="2d_bool_mask_after_none",
+                source_tensor=torch.zeros([2, 3, 4], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    torch.tensor(
+                        [
+                            [True, False, False, True],
+                            [False, True, False, False],
+                            [False, False, True, True],
+                        ]
+                    ),
+                ),
+                value_tensor=torch.arange(5, dtype=torch.float32),
+            ),
         ]
     )
     def test_index_put(
@@ -445,6 +460,10 @@ class TestIndexPutConverter(DispatchTestCase):
     ):
         if accumulate and ENABLED_FEATURES.tensorrt_rtx:
             pytest.skip("ScatterAdd plugin not available in TRT RTX")
+        if ENABLED_FEATURES.tensorrt_rtx and any(
+            index is not None and index.dtype == torch.bool for index in indices_tensor
+        ):
+            pytest.skip("Skipped on tensorrt_rtx due to nonzero not supported")
 
         # Keyed on the case's dtype rather than its index: the generated ids are bare
         # test_index_put_<N>, and there is a commented-out param above, so any index-based

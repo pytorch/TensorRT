@@ -120,8 +120,8 @@ def expand_boolean_indices(
 
             mask_ndim = len(ind.shape) if hasattr(ind, "shape") else 1
 
-            if len(indices) == 1 and mask_ndim > 1:
-                # x[bool_nd] = v — single N-D boolean mask.
+            if mask_ndim > 1:
+                # An N-D mask stands for N index tensors, alone or among other indices.
                 # Extract row d (axis=0) from (mask_ndim, N) → (N,) per dim.
                 for d in range(mask_ndim):
                     gather_layer = ctx.net.add_gather(
