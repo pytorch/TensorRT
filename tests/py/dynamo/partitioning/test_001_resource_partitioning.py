@@ -190,6 +190,8 @@ class TestResourcePartitioning(TestCase):
                 partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
             )
 
+        # Each max_pool2d-separated block of two convolutions holds 720 MiB of weights and splits
+        # in two under the 230 MiB budget: a 144 MiB convolution and a 576 MiB one.
         assert (
             len(
                 [
@@ -198,8 +200,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            == 4
-        ), "The graph should have 4 accelerated subgraphs"
+            == 5
+        ), "The graph should have 5 accelerated subgraphs"
         # The trailing FP32 Linear becomes an extra PyTorch block wherever TensorRT-RTX
         # cannot serve an FP32 GEMM; the accelerated blocks above are unaffected.
         expected_gpu_subgraphs = 3 if _fp32_gemm_falls_back_to_pytorch() else 2
@@ -431,6 +433,8 @@ class TestResourcePartitioning(TestCase):
                 partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
             )
 
+        # Each max_pool2d-separated block of two convolutions holds 720 MiB of weights and splits
+        # in two under the 230 MiB budget: a 144 MiB convolution and a 576 MiB one.
         assert (
             len(
                 [
@@ -439,8 +443,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            == 4
-        ), "The graph should have 4 accelerated subgraphs"
+            == 5
+        ), "The graph should have 5 accelerated subgraphs"
 
         torch._dynamo.reset()
 
