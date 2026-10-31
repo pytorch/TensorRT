@@ -699,7 +699,7 @@ class TestRewriteEfficientAttention(TestCase):
         torch.cuda.reset_peak_memory_stats()
         before = torch.cuda.memory_allocated()
         self.assertTrue(_check_causal(bias, seq))
-        # Indexing out the blocked positions needed about ten times the bias.
+        # Indexing out the blocked positions needed several times the bias.
         self.assertLess(torch.cuda.max_memory_allocated() - before, 4 * bias.nbytes)
 
     def test_force_causal_efficient_attention_keeps_a_bias_with_unused_log_sumexp(
