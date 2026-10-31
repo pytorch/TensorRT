@@ -368,6 +368,18 @@ class TestUInt8Support(TestCase):
                 )
                 torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
 
+        # torch.compile converts in a fake mode, and 114 becomes a uint8 constant.
+        class Fill(nn.Module):
+            def forward(self, mask, a):
+                return torch.where(mask, a, 114)
+
+        compiled = torch.compile(
+            Fill(),
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
+        )
+        torch.testing.assert_close(compiled(mask, a), Fill()(mask, a))
+
     def test_uint8_full_overwrite_from_float(self):
         class Overwrite(nn.Module):
             def forward(self, image, values):
