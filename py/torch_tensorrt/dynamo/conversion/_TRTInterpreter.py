@@ -1078,8 +1078,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 output = self._reshape_output_to_scalar(output, name)
 
             # TensorRT rejects a network input that is also an output, and a tensor
-            # can be marked as an output only once, so mark a copy.
-            if output.is_network_input or repeated:
+            # can be marked as an output only once, so mark a copy, unless the cast or
+            # reshape above already made a new tensor.
+            if output.is_network_input or (repeated and id(output) == original_id):
                 layer = self.ctx.net.add_identity(output)
                 layer.name = f"Copy {output.name} to output {name}"
                 output = layer.get_output(0)

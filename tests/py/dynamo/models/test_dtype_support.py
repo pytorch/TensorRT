@@ -545,6 +545,30 @@ class TestUInt8Support(TestCase):
                 reuse_cached_engines=False,
             )
 
+        # The engine returns the widened permute twice: as the buffer write and as
+        # the clone of the buffer.
+        class Frame(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("frame", torch.zeros(8, 8, 3, dtype=torch.uint8))
+
+            def forward(self, image):
+                self.frame[:] = image.permute(1, 0, 2)
+                return self.frame.clone()
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(Frame().cuda(), (image,)),
+            arg_inputs=[image],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(image)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, Frame().cuda()(image))
+
     def test_uint8_output(self):
         trt_mod = _build_engine(
             trt.float32, lambda network, x: network.add_cast(x, trt.uint8)
