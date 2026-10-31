@@ -982,10 +982,9 @@ def index_put_converter(
 
     if not isinstance(values, ITensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
-    if (isinstance(N, int) and N == 0) or 0 in tuple(values.shape):
-        # An empty index or empty values write nothing. Building the scatter path anyway
-        # trips TensorRT: a squeezeDims assertion on DGX Spark (GB10, SM 12.1) for an empty
-        # index, and a failed engine build for empty values.
+    if isinstance(N, int) and N == 0:
+        # Empty index -> no-op. Building the scatter path anyway trips a
+        # TensorRT squeezeDims assertion on DGX Spark (GB10, SM 12.1).
         identity_layer = ctx.net.add_identity(input_tensor)
         set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
         return identity_layer.get_output(0)
@@ -1166,9 +1165,23 @@ def index_put_converter(
         (-1, rank),
     )
 
-    flattened_values = _broadcast_index_put_values(
-        ctx, target, source_ir, f"{name}_values", values, I, index_shape, F_shape_values
-    )
+    if 0 in tuple(values.shape):
+        # Values with no elements only fit an empty input[indices], which the scatter checks
+        # at runtime. Laying them out trips TensorRT's engine build.
+        flattened_values = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_values_flatten", values, (-1,)
+        )
+    else:
+        flattened_values = _broadcast_index_put_values(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_values",
+            values,
+            I,
+            index_shape,
+            F_shape_values,
+        )
     if flattened_values.dtype != input_tensor.dtype:
         flattened_values = cast_trt_tensor(
             ctx,

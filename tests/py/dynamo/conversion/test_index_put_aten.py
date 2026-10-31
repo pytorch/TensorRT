@@ -666,17 +666,6 @@ class TestIndexPutConverter(DispatchTestCase):
             (SetRows(), [(data_1d, mask, values), (data_1d, no_mask, values)]),
             (SetColumns(), [(data_3d, mask, values), (data_3d, no_mask, values)]),
             (SetPlanes(), [(data_3d, mask, scalar), (data_3d, no_mask, scalar)]),
-            # Values with no elements write nothing.
-            (
-                SetPlanes(),
-                [
-                    (
-                        torch.zeros(3, 4, device="cuda"),
-                        no_mask,
-                        torch.zeros(3, 0, device="cuda"),
-                    )
-                ],
-            ),
             # One row and two columns broadcast to two pairs.
             (
                 SetPairs(),
@@ -708,6 +697,23 @@ class TestIndexPutConverter(DispatchTestCase):
                 self.assertEqual(left, [])
                 for inputs in runs:
                     torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
+        # Values with no elements write nothing, and raise as in PyTorch once the index
+        # selects something.
+        empty = (
+            torch.zeros(3, 4, device="cuda"),
+            no_mask,
+            torch.zeros(3, 0, device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(SetPlanes(), empty),
+            arg_inputs=empty,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*empty), SetPlanes()(*empty))
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(empty[0], mask, empty[2])
 
     def test_computed_0d_index_and_value(self):
         # TensorRT holds a computed 0-d tensor, such as value + 1, as a 1-D tensor of one
