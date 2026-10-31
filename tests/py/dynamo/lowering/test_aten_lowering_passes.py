@@ -655,6 +655,31 @@ class TestRewriteEfficientAttention(TestCase):
                 ]
                 self.assertEqual(attention.args[3] is None, replaced)
 
+    def test_force_causal_efficient_attention_keeps_a_bias_with_unused_log_sumexp(
+        self,
+    ):
+        # The converter refuses compute_log_sumexp, so this compiles only if the
+        # pass clears the flag that nothing reads.
+        class LogSumExp(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True
+                )
+                return out[0]
+
+        query = torch.randn(4, 8, 32, 16, device="cuda")
+        attn_bias = torch.randn(4, 8, 32, 32, device="cuda")
+        model = LogSumExp()
+        trt_module = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (query, attn_bias)),
+            [query, attn_bias],
+            min_block_size=1,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(
+            model(query, attn_bias), trt_module(query, attn_bias), rtol=1e-2, atol=1e-2
+        )
+
     def test_force_causal_efficient_attention_keeps_block_causal_mask(self):
         # Complex RoPE makes the complex lowering retrace scaled_dot_product_attention
         # into efficient attention, with the block-causal mask as its attn_bias.
