@@ -713,10 +713,13 @@ class TestRewriteEfficientAttention(TestCase):
         }
         for name, (model, inputs) in unproven.items():
             for setting, replaced in ((True, True), (None, False)):
-                with self.subTest(name, attn_bias_is_causal=setting), mock.patch(
-                    "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
-                    side_effect=torch.OutOfMemoryError,
-                ) as check:
+                with (
+                    self.subTest(name, attn_bias_is_causal=setting),
+                    mock.patch(
+                        "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
+                        side_effect=torch.OutOfMemoryError,
+                    ) as check,
+                ):
                     gm = force_causal_efficient_attention(
                         torch.export.export(model, (inputs,)).module(),
                         CompilationSettings(attn_bias_is_causal=setting),
