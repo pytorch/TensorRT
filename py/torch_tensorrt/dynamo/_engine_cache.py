@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+import functools
 import io
 import logging
 import os
@@ -96,7 +97,18 @@ class BaseEngineCache(ABC):
                     arguments = torch.fx.node.map_arg(
                         (node.args, node.kwargs), lambda n: f"%{positions[n]}"
                     )
-                    canonical_nodes.append(f"{node.op}_{node.target}{arguments}")
+                    canonical = f"{node.op}_{node.target}{arguments}"
+                    if node.op == "get_attr":
+                        attr = functools.reduce(
+                            lambda obj, name: getattr(obj, name, None),
+                            node.target.split("."),
+                            graph.owning_module,
+                        )
+                        # A torch.cond branch is a submodule, and its body is part
+                        # of the engine.
+                        if isinstance(attr, torch.fx.GraphModule):
+                            canonical += f"{{{canonicalize_graph(attr.graph)}}}"
+                    canonical_nodes.append(canonical)
                 positions[node] = len(positions)
 
             return " ".join(canonical_nodes)
