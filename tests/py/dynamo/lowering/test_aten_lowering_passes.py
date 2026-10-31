@@ -12,6 +12,7 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    _check_causal,
     force_causal_efficient_attention,
 )
 
@@ -672,6 +673,19 @@ class TestRewriteEfficientAttention(TestCase):
             == torch.ops.aten._scaled_dot_product_efficient_attention.default
         ]
         self.assertIsNotNone(attention.args[3])
+
+    def test_causal_check_memory(self):
+        seq = 4096
+        bias = torch.zeros(seq, seq, dtype=torch.float16, device="cuda").masked_fill(
+            torch.ones(seq, seq, dtype=torch.bool, device="cuda").triu(1),
+            float("-inf"),
+        )
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+        before = torch.cuda.memory_allocated()
+        self.assertTrue(_check_causal(bias, seq))
+        # Indexing out the blocked positions needed about ten times the bias.
+        self.assertLess(torch.cuda.max_memory_allocated() - before, 4 * bias.nbytes)
 
     def test_force_causal_efficient_attention_keeps_a_bias_with_unused_log_sumexp(
         self,
