@@ -371,6 +371,13 @@ Graph Partitioning
        form produced by AOT tracing under ``torch.compile`` are supported for
        ``repeat_kv`` style graphs. In the ``bmm`` form, broadcasting a single KV
        head with ``enable_gqa=True`` is not folded.
+   * - ``fallback_pytorch_plugin_ops``
+     - ``False``
+     - Run operators whose converters insert a TensorRT plugin that runs PyTorch,
+       such as an accumulating ``aten.index_put`` (Torch-TensorRT's ScatterAdd
+       plugin) or a generated plugin without an AOT kernel, in PyTorch instead of
+       TensorRT. Set it for runtimes without PyTorch: ExecuTorch export refuses an
+       engine that uses such a plugin.
 
 ----
 

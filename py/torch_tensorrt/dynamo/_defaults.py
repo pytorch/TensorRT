@@ -85,6 +85,7 @@ ATTN_BIAS_IS_CAUSAL = None
 FOLD_SHARED_KV_ATTENTION = False
 DEDUPLICATE_WEIGHTS = False
 FALLBACK_DATA_DEPENDENT_OPS = False
+FALLBACK_PYTORCH_PLUGIN_OPS = False
 
 # Global Performance Tuning (TensorRT build-route knobs)
 BUILD_ROUTE = None

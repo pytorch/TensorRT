@@ -150,17 +150,28 @@ def validate_engine_info(
         if len(engine_info) > SERIALIZED_METADATA_IDX
         else ""
     )
-    if serialized_metadata and TorchTensorRTModule.decode_metadata(
-        serialized_metadata
-    ).get("requires_libtorch_plugin", False):
+    metadata = (
+        TorchTensorRTModule.decode_metadata(serialized_metadata)
+        if serialized_metadata
+        else {}
+    )
+    plugin_ops = metadata.get("pytorch_plugin_ops")
+    # Dynamo compilation always writes metadata, so only an engine built another way lacks
+    # it and is passed through as before. One with metadata but no mark may hold plugins.
+    if metadata and plugin_ops is None:
         raise RuntimeError(
-            "ExecuTorch export does not support TensorRT engines that use "
-            "Torch-TensorRT's ScatterAdd plugin, which runs on libtorch. "
-            f"aten.index_put with accumulate=True converts to it{node_suffix}. The "
-            "ExecuTorch TensorRT runtime does not load libtorch, so it cannot load "
-            "this engine. "
-            "Compile with torch_executed_ops={torch.ops.aten.index_put.default} to "
-            "run index_put outside TensorRT."
+            f"ExecuTorch export cannot check the TensorRT engine{node_suffix}: it does "
+            "not record whether the engine uses TensorRT plugins that run PyTorch. It "
+            "was saved by an older Torch-TensorRT, or wrapped in TorchTensorRTModule "
+            "without pytorch_plugin_ops. Compile the model again, or pass "
+            "pytorch_plugin_ops ([] for an engine without such plugins)."
+        )
+    if plugin_ops:
+        raise RuntimeError(
+            f"ExecuTorch export does not support the TensorRT engine{node_suffix}: it "
+            f"runs {', '.join(plugin_ops)} with TensorRT plugins that run PyTorch, and "
+            "the ExecuTorch TensorRT runtime does not load PyTorch. Compile with "
+            "fallback_pytorch_plugin_ops=True to keep those operators out of TensorRT."
         )
 
 

@@ -1822,6 +1822,7 @@ def _index_put_accumulate_validator(
     torch.ops.aten.index_put.default,
     capability_validator=_index_put_accumulate_validator,
     supports_dynamic_shapes=True,
+    requires_pytorch_plugin=True,
 )
 @enforce_tensor_types(
     {

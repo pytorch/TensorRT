@@ -166,6 +166,28 @@ in `Run from Python`_ and `Run from C++`_. If the CUDA part has weights, loading
     the same directory overwrites the first one's weights. The first model can then return wrong
     answers with no error, or fail to load. Save each model into its own directory.
 
+Keep plugins that run PyTorch out of the engine
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some converters build a TensorRT plugin that runs PyTorch when the engine runs: ``aten.index_put``
+with ``accumulate=True`` uses Torch-TensorRT's ScatterAdd plugin, and a plugin made with
+``torch_tensorrt.dynamo.conversion.plugins.custom_op`` that does not use an AOT kernel runs the
+PyTorch op from Python. The ExecuTorch runtime does not load PyTorch, so ``save()`` refuses such an
+engine and names the operators. It finds them through converters registered with
+``requires_pytorch_plugin=True``, so a custom converter that adds such a plugin must set that flag.
+``save()`` also refuses an engine that does not record this. If an older Torch-TensorRT saved it,
+compile the model again. If you wrapped it in ``TorchTensorRTModule`` yourself, pass
+``pytorch_plugin_ops`` (``[]`` for an engine built with ``fallback_pytorch_plugin_ops=True``). Compile with ``fallback_pytorch_plugin_ops=True`` to keep those
+operators out of TensorRT. A ``torch.cond`` with one of them in a branch then runs in PyTorch too.
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=example_inputs,
+        fallback_pytorch_plugin_ops=True,
+    )
+
 Keep inputs and outputs on the GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

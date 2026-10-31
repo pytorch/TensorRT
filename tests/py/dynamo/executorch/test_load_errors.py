@@ -119,10 +119,10 @@ def test_an_engine_tensorrt_cannot_read_names_both_tensorrt_versions(tmp_path, c
     assert f"this runtime is TensorRT {runtime_version}" in log, log
 
 
-def test_an_engine_with_a_libtorch_plugin_is_refused_at_save_and_the_advice_loads(
+def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads(
     tmp_path,
 ):
-    """ScatterAdd calls libtorch, which the runtime does not load, so the program could never load."""
+    """ScatterAdd runs PyTorch, which the runtime does not load, so the program could never load."""
     import tensorrt
     import torch_tensorrt
 
@@ -134,7 +134,8 @@ def test_an_engine_with_a_libtorch_plugin_is_refused_at_save_and_the_advice_load
 
     class AccumulateRows(torch.nn.Module):
         def forward(self, x, index, values):
-            return x.index_put((index,), values * 2, accumulate=True) + 1
+            x = x.index_put((index,), values * 2, accumulate=True)
+            return x.index_put((index[:1],), values[:1]) + 1
 
     inputs = (
         torch.zeros(16, 8, device="cuda"),
@@ -155,12 +156,34 @@ def test_an_engine_with_a_libtorch_plugin_is_refused_at_save_and_the_advice_load
             retrace=False,
             arg_inputs=inputs,
         )
+        return compiled
 
-    with pytest.raises(RuntimeError, match="runs on libtorch"):
+    with pytest.raises(RuntimeError, match="run PyTorch"):
         compile_and_save()
     assert not pte.exists()
+    from torch_tensorrt.dynamo._engine_cache import DiskEngineCache
 
-    compile_and_save(torch_executed_ops={torch.ops.aten.index_put.default})
+    cache = DiskEngineCache(str(tmp_path / "cache"), 1 << 30)
+    # The second compile takes the engine from the cache.
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="run PyTorch"):
+            compile_and_save(
+                cache_built_engines=True,
+                reuse_cached_engines=True,
+                immutable_weights=False,
+                custom_engine_cache=cache,
+            )
+
+    compiled = compile_and_save(fallback_pytorch_plugin_ops=True)
+    # Only the accumulating index_put leaves TensorRT.
+    left_to_pytorch = [
+        node.args[3:]
+        for module in compiled.modules()
+        if isinstance(module, torch.fx.GraphModule)
+        for node in module.graph.nodes
+        if node.target is torch.ops.aten.index_put.default
+    ]
+    assert left_to_pytorch == [(True,)]
     script = (
         "import json\n"
         "import sys\n"
