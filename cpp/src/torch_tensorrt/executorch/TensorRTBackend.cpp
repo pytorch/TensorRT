@@ -905,6 +905,13 @@ class SharedScratchClaim {
     disposal_stream_ = disposal_stream;
   }
 
+  // Records a growth for release() to log once the lock is dropped: a log sink can
+  // block, and every pooled engine on this device waits for this lock meanwhile.
+  void note_growth(size_t bytes, bool first_buffer) {
+    grown_bytes_ = bytes;
+    first_buffer_ = first_buffer;
+  }
+
   // Drops the lock, and the device pointer with it so device() cannot hand out a
   // pointer this claim no longer holds the lock for. Then disposes of whatever a
   // growth displaced, after the unlock, because that disposal waits for an enqueue
@@ -948,6 +955,15 @@ class SharedScratchClaim {
       lock_.unlock();
     }
     dev_ = nullptr;
+    if (grown_bytes_ != 0) {
+      ET_LOG(
+          Info,
+          "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
+          device_id_,
+          first_buffer_ ? "allocated" : "grew to",
+          grown_bytes_);
+      grown_bytes_ = 0;
+    }
     if (retired == nullptr) {
       return true;
     }
@@ -1052,6 +1068,8 @@ class SharedScratchClaim {
   void* retired_ = nullptr;
   cudaEvent_t retired_wait_ = nullptr;
   cudaStream_t disposal_stream_ = nullptr;
+  size_t grown_bytes_ = 0;
+  bool first_buffer_ = false;
 };
 
 // What a call needing no activation scratch is given when the pool holds nothing
@@ -1195,18 +1213,13 @@ Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need
   void* const buffer = shared_scratch_get_or_grow(
       dev,
       need,
-      [device_id, first_buffer](size_t bytes) -> void* {
+      [&claim, first_buffer](size_t bytes) -> void* {
         void* p = nullptr;
         if (cudaMalloc(&p, bytes) != cudaSuccess) {
           cudaGetLastError();
           return nullptr;
         }
-        ET_LOG(
-            Info,
-            "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
-            device_id,
-            first_buffer ? "allocated" : "grew to",
-            bytes);
+        claim.note_growth(bytes, first_buffer);
         return p;
       },
       retired);
