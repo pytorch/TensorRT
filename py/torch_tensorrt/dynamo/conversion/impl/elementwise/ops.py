@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import tensorrt as trt
 import torch
@@ -530,34 +530,8 @@ def _is_float(value: Union[TRTTensor, torch.Tensor, int, float]) -> bool:
     if isinstance(value, TRTTensor):
         return value.dtype in (trt.float16, trt.bfloat16, trt.float32)
     if isinstance(value, torch.Tensor):
-        return value.is_floating_point()
+        return bool(value.is_floating_point())
     return isinstance(value, float)
-
-
-def _cast_ints_to_float(
-    ctx: ConversionContext,
-    name: str,
-    lhs_val: Union[TRTTensor, torch.Tensor, int, float],
-    rhs_val: Union[TRTTensor, torch.Tensor, int, float],
-) -> Tuple[Union[TRTTensor, torch.Tensor, int, float], ...]:
-    """Cast integer and bool TensorRT operands to the float type PyTorch promotes to:
-    the other operand's float type, or float32."""
-    float_type = next(
-        (
-            value.dtype
-            for value in (lhs_val, rhs_val)
-            if isinstance(value, TRTTensor) and _is_float(value)
-        ),
-        trt.float32,
-    )
-    return tuple(
-        (
-            cast_trt_tensor(ctx, value, float_type, f"{name}_{side}_float")
-            if isinstance(value, TRTTensor) and not _is_float(value)
-            else value
-        )
-        for side, value in (("lhs", lhs_val), ("rhs", rhs_val))
-    )
 
 
 def div(
@@ -568,8 +542,13 @@ def div(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    # True division gives a float even for integers, as in PyTorch.
-    lhs_val, rhs_val = _cast_ints_to_float(ctx, name, lhs_val, rhs_val)
+    # True division of integers gives float32, as in PyTorch. With a float operand,
+    # the binary elementwise promotion already picks its float type.
+    if not (_is_float(lhs_val) or _is_float(rhs_val)):
+        if isinstance(lhs_val, TRTTensor):
+            lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, f"{name}_lhs_float")
+        if isinstance(rhs_val, TRTTensor):
+            rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, f"{name}_rhs_float")
 
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
@@ -584,40 +563,19 @@ def pow(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-
-    # A float base or exponent makes the power float, as in PyTorch.
-    if _is_float(lhs_val) or _is_float(rhs_val):
-        lhs_val, rhs_val = _cast_ints_to_float(ctx, name, lhs_val, rhs_val)
-
-    lhs_dtype = None
-    rhs_dtype = None
     if isinstance(lhs_val, (int, float)) and isinstance(rhs_val, (int, float)):
         raise ValueError(
             "Both lhs_val and rhs_val are int or float, at least one of them should be a tensor"
         )
-    elif isinstance(lhs_val, (int, float)):
-        # At this point, rhs_val must be a Tensor since we checked both aren't scalars
-        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
-        rhs_dtype = rhs_val.dtype
-        lhs_dtype = rhs_dtype
-    elif isinstance(rhs_val, (int, float)):
-        # At this point, lhs_val must be a Tensor since we checked both aren't scalars
-        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
-        lhs_dtype = lhs_val.dtype
-        rhs_dtype = lhs_dtype
-    else:
-        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
-        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
-        lhs_dtype = lhs_val.dtype
-        rhs_dtype = rhs_val.dtype
-
-    # POW operation supports only float32 and int8 inputs
-    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", lhs_dtype)
-    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", rhs_dtype)
-    out = convert_binary_elementwise(
+    # Keep each operand's own dtype; the binary elementwise path promotes the pair as
+    # PyTorch does, so a float exponent of an integer tensor gives a float.
+    if isinstance(lhs_val, torch.Tensor):
+        lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val")
+    if isinstance(rhs_val, torch.Tensor):
+        rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val")
+    return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )
-    return out
 
 
 def floor_divide(

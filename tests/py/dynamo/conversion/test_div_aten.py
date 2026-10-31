@@ -115,6 +115,21 @@ class TestDivConverter(DispatchTestCase):
         ]
         self.run_test(IntDiv(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
+    def test_div_and_pow_of_integers_by_a_half_constant_stay_half(self):
+        # The Linear needs both inputs in one type, so a float32 result does not build.
+        class HalfScale(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("scale", torch.tensor(4.0, dtype=torch.half))
+                self.register_buffer("root", torch.tensor(0.5, dtype=torch.half))
+                self.lin = nn.Linear(8, 4).half()
+
+            def forward(self, x):
+                return self.lin(x / self.scale + x**self.root)
+
+        inputs = [torch.randint(0, 256, (2, 8), dtype=torch.int32)]
+        self.run_test(HalfScale(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
 
 if __name__ == "__main__":
     run_tests()
