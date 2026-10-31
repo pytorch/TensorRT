@@ -125,8 +125,8 @@ def _prove_causal(
     It is causal when it keeps exactly the lower triangle (0) and blocks the rest
     (-inf, or the dtype's lowest value as Hugging Face uses). It is not causal when
     its zeros are anywhere else, or when it does not block a position above the
-    diagonal. A bias whose check fails counts as not causal, so that a machine with
-    less memory does not compile the same bias differently.
+    diagonal. A bias whose check fails counts as not causal, so that a failed check
+    never replaces a mask that is not causal.
     """
     if not isinstance(seq_len, int):
         return None
