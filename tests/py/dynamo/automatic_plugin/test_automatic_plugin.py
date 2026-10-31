@@ -128,10 +128,12 @@ class TestAutomaticPlugin(DispatchTestCase):
             engine.pytorch_plugin_ops, ["torch.ops.torchtrt_ex.elementwise_mul.default"]
         )
 
-        # The mark survives a state_dict round trip, which reloads it.
-        engine.load_state_dict(engine.state_dict())
+        # The mark survives a state_dict round trip into a new module.
+        restored = torch_tensorrt.dynamo.runtime.TorchTensorRTModule()
+        restored.load_state_dict(engine.state_dict())
         self.assertEqual(
-            engine.pytorch_plugin_ops, ["torch.ops.torchtrt_ex.elementwise_mul.default"]
+            restored.pytorch_plugin_ops,
+            ["torch.ops.torchtrt_ex.elementwise_mul.default"],
         )
 
         # A module pickled before the mark existed has no such field.
