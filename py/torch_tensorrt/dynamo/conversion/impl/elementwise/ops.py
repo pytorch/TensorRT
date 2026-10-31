@@ -555,6 +555,20 @@ def div(
     )
 
 
+def prims_div(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    """prims.div divides floats and truncates integers, keeping them integer."""
+    if _is_float(lhs_val) or _is_float(rhs_val):
+        return div(ctx, target, source_ir, name, lhs_val, rhs_val)
+    return trunc_div(ctx, target, source_ir, name, lhs_val, rhs_val)
+
+
 def pow(
     ctx: ConversionContext,
     target: Target,

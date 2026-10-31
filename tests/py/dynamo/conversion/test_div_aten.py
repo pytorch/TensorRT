@@ -103,6 +103,18 @@ class TestDivConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_prims_div_truncates_integers(self):
+        # Doubling keeps a float quotient from being truncated back at the output.
+        class div(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.prims.div.default(lhs_val, rhs_val) * 2
+
+        inputs = [
+            torch.randint(-50, 50, (2, 8), dtype=torch.int32),
+            torch.tensor([1, -2, 3, -4, 5, -6, 7, -8], dtype=torch.int32).repeat(2, 1),
+        ]
+        self.run_test(div(), inputs)
+
     def test_div_of_integers_is_float(self):
         # Reciprocal lowers to 1 / x, so it is a true division too.
         class IntDiv(nn.Module):
