@@ -4,6 +4,7 @@
 import operator
 import sys
 import tempfile
+from unittest import mock
 
 import torch
 import torch_tensorrt
@@ -654,6 +655,23 @@ class TestRewriteEfficientAttention(TestCase):
                     == torch.ops.aten._scaled_dot_product_efficient_attention.default
                 ]
                 self.assertEqual(attention.args[3] is None, replaced)
+
+        # A check that fails, for example by running out of memory, keeps the bias.
+        ep = torch.export.export(BufferBias(causal), (query,))
+        with mock.patch(
+            "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
+            side_effect=torch.OutOfMemoryError,
+        ):
+            gm = force_causal_efficient_attention(
+                ep.module(), CompilationSettings(attn_bias_is_causal=True)
+            )
+        (attention,) = [
+            node
+            for node in gm.graph.nodes
+            if node.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        ]
+        self.assertIsNotNone(attention.args[3])
 
     def test_force_causal_efficient_attention_keeps_a_bias_with_unused_log_sumexp(
         self,
