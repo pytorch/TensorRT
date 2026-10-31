@@ -207,9 +207,10 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         one, such as a reshape, a slice or a concatenation of uint8 data, fails the
         build. A clone, and a slice_scatter that overwrites the whole tensor with a
         uint8 source, can hand an engine input through as it is, so they are left to
-        their converters. So is a where between tensors of its own rank that are not
-        constants: its converter casts uint8 values to int32 before the select layer,
-        and only a value of lower rank or a constant would make a uint8 layer first.
+        their converters. So is a where between tensors whose uint8 values have its
+        own rank and are not constants: its converter casts uint8 values to int32
+        before the select layer, and only a uint8 value of lower rank or a uint8
+        constant would make a uint8 layer first.
         uint8 constants are packed FP4 weights that the quantization converters read
         themselves.
         """
@@ -222,9 +223,14 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             values = node.args[1:3]
             if output is not None and all(
                 isinstance(value, torch.fx.Node)
-                and value.op != "get_attr"
                 and isinstance(value.meta.get("val"), torch.Tensor)
-                and value.meta["val"].dim() == output.dim()
+                and (
+                    value.meta["val"].dtype != torch.uint8
+                    or (
+                        value.op != "get_attr"
+                        and value.meta["val"].dim() == output.dim()
+                    )
+                )
                 for value in values
             ):
                 return False

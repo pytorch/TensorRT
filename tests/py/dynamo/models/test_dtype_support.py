@@ -344,14 +344,17 @@ class TestUInt8Support(TestCase):
             torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
             for _ in range(2)
         )
-        for mod, inputs, full in (
-            (Select(), (mask, a, b), True),
-            (Select(), (mask, a, b.bool()), True),
-            (Select(), (mask, a, b[0, 0]), False),
-            (SelectBackground(b), (mask, a), False),
-        ):
-            last = inputs[-1]
-            with self.subTest(type(mod).__name__, last=(last.dtype, tuple(last.shape))):
+        flags = torch.arange(192, device="cuda").reshape(8, 8, 3) % 2 == 0
+        cases = {
+            "uint8": (Select(), (mask, a, b), True),
+            "bool": (Select(), (mask, a, flags), True),
+            "bool of lower rank": (Select(), (mask, a, flags[0, 0]), True),
+            "bool constant": (SelectBackground(flags), (mask, a), True),
+            "uint8 of lower rank": (Select(), (mask, a, b[0, 0]), False),
+            "uint8 constant": (SelectBackground(b), (mask, a), False),
+        }
+        for name, (mod, inputs, full) in cases.items():
+            with self.subTest(name):
                 trt_mod = torch_tensorrt.dynamo.compile(
                     torch.export.export(mod, inputs),
                     inputs=list(inputs),
