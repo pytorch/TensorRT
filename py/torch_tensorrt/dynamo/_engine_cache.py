@@ -84,13 +84,22 @@ class BaseEngineCache(ABC):
             """
             canonical_nodes = []
             input_counter = 0
+            positions: Dict[torch.fx.Node, int] = {}
 
             for node in graph.nodes:
                 if node.op == "placeholder":
                     canonical_nodes.append(f"placeholder_input_{input_counter}")
                     input_counter += 1
                 else:
-                    canonical_nodes.append(f"{node.op}_{node.target}")
+                    # Arguments are part of the engine (an attention bias the
+                    # lowering kept or dropped, a permutation), unlike weights,
+                    # which a refit replaces. Nodes go in by position, so the
+                    # key does not depend on node names.
+                    arguments = torch.fx.node.map_arg(
+                        (node.args, node.kwargs), lambda n: f"%{positions[n]}"
+                    )
+                    canonical_nodes.append(f"{node.op}_{node.target}{arguments}")
+                positions[node] = len(positions)
 
             return " ".join(canonical_nodes)
 

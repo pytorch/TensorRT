@@ -654,6 +654,26 @@ class TestEngineCache(TestCase):
 
         assertions.assertEqual(hash1, hash2)
 
+    def test_graphs_that_differ_in_an_argument_are_not_equal(self):
+        class Permute(torch.nn.Module):
+            def __init__(self, dims):
+                super().__init__()
+                self.dims = dims
+
+            def forward(self, x):
+                return x.permute(self.dims) + 1
+
+        x = torch.randn(3, 3, device="cuda")
+        hashes = {
+            BaseEngineCache.get_hash(
+                torch.export.export(Permute(dims), (x,)).module(),
+                (torch_trt.Input(shape=(3, 3)),),
+                CompilationSettings(),
+            )
+            for dims in ((0, 1), (1, 0))
+        }
+        assertions.assertEqual(len(hashes), 2)
+
     # @unittest.skip("benchmark on small models")
     @unittest.skipIf(
         torch_trt.ENABLED_FEATURES.tensorrt_rtx,
