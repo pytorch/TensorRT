@@ -719,6 +719,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         state.setdefault("_serialized_engine", None)
         state.setdefault("_runtime_settings", RuntimeSettings(runtime_cache=None))
         state.setdefault("_implicit_cache_handle", None)
+        # A module saved before the mark existed keeps it unknown (None), so the
+        # ExecuTorch save check asks for a recompile instead of guessing.
+        state.setdefault("pytorch_plugin_ops", None)
         set_state = getattr(super(), "__setstate__", None)
         if set_state is not None:
             set_state(state)

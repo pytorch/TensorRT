@@ -128,6 +128,14 @@ class TestAutomaticPlugin(DispatchTestCase):
             engine.pytorch_plugin_ops, ["torch.ops.torchtrt_ex.elementwise_mul.default"]
         )
 
+        # A module pickled before the mark existed has no such field.
+        state = engine.__getstate__()
+        del state["pytorch_plugin_ops"]
+        legacy = type(engine).__new__(type(engine))
+        legacy.__setstate__(state)
+        self.assertIsNone(legacy.pytorch_plugin_ops)
+        legacy.state_dict()
+
 
 if __name__ == "__main__":
     run_tests()
