@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <NvInfer.h>
+#include <NvInferPlugin.h>
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
@@ -296,6 +297,9 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
     }
     if (logger == nullptr) {
       logger = new TRTLogger();
+      // Engines can use TensorRT's standard plugins, such as ScatterElements for an
+      // accumulating index_put, and their creators are only registered on request.
+      initLibNvInferPlugins(logger, "");
     }
     runtime = nvinfer1::createInferRuntime(*logger);
     if (runtime != nullptr) {

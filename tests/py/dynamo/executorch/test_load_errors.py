@@ -133,14 +133,17 @@ def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads
         pytest.skip("needs Torch-TensorRT's ScatterAdd plugin")
 
     class AccumulateRows(torch.nn.Module):
-        def forward(self, x, index, values):
+        def forward(self, x, index, values, seen):
+            # A float accumulate uses TensorRT's ScatterElements plugin, a bool one ScatterAdd.
             x = x.index_put((index,), values * 2, accumulate=True)
-            return x.index_put((index[:1],), values[:1]) + 1
+            seen = seen.index_put((index,), values > 0, accumulate=True)
+            return x.index_put((index[:1],), values[:1]) + 1, seen
 
     inputs = (
         torch.zeros(16, 8, device="cuda"),
         torch.tensor([1, 3, 3, 7], device="cuda"),
         torch.ones(4, 8, device="cuda"),
+        torch.zeros(16, 8, dtype=torch.bool, device="cuda"),
     )
     exported = torch.export.export(AccumulateRows(), inputs)
     pte = tmp_path / "model.pte"
@@ -175,15 +178,15 @@ def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads
             )
 
     compiled = compile_and_save(fallback_pytorch_plugin_ops=True)
-    # Only the accumulating index_put leaves TensorRT.
+    # Only the bool accumulate leaves TensorRT.
     left_to_pytorch = [
-        node.args[3:]
+        node.args[0].meta["val"].dtype
         for module in compiled.modules()
         if isinstance(module, torch.fx.GraphModule)
         for node in module.graph.nodes
         if node.target is torch.ops.aten.index_put.default
     ]
-    assert left_to_pytorch == [(True,)]
+    assert left_to_pytorch == [torch.bool]
     script = (
         "import json\n"
         "import sys\n"
@@ -192,9 +195,9 @@ def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads
         "from executorch.runtime import Runtime\n"
         "method = Runtime.get().load_program(sys.argv[1]).load_method('forward')\n"
         "inputs = [np.zeros((16, 8), np.float32), np.array([1, 3, 3, 7]),"
-        " np.ones((4, 8), np.float32)]\n"
+        " np.ones((4, 8), np.float32), np.zeros((16, 8), bool)]\n"
         "assert 'torch' not in sys.modules\n"
-        "print(json.dumps(np.asarray(method.execute(inputs)[0]).tolist()))\n"
+        "print(json.dumps([np.asarray(out).tolist() for out in method.execute(inputs)]))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", script, str(pte)],
@@ -204,5 +207,5 @@ def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads
         timeout=600,
     )
     assert result.returncode == 0, result.stderr[-2000:]
-    expected = AccumulateRows()(*inputs).cpu().tolist()
+    expected = [out.cpu().tolist() for out in AccumulateRows()(*inputs)]
     assert json.loads(result.stdout.strip().splitlines()[-1]) == expected

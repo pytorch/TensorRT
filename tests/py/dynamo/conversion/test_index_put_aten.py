@@ -10,11 +10,6 @@ from torch_tensorrt import ENABLED_FEATURES
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
-# NOTE: accumulate=True with *duplicate* indices is NOT supported in TRT.
-# TensorRT's ScatterMode.ND overwrites on collision — there is no scatter_add
-# reduction mode. The current implementation (scatter into zeros + elementwise
-# add) only gives correct results when every scattered index is unique.
-
 
 class TestIndexPutConverter(DispatchTestCase):
     @parameterized.expand(
@@ -374,7 +369,7 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([5.0, 7.0, 3.0], dtype=torch.float32),
                 accumulate=True,
             ),
-            # bfloat16 + duplicate indices: computation stays in bfloat16 (no forced fp32 cast).
+            # bfloat16 + duplicate indices.
             param(
                 test_name="accumulate_bfloat16_duplicate",
                 source_tensor=torch.zeros([4, 4], dtype=torch.bfloat16),
@@ -796,6 +791,41 @@ class TestIndexPutConverter(DispatchTestCase):
                 f"Trial {trial}: random-walk accumulate mismatch, "
                 f"max diff = {(result - torch_output).abs().max()}"
             )
+
+    @parameterized.expand([(torch.float32,), (torch.float16,), (torch.bfloat16,)])
+    def test_accumulate_needs_no_pytorch_plugin(self, dtype):
+        """Duplicates sum before rounding, as in eager, without a plugin that runs PyTorch."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # Rounding to 16 bits after each +1 would leave 2048 unchanged, so only a float32
+        # sum of the 16 duplicates reaches eager's 2064. Row -3 is row 1.
+        inputs = (
+            torch.full((4, 2), 2048.0, dtype=dtype, device="cuda"),
+            torch.tensor([1] * 15 + [-3], device="cuda"),
+            torch.ones(16, 2, dtype=dtype, device="cuda"),
+        )
+        trt_mod = torchtrt.dynamo.compile(
+            torch.export.export(Accumulate(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            fallback_pytorch_plugin_ops=True,
+        )
+        left_to_pytorch = [
+            node
+            for module in trt_mod.modules()
+            if isinstance(module, torch.fx.GraphModule)
+            for node in module.graph.nodes
+            if node.target is torch.ops.aten.index_put.default
+        ]
+        self.assertEqual(left_to_pytorch, [])
+        torch.testing.assert_close(
+            trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
+        )
 
     def test_accumulate_expanded_values_3d(self):
         """accumulate=True with 3-D source and broadcast mesh indices — mirrors the

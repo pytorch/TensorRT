@@ -683,6 +683,101 @@ def index_put_scatter_add_plugin(
     return out
 
 
+def scatter_add_nd(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: ITensor,
+    indices: ITensor,
+    values: ITensor,
+) -> ITensor:
+    """Add ``values`` (P,) into ``input_tensor`` at the (P, rank) ``indices``, summing duplicates.
+
+    The scatter layer leaves duplicate writes undefined, so this flattens the input and uses
+    TensorRT's standard ScatterElements plugin with reduction "add", which runs without PyTorch.
+    """
+    rank = len(input_tensor.shape)
+    dims: List[Union[int, ITensor]] = [
+        (
+            get_shape(ctx, target, source_ir, f"{name}_dim_{d}", input_tensor, d)
+            if input_tensor.shape[d] == DYNAMIC_DIM
+            else input_tensor.shape[d]
+        )
+        for d in range(rank)
+    ]
+    # The plugin takes int64 indices only.
+    indices = cast_trt_tensor(ctx, indices, trt.int64, f"{name}_indices_int64")
+    flat_index: Optional[ITensor] = None
+    for d in range(rank):
+        index = select(ctx, target, source_ir, f"{name}_index_{d}", indices, 1, d)
+        # Wrap negative indices per dimension before combining them.
+        index = impl.condition.select(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_wrap_{d}",
+            impl.elementwise.add(
+                ctx, target, source_ir, f"{name}_wrapped_{d}", index, dims[d]
+            ),
+            index,
+            impl.elementwise.lt(ctx, target, source_ir, f"{name}_neg_{d}", index, 0),
+        )
+        flat_index = (
+            index
+            if flat_index is None
+            else impl.elementwise.add(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_flat_index_{d}",
+                impl.elementwise.mul(
+                    ctx, target, source_ir, f"{name}_row_{d}", flat_index, dims[d]
+                ),
+                index,
+            )
+        )
+    assert flat_index is not None
+
+    # 16-bit atomics would round after every duplicate, so sum in float32 and round once.
+    compute_dtype = (
+        trt.float32
+        if input_tensor.dtype in (trt.float16, trt.bfloat16)
+        else input_tensor.dtype
+    )
+    flat_input = impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_flat_input",
+        cast_trt_tensor(ctx, input_tensor, compute_dtype, f"{name}_input_cast"),
+        (-1,),
+    )
+    values = cast_trt_tensor(ctx, values, compute_dtype, f"{name}_values_cast")
+
+    creator = trt.get_plugin_registry().get_creator("ScatterElements", "2", "")
+    assert creator is not None, "TensorRT's ScatterElements plugin is not registered"
+    fields = trt.PluginFieldCollection(
+        [
+            trt.PluginField(
+                "axis", np.array([0], dtype=np.int32), trt.PluginFieldType.INT32
+            ),
+            trt.PluginField(
+                "reduction",
+                np.frombuffer(b"add", dtype=np.int8),
+                trt.PluginFieldType.CHAR,
+            ),
+        ]
+    )
+    plugin = creator.create_plugin(name, fields, trt.TensorRTPhase.BUILD)
+    layer = ctx.net.add_plugin_v3([flat_input, flat_index, values], [], plugin)
+    set_layer_name(layer, target, f"{name}_scatter_add", source_ir)
+    out = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_output", layer.get_output(0), dims
+    )
+    return cast_trt_tensor(ctx, out, input_tensor.dtype, f"{name}_output_cast")
+
+
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
@@ -691,6 +786,7 @@ def index_put_converter(
     input_tensor: ITensor,
     input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
     values: ITensor,
+    accumulate: bool = False,
 ) -> ITensor:
     # Convert 'input_indices' to TRT tensors (or keep None as is)
     input_indices = expand_boolean_indices(
@@ -1147,6 +1243,10 @@ def index_put_converter(
             flattened_values,
             input_tensor.dtype,
             f"{name}_values_cast",
+        )
+    if accumulate:
+        return scatter_add_nd(
+            ctx, target, source_ir, name, input_tensor, indices_cat, flattened_values
         )
     scatter_layer = ctx.net.add_scatter(
         input_tensor,

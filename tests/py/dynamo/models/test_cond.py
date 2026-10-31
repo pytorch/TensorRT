@@ -205,16 +205,21 @@ class TestCondCompilation(TestCase):
         ):
             self.skipTest("needs Torch-TensorRT's ScatterAdd plugin")
 
+        # A bool accumulate uses ScatterAdd. A float one would use TensorRT's ScatterElements.
         class AccumulateCond(nn.Module):
             def forward(self, x, index, predicate):
                 return torch.cond(
                     predicate,
                     lambda v, i: v.index_put((i,), torch.ones_like(v[:2]), True),
-                    lambda v, i: v - 1,
+                    lambda v, i: v.logical_not(),
                     (x, index),
                 )
 
-        inputs = (torch.zeros(8, 4), torch.tensor([1, 1]), torch.tensor(True))
+        inputs = (
+            torch.zeros(8, 4, dtype=torch.bool),
+            torch.tensor([1, 1]),
+            torch.tensor(True),
+        )
         cond = _cond_node(_export_lowered(AccumulateCond(), inputs))
         previous = (CONVERTERS.compilation_settings, CONVERTERS.disallowed_targets)
         try:

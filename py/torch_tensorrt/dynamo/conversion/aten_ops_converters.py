@@ -1786,6 +1786,75 @@ def aten_ops_select(
     )
 
 
+def _index_put_scatter_elements_validator(
+    node: torch.fx.Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Validator for accumulate=True using TensorRT's standard ScatterElements plugin.
+
+    That plugin runs without PyTorch, so it is preferred over ScatterAdd, which handles the rest.
+    """
+    import tensorrt as trt
+
+    if not (
+        index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and args_bounds_check(node.args, 3, False)
+    ):
+        return False
+    data = node.args[0].meta.get("val")
+    if data is None or data.dtype not in (
+        torch.float32,
+        torch.float16,
+        torch.bfloat16,
+        torch.int32,
+        torch.int64,
+    ):
+        return False
+    # The plugin takes the length of the flattened input as a 32-bit integer.
+    if isinstance(data.numel(), int) and data.numel() >= 2**31:
+        return False
+    # index_put_converter broadcasts multi-dimensional index tensors to a static shape.
+    for index in node.args[1]:
+        val = index.meta.get("val") if index is not None else None
+        if (
+            val is not None
+            and val.dim() > 1
+            and any(isinstance(size, torch.SymInt) for size in val.shape)
+        ):
+            return False
+    return trt.get_plugin_registry().get_creator("ScatterElements", "2", "") is not None
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put.default,
+    capability_validator=_index_put_scatter_elements_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_put_scatter_elements(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_put_converter(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        accumulate=True,
+    )
+
+
 def _scatter_add_plugin_available() -> bool:
     import tensorrt as trt
 

@@ -123,8 +123,8 @@ cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
 - Link the archive into your program with `-Wl,--whole-archive`, together with
   `libextension_cuda.so`, ExecuTorch's portable kernels (`libportable_ops_lib.a`, also with
   `-Wl,--whole-archive`, and `libportable_kernels.a`), the ExecuTorch core (`libexecutorch_core.a`),
-  TensorRT's `nvinfer`, the CUDA runtime and pthreads. The delegate and the kernels register
-  themselves from static initializers, and a plain static link drops them.
+  TensorRT's `nvinfer` and `nvinfer_plugin`, the CUDA runtime and pthreads. The delegate and the
+  kernels register themselves from static initializers, and a plain static link drops them.
 - The portable kernels include the two copy operators that a default export puts at the edges of
   the program, `et_copy::_h2d_copy.out` and `et_copy::_d2h_copy.out`. Without them, loading fails
   with `Error::OperatorMissing`, and a build with ExecuTorch logging on also logs
