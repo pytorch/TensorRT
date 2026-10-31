@@ -325,8 +325,8 @@ class TestUInt8Support(TestCase):
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
     def test_uint8_where(self):
-        # The where converter casts uint8 inputs to int32, but cannot reshape a uint8
-        # value of lower rank or hold a uint8 constant.
+        # The where converter widens uint8 values before it reshapes a value of
+        # lower rank or makes a constant, which TensorRT cannot do in uint8.
         class Select(nn.Module):
             def forward(self, mask, a, b):
                 return torch.where(mask, a, b).float() * 2
@@ -347,22 +347,22 @@ class TestUInt8Support(TestCase):
         flags = torch.arange(192, device="cuda").reshape(8, 8, 3) % 2 == 0
         c = torch.randn(8, 8, 3, device="cuda")
         cases = {
-            "uint8": (Select(), (mask, a, b), True),
-            "bool": (Select(), (mask, a, flags), True),
-            "bool of lower rank": (Select(), (mask, a, flags[0, 0]), True),
-            "bool constant": (SelectBackground(flags), (mask, a), True),
-            "uint8 of lower rank": (Select(), (mask, a, b[0, 0]), False),
-            "uint8 constant": (SelectBackground(b), (mask, a), False),
-            "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c), False),
-            "uint8 constant, float output": (SelectBackground(b), (mask, c), False),
+            "uint8": (Select(), (mask, a, b)),
+            "bool": (Select(), (mask, a, flags)),
+            "bool of lower rank": (Select(), (mask, a, flags[0, 0])),
+            "bool constant": (SelectBackground(flags), (mask, a)),
+            "uint8 of lower rank": (Select(), (mask, a, b[0, 0])),
+            "uint8 constant": (SelectBackground(b), (mask, a)),
+            "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c)),
+            "uint8 constant, float output": (SelectBackground(b), (mask, c)),
         }
-        for name, (mod, inputs, full) in cases.items():
+        for name, (mod, inputs) in cases.items():
             with self.subTest(name):
                 trt_mod = torch_tensorrt.dynamo.compile(
                     torch.export.export(mod, inputs),
                     inputs=list(inputs),
                     min_block_size=1,
-                    require_full_compilation=full,
+                    require_full_compilation=True,
                     cache_built_engines=False,
                     reuse_cached_engines=False,
                 )
