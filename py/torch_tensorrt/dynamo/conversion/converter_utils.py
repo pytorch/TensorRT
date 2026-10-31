@@ -192,28 +192,6 @@ def cast_trt_tensor(
         return input_val
 
 
-def cast_int_int_div_trt_tensor(
-    ctx: ConversionContext,
-    lhs_val: TRTTensor,
-    rhs_val: TRTTensor,
-    name: str,
-) -> List[TRTTensor]:
-    """
-    Given two `int` data type TRT Tensor to div operation, cast the TRT Tensor to float type
-    Args:
-        ctx (ConversionContext): A ConversionContext object
-        lhs_val (TRTTensor): A TRT Tensor numerator
-        rhs_val (TRTTensor): A TRT Tensor numerator
-        name (str): Name of calling layer
-    Returns:
-        A list of lhs_val and rhs_val casted to the appropriate datatype
-    """
-    if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
-        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
-        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, name)
-    return [lhs_val, rhs_val]
-
-
 def broadcastable(
     a: Union[TRTTensor, np.ndarray], b: Union[TRTTensor, np.ndarray]
 ) -> bool:
