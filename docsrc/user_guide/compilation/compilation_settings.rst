@@ -117,8 +117,8 @@ Optimization Tuning
        -inf (or the dtype's lowest value) above. ``True``: also a bias that cannot be
        proven, such as one built from an input, with a dynamic sequence length, or
        from a module buffer under ``torch.compile``; you assert that it is causal. A
-       bias that is computed and found not causal is always kept. ``False``: never
-       replace. A replaced bias is not read again, so refitting the weights it came
+       bias that is computed and found not causal, or whose check fails, is always
+       kept. ``False``: never replace. A replaced bias is not read again, so refitting the weights it came
        from does not change the engine.
 
 ----

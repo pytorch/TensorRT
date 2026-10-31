@@ -27,7 +27,8 @@ def force_causal_efficient_attention(
 
     * None: a bias proven causal (see _prove_causal).
     * True: also a bias the pass cannot prove, which the caller asserts is causal. A
-      bias the pass checks and finds not causal, such as a block-causal mask, is kept.
+      bias the pass checks and finds not causal, such as a block-causal mask, is kept,
+      and so is one whose check fails, for example by running out of memory.
     * False: none.
 
     For decode-phase attention (seq_q != seq_k): skip the transformation.
@@ -124,7 +125,8 @@ def _prove_causal(
     It is causal when it keeps exactly the lower triangle (0) and blocks the rest
     (-inf, or the dtype's lowest value as Hugging Face uses). It is not causal when
     its zeros are anywhere else, or when it does not block a position above the
-    diagonal.
+    diagonal. A bias whose check fails counts as not causal, so that a machine with
+    less memory does not compile the same bias differently.
     """
     if not isinstance(seq_len, int):
         return None
@@ -151,8 +153,8 @@ def _prove_causal(
         try:
             return _check_causal(torch.fx.GraphModule(gm, graph)(), seq_len)
         except Exception as e:
-            logger.debug(f"Could not check attn_bias {attn_bias}: {e}")
-            return None
+            logger.warning(f"Keeping attn_bias {attn_bias}, could not check it: {e}")
+            return False
 
 
 def _check_causal(bias: Any, seq_len: int) -> Optional[bool]:
