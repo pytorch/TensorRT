@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import sys
 import unittest.mock as mock
 
 import torch
@@ -115,6 +116,40 @@ class TestResourcePartitioning(TestCase):
             partitioner._verify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
 
             break
+
+    def test_fusion_with_a_long_chain_of_producers(self):
+        class MulAddAfterChain(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = nn.Parameter(torch.ones(4))
+
+            def forward(self, x, y):
+                z = x * self.w
+                # The add of the mul + add fusion reads a chain longer than the recursion limit.
+                for _ in range(2 * sys.getrecursionlimit()):
+                    y = torch.sin(y)
+                return z + y
+
+        inputs = (torch.randn(4), torch.randn(4))
+        gm = torch.export.export(MulAddAfterChain(), inputs).module(check_guards=False)
+        partitioner = ResourcePartitioner(
+            gm, cpu_memory_budget=None, submodule_name="m"
+        )
+        nodes = partitioner.put_nodes_into_subgraphs()[0].nodes
+        # Split right after the mul, which breaks the fusion.
+        subgraphs = [
+            Subgraph(is_acc=True, nodes=nodes[:1]),
+            Subgraph(is_acc=True, nodes=nodes[1:]),
+        ]
+        leaf_node = partitioner.get_leaf_node(subgraphs[0].nodes)
+        assert partitioner.step_if_break_fusion(
+            subgraphs,
+            leaf_node,
+            set(subgraphs[0].nodes),
+            set(subgraphs[1].nodes),
+        )
+        assert subgraphs[0].nodes == nodes
+        assert subgraphs[1].nodes == []
 
 
 if __name__ == "__main__":

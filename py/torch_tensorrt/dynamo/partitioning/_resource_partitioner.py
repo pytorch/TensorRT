@@ -383,20 +383,25 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         def add_nodes(node: torch.fx.Node) -> None:
             """
-            This function adds a node and all its previous nodes to the first subgraph and removes it from the second subgraph in post order.
+            This function moves a node and all its previous nodes in the second subgraph to the first subgraph, keeping their order.
             """
-            if (
-                node.op in CALLABLE_NODE_OPS
-                and node not in nodes_in_first_subgraph
-                and node in nodes_in_second_subgraph
-            ):
-                # Exclude all nodes already in the first subgraph
-                nodes_in_first_subgraph.add(node)
-                nodes_in_second_subgraph.remove(node)
-                for input_node in node._input_nodes:
-                    add_nodes(input_node)
-                subgraphs[0].nodes.append(node)
-                subgraphs[1].nodes.remove(node)
+            # An explicit stack, not recursion: a chain of producers can be longer than Python's recursion limit.
+            nodes_to_move, stack = set(), [node]
+            while stack:
+                n = stack.pop()
+                if (
+                    n.op in CALLABLE_NODE_OPS
+                    and n not in nodes_to_move
+                    and n in nodes_in_second_subgraph
+                ):
+                    nodes_to_move.add(n)
+                    stack.extend(n._input_nodes)
+            nodes_in_first_subgraph.update(nodes_to_move)
+            nodes_in_second_subgraph.difference_update(nodes_to_move)
+            # The second subgraph is in graph order, so producers move before their users.
+            for n in [n for n in subgraphs[1].nodes if n in nodes_to_move]:
+                subgraphs[0].nodes.append(n)
+                subgraphs[1].nodes.remove(n)
 
         fusion_broken = False
         for leaf in leaf_nodes:
