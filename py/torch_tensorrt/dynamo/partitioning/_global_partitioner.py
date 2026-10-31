@@ -206,32 +206,15 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         TensorRT allows uint8 only at engine inputs and outputs, so a layer that makes
         one, such as a reshape, a slice or a concatenation of uint8 data, fails the
         build. A clone, and a slice_scatter that overwrites the whole tensor with a
-        uint8 source, can hand an engine input through as it is, so they are left to
-        their converters. A where's converter casts uint8 values to int32 before the
-        select layer, but first reshapes a value of lower rank and makes a constant.
-        So a where with a uint8 value of lower rank or a uint8 constant makes a uint8
-        tensor whatever its output, and a where between other tensors does not. uint8
-        constants are packed FP4 weights that the quantization converters read
-        themselves.
+        uint8 source, can hand an engine input through as it is, and the where
+        converter widens uint8 values first, so they are left to their converters. A
+        get_attr is not refused: uint8 weights are packed FP4 that the quantization
+        converters read themselves.
         """
         if node.op not in CALLABLE_NODE_OPS:
             return False
-        if node.target == torch.ops.aten.clone.default:
+        if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
             return False
-        if node.target == torch.ops.aten.where.self:
-            output = node.meta.get("val")
-            values = node.args[1:3]
-            tensors = [getattr(value, "meta", {}).get("val") for value in values]
-            if output is not None:
-                if any(
-                    isinstance(tensor, torch.Tensor)
-                    and tensor.dtype == torch.uint8
-                    and (value.op == "get_attr" or tensor.dim() < output.dim())
-                    for value, tensor in zip(values, tensors)
-                ):
-                    return True
-                if all(isinstance(tensor, torch.Tensor) for tensor in tensors):
-                    return False
         if node.target == torch.ops.aten.slice_scatter.default:
             destination = getattr(node.args[0], "meta", {}).get("val")
             source = getattr(node.args[1], "meta", {}).get("val")

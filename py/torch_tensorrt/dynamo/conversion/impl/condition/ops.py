@@ -34,6 +34,11 @@ def where(
     if not (broadcastable(input, other)):
         assert "The two torch tensors should be broadcastable"
 
+    # TensorRT has no uint8 shuffle or constant, so widen uint8 values before the
+    # broadcast and constant steps below. The select would promote them anyway.
+    input = _widen_uint8(ctx, input, f"{name}_x_int32")
+    other = _widen_uint8(ctx, other, f"{name}_y_int32")
+
     x_shape = list(input.shape)
     y_shape = list(other.shape)
     condition_shape = list(condition.shape)
@@ -66,6 +71,20 @@ def where(
     input, other = promote_trt_tensors_to_same_dtype(ctx, input, other, name)
 
     return select(ctx, target, source_ir, name, input, other, condition)
+
+
+def _widen_uint8(
+    ctx: ConversionContext,
+    value: Union[TRTTensor, np.ndarray, torch.Tensor],
+    name: str,
+) -> Union[TRTTensor, np.ndarray, torch.Tensor]:
+    if isinstance(value, TRTTensor) and value.dtype == trt.uint8:
+        return cast_trt_tensor(ctx, value, trt.int32, name)
+    if isinstance(value, torch.Tensor) and value.dtype == torch.uint8:
+        return value.to(torch.int32)
+    if isinstance(value, np.ndarray) and value.dtype == np.uint8:
+        return value.astype(np.int32)
+    return value
 
 
 def select(
