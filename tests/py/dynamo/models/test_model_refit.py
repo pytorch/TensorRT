@@ -872,16 +872,19 @@ def test_refit_one_engine_python_runtime_without_weightmap():
 def test_refit_rejects_weights_of_another_shape():
     inputs = (torch.randn(4, 8, device="cuda"),)
     trt_gm = torchtrt.dynamo.compile(
-        torch.export.export(torch.nn.Linear(8, 16).cuda(), inputs),
+        torch.export.export(torch.nn.Linear(8, 16, bias=False).cuda(), inputs),
         inputs,
         min_block_size=1,
         immutable_weights=False,
     )
-    with pytest.raises(AssertionError, match=r"holds \d+ DataType.FLOAT, the new"):
+    with pytest.raises(
+        AssertionError,
+        match="holds 128 DataType.FLOAT, the new weight is 256 DataType.FLOAT",
+    ):
         refit_module_weights(
             compiled_module=trt_gm,
             new_weight_module=torch.export.export(
-                torch.nn.Linear(8, 32).cuda(), inputs
+                torch.nn.Linear(8, 32, bias=False).cuda(), inputs
             ),
             arg_inputs=inputs,
         )
