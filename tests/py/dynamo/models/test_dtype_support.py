@@ -331,6 +331,10 @@ class TestUInt8Support(TestCase):
             "slice": lambda image: image[2:6],
             "stack": lambda image: torch.stack([image, image]),
             "split": lambda image: torch.split(image, 4)[1],
+            "cat with a uint8 constant": lambda image: torch.cat(
+                [image, torch.zeros(8, 8, 1, dtype=torch.uint8, device=image.device)],
+                -1,
+            ),
             "full slice_scatter from a permute": lambda image: torch.slice_scatter(
                 image, image.permute(1, 0, 2), 0, 0, 8
             ),

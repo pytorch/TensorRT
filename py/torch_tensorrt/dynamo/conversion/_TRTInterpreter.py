@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import itertools
 import logging
 import os
 import warnings
@@ -40,12 +41,12 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     UINT8_DATA_MOVEMENT_OPS,
-    cast_trt_tensor,
     get_node_io,
     get_node_name,
     get_trt_tensor,
     makes_uint8_tensor,
     to_torch,
+    widen_uint8,
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
@@ -857,15 +858,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             _LOGGER.debug(f"{target} adds a plugin that runs PyTorch")
 
         if target in UINT8_DATA_MOVEMENT_OPS:
+            names = (f"{self._cur_node_name}_uint8_{i}" for i in itertools.count())
             args = torch.fx.node.map_aggregate(
-                args,
-                lambda arg: (
-                    cast_trt_tensor(
-                        self.ctx, arg, trt.int32, f"{self._cur_node_name}_{arg.name}"
-                    )
-                    if isinstance(arg, trt.ITensor) and arg.dtype == trt.uint8
-                    else arg
-                ),
+                args, lambda arg: widen_uint8(self.ctx, arg, next(names))
             )
 
         self.ctx.current_node = self._cur_node

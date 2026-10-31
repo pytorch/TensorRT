@@ -263,6 +263,26 @@ def cast_trt_tensor(
         return input_val
 
 
+def widen_uint8(
+    ctx: ConversionContext,
+    value: Any,
+    name: str,
+) -> Any:
+    """Cast a uint8 tensor or constant to int32, and return any other value as is.
+
+    TensorRT allows uint8 only at engine inputs and outputs, so ops that only move
+    data, and ``where``, run on int32 instead; the values are the same.
+    """
+    if isinstance(value, TRTTensor) and value.dtype == trt.uint8:
+        return cast_trt_tensor(ctx, value, trt.int32, name)
+    # get_trt_tensor converts the constant outside the fake mode of torch.compile.
+    if (isinstance(value, torch.Tensor) and value.dtype == torch.uint8) or (
+        isinstance(value, np.ndarray) and value.dtype == np.uint8
+    ):
+        return get_trt_tensor(ctx, value, name, dtype=torch.int32)
+    return value
+
+
 def broadcastable(
     a: Union[TRTTensor, np.ndarray], b: Union[TRTTensor, np.ndarray]
 ) -> bool:
