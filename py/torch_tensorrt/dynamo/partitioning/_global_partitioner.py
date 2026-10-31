@@ -32,6 +32,21 @@ from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
 logger = logging.getLogger(__name__)
 
+# Ops that only move data, so their result has the same type in an engine as their input.
+_DATA_MOVEMENT_OPS = {
+    torch.ops.aten.permute.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten.view.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.slice.Tensor,
+    torch.ops.aten.select.int,
+    torch.ops.aten.cat.default,
+}
+
 
 class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
     """Partitioner to split an FX graph into subgraphs based on operator support
@@ -207,13 +222,18 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         one, such as a reshape, a slice or a concatenation of uint8 data, fails the
         build. A clone, and a slice_scatter that overwrites the whole tensor with a
         uint8 source, can hand an engine input through as it is, and the where
-        converter widens uint8 values first, so they are left to their converters. A
-        get_attr is not refused: uint8 weights are packed FP4 that the quantization
-        converters read themselves.
+        converter widens uint8 values first, so they are left to their converters. So
+        is an op that only moves data a where already widened. A get_attr is not
+        refused: uint8 weights are packed FP4 that the quantization converters read
+        themselves.
         """
         if node.op not in CALLABLE_NODE_OPS:
             return False
         if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+            return False
+        if node.target in _DATA_MOVEMENT_OPS and (
+            TorchTensorRTOperatorSupport._is_widened_uint8(node)
+        ):
             return False
         if node.target == torch.ops.aten.slice_scatter.default:
             destination = getattr(node.args[0], "meta", {}).get("val")
@@ -237,6 +257,23 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         return any(
             isinstance(leaf, torch.Tensor) and leaf.dtype == torch.uint8
             for leaf in leaves
+        )
+
+    @staticmethod
+    def _is_widened_uint8(node: torch.fx.Node) -> bool:
+        """True if the node's uint8 data is int32 inside an engine: a where, which
+        widens uint8 values, or an op that only moves data from such nodes."""
+        if node.target == torch.ops.aten.where.self:
+            return True
+        if node.target not in _DATA_MOVEMENT_OPS:
+            return False
+        uint8_inputs = [
+            arg
+            for arg in node.all_input_nodes
+            if getattr(arg.meta.get("val"), "dtype", None) == torch.uint8
+        ]
+        return bool(uint8_inputs) and all(
+            TorchTensorRTOperatorSupport._is_widened_uint8(arg) for arg in uint8_inputs
         )
 
     @staticmethod

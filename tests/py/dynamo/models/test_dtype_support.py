@@ -331,6 +331,10 @@ class TestUInt8Support(TestCase):
             def forward(self, mask, a, b):
                 return torch.where(mask, a, b).float() * 2
 
+        class SelectThenPermute(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b).permute(2, 0, 1).float()
+
         class SelectBackground(nn.Module):
             def __init__(self, background):
                 super().__init__()
@@ -348,6 +352,7 @@ class TestUInt8Support(TestCase):
         c = torch.randn(8, 8, 3, device="cuda")
         cases = {
             "uint8": (Select(), (mask, a, b)),
+            "uint8, then permuted": (SelectThenPermute(), (mask, a, b)),
             "bool": (Select(), (mask, a, flags)),
             "bool of lower rank": (Select(), (mask, a, flags[0, 0])),
             "bool constant": (SelectBackground(flags), (mask, a)),
