@@ -404,6 +404,23 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([1.0], dtype=torch.float32),
                 accumulate=True,
             ),
+            # A 2-D index, as in an embedding gradient, uses ScatterAdd.
+            param(
+                test_name="accumulate_2d_index",
+                source_tensor=torch.zeros([10, 4], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([[1, 3, 3], [0, 9, 1]], dtype=torch.int64),
+                ),
+                value_tensor=torch.ones([2, 3, 4], dtype=torch.float32),
+                accumulate=True,
+            ),
+            param(
+                test_name="accumulate_bool_mask",
+                source_tensor=torch.zeros([5, 3], dtype=torch.float32),
+                indices_tensor=(torch.tensor([True, False, True, True, False]),),
+                value_tensor=torch.arange(9, dtype=torch.float32).reshape(3, 3),
+                accumulate=True,
+            ),
         ]
     )
     def test_index_put(
@@ -802,8 +819,8 @@ class TestIndexPutConverter(DispatchTestCase):
             def forward(self, x, index, values):
                 return x.index_put((index,), values, accumulate=True)
 
-        # All 16 indices are row 1, and one 16 x 2 block of values broadcasts over them. A 16-bit
-        # sum would round each step back to 2048, so only a float32 sum gives eager's 2064 and 2080.
+        # All 16 indices are row 1, and one 16 x 2 block of values broadcasts over them. Rounding to
+        # 16 bits after each add would keep the 1.0 entries at 2048, so only a float32 sum gives 2064.
         inputs = (
             torch.full((3, 16, 2), 2048.0, dtype=dtype, device="cuda"),
             torch.tensor([1] * 15 + [-2], device="cuda"),

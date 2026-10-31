@@ -171,8 +171,8 @@ Keep plugins that run PyTorch out of the engine
 
 Some converters build a TensorRT plugin that runs PyTorch when the engine runs. ``aten.index_put``
 with ``accumulate=True`` and one 1-D index uses TensorRT's own ScatterElements plugin, which does
-not. With several index tensors, an index of more than one dimension, or a bool tensor, it uses
-Torch-TensorRT's ScatterAdd plugin, which does. A plugin made with
+not. With several index tensors, an index that is not 1-D, or a tensor of another type such as
+bool, it uses Torch-TensorRT's ScatterAdd plugin, which does. A plugin made with
 ``torch_tensorrt.dynamo.conversion.plugins.custom_op`` that does not use an AOT kernel runs the
 PyTorch op from Python. The ExecuTorch runtime does not load PyTorch, so ``save()`` refuses such an
 engine and names the operators. It finds them through converters registered with
