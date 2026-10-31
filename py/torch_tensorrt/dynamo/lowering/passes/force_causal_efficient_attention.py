@@ -177,9 +177,10 @@ def _check_causal(bias: Any, seq_len: int) -> Optional[bool]:
     bias = bias.expand(keep.shape)
     if not torch.equal(bias == 0, keep):
         return False
-    blocked = bias[~keep]
-    if bool((blocked <= torch.finfo(bias.dtype).min).all()):
+    # Compare in place: indexing the blocked positions out would build an int64 index
+    # several times the size of the bias.
+    if bool(((bias <= torch.finfo(bias.dtype).min) | keep).all()):
         return True
     # exp(-1e4) is 0 even in float32, so softmax gives such a position no weight in
     # practice, though that is not a proof for every score.
-    return None if bool((blocked <= -1e4).all()) else False
+    return None if bool(((bias <= -1e4) | keep).all()) else False
