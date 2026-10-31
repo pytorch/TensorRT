@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
 from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
@@ -77,6 +78,20 @@ def force_causal_efficient_attention(
                 f"Keeping attn_bias of node {node} because it is "
                 + ("not causal" if proof is False else "not proven causal")
             )
+            # The converter refuses compute_log_sumexp, which the replacement below
+            # clears. Clear it for a kept bias too when nothing reads log_sumexp. With
+            # dropout it stays, and the node stays in PyTorch, which applies dropout.
+            if (
+                len(node.args) > 4
+                and node.args[4]
+                and (len(node.args) < 6 or node.args[5] == 0.0)
+                and all(
+                    user.target is operator.getitem and user.args[1] == 0
+                    for user in node.users
+                )
+            ):
+                node.args = node.args[:4] + (False,) + node.args[5:]
+                changed = True
             continue
 
         node.args = (
