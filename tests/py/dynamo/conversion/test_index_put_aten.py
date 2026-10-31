@@ -577,6 +577,43 @@ class TestIndexPutConverter(DispatchTestCase):
                 with self.assertRaises((RuntimeError, IndexError)):
                     compiled(data, fewer, values)
 
+    def test_runtime_length_one_broadcasts(self):
+        # A length known only at runtime that turns out to be 1 repeats, as in PyTorch.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("Skipped on tensorrt_rtx due to nonzero not supported")
+
+        class SetRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(
+                    data, [index], values[values > 0]
+                )
+
+        class SetColumns(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                column = torch.tensor([1], device=data.device)
+                return torch.ops.aten.index_put.default(
+                    data, [None, index, column], values[values > 0]
+                )
+
+        # Two indices and one value here.
+        mask = torch.tensor([1, 0, 1, 0], device="cuda")
+        values = torch.tensor([7.0, -1.0], device="cuda")
+        cases = [
+            (SetRows(), (torch.zeros(4, device="cuda"), mask, values)),
+            (SetColumns(), (torch.zeros(3, 4, 5, device="cuda"), mask, values)),
+        ]
+        for model, inputs in cases:
+            with self.subTest(type(model).__name__):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):
