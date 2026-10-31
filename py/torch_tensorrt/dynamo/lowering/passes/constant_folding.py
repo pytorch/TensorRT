@@ -310,17 +310,17 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def run_node(self, node: torch.fx.Node) -> Any:
         try:
             return super().run_node(node)
-        except RuntimeError:
+        except RuntimeError as error:
             # offload_module_to_cpu leaves folded constants on the CPU while their
             # metadata keeps the device that computed them. An op that also reads a
             # tensor on that device, such as a scalar the complex lowering's retrace
             # created there, can fail on the mix. Only then does it run again with
             # those constants on their device, so every op that ran before still
-            # computes where it did.
+            # computes where it did, and an op that fails either way keeps its error.
             inputs = {inp: self.env.get(inp) for inp in node.all_input_nodes}
             devices = {v.device for v in inputs.values() if isinstance(v, torch.Tensor)}
-            moved = {
-                inp: value.to(meta.device)
+            offloaded = {
+                inp: meta.device
                 for inp, value in inputs.items()
                 if isinstance(value, torch.Tensor)
                 and value.device.type == "cpu"
@@ -328,10 +328,14 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
                 and meta.device.type != "cpu"
                 and meta.device in devices
             }
-            if not moved:
+            if not offloaded:
                 raise
-            self.env.update(moved)
             try:
+                self.env.update(
+                    {inp: inputs[inp].to(device) for inp, device in offloaded.items()}
+                )
                 return super().run_node(node)
+            except RuntimeError:
+                raise error from None
             finally:
-                self.env.update({inp: inputs[inp] for inp in moved})
+                self.env.update({inp: inputs[inp] for inp in offloaded})
