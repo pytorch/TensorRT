@@ -150,17 +150,18 @@ def validate_engine_info(
         if len(engine_info) > SERIALIZED_METADATA_IDX
         else ""
     )
-    if serialized_metadata and TorchTensorRTModule.decode_metadata(
-        serialized_metadata
-    ).get("requires_libtorch_plugin", False):
+    metadata = (
+        TorchTensorRTModule.decode_metadata(serialized_metadata)
+        if serialized_metadata
+        else {}
+    )
+    plugin_ops = metadata.get("pytorch_plugin_ops")
+    if plugin_ops:
         raise RuntimeError(
-            "ExecuTorch export does not support TensorRT engines that use "
-            "Torch-TensorRT's ScatterAdd plugin, which runs on libtorch. "
-            f"aten.index_put with accumulate=True converts to it{node_suffix}. The "
-            "ExecuTorch TensorRT runtime does not load libtorch, so it cannot load "
-            "this engine. "
-            "Compile with torch_executed_ops={torch.ops.aten.index_put.default} to "
-            "run index_put outside TensorRT."
+            f"ExecuTorch export does not support the TensorRT engine{node_suffix}: it "
+            f"runs {', '.join(plugin_ops)} with TensorRT plugins that run PyTorch, and "
+            "the ExecuTorch TensorRT runtime does not load PyTorch. Compile with "
+            "fallback_pytorch_plugin_ops=True to keep those operators out of TensorRT."
         )
 
 

@@ -130,7 +130,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
         num_user_outputs: Optional[int] = None,
-        requires_libtorch_plugin: bool = False,
+        pytorch_plugin_ops: Optional[List[str]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -210,7 +210,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
         self.num_user_outputs = num_user_outputs
-        self.requires_libtorch_plugin = requires_libtorch_plugin
+        self.pytorch_plugin_ops = list(pytorch_plugin_ops or [])
         self.target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -282,7 +282,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
             "num_user_outputs": self.num_user_outputs,
-            "requires_libtorch_plugin": self.requires_libtorch_plugin,
+            "pytorch_plugin_ops": self.pytorch_plugin_ops,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
@@ -588,9 +588,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
             self.num_user_outputs = metadata.get("num_user_outputs")
-            self.requires_libtorch_plugin = metadata.get(
-                "requires_libtorch_plugin", False
-            )
+            self.pytorch_plugin_ops = metadata.get("pytorch_plugin_ops", [])
             self.aliased_io = deserialize_aliased_io(
                 str(serialized_engine_info[ALIASED_IO_IDX])
             )

@@ -46,7 +46,7 @@ class ConversionContext:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
-        requires_libtorch_plugin: Boolean flag indicating if the converter inserts a Torch-TensorRT plugin whose kernel calls libtorch (e.g. ScatterAdd), so the engine only loads where the Torch-TensorRT runtime library is loaded
+        pytorch_plugin_ops: Operators converted with TensorRT plugins whose kernels run PyTorch, so the engine only runs in a process with PyTorch
         weight_refit_map: Dictionary mapping weight names to their corresponding np.array
         cpu_weights_reference_holder: Dictionary mapping weight names to their corresponding torch.Tensor
         current_node: The FX node currently being converted, used by converters that need access to graph-level metadata (e.g. annotations set by lowering passes)
@@ -57,7 +57,7 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
-    requires_libtorch_plugin: bool = False
+    pytorch_plugin_ops: set[str] = field(default_factory=set)
     requires_native_multidevice: bool = False
     requires_aliased_plugin_io: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)

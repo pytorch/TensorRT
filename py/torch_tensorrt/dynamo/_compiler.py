@@ -140,6 +140,7 @@ def cross_compile_for_windows(
     attn_bias_is_causal: Optional[bool] = _defaults.ATTN_BIAS_IS_CAUSAL,
     fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    fallback_pytorch_plugin_ops: bool = _defaults.FALLBACK_PYTORCH_PLUGIN_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -233,6 +234,7 @@ def cross_compile_for_windows(
         attn_bias_is_causal (Optional[bool]): Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal mask, which is faster and more accurate. None: only a bias proven causal, one that depends on no graph input and holds 0 on and below the diagonal and -inf (or the dtype's lowest value) above. True: also a bias that cannot be proven, such as one built from an input, with a dynamic sequence length, or from a module buffer under torch.compile; you assert that it is causal. A bias that is computed and found not causal, or whose check fails, is always kept. False: never replace. A replaced bias is not read again, so refitting the weights it came from does not change the engine. Default is None.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -393,6 +395,7 @@ def cross_compile_for_windows(
         "attn_bias_is_causal": attn_bias_is_causal,
         "fold_shared_kv_attention": fold_shared_kv_attention,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
+        "fallback_pytorch_plugin_ops": fallback_pytorch_plugin_ops,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -534,6 +537,7 @@ def compile(
     attn_bias_is_causal: Optional[bool] = _defaults.ATTN_BIAS_IS_CAUSAL,
     fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
+    fallback_pytorch_plugin_ops: bool = _defaults.FALLBACK_PYTORCH_PLUGIN_OPS,
     build_route: Optional[str] = _defaults.BUILD_ROUTE,
     tune_build_routes: Optional[str] = _defaults.TUNE_BUILD_ROUTES,
     tune_build_route_file: Optional[str] = _defaults.TUNE_BUILD_ROUTE_FILE,
@@ -650,6 +654,7 @@ def compile(
         attn_bias_is_causal (Optional[bool]): Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal mask, which is faster and more accurate. None: only a bias proven causal, one that depends on no graph input and holds 0 on and below the diagonal and -inf (or the dtype's lowest value) above. True: also a bias that cannot be proven, such as one built from an input, with a dynamic sequence length, or from a module buffer under torch.compile; you assert that it is causal. A bias that is computed and found not causal, or whose check fails, is always kept. False: never replace. A replaced bias is not read again, so refitting the weights it came from does not change the engine. Default is None.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
+        fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
         tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
@@ -856,6 +861,7 @@ def compile(
         "attn_bias_is_causal": attn_bias_is_causal,
         "fold_shared_kv_attention": fold_shared_kv_attention,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
+        "fallback_pytorch_plugin_ops": fallback_pytorch_plugin_ops,
         "build_route": build_route,
         "tune_build_routes": tune_build_routes,
         "tune_build_route_file": tune_build_route_file,

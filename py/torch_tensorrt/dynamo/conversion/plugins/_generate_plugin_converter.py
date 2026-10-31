@@ -184,6 +184,8 @@ def _generate_plugin_converter(
         # A mutating schema means the plugin declares aliased I/O
         # (`_generate_plugin` emits `.aliased()` from the same signal).
         requires_aliased_plugin_io=schema_declares_mutation,
+        # A JIT plugin runs the PyTorch op from Python at execution time.
+        requires_pytorch_plugin=not use_aot_plugin,
     )(custom_kernel_converter)
     assert torch_overload in DYNAMO_CONVERTERS, (
         f"Generated dynamo converter for {namespace}::{op_name} did not get properly"

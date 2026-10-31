@@ -190,15 +190,15 @@ def test_preprocess_rejects_output_allocator():
 
 
 @pytest.mark.unit
-def test_preprocess_rejects_an_engine_with_a_libtorch_plugin():
+def test_preprocess_rejects_an_engine_with_a_pytorch_plugin():
     engine_info = [""] * SERIALIZATION_LEN
     engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
     engine_info[SERIALIZED_METADATA_IDX] = base64.b64encode(
-        pickle.dumps({"requires_libtorch_plugin": True})
+        pickle.dumps({"pytorch_plugin_ops": ["aten.index_put.default"]})
     ).decode("utf-8")
     edge_program = _build_edge_program(engine_info)
 
-    with pytest.raises(RuntimeError, match="runs on libtorch"):
+    with pytest.raises(RuntimeError, match="runs aten.index_put.default with TensorRT"):
         TensorRTBackend.preprocess(edge_program, [])
 
 
