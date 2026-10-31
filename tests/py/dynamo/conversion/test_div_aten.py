@@ -103,6 +103,18 @@ class TestDivConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_div_of_integers_is_float(self):
+        # Reciprocal lowers to 1 / x, so it is a true division too.
+        class IntDiv(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return lhs_val / rhs_val, lhs_val / 255, torch.reciprocal(rhs_val)
+
+        inputs = [
+            torch.randint(0, 256, (2, 3), dtype=torch.int32),
+            torch.randint(1, 256, (2, 3), dtype=torch.int32),
+        ]
+        self.run_test(IntDiv(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
 
 if __name__ == "__main__":
     run_tests()
