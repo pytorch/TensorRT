@@ -632,6 +632,21 @@ class TestRewriteEfficientAttention(TestCase):
                 True,
             ),
             (BufferBias(causal), (query,), None, CompilationSettings(), True),
+            (
+                BufferBias(causal),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=False),
+                False,
+            ),
+            # A sliding window: blocks every position above the diagonal, and some below.
+            (
+                BufferBias(causal.masked_fill(upper.mT.tril(-4), float("-inf"))),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                False,
+            ),
             # Zeros on the lower triangle, but positions above it are not blocked.
             (
                 BufferBias(causal.nan_to_num(neginf=5.0)),
