@@ -74,6 +74,24 @@ def _tensor_reuses_module_storage(
     return False
 
 
+def _has_offloaded_constants(gm: torch.fx.GraphModule) -> bool:
+    """Whether a constant sits on the CPU while its metadata names a device."""
+    for node in gm.graph.nodes:
+        meta = node.meta.get("val")
+        if node.op != "get_attr" or not isinstance(meta, torch.Tensor):
+            continue
+        value: Any = gm
+        for atom in str(node.target).split("."):
+            value = getattr(value, atom, None)
+        if (
+            isinstance(value, torch.Tensor)
+            and value.device.type == "cpu"
+            and meta.device.type != "cpu"
+        ):
+            return True
+    return False
+
+
 @torch.utils._python_dispatch._disable_current_modes()  # type: ignore
 def constant_fold(
     gm: torch.fx.GraphModule, settings: CompilationSettings
@@ -85,7 +103,12 @@ def constant_fold(
 
     Modifies the graph in-place and replaces node with constants
     """
-    cf = _TorchTensorRTConstantFolder(gm, skip_constructors=False)
+    folder = (
+        _OffloadedConstantFolder
+        if _has_offloaded_constants(gm)
+        else _TorchTensorRTConstantFolder
+    )
+    cf = folder(gm, skip_constructors=False)
     cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
@@ -306,6 +329,10 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         # The meta value holds the IDs of the rules that marked this node; it is
         # empty once every rule that claimed it has been disabled.
         return bool(node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY))
+
+
+class _OffloadedConstantFolder(_TorchTensorRTConstantFolder):
+    """Folds a graph holding constants that offload_module_to_cpu left on the CPU."""
 
     def run_node(self, node: torch.fx.Node) -> Any:
         try:

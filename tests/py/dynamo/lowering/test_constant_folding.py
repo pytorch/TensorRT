@@ -236,7 +236,7 @@ class TestConstantFolding(TestCase):
             )
             actual = compiled_model(example_input)
 
-        # The attention's matrix multiplies run in TF32 by default.
+        # TensorRT may run the attention's matrix multiplies in TF32.
         torch.testing.assert_close(actual, expected, rtol=0.02, atol=0.02)
         self.assertEqual(model.scale.device.type, "cpu")
 
