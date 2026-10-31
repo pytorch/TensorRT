@@ -794,7 +794,7 @@ class TestIndexPutConverter(DispatchTestCase):
 
     @parameterized.expand([(torch.float32,), (torch.float16,), (torch.bfloat16,)])
     def test_accumulate_needs_no_pytorch_plugin(self, dtype):
-        """Duplicates sum before rounding, as in eager, without a plugin that runs PyTorch."""
+        """Duplicates sum and values broadcast as in eager, without a plugin that runs PyTorch."""
         if ENABLED_FEATURES.tensorrt_rtx:
             pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
 
@@ -802,27 +802,24 @@ class TestIndexPutConverter(DispatchTestCase):
             def forward(self, x, index, values):
                 return x.index_put((index,), values, accumulate=True)
 
-        # Rounding to 16 bits after each +1 would leave 2048 unchanged, so only a float32
-        # sum of the 16 duplicates reaches eager's 2064. Row -3 is row 1.
+        # All 16 indices are row 1, and one 16 x 2 block of values broadcasts over them. A 16-bit
+        # sum would round each step back to 2048, so only a float32 sum gives eager's 2064 and 2080.
         inputs = (
-            torch.full((4, 2), 2048.0, dtype=dtype, device="cuda"),
-            torch.tensor([1] * 15 + [-3], device="cuda"),
-            torch.ones(16, 2, dtype=dtype, device="cuda"),
+            torch.full((3, 16, 2), 2048.0, dtype=dtype, device="cuda"),
+            torch.tensor([1] * 15 + [-2], device="cuda"),
+            torch.tensor([[1.0, 1.0], [2.0, 2.0]] * 8, dtype=dtype, device="cuda"),
         )
         trt_mod = torchtrt.dynamo.compile(
             torch.export.export(Accumulate(), inputs),
             arg_inputs=inputs,
             min_block_size=1,
-            fallback_pytorch_plugin_ops=True,
         )
-        left_to_pytorch = [
-            node
+        (engine,) = [
+            module
             for module in trt_mod.modules()
-            if isinstance(module, torch.fx.GraphModule)
-            for node in module.graph.nodes
-            if node.target is torch.ops.aten.index_put.default
+            if isinstance(module, torchtrt.dynamo.runtime.TorchTensorRTModule)
         ]
-        self.assertEqual(left_to_pytorch, [])
+        self.assertEqual(engine.pytorch_plugin_ops, [])
         torch.testing.assert_close(
             trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
         )
@@ -993,6 +990,65 @@ class TestIndexPutConverter(DispatchTestCase):
         assert torch.allclose(
             result, torch_output, atol=1e-4, rtol=1e-4
         ), f"Non-contiguous accumulate mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_accumulate_dynamic_shape_that_can_reach_2_31_elements(self):
+        """With fallback_pytorch_plugin_ops, a dynamic shape that can reach 2**31 elements runs in PyTorch."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # ScatterElements reads past its buffers once the updates reach 2**31 elements. The
+        # validator sees only the exported range, so an unbounded one cannot be trusted. A long
+        # index makes the updates larger than the input, and more rows make the input larger.
+        for rows, max_columns, exported_max, index_length, left_to_pytorch in (
+            (4, 2**20, 2**20, 4, 0),
+            (4, 2**29, 2**29, 4, 1),
+            (4, 2**20, None, 4, 1),
+            (4, 2**20, 2**20, 4096, 1),
+            (8, 2**28, 2**28, 4, 1),
+        ):
+            inputs = (
+                torch.zeros(rows, 64, device="cuda"),
+                torch.tensor([0, 0, 1, 3], device="cuda").repeat(index_length // 4),
+                torch.ones(1, 1, device="cuda"),
+            )
+            with self.subTest(
+                rows=rows,
+                max_columns=max_columns,
+                exported_max=exported_max,
+                index_length=index_length,
+            ):
+                columns = torch.export.Dim("columns", min=2, max=exported_max)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(
+                        Accumulate(),
+                        inputs,
+                        dynamic_shapes=({1: columns}, None, None),
+                    ),
+                    arg_inputs=[
+                        torchtrt.Input(
+                            min_shape=(rows, 2),
+                            opt_shape=(rows, 64),
+                            max_shape=(rows, max_columns),
+                            dtype=torch.float32,
+                        ),
+                        *inputs[1:],
+                    ],
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), left_to_pytorch)
+                torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
 
     def test_accumulate_expanded_values_broadcast(self):
         """accumulate=True with value broadcasting — 0D scalar and 1D values

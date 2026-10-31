@@ -46,7 +46,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, extract_var_range_info
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -1786,10 +1786,20 @@ def aten_ops_select(
     )
 
 
+def _has_fewer_than_2_31_elements(shape: Sequence[Union[int, torch.SymInt]]) -> bool:
+    """Whether a shape stays under 2**31 elements up to the upper bound of each dynamic size.
+
+    A dynamic size with no upper bound in the exported program can grow past it.
+    """
+    numel = functools.reduce(operator.mul, shape, 1)
+    bound = numel if isinstance(numel, int) else extract_var_range_info(numel)["max"]
+    return bound is not None and bound < 2**31
+
+
 def _index_put_scatter_elements_validator(
     node: torch.fx.Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Validator for accumulate=True using TensorRT's standard ScatterElements plugin.
+    """Validator for accumulate=True with one 1-D index, using TensorRT's ScatterElements plugin.
 
     That plugin runs without PyTorch, so it is preferred over ScatterAdd, which handles the rest.
     """
@@ -1801,8 +1811,15 @@ def _index_put_scatter_elements_validator(
         and args_bounds_check(node.args, 3, False)
     ):
         return False
+    positions = [d for d, index in enumerate(node.args[1]) if index is not None]
+    if len(positions) != 1:
+        return False
+    (dim,) = positions
+    index = node.args[1][dim].meta.get("val")
     data = node.args[0].meta.get("val")
-    if data is None or data.dtype not in (
+    if index is None or index.dim() != 1 or data is None:
+        return False
+    if data.dtype not in (
         torch.float32,
         torch.float16,
         torch.bfloat16,
@@ -1810,24 +1827,19 @@ def _index_put_scatter_elements_validator(
         torch.int64,
     ):
         return False
-    # The plugin takes the length of the flattened input as a 32-bit integer.
-    if isinstance(data.numel(), int) and data.numel() >= 2**31:
+    # The plugin counts elements with 32-bit integers.
+    updates_shape = [*data.shape[:dim], index.shape[0], *data.shape[dim + 1 :]]
+    if not all(
+        _has_fewer_than_2_31_elements(shape) for shape in (data.shape, updates_shape)
+    ):
         return False
-    # index_put_converter broadcasts multi-dimensional index tensors to a static shape.
-    for index in node.args[1]:
-        val = index.meta.get("val") if index is not None else None
-        if (
-            val is not None
-            and val.dim() > 1
-            and any(isinstance(size, torch.SymInt) for size in val.shape)
-        ):
-            return False
     return trt.get_plugin_registry().get_creator("ScatterElements", "2", "") is not None
 
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=_index_put_scatter_elements_validator,
+    priority=ConverterPriority.HIGH,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -1843,15 +1855,8 @@ def aten_ops_index_put_scatter_elements(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.select.index_put_converter(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args[2],
-        accumulate=True,
+    return impl.select.index_put_scatter_elements(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
 
 
