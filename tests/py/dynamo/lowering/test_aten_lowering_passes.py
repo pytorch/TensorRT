@@ -619,6 +619,7 @@ class TestRewriteEfficientAttention(TestCase):
         dynamic_seq = ({2: seq}, {2: seq, 3: seq})
         # (model, inputs, dynamic shapes, settings, whether the bias is replaced)
         cases = [
+            (InputBias(), (query, causal), None, CompilationSettings(), True),
             (
                 InputBias(),
                 (query, causal),
