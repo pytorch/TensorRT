@@ -5267,7 +5267,7 @@ def attention_capability_validator(
     one node and no ``mm``/``bmm`` for that guard to see. On Turing TRT-RTX this results
     in failure. Only the q/k/v dtypes matter, so FP16 attention keeps running on TensorRT.
     """
-    if _has_constant_key(node, settings):
+    if _has_constant_key(node):
         return False
 
     if not trt_rtx_targets_turing(settings):
@@ -5360,19 +5360,17 @@ def _inputs_quantized_to_fp8(node: Node) -> bool:
     )
 
 
-def _has_constant_key(node: Node, settings: Optional[CompilationSettings]) -> bool:
+def _has_constant_key(node: Node) -> bool:
     # TensorRT 11.2 to 11.4 give wrong FP16 and BF16 results for an attention layer whose key is a
     # constant: they fold the transpose of the key into the constant, and the fused kernel output is then
-    # wrong. Seen on an A100 and an H100, and declined on every version. FP32 attention does not use that
-    # kernel, and refittable weights are not folded, so both are right. A key whose shape or offset comes
-    # from an input keeps the layer as before; TensorRT can still fold it when the optimization profile
-    # fixes the input sizes the key uses.
+    # wrong. Seen on an A100 and an H100, and declined on every version. Refittable engines do not fold
+    # the key, but then return NaN for a fully masked row, unlike with an input key, so they are declined
+    # too. FP32 attention does not use that kernel and gives the same results as with an input key. A key
+    # whose shape or offset comes from an input keeps the layer as before; TensorRT can still fold it when
+    # the optimization profile fixes the input sizes the key uses.
     from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
         _aliases_input,
     )
-
-    if settings is not None and not settings.immutable_weights:
-        return False
 
     key = source = node.args[1]
     # Constant folding keeps some views of a constant, such as one that is also a graph output.
