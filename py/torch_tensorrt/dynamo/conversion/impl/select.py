@@ -676,6 +676,7 @@ def index_put_scatter_add_plugin(
 
     plugin_inputs = [input_tensor] + idx_tensors + [values]
     layer = ctx.net.add_plugin_v3(plugin_inputs, [], plugin)
+    ctx.requires_libtorch_plugin = True
     set_layer_name(layer, target, name, source_ir)
     out = layer.get_output(0)
     if original_dtype not in _supported_float_dtypes:

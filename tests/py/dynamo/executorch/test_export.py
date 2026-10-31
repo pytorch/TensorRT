@@ -4,6 +4,7 @@
 import base64
 import gc
 import importlib
+import pickle
 import sys
 import types
 import weakref
@@ -117,7 +118,9 @@ class _EngineState:
         self.info[INPUT_BINDING_NAMES_IDX] = "x"
         self.info[OUTPUT_BINDING_NAMES_IDX] = "output0"
         self.info[HW_COMPATIBLE_IDX] = "0"
-        self.info[SERIALIZED_METADATA_IDX] = "engine-metadata"
+        self.info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+            pickle.dumps({"name": "engine-metadata"})
+        ).decode("utf-8")
         self.info[TARGET_PLATFORM_IDX] = "linux_x86_64"
         self.info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(int(requires_output_allocator))
         self.info[RESOURCE_ALLOCATION_STRATEGY_IDX] = "1"

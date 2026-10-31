@@ -36,6 +36,7 @@ class TestAliasedIOCacheRoundTrip(unittest.TestCase):
             requires_output_allocator=False,
             requires_native_multidevice=False,
             aliased_io=ALIASED_IO,
+            requires_libtorch_plugin=False,
         )
         self.assertEqual(BaseEngineCache.unpack(blob)[7], ALIASED_IO)
 
@@ -58,6 +59,7 @@ class TestAliasedIOCacheRoundTrip(unittest.TestCase):
             requires_output_allocator=False,
             requires_native_multidevice=False,
             aliased_io=ALIASED_IO,
+            requires_libtorch_plugin=False,
         )
         cache.save("fresh", fresh)
         hit = cache.check("fresh")
@@ -80,6 +82,16 @@ class TestAliasedIOCacheRoundTrip(unittest.TestCase):
                 "requires_native_multidevice": False,
             }
         )
+
+    def test_check_rejects_a_blob_written_before_requires_libtorch_plugin_was_cached(
+        self,
+    ):
+        """Read as "no plugin", such a blob would let ScatterAdd through the ExecuTorch export check."""
+        cache = DiskEngineCache(tempfile.mkdtemp(), 1 << 30)
+        blob = pickle.loads(self._legacy_blob())
+        blob["aliased_io"] = {}
+        cache.save("legacy", pickle.dumps(blob))
+        self.assertIsNone(cache.check("legacy"))
 
     def test_unpack_tolerates_a_blob_without_aliased_io(self):
         """unpack stays lenient: it is a deserializer, not the reuse decision.

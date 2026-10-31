@@ -30,6 +30,7 @@ UnpackedCacheHit = Tuple[
     bool,
     bool,
     Dict[str, Tuple[str, str]],
+    bool,
 ]
 
 
@@ -127,6 +128,7 @@ class BaseEngineCache(ABC):
         requires_output_allocator: bool,
         requires_native_multidevice: bool,
         aliased_io: Dict[str, Tuple[str, str]],
+        requires_libtorch_plugin: bool,
     ) -> bytes:
         """Pack serialized engine, input names, and output names into a single blob
 
@@ -139,6 +141,7 @@ class BaseEngineCache(ABC):
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             aliased_io (Dict[str, Tuple[str, str]]): Map of engine output binding name -> (input binding name, kind_str) for outputs the engine writes through in place
+            requires_libtorch_plugin (bool): Boolean flag indicating if the engine contains a Torch-TensorRT plugin whose kernel calls libtorch (e.g. ScatterAdd)
         Returns:
             bytes: packed blob
         """
@@ -154,6 +157,7 @@ class BaseEngineCache(ABC):
                 "requires_output_allocator": requires_output_allocator,
                 "requires_native_multidevice": requires_native_multidevice,
                 "aliased_io": aliased_io,
+                "requires_libtorch_plugin": requires_libtorch_plugin,
             }
         )
 
@@ -165,7 +169,7 @@ class BaseEngineCache(ABC):
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool, Dict[str, Tuple[str, str]]]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice, aliased_io
+            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool, Dict[str, Tuple[str, str]], bool]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice, aliased_io, requires_libtorch_plugin
         """
         return BaseEngineCache._fields_from(pickle.loads(packed_obj))
 
@@ -186,6 +190,7 @@ class BaseEngineCache(ABC):
             unpacked["requires_output_allocator"],
             unpacked.get("requires_native_multidevice", False),
             unpacked.get("aliased_io", {}),
+            unpacked.get("requires_libtorch_plugin", False),
         )
 
     def insert(
@@ -235,6 +240,15 @@ class BaseEngineCache(ABC):
             _LOGGER.info(
                 "Ignoring engine cache entry %s: written before aliased_io was "
                 "cached, so it cannot be reused safely. It will be rebuilt.",
+                hash,
+            )
+            return None
+        # Likewise, reading an older blob as "no libtorch plugin" would let an engine
+        # with ScatterAdd through the ExecuTorch export check.
+        if "requires_libtorch_plugin" not in unpacked:
+            _LOGGER.info(
+                "Ignoring engine cache entry %s: written before "
+                "requires_libtorch_plugin was cached. It will be rebuilt.",
                 hash,
             )
             return None

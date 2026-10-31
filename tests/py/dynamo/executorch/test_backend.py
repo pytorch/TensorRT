@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import ast
+import base64
 import operator
+import pickle
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -23,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     OUTPUT_BINDING_NAMES_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
     SERIALIZATION_LEN,
+    SERIALIZED_METADATA_IDX,
 )
 from torch_tensorrt.executorch.backend import (  # noqa: E402
     TensorRTBackend,
@@ -183,6 +186,19 @@ def test_preprocess_rejects_output_allocator():
     edge_program = _build_edge_program(engine_info)
 
     with pytest.raises(RuntimeError, match="output allocator"):
+        TensorRTBackend.preprocess(edge_program, [])
+
+
+@pytest.mark.unit
+def test_preprocess_rejects_an_engine_with_a_libtorch_plugin():
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
+    engine_info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+        pickle.dumps({"requires_libtorch_plugin": True})
+    ).decode("utf-8")
+    edge_program = _build_edge_program(engine_info)
+
+    with pytest.raises(RuntimeError, match="runs on libtorch"):
         TensorRTBackend.preprocess(edge_program, [])
 
 
