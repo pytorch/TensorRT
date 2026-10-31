@@ -726,6 +726,12 @@ class TestIndexPutConverter(DispatchTestCase):
             def forward(self, data, index, values):
                 return torch.ops.aten.index_put.default(data, [None, index + 1], values)
 
+        class Gate(torch.nn.Module):
+            def forward(self, data, index):
+                return torch.ops.aten.index_put.default(
+                    data, [index > 0], torch.tensor(7.0)
+                )
+
         index = torch.tensor(1, device="cuda")
         cases = [
             (
@@ -744,6 +750,8 @@ class TestIndexPutConverter(DispatchTestCase):
                     torch.arange(15.0, device="cuda").reshape(3, 5),
                 ),
             ),
+            # A 0-d mask from a comparison stays a mask.
+            (Gate(), (torch.arange(4.0, device="cuda").reshape(1, 4), index)),
         ]
         for model, inputs in cases:
             with self.subTest(type(model).__name__):

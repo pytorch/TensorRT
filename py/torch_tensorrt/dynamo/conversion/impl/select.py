@@ -933,6 +933,7 @@ def index_put_converter(
 ) -> ITensor:
     # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
     # would move the values in input[indices]. Give such an index its rank in the graph.
+    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
     ranks = _index_ranks_in_graph(ctx)
     input_indices = [
         (
@@ -940,6 +941,7 @@ def index_put_converter(
                 ctx, target, source_ir, f"{name}_index_{i}_0d", idx, ()
             )
             if isinstance(idx, ITensor)
+            and idx.dtype != trt.bool
             and tuple(idx.shape) == (1,)
             and i < len(ranks)
             and ranks[i] == 0
