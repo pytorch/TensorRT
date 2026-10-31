@@ -949,6 +949,8 @@ def compile_cutile_to_ptx(
         )
 
     ptx = reorder_entry_params(ptx, order, parsed)
+    # tileiras appends the Tile IR source as a trailing section that some drivers reject as INVALID_PTX
+    ptx = ptx.split(".nv_intermediate_source_section", 1)[0]
     if max_ptx_version is not None:
         ptx = cap_ptx_version(ptx, max_ptx_version)
     if _should_verify_ptx(arch_override):
