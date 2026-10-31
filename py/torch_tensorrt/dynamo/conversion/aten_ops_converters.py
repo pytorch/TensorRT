@@ -1801,12 +1801,15 @@ def _index_put_scatter_elements_validator(
 ) -> bool:
     """Validator for accumulate=True with one 1-D index, using TensorRT's ScatterElements plugin.
 
-    That plugin runs without PyTorch, so it is preferred over ScatterAdd, which handles the rest.
+    That plugin runs without PyTorch, so it takes the node only when fallback_pytorch_plugin_ops
+    skips ScatterAdd. Without that setting ScatterAdd converts the node as before.
     """
     import tensorrt as trt
 
     if not (
-        index_dtype_validator(node, settings)
+        settings is not None
+        and settings.fallback_pytorch_plugin_ops
+        and index_dtype_validator(node, settings)
         and index_nonbool_validator(node, settings)
         and args_bounds_check(node.args, 3, False)
     ):
@@ -1818,6 +1821,12 @@ def _index_put_scatter_elements_validator(
     index = node.args[1][dim].meta.get("val")
     data = node.args[0].meta.get("val")
     if index is None or index.dim() != 1 or data is None:
+        return False
+    # PyTorch rejects a mask whose length is not the dimension's. Once the mask becomes
+    # positions, the engine cannot tell, so leave a mask it cannot prove fits to PyTorch.
+    if index.dtype == torch.bool and not statically_known_true(
+        index.shape[0] == data.shape[dim]
+    ):
         return False
     if data.dtype not in (
         torch.float32,
@@ -1839,7 +1848,6 @@ def _index_put_scatter_elements_validator(
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=_index_put_scatter_elements_validator,
-    priority=ConverterPriority.HIGH,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(

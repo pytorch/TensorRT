@@ -134,7 +134,8 @@ def test_an_engine_with_a_pytorch_plugin_is_refused_at_save_and_the_advice_loads
 
     class AccumulateRows(torch.nn.Module):
         def forward(self, x, index, values, seen):
-            # A float accumulate uses TensorRT's ScatterElements plugin, a bool one ScatterAdd.
+            # Both accumulates use ScatterAdd by default. With fallback_pytorch_plugin_ops the
+            # float one uses ScatterElements and the bool one runs in PyTorch.
             x = x.index_put((index,), values * 2, accumulate=True)
             seen = seen.index_put((index,), values > 0, accumulate=True)
             return x.index_put((index[:1],), values[:1]) + 1, seen

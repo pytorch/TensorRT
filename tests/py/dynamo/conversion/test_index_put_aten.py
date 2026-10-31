@@ -404,23 +404,6 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([1.0], dtype=torch.float32),
                 accumulate=True,
             ),
-            # A 2-D index, as in an embedding gradient, uses ScatterAdd.
-            param(
-                test_name="accumulate_2d_index",
-                source_tensor=torch.zeros([10, 4], dtype=torch.float32),
-                indices_tensor=(
-                    torch.tensor([[1, 3, 3], [0, 9, 1]], dtype=torch.int64),
-                ),
-                value_tensor=torch.ones([2, 3, 4], dtype=torch.float32),
-                accumulate=True,
-            ),
-            param(
-                test_name="accumulate_bool_mask",
-                source_tensor=torch.zeros([5, 3], dtype=torch.float32),
-                indices_tensor=(torch.tensor([True, False, True, True, False]),),
-                value_tensor=torch.arange(9, dtype=torch.float32).reshape(3, 3),
-                accumulate=True,
-            ),
         ]
     )
     def test_index_put(
@@ -811,7 +794,7 @@ class TestIndexPutConverter(DispatchTestCase):
 
     @parameterized.expand([(torch.float32,), (torch.float16,), (torch.bfloat16,)])
     def test_accumulate_needs_no_pytorch_plugin(self, dtype):
-        """Duplicates sum and values broadcast as in eager, without a plugin that runs PyTorch."""
+        """With fallback_pytorch_plugin_ops, TensorRT sums duplicates and broadcasts values as eager."""
         if ENABLED_FEATURES.tensorrt_rtx:
             pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
 
@@ -826,20 +809,72 @@ class TestIndexPutConverter(DispatchTestCase):
             torch.tensor([1] * 15 + [-2], device="cuda"),
             torch.tensor([[1.0, 1.0], [2.0, 2.0]] * 8, dtype=dtype, device="cuda"),
         )
-        trt_mod = torchtrt.dynamo.compile(
-            torch.export.export(Accumulate(), inputs),
-            arg_inputs=inputs,
-            min_block_size=1,
-        )
-        (engine,) = [
-            module
-            for module in trt_mod.modules()
-            if isinstance(module, torchtrt.dynamo.runtime.TorchTensorRTModule)
-        ]
+
+        def compile_with(**settings):
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(Accumulate(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                **settings,
+            )
+            engines = [
+                module
+                for module in compiled.modules()
+                if isinstance(module, torchtrt.dynamo.runtime.TorchTensorRTModule)
+            ]
+            return compiled, engines
+
+        # Without the setting nothing changes: ScatterAdd, or PyTorch where it is missing.
+        _, engines = compile_with()
+        self.assertTrue(all(engine.pytorch_plugin_ops for engine in engines))
+        trt_mod, (engine,) = compile_with(fallback_pytorch_plugin_ops=True)
         self.assertEqual(engine.pytorch_plugin_ops, [])
         torch.testing.assert_close(
             trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
         )
+
+    def test_accumulate_index_forms_with_fallback_setting(self):
+        """With fallback_pytorch_plugin_ops, a bool mask stays in TensorRT and a 2-D index does not."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        cases = {
+            "bool mask": (
+                torch.zeros(5, 3, device="cuda"),
+                torch.tensor([True, False, True, True, False], device="cuda"),
+                torch.arange(9.0, device="cuda").reshape(3, 3),
+                0,
+            ),
+            # A 2-D index, as in an embedding gradient, runs in PyTorch.
+            "2-D index": (
+                torch.zeros(10, 4, device="cuda"),
+                torch.tensor([[1, 3, 3], [0, 9, 1]], device="cuda"),
+                torch.ones(2, 3, 4, device="cuda"),
+                1,
+            ),
+        }
+        for name, (x, index, values, left_to_pytorch) in cases.items():
+            with self.subTest(name):
+                inputs = (x, index, values)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(Accumulate(), inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), left_to_pytorch)
+                torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
 
     def test_accumulate_expanded_values_3d(self):
         """accumulate=True with 3-D source and broadcast mesh indices — mirrors the
@@ -1066,6 +1101,61 @@ class TestIndexPutConverter(DispatchTestCase):
                 ]
                 self.assertEqual(len(left), left_to_pytorch)
                 torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
+
+    def test_accumulate_mask_of_another_length_with_fallback_setting(self):
+        """A bool mask that does not match its dimension stays in PyTorch, which rejects it."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, mask, values):
+                return x.index_put((mask,), values, accumulate=True)
+
+        for length in (3, 5):
+            with self.subTest(length=length):
+                mask = torch.tensor([True, False] * 3, device="cuda")[:length]
+                inputs = (
+                    torch.zeros(4, device="cuda"),
+                    mask,
+                    torch.tensor(7.0, device="cuda"),
+                )
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(Accumulate(), inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                with self.assertRaises(IndexError):
+                    Accumulate()(*inputs)
+                with self.assertRaises(IndexError):
+                    compiled(*inputs)
+
+    def test_accumulate_serialized_engine_needs_no_pytorch_plugin(self):
+        """The serialized engine export honors fallback_pytorch_plugin_ops too."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        inputs = (
+            torch.zeros(4, 3, device="cuda"),
+            torch.tensor([0, 2, 2], device="cuda"),
+            torch.ones(3, 3, device="cuda"),
+        )
+        engine = torchtrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+            torch.export.export(Accumulate(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            fallback_pytorch_plugin_ops=True,
+        )
+        self.assertFalse(b"ScatterAdd" in engine)
+        self.assertTrue(b"ScatterElements" in engine)
+        trt_mod = torchtrt.dynamo.runtime.TorchTensorRTModule(
+            engine, ["x", "index", "values"], ["output0"]
+        )
+        torch.testing.assert_close(trt_mod(*inputs), Accumulate()(*inputs))
 
     def test_accumulate_expanded_values_broadcast(self):
         """accumulate=True with value broadcasting — 0D scalar and 1D values

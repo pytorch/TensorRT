@@ -378,6 +378,9 @@ Graph Partitioning
        plugin) or a generated plugin without an AOT kernel, in PyTorch instead of
        TensorRT. Set it for runtimes without PyTorch: ExecuTorch export refuses an
        engine that uses such a plugin.
+       With it, an accumulating ``index_put`` with one 1-D index can stay in TensorRT
+       through TensorRT's ScatterElements plugin, which needs no PyTorch. The data
+       type and size limits are in the ExecuTorch guide.
 
 ----
 
