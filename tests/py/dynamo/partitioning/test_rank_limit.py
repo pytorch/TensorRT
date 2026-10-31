@@ -124,7 +124,9 @@ class TestTensorRankPartitioning(TestCase):
 
         x = torch.rand(2, 4, 8, device="cuda")
         compiled = torch.compile(
-            CloneThenHighRankView(), backend="tensorrt", options={"min_block_size": 1}
+            CloneThenHighRankView(),
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
         )
         out = compiled(x)
         self.assertEqual(out, x.view(RANK_10_SHAPE))
