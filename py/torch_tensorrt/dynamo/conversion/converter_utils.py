@@ -4,6 +4,7 @@
 import collections
 import functools
 import logging
+import operator
 import weakref
 from typing import (
     Any,
@@ -25,6 +26,8 @@ import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
+from torch.utils._pytree import tree_flatten
 from torch_tensorrt import _enums
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -152,6 +155,73 @@ def is_only_operator_on_placeholder(
             if isinstance(arg, torch.fx.Node)
         )
         and any(user.op == "output" for user in list(node.users.keys()))
+    )
+
+
+# Ops that only move data. TensorRT has no uint8 layers for them, so the interpreter widens a
+# uint8 input to int32 first; the values are the same, and nothing computes on them.
+UINT8_DATA_MOVEMENT_OPS = {
+    torch.ops.aten.permute.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten.view.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.slice.Tensor,
+    torch.ops.aten.cat.default,
+    torch.ops.aten.split.Tensor,
+    torch.ops.aten.split_with_sizes.default,
+    torch.ops.aten.flip.default,
+    torch.ops.aten.roll.default,
+    torch.ops.aten.repeat.default,
+    torch.ops.aten.constant_pad_nd.default,
+    torch.ops.aten.index_select.default,
+}
+
+
+def makes_uint8_tensor(node: torch.fx.Node) -> bool:
+    """Return True if the node would make a uint8 tensor inside a TensorRT engine.
+
+    TensorRT allows uint8 only at engine inputs and outputs, so a layer that makes
+    one, such as an add of uint8 values, fails the build. A clone, and a
+    slice_scatter that overwrites the whole tensor with a uint8 source, can hand an
+    engine input through as it is, the where converter widens uint8 values first,
+    and the interpreter widens the uint8 input of an op that only moves data, so
+    they are left to their converters. A get_attr is not refused: uint8 weights are
+    packed FP4 that the quantization converters read themselves.
+    """
+    if node.op not in CALLABLE_NODE_OPS:
+        return False
+    if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+        return False
+    if node.target in UINT8_DATA_MOVEMENT_OPS or (
+        node.target is operator.getitem
+        and getattr(node.args[0], "target", None) in UINT8_DATA_MOVEMENT_OPS
+    ):
+        return False
+    if node.target == torch.ops.aten.slice_scatter.default:
+        destination = getattr(node.args[0], "meta", {}).get("val")
+        source = getattr(node.args[1], "meta", {}).get("val")
+        if (
+            destination is not None
+            and source is not None
+            and source.dtype == destination.dtype
+        ):
+            args = node.args
+            *_, status = impl.slice_scatter.resolve_slice_scatter_write(
+                tuple(destination.shape),
+                args[2] if len(args) > 2 else 0,
+                args[3] if len(args) > 3 else None,
+                args[4] if len(args) > 4 else None,
+                args[5] if len(args) > 5 else None,
+            )
+            if status is impl.slice_scatter.KVWriteStatus.FULL_OVERWRITE:
+                return False
+    leaves, _ = tree_flatten(node.meta.get("val"))
+    return any(
+        isinstance(leaf, torch.Tensor) and leaf.dtype == torch.uint8 for leaf in leaves
     )
 
 

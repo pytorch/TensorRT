@@ -287,8 +287,44 @@ class TestUInt8Support(TestCase):
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
+    def test_uint8_arithmetic_after_a_shape_op_in_a_single_engine(self):
+        # The permute runs on a widened int32 copy, where 255 * 2 does not wrap, and a
+        # single-engine build has no PyTorch fallback, so it must refuse the multiply.
+        class Scale(nn.Module):
+            def forward(self, image):
+                return (image.permute(2, 0, 1) * 2) // 3
+
+        image = torch.full((2, 2, 3), 255, dtype=torch.uint8, device="cuda")
+        with self.assertRaises(Exception) as caught:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Scale(), (image,)),
+                arg_inputs=[image],
+                min_block_size=1,
+            )
+        self.assertIn("computes a uint8 result", str(caught.exception.__cause__))
+
+    def test_uint8_index_after_a_shape_op_in_a_single_engine(self):
+        # An index only picks values, so the widened int32 copy gives the same result.
+        class Pick(nn.Module):
+            def forward(self, image, rows):
+                return image.permute(2, 0, 1)[rows].float() / 255
+
+        inputs = (
+            torch.randint(0, 256, (4, 5, 3), dtype=torch.uint8, device="cuda"),
+            torch.tensor([2, 0], device="cuda"),
+        )
+        engine = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Pick(), inputs),
+                arg_inputs=list(inputs),
+                min_block_size=1,
+            )
+        )
+        self.assertTrue(engine)
+
     def test_uint8_shape_op_before_cast(self):
-        # TensorRT has no layer that reshapes uint8, so these must stay in PyTorch.
+        # TensorRT has no uint8 layer for these, so the interpreter widens their uint8
+        # input. A partial slice_scatter still writes in PyTorch.
         shape_ops = {
             "permute": lambda image: image.permute(2, 0, 1),
             "unsqueeze": lambda image: image.unsqueeze(0),
@@ -317,11 +353,16 @@ class TestUInt8Support(TestCase):
                     inputs=[in_tensor],
                     pass_through_build_failures=True,
                     min_block_size=1,
+                    require_full_compilation=name != "partial slice_scatter",
                     cache_built_engines=False,
                     reuse_cached_engines=False,
                 )
-                engines = [n for n, _ in trt_mod.named_children() if "_run_on_acc" in n]
-                self.assertEqual(len(engines), 1)
+                if name == "partial slice_scatter":
+                    # The slice and the cast around the write stay in TensorRT.
+                    engines = [
+                        n for n, _ in trt_mod.named_children() if "_run_on_acc" in n
+                    ]
+                    self.assertEqual(len(engines), 2)
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
     def test_uint8_where(self):
@@ -372,6 +413,31 @@ class TestUInt8Support(TestCase):
                     reuse_cached_engines=False,
                 )
                 torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+        # A select runs in PyTorch, and so does a where in torch_executed_ops, so uint8
+        # data reaches the next engine as an input, which the interpreter widens.
+        class SelectThenUnsqueeze(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b)[..., 0].unsqueeze(0).float()
+
+        partial = {
+            "select, then unsqueezed": (SelectThenUnsqueeze(), {}),
+            "where in PyTorch, then permuted": (
+                SelectThenPermute(),
+                {"torch_executed_ops": {torch.ops.aten.where.self}},
+            ),
+        }
+        for name, (mod, settings) in partial.items():
+            with self.subTest(name):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (mask, a, b)),
+                    inputs=[mask, a, b],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    **settings,
+                )
+                torch.testing.assert_close(trt_mod(mask, a, b), mod(mask, a, b))
 
         # torch.compile converts in a fake mode, and 114 becomes a uint8 constant.
         class Fill(nn.Module):

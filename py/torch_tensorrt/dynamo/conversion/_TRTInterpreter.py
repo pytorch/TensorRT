@@ -39,9 +39,12 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_DATA_MOVEMENT_OPS,
+    cast_trt_tensor,
     get_node_io,
     get_node_name,
     get_trt_tensor,
+    makes_uint8_tensor,
     to_torch,
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
@@ -58,6 +61,12 @@ from torch_tensorrt.logging import TRT_LOGGER
 import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_UINT8_VALUE_PICKING_OPS = {
+    torch.ops.aten.select.int,
+    torch.ops.aten.index.Tensor,
+    torch.ops.aten.gather.default,
+}
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
     Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
@@ -812,6 +821,23 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise UnsupportedOperatorException(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
+        # The partitioners keep such a node in PyTorch. A single-engine build has no
+        # fallback, and the widened int32 values would not wrap as uint8 does. An op that
+        # only picks input values gives the same values from a widened input.
+        if (
+            makes_uint8_tensor(self._cur_node)
+            and self._cur_node.target not in _UINT8_VALUE_PICKING_OPS
+            and any(
+                getattr(arg.meta.get("val"), "dtype", None) == torch.uint8
+                and isinstance(self.env.get(arg), trt.ITensor)
+                and self.env[arg].dtype != trt.uint8
+                for arg in self._cur_node.all_input_nodes
+            )
+        ):
+            raise UnsupportedOperatorException(
+                f"Conversion of {self._cur_node_name} not supported: it computes a uint8 "
+                "result, which TensorRT cannot do inside an engine. Run it in PyTorch."
+            )
 
         converter, calling_convention, converter_info = converter_packet
         if converter_info.get("requires_output_allocator", False):
@@ -829,6 +855,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_pytorch_plugin", False):
             self.ctx.pytorch_plugin_ops.add(CONVERTERS.qualified_name_or_str(target))
             _LOGGER.debug(f"{target} adds a plugin that runs PyTorch")
+
+        if target in UINT8_DATA_MOVEMENT_OPS:
+            args = torch.fx.node.map_aggregate(
+                args,
+                lambda arg: (
+                    cast_trt_tensor(
+                        self.ctx, arg, trt.int32, f"{self._cur_node_name}_{arg.name}"
+                    )
+                    if isinstance(arg, trt.ITensor) and arg.dtype == trt.uint8
+                    else arg
+                ),
+            )
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:

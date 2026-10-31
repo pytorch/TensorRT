@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS,
     dynamo_tensorrt_converter,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,12 +78,7 @@ def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
                     node.target,
                 )
                 return False
-            # Local to keep conversion from importing partitioning, which imports it.
-            from torch_tensorrt.dynamo.partitioning._global_partitioner import (
-                TorchTensorRTOperatorSupport,
-            )
-
-            if TorchTensorRTOperatorSupport._makes_uint8_tensor(node):
+            if makes_uint8_tensor(node):
                 _LOGGER.debug(
                     "torch.cond subgraph %s makes a uint8 tensor in %s",
                     gm._get_name(),
