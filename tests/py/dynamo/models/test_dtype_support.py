@@ -345,6 +345,7 @@ class TestUInt8Support(TestCase):
             for _ in range(2)
         )
         flags = torch.arange(192, device="cuda").reshape(8, 8, 3) % 2 == 0
+        c = torch.randn(8, 8, 3, device="cuda")
         cases = {
             "uint8": (Select(), (mask, a, b), True),
             "bool": (Select(), (mask, a, flags), True),
@@ -352,6 +353,8 @@ class TestUInt8Support(TestCase):
             "bool constant": (SelectBackground(flags), (mask, a), True),
             "uint8 of lower rank": (Select(), (mask, a, b[0, 0]), False),
             "uint8 constant": (SelectBackground(b), (mask, a), False),
+            "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c), False),
+            "uint8 constant, float output": (SelectBackground(b), (mask, c), False),
         }
         for name, (mod, inputs, full) in cases.items():
             with self.subTest(name):
