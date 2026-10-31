@@ -193,7 +193,8 @@ class TestConstantFolding(TestCase):
     )
     def test_offloaded_constants_reach_the_complex_decomposition(self):
         # offload_module_to_cpu leaves folded constants on the CPU; the complex
-        # decomposition retraces the graph and must not fall back over them.
+        # decomposition retraces the graph and folds it again, and must neither
+        # fall back over them nor mix them with the device tensors it adds.
         class Rotary(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -203,11 +204,17 @@ class TestConstantFolding(TestCase):
                 )
                 # Read only by constant folding, so the retraced module drops it.
                 self.scale = torch.nn.Parameter(torch.ones(4))
+                self.register_buffer("causal", torch.ones(8, 8).tril())
 
             def forward(self, x):
                 freqs = self.freqs[: x.shape[0]] * self.scale.mean()
                 z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
-                return torch.view_as_real(z * freqs).flatten(1)
+                y = torch.view_as_real(z * freqs).flatten(1)[None, None]
+                # The retrace expands the attention, turning the folded mask into
+                # a bias with scalars it creates on the device.
+                return torch.nn.functional.scaled_dot_product_attention(
+                    y, y, y, attn_mask=self.causal > 0
+                )
 
         model = Rotary().eval().cuda()
         example_input = torch.randn(8, 8, device="cuda")
@@ -229,7 +236,8 @@ class TestConstantFolding(TestCase):
             )
             actual = compiled_model(example_input)
 
-        torch.testing.assert_close(actual, expected)
+        # The attention's matrix multiplies run in TF32 by default.
+        torch.testing.assert_close(actual, expected, rtol=0.02, atol=0.02)
         self.assertEqual(model.scale.device.type, "cpu")
 
     @unittest.skipIf(
@@ -237,7 +245,7 @@ class TestConstantFolding(TestCase):
         or not complex_decomposition_adapter.has_complex_decomposition(),
         "needs CUDA and the upstream complex decomposition",
     )
-    def test_complex_fallback_does_not_hold_device_copies_of_offloaded_constants(
+    def test_complex_decomposition_does_not_hold_device_copies_of_offloaded_constants(
         self,
     ):
         from torch._functorch._aot_autograd import complex_decomposition
@@ -286,6 +294,13 @@ class TestConstantFolding(TestCase):
             complex_decomposition_adapter.complex_decomposition_adapter(gm, settings)
 
         self.assertEqual(allocated["fallback"], allocated["before"])
+
+        # Nor after a successful retrace, where folding drops the node that read
+        # the constant.
+        decomposed = complex_decomposition_adapter.complex_decomposition_adapter(
+            constant_fold(exported_program.module(), settings), settings
+        )
+        self.assertFalse(any(buffer.is_cuda for buffer in decomposed.buffers()))
 
 
 if __name__ == "__main__":

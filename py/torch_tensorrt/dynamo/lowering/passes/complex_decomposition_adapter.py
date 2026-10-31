@@ -146,11 +146,6 @@ def complex_decomposition_adapter(
         # Not inside the except block: there the failed retrace's frames are still
         # alive, and with them its device copies of the offloaded constants.
         return complex_graph_detection(gm, settings)
-    _restore_offloaded_constants(decomposed_gm, offloaded)
-    if offloaded:
-        # The retrace leaves the device copies in reference cycles. Free them now
-        # rather than holding them through the engine build.
-        gc.collect()
     gm = decomposed_gm
 
     # A real-mode make_fx retrace gives each constant it records, and each tensor it
@@ -179,8 +174,15 @@ def complex_decomposition_adapter(
     #     a constant that the constant-folding stage had already reduced to one
     #     frozen tensor comes back as a live chain of ops reading it, and the
     #     converters for those ops expect a TRT tensor rather than a weight.
+    #     Fold before the CPU tensors go back. The retrace created ops, such as
+    #     an attention mask's scalars, on the device of the copies it was given.
     gm = mark_constant_fold_exclusions(gm, settings)
     gm = constant_fold(gm, settings)
+    _restore_offloaded_constants(gm, offloaded)
+    if offloaded:
+        # The retrace leaves the device copies in reference cycles. Free them now
+        # rather than holding them through the engine build.
+        gc.collect()
 
     # (4) Normalize the seams into the interleaved [..., 2] layout used by TRT.
     gm = _normalize_complex_boundary_for_trt(gm)
@@ -308,13 +310,15 @@ def _offloaded_constants_on_device(
 def _restore_offloaded_constants(
     gm: GraphModule, offloaded: dict[int, torch.Tensor]
 ) -> None:
-    """Put the CPU tensors back wherever the retraced module kept a device copy."""
-    for node in gm.graph.nodes:
-        if node.op != "get_attr":
-            continue
-        real = offloaded.get(id(getattr(gm, str(node.target), None)))
+    """Put the CPU tensors back wherever the retraced module kept a device copy.
+
+    The retrace registers its constants as buffers. Read those rather than the
+    graph, which no longer reads the constants that folding consumed.
+    """
+    for name, buffer in list(gm.named_buffers(recurse=False)):
+        real = offloaded.get(id(buffer))
         if real is not None:
-            setattr(gm, str(node.target), real)
+            setattr(gm, name, real)
 
 
 def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:
