@@ -102,8 +102,9 @@ class TestDecomposeUnsupportedAttention(TestCase):
         self.assertIn(torch.ops.aten.scaled_dot_product_attention.default, targets)
 
     def test_attention_with_a_constant_key_is_left_for_pytorch(self):
-        # TensorRT's attention layer gets a constant key wrong in FP16 and BF16. FP32 is right,
-        # and a key that takes its batch from an input keeps the layer as before.
+        # TensorRT's attention layer gets a constant key wrong in FP16 and BF16 when the weights
+        # cannot be refitted. FP32, refittable engines and a key that takes its batch from an
+        # input keep the layer as before.
         class ConstantKey(nn.Module):
             def __init__(self, dtype):
                 super().__init__()
@@ -114,15 +115,23 @@ class TestDecomposeUnsupportedAttention(TestCase):
                 return torch.ops.aten.scaled_dot_product_attention.default(q, k, v)
 
         sdpa = torch.ops.aten.scaled_dot_product_attention.default
-        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
         batch = torch.export.Dim("batch")
-        for dtype, dynamic_shapes, supported in (
-            (torch.float16, None, False),
-            (torch.bfloat16, None, False),
-            (torch.float16, ({0: batch}, {0: batch}), True),
-            (torch.float32, None, True),
+        for dtype, dynamic_shapes, immutable_weights, supported in (
+            (torch.float16, None, True, False),
+            (torch.bfloat16, None, True, False),
+            (torch.float16, ({0: batch}, {0: batch}), True, True),
+            (torch.float32, None, True, True),
+            (torch.float16, None, False, True),
         ):
-            with self.subTest(dtype=dtype, dynamic=dynamic_shapes is not None):
+            settings = CompilationSettings(
+                min_block_size=1,
+                decompose_attention=False,
+                immutable_weights=immutable_weights,
+            )
+            dynamic = dynamic_shapes is not None
+            with self.subTest(
+                dtype=dtype, dynamic=dynamic, refit=not immutable_weights
+            ):
                 inputs = tuple(torch.randn(2, 2, 4, 8, dtype=dtype) for _ in range(2))
                 ep = torch.export.export(
                     ConstantKey(dtype), inputs, dynamic_shapes=dynamic_shapes

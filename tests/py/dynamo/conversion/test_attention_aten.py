@@ -7,10 +7,13 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    attention_capability_validator,
+)
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
@@ -489,18 +492,15 @@ class TestScaledDotProductAttention(DispatchTestCase):
             # The slice offset comes from an input, so the key is not a constant.
             graph.call_function(torch.ops.aten.slice.Tensor, (key, 0, start)): False,
         }
-        for k in is_constant:
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        for k, constant in is_constant.items():
             k.meta["val"] = torch.empty(1, dtype=torch.float16, device="meta")
-        for op in (
-            torch.ops.aten.scaled_dot_product_attention.default,
-            torch.ops.aten._scaled_dot_product_flash_attention.default,
-            torch.ops.aten._scaled_dot_product_efficient_attention.default,
-            torch.ops.aten._scaled_dot_product_cudnn_attention.default,
-        ):
-            for k, constant in is_constant.items():
-                with self.subTest(op=op, key=k.name):
-                    node = graph.call_function(op, (query, k, value))
-                    self.assertEqual(node not in DYNAMO_CONVERTERS, constant)
+            with self.subTest(key=k.name):
+                node = graph.call_function(sdpa, (query, k, value))
+                self.assertEqual(
+                    attention_capability_validator(node, CompilationSettings()),
+                    not constant,
+                )
 
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
