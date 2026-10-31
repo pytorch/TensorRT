@@ -650,32 +650,38 @@ class TestIndexPutConverter(DispatchTestCase):
                     values,
                 )
 
-        # Two indices and one value here.
+        # Two indices and one value, then no index, run on one engine.
         mask = torch.tensor([1, 0, 1, 0], device="cuda")
+        no_mask = torch.zeros_like(mask)
         values = torch.tensor([7.0, -1.0], device="cuda")
+        data_1d = torch.zeros(4, device="cuda")
+        data_3d = torch.zeros(3, 4, 5, device="cuda")
         cases = [
-            (SetRows(), (torch.zeros(4, device="cuda"), mask, values)),
-            (SetColumns(), (torch.zeros(3, 4, 5, device="cuda"), mask, values)),
+            (SetRows(), [(data_1d, mask, values), (data_1d, no_mask, values)]),
+            (SetColumns(), [(data_3d, mask, values), (data_3d, no_mask, values)]),
             # One row and two columns broadcast to two pairs.
             (
                 SetPairs(),
-                (
-                    torch.zeros(4, 5, device="cuda"),
-                    torch.tensor([0, 0, 1, 0], device="cuda"),
-                    torch.tensor([1, 0, 0, 1, 0], device="cuda"),
-                    torch.tensor([3.0, 4.0], device="cuda"),
-                ),
+                [
+                    (
+                        torch.zeros(4, 5, device="cuda"),
+                        torch.tensor([0, 0, 1, 0], device="cuda"),
+                        torch.tensor([1, 0, 0, 1, 0], device="cuda"),
+                        torch.tensor([3.0, 4.0], device="cuda"),
+                    )
+                ],
             ),
         ]
-        for model, inputs in cases:
+        for model, runs in cases:
             with self.subTest(type(model).__name__):
                 compiled = torchtrt.dynamo.compile(
-                    torch.export.export(model, inputs),
-                    arg_inputs=inputs,
+                    torch.export.export(model, runs[0]),
+                    arg_inputs=runs[0],
                     min_block_size=1,
                     pass_through_build_failures=True,
                 )
-                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+                for inputs in runs:
+                    torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):

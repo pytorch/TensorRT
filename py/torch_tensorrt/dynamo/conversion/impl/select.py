@@ -873,7 +873,8 @@ def _broadcast_index_put_values(
         values = impl.slice.expand(
             ctx, target, source_ir, f"{name}_repeat", values, (repeats, values.shape[1])
         )
-    # The scatter coordinates list the index dims first.
+    # The scatter coordinates list the index dims first. Pass every size, since TensorRT
+    # cannot infer one when the index is empty at runtime.
     if start and index_shape:
         values = impl.shuffle.reshape(
             ctx,
@@ -884,7 +885,7 @@ def _broadcast_index_put_values(
             (
                 _volume(ctx, target, source_ir, f"{name}_before", free_shape[:start]),
                 _volume(ctx, target, source_ir, f"{name}_indexed", index_shape),
-                -1,
+                _volume(ctx, target, source_ir, f"{name}_after", free_shape[start:]),
             ),
         )
         values = impl.permutation.permute(
