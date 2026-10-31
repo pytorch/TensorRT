@@ -200,29 +200,42 @@ zero-copy views of a safetensors file:
 
 - ``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them,
   while it builds the engine that uses the weight.
-- With ``release_weights_after_build=True``, the pages are dropped again once the last engine that reads
-  the weight is built. The tensor stays valid; its pages are re-read from the file if it is used again.
+- The pages are dropped again once the last engine that reads the weight is built. The tensor stays
+  valid; its pages are re-read from the file if it is used again.
+
+``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
+building it allocates no weights, maps them, and drops their pages when the block ends, unless the block
+sets ``release_weights_after_build=False``.
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
-    from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
+    from torch_tensorrt.dynamo.tools import save_weights_for_mapping
 
     # Once, wherever the model loads: write its weights in the dtypes it runs in.
     save_weights_for_mapping(model, "weights.safetensors")
 
-    # To compile: build the model without allocating weights, and map them.
-    with torch.device("meta"):
-        model = MyModel().eval()
-    mapping = map_weights(model, "weights.safetensors", strict=True)
-    print(f"{mapping.mapped_bytes / 2**30:.2f} GiB mapped")
+    # To compile:
+    ctx = torch_tensorrt.dynamo.low_memory(lambda: MyModel().eval(), "weights.safetensors")
+    with ctx as model:
+        print(f"{ctx.report.mapped_bytes / 2**30:.2f} GiB mapped")
+        example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
+        exported = torch.export.export(model, (example,))
+        trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example.cuda()])
 
-    example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
-    exported = torch.export.export(model, (example,))
-    trt_model = torch_tensorrt.dynamo.compile(
-        exported, inputs=[example.cuda()], release_weights_after_build=True
-    )
+Any other keyword of ``low_memory`` is a ``torch_tensorrt.dynamo.compile`` setting, used as the default
+for every call to it inside the block, including in a script you don't own, and so for
+``torch_tensorrt.compile(..., ir="dynamo")``. ``torch.compile(backend="tensorrt")``,
+``cross_compile_for_windows`` and ``convert_exported_program_to_serialized_trt_engine`` don't use them.
+An argument passed to ``compile`` wins over the block's:
+
+.. code-block:: python
+
+    with torch_tensorrt.dynamo.low_memory(enable_resource_partitioning=True, optimization_level=1):
+        run_export_script()
+
+``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
 
 **What to know:**
 
@@ -251,12 +264,18 @@ zero-copy views of a safetensors file:
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** are listed in ``mapping.missing`` and left as they were (still on ``meta`` if the
-  model was built there). ``strict=True`` raises instead for any name in the model's ``state_dict``;
-  non-persistent buffers, such as rotary frequencies, aren't required, so recompute those or write them
-  with ``save_weights_for_mapping``. On any error the model is left unchanged.
+- **Missing names** raise in ``low_memory``: every tensor must be in the file, non-persistent buffers
+  such as rotary frequencies included, and ``save_weights_for_mapping`` writes those too.
+  ``map_weights`` alone lists missing names in its result's ``missing`` and leaves them as they were
+  (still on ``meta`` if the model was built there). With ``strict=True``, it raises instead for any name
+  in the model's ``state_dict``; non-persistent buffers aren't required. On any error the model is left
+  unchanged.
 - **The file must stay in place** while the model or its weights are in use. ``map_weights`` maps it
-  copy-on-write and never writes to it. A write to a released weight is lost when its pages are dropped.
+  copy-on-write and never writes to it. A write to a mapped weight is lost when its pages are dropped,
+  so to train or update a mapped model in place, compile it with ``release_weights_after_build=False``;
+  with ``low_memory``, set it on the block, whose end drops the pages too.
+  ``release_weights_after_build=True`` also frees weights that aren't mapped, which the source model
+  then can't use.
 - **Releasing pages uses** ``madvise(MADV_DONTNEED)`` **(POSIX).** Elsewhere the mapping works, but the
   pages stay resident until the file is unmapped.
 

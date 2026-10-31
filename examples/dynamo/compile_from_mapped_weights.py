@@ -12,15 +12,14 @@ To compile a model, its weights normally have to be loaded into host memory firs
 the first TensorRT engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's
 weights at zero-copy views of a safetensors file. ``torch.export`` reads only shapes, so a weight's
 pages become resident only when TensorRT reads them, while it builds the engine that uses the weight.
-With ``release_weights_after_build=True`` the pages are dropped again once the last engine that reads
-the weight is built.
+The pages are dropped again once the last engine that reads the weight is built.
 
 This example:
 
 1. writes a model's weights once with ``save_weights_for_mapping``, standing in for a checkpoint;
-2. builds the model on the ``meta`` device, so constructing it allocates no weights, and maps its weights;
-3. exports and compiles it on the CPU, releasing each weight after its last engine;
-4. checks the compiled model against the original.
+2. with ``torch_tensorrt.dynamo.low_memory``, builds the model on the ``meta`` device, so constructing it
+   allocates no weights, maps its weights, and exports and compiles it on the CPU;
+3. checks the compiled model against the original.
 
 How much of the weights file is resident is read from ``/proc/self/smaps``, so it prints on Linux only.
 """
@@ -30,7 +29,7 @@ import tempfile
 
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
+from torch_tensorrt.dynamo.tools import save_weights_for_mapping
 
 
 def resident_mib(path: str) -> float:
@@ -75,42 +74,29 @@ save_weights_for_mapping(reference, path)
 print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 
 # %%
-# Build the model without its weights and map them
-# ------------------------------------------------
+# Build, map, export and compile
+# ------------------------------
 #
-# On ``meta`` the model allocates nothing. ``strict=True`` raises if a tensor in the model's
-# ``state_dict`` is missing from the file. Mapping doesn't read the weights, so none of the file is
-# resident yet.
-
-with torch.device("meta"):
-    model = MLP().eval()
-
-mapping = map_weights(model, path, strict=True)
-print(
-    f"mapped {mapping.mapped_bytes / 2**20:.0f} MiB, {len(mapping.missing)} missing; "
-    f"resident: {resident_mib(path):.0f} MiB"
-)
-
-# %%
-# Export and compile on the CPU
-# -----------------------------
+# ``low_memory`` builds the model on ``meta``, where it allocates nothing, and maps its weights; every
+# tensor must be in the file. Mapping doesn't read the weights, so none of the file is resident yet.
 #
 # The mapped weights are CPU tensors, so the model and its example input stay on the CPU through
 # ``torch.export``. TensorRT takes weights as host pointers and reads each one in place from the mapping:
-# there's no GPU copy and no host copy. ``release_weights_after_build=True`` drops a weight's pages once
-# the last engine that reads it is built; the tensor stays valid and is re-read from the file if used.
+# there's no GPU copy and no host copy. A weight's pages are dropped once the last engine that reads it
+# is built; the tensor stays valid and is re-read from the file if used. Keyword arguments such as
+# ``min_block_size`` are defaults for every ``compile`` inside the block.
 
 x = torch.randn(4, 2048)
-with torch.no_grad():
-    exported = torch.export.export(model, (x,))
-    trt_model = torch_tensorrt.dynamo.compile(
-        exported,
-        inputs=[x.cuda()],
-        min_block_size=1,
-        release_weights_after_build=True,
+ctx = torch_tensorrt.dynamo.low_memory(lambda: MLP().eval(), path, min_block_size=1)
+with ctx as model, torch.no_grad():
+    print(
+        f"mapped {ctx.report.mapped_bytes / 2**20:.0f} MiB; "
+        f"resident: {resident_mib(path):.0f} MiB"
     )
-# With release_weights_after_build=False the whole file (192 MiB here) would still be resident.
-print(f"compiled; resident: {resident_mib(path):.0f} MiB of the weights file")
+    exported = torch.export.export(model, (x,))
+    trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[x.cuda()])
+    # With release_weights_after_build=False the whole file (192 MiB here) would still be resident.
+    print(f"compiled; resident: {resident_mib(path):.0f} MiB of the weights file")
 
 # %%
 # Check the result
