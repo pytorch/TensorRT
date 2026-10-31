@@ -2,8 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
+from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
+from torch._subclasses.fake_tensor import FakeTensor
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -15,19 +19,27 @@ logger = logging.getLogger(__name__)
 def force_causal_efficient_attention(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
-    """Force efficient-attention calls to causal mode when enabled in settings.
+    """Replace a causal attn_bias of efficient attention with is_causal=True.
 
-    For square attention (seq_q == seq_k): replaces attn_bias with is_causal=True
-    so IAttentionLayer can use its native causal path.
+    IAttentionLayer then uses its native causal path, which is faster and more
+    accurate than a mask. ``settings.attn_bias_is_causal`` picks the biases of square
+    attention (seq_q == seq_k) to replace:
+
+    * None: a bias proven causal (see _prove_causal).
+    * True: also a bias the pass cannot prove, which the caller asserts is causal. A
+      bias the pass checks and finds not causal, such as a block-causal mask, is kept,
+      and so is one whose check fails, for example by running out of memory.
+    * False: none.
 
     For decode-phase attention (seq_q != seq_k): skip the transformation.
     Applying is_causal=True is semantically wrong because it creates a lower-triangular
     mask aligned to position 0, so the query attends only to k[0] instead of all past keys.
     The node is left unchanged and passed to IAttentionLayer, which supports non-square Q/K natively.
     """
-    if not settings.attn_bias_is_causal:
+    if settings.attn_bias_is_causal is False:
         return gm
 
+    proofs: Dict[Tuple[torch.fx.Node, Any], Optional[bool]] = {}
     changed = False
     for node in gm.graph.nodes:
         if (
@@ -53,6 +65,36 @@ def force_causal_efficient_attention(
             )
             continue
 
+        seq_len = (
+            query_meta.size(-2)
+            if query_meta is not None and key_meta is not None
+            else None
+        )
+        key = (attn_bias, seq_len if isinstance(seq_len, int) else None)
+        if key not in proofs:
+            proofs[key] = _prove_causal(gm, attn_bias, seq_len)
+        proof = proofs[key]
+        if not (proof or (proof is None and settings.attn_bias_is_causal)):
+            logger.debug(
+                f"Keeping attn_bias of node {node} because it is "
+                + ("not causal" if proof is False else "not proven causal")
+            )
+            # The converter refuses compute_log_sumexp, which the replacement below
+            # clears. Clear it for a kept bias too when nothing reads log_sumexp. With
+            # dropout it stays, and the node stays in PyTorch, which applies dropout.
+            if (
+                len(node.args) > 4
+                and node.args[4]
+                and (len(node.args) < 6 or node.args[5] == 0.0)
+                and all(
+                    user.target is operator.getitem and user.args[1] == 0
+                    for user in node.users
+                )
+            ):
+                node.args = node.args[:4] + (False,) + node.args[5:]
+                changed = True
+            continue
+
         node.args = (
             node.args[0],
             node.args[1],
@@ -70,3 +112,75 @@ def force_causal_efficient_attention(
 
     logger.debug(f"After forcing causal efficient attention pass:\n{gm.graph}")
     return gm
+
+
+def _prove_causal(
+    gm: torch.fx.GraphModule,
+    attn_bias: torch.fx.Node,
+    seq_len: Any,
+) -> Optional[bool]:
+    """Whether attn_bias is a causal mask for every input, or None if unknown.
+
+    The value of a bias that depends on no graph input can be computed here once.
+    It is causal when it keeps exactly the lower triangle (0) and blocks the rest
+    (-inf, or the dtype's lowest value as Hugging Face uses). It is not causal when
+    its zeros are anywhere else, or when it does not block a position above the
+    diagonal. A bias whose check fails counts as not causal, so that a failed check
+    never replaces a mask that is not causal.
+    """
+    if not isinstance(seq_len, int):
+        return None
+
+    producers: Set[torch.fx.Node] = set()
+    to_visit = [attn_bias]
+    while to_visit:
+        current = to_visit.pop()
+        if current in producers:
+            continue
+        if current.op not in ("call_function", "get_attr") or current.is_impure():
+            return None
+        producers.add(current)
+        to_visit.extend(current.all_input_nodes)
+
+    graph = torch.fx.Graph()
+    copies: Dict[torch.fx.Node, torch.fx.Node] = {}
+    for current in gm.graph.nodes:
+        if current in producers:
+            copies[current] = graph.node_copy(current, lambda n: copies[n])
+    graph.output(copies[attn_bias])
+    # torch.compile lowers under a fake mode, where the bias would have no values.
+    with unset_fake_temporarily():
+        try:
+            return _check_causal(torch.fx.GraphModule(gm, graph)(), seq_len)
+        except Exception as e:
+            logger.warning(f"Keeping attn_bias {attn_bias}, could not check it: {e}")
+            return False
+
+
+def _check_causal(bias: Any, seq_len: int) -> Optional[bool]:
+    if (
+        not isinstance(bias, torch.Tensor)
+        or isinstance(bias, FakeTensor)
+        or not bias.is_floating_point()
+    ):
+        return None
+    try:
+        shape = torch.broadcast_shapes(bias.shape, (seq_len, seq_len))
+    except RuntimeError:
+        return False
+    if shape[-2:] != (seq_len, seq_len):
+        return False
+    # A broadcast dimension repeats one slice, so checking that slice is enough.
+    bias = bias[tuple(slice(0, 1) if st == 0 else slice(None) for st in bias.stride())]
+    keep = torch.ones(seq_len, seq_len, dtype=torch.bool, device=bias.device).tril()
+    keep = keep.expand(torch.broadcast_shapes(bias.shape, keep.shape))
+    bias = bias.expand(keep.shape)
+    if not torch.equal(bias == 0, keep):
+        return False
+    # Compare in place: indexing the blocked positions out would build an int64 index
+    # several times the size of the bias.
+    if bool(((bias <= torch.finfo(bias.dtype).min) | keep).all()):
+        return True
+    # exp(-1e4) is 0 even in float32, so softmax gives such a position no weight in
+    # practice, though that is not a proof for every score.
+    return None if bool(((bias <= -1e4) | keep).all()) else False

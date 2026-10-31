@@ -654,6 +654,44 @@ class TestEngineCache(TestCase):
 
         assertions.assertEqual(hash1, hash2)
 
+    def test_graphs_that_differ_in_more_than_weight_values_are_not_equal(self):
+        class Permute(torch.nn.Module):
+            def __init__(self, dims):
+                super().__init__()
+                self.dims = dims
+
+            def forward(self, x):
+                return x.permute(self.dims)
+
+        class Cond(torch.nn.Module):
+            def __init__(self, branch):
+                super().__init__()
+                self.branch = branch
+
+            def forward(self, x):
+                return torch.cond(x.sum() > 0, self.branch, lambda t: -t, (x,))
+
+        x = torch.randn(3, 3, device="cuda")
+        pairs = {
+            "argument": (Permute((0, 1)), Permute((1, 0))),
+            "cond branch": (Cond(lambda t: t.sin()), Cond(lambda t: t.cos())),
+            "weight shape": (
+                torch.nn.Linear(3, 4).cuda(),
+                torch.nn.Linear(3, 5).cuda(),
+            ),
+        }
+        for name, models in pairs.items():
+            with self.subTest(name):
+                hashes = {
+                    BaseEngineCache.get_hash(
+                        torch.export.export(model, (x,)).module(),
+                        (torch_trt.Input(shape=(3, 3)),),
+                        CompilationSettings(),
+                    )
+                    for model in models
+                }
+                self.assertEqual(len(hashes), 2)
+
     # @unittest.skip("benchmark on small models")
     @unittest.skipIf(
         torch_trt.ENABLED_FEATURES.tensorrt_rtx,

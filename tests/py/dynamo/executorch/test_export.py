@@ -4,6 +4,7 @@
 import base64
 import gc
 import importlib
+import pickle
 import sys
 import types
 import weakref
@@ -117,7 +118,9 @@ class _EngineState:
         self.info[INPUT_BINDING_NAMES_IDX] = "x"
         self.info[OUTPUT_BINDING_NAMES_IDX] = "output0"
         self.info[HW_COMPATIBLE_IDX] = "0"
-        self.info[SERIALIZED_METADATA_IDX] = "engine-metadata"
+        self.info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+            pickle.dumps({"name": "engine-metadata"})
+        ).decode("utf-8")
         self.info[TARGET_PLATFORM_IDX] = "linux_x86_64"
         self.info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(int(requires_output_allocator))
         self.info[RESOURCE_ALLOCATION_STRATEGY_IDX] = "1"
@@ -910,6 +913,28 @@ def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
     # An output shape that depends on the data still needs an output allocator.
     with pytest.raises(RuntimeError, match="output allocator"):
         save(MaskedRows())
+
+
+@pytest.mark.unit
+def test_program_without_inputs_exports_a_pte(tmp_path):
+    """With no user inputs, lift() has only the TensorRT engine to turn into an input."""
+
+    class Noise(torch.nn.Module):
+        def forward(self):
+            # The random draw stays in PyTorch, so the engine gets its result as input.
+            return torch.randn(50, 32, device="cuda") * 2 + 1
+
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(Noise().eval(), ()), arg_inputs=(), min_block_size=1
+    )
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+    output = tmp_path / "noise.pte"
+
+    torch_tensorrt.save(
+        compiled, str(output), output_format="executorch", retrace=False
+    )
+
+    assert b"TensorRTBackend" in output.read_bytes()
 
 
 @pytest.mark.unit

@@ -287,6 +287,172 @@ class TestUInt8Support(TestCase):
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
+    def test_uint8_shape_op_before_cast(self):
+        # TensorRT has no layer that reshapes uint8, so these must stay in PyTorch.
+        shape_ops = {
+            "permute": lambda image: image.permute(2, 0, 1),
+            "unsqueeze": lambda image: image.unsqueeze(0),
+            "slice": lambda image: image[2:6],
+            "stack": lambda image: torch.stack([image, image]),
+            "split": lambda image: torch.split(image, 4)[1],
+            "partial slice_scatter": lambda image: torch.slice_scatter(
+                image, image[:2], 0, 2, 4
+            ),
+        }
+
+        class ImageModule(nn.Module):
+            def __init__(self, shape_op):
+                super().__init__()
+                self.shape_op = shape_op
+
+            def forward(self, image):
+                return self.shape_op(image).float() / 255
+
+        in_tensor = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        for name, shape_op in shape_ops.items():
+            with self.subTest(name):
+                mod = ImageModule(shape_op)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (in_tensor,)),
+                    inputs=[in_tensor],
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                engines = [n for n, _ in trt_mod.named_children() if "_run_on_acc" in n]
+                self.assertEqual(len(engines), 1)
+                torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
+
+    def test_uint8_where(self):
+        # The where converter widens uint8 values before it reshapes a value of
+        # lower rank or makes a constant, which TensorRT cannot do in uint8.
+        class Select(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b).float() * 2
+
+        class SelectBackground(nn.Module):
+            def __init__(self, background):
+                super().__init__()
+                self.register_buffer("background", background)
+
+            def forward(self, mask, a):
+                return torch.where(mask, a, self.background).float() * 2
+
+        mask = torch.rand(8, 8, 3, device="cuda") > 0.5
+        a, b = (
+            torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+            for _ in range(2)
+        )
+        flags = torch.arange(192, device="cuda").reshape(8, 8, 3) % 2 == 0
+        c = torch.randn(8, 8, 3, device="cuda")
+        cases = {
+            "uint8": (Select(), (mask, a, b)),
+            "bool": (Select(), (mask, a, flags)),
+            "bool of lower rank": (Select(), (mask, a, flags[0, 0])),
+            "bool constant": (SelectBackground(flags), (mask, a)),
+            "uint8 of lower rank": (Select(), (mask, a, b[0, 0])),
+            "uint8 constant": (SelectBackground(b), (mask, a)),
+            "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c)),
+            "uint8 constant, float output": (SelectBackground(b), (mask, c)),
+        }
+        for name, (mod, inputs) in cases.items():
+            with self.subTest(name):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, inputs),
+                    inputs=list(inputs),
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+        # torch.compile converts in a fake mode, and 114 becomes a uint8 constant.
+        class Fill(nn.Module):
+            def forward(self, mask, a):
+                return torch.where(mask, a, 114)
+
+        compiled = torch.compile(
+            Fill(),
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
+        )
+        torch.testing.assert_close(compiled(mask, a), Fill()(mask, a))
+
+    def test_uint8_full_overwrite_from_float(self):
+        class Overwrite(nn.Module):
+            def forward(self, image, values):
+                return torch.slice_scatter(image, values, 0, 0, 8).float() / 255
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        values = torch.randint(0, 256, (8, 8, 3), device="cuda").float()
+        mod = Overwrite()
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, (image, values)),
+            arg_inputs=[image, values],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(trt_mod(image, values), mod(image, values))
+
+    def test_uint8_in_cond_branch(self):
+        class CondModule(nn.Module):
+            def __init__(self, shape_op):
+                super().__init__()
+                self.shape_op = shape_op
+
+            def forward(self, image, flag):
+                return torch.cond(
+                    flag.sum() > 0,
+                    lambda image: self.shape_op(image).float() / 255,
+                    lambda image: self.shape_op(image).float() / 127,
+                    (image,),
+                )
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        flag = torch.ones(2, device="cuda")
+        for name, shape_op in (
+            ("permute", lambda image: image.permute(2, 0, 1)),
+            ("cast only", lambda image: image),
+        ):
+            with self.subTest(name):
+                mod = CondModule(shape_op)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (image, flag)),
+                    arg_inputs=[image, flag],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(image, flag), mod(image, flag))
+
+    def test_uint8_buffer_write(self):
+        class Cache(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "cache", torch.zeros(1, 2, 8, 4, dtype=torch.uint8)
+                )
+
+            def forward(self, update):
+                self.cache[:, :, 2:4] = update
+                return self.cache.float() * 2
+
+        update = torch.randint(0, 256, (1, 2, 2, 4), dtype=torch.uint8, device="cuda")
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(Cache().cuda(), (update,)),
+            arg_inputs=[update],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(update)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, Cache().cuda()(update))
+
     def test_uint8_output(self):
         trt_mod = _build_engine(
             trt.float32, lambda network, x: network.add_cast(x, trt.uint8)

@@ -194,6 +194,39 @@ class TestCondCompilation(TestCase):
                 self.assertTrue(_same_io(identity(a), identity(a)))
                 self.assertFalse(_same_io(identity(a), identity(b)))
 
+    def test_cond_falls_back_when_a_branch_needs_a_pytorch_plugin(self):
+        import tensorrt
+
+        if (
+            tensorrt.get_plugin_registry().get_creator(
+                "ScatterAdd", "1", "torch_tensorrt"
+            )
+            is None
+        ):
+            self.skipTest("needs Torch-TensorRT's ScatterAdd plugin")
+
+        class AccumulateCond(nn.Module):
+            def forward(self, x, index, predicate):
+                return torch.cond(
+                    predicate,
+                    lambda v, i: v.index_put((i,), torch.ones_like(v[:2]), True),
+                    lambda v, i: v - 1,
+                    (x, index),
+                )
+
+        inputs = (torch.zeros(8, 4), torch.tensor([1, 1]), torch.tensor(True))
+        cond = _cond_node(_export_lowered(AccumulateCond(), inputs))
+        previous = (CONVERTERS.compilation_settings, CONVERTERS.disallowed_targets)
+        try:
+            CONVERTERS.set_compilation_settings(CompilationSettings())
+            self.assertTrue(cond in CONVERTERS)
+            CONVERTERS.set_compilation_settings(
+                CompilationSettings(fallback_pytorch_plugin_ops=True)
+            )
+            self.assertFalse(cond in CONVERTERS)
+        finally:
+            CONVERTERS.compilation_settings, CONVERTERS.disallowed_targets = previous
+
     def test_cond_falls_back_when_branch_has_unsupported_op(self):
         x = torch.randn(1, 4).abs() + 0.1
         pred = torch.tensor(True)

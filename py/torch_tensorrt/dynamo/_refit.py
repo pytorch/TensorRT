@@ -112,7 +112,15 @@ def _refit_single_trt_engine_with_gm(
             trt_wt_tensor = trt.Weights(
                 trt_dtype, weight.data_ptr(), torch.numel(weight)
             )
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            if not refitter.set_named_weights(
+                layer_name, trt_wt_tensor, trt_wt_location
+            ):
+                expected = refitter.get_weights_prototype(layer_name)
+                raise AssertionError(
+                    f"TensorRT refused the new weight for {layer_name}: the engine "
+                    f"holds {expected.size} {expected.dtype}, the new weight is "
+                    f"{trt_wt_tensor.size} {trt_dtype}"
+                )
             refitted.add(layer_name)
 
         if len(refitted) != len(weight_list):

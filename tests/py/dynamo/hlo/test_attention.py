@@ -18,11 +18,10 @@ Known limitations
 
 Notes on attn_bias_is_causal
 -----------------------------
-  Default True: the force_causal_efficient_attention lowering pass strips
-    attn_bias and sets is_causal=True before reaching the converter.
-    This is an HF-model optimization; most production uses keep the default.
-  Set False: attn_bias is forwarded to IAttentionLayer.mask.  Required for
-    any test that validates actual bias tensor values.
+  Default None: the force_causal_efficient_attention lowering pass strips an
+    attn_bias proven to be a causal mask and sets is_causal=True before reaching
+    the converter.  True also strips one the pass cannot check.
+  Set False: attn_bias is always forwarded to IAttentionLayer.mask.
 
 Test classes
 ------------
@@ -615,9 +614,10 @@ class TestEfficientAttention(DispatchTestCase):
 
     test_attn_bias_is_causal_opt
         Exercises the force_causal_efficient_attention lowering pass
-        (attn_bias_is_causal=True, default).  The pass strips attn_bias and
-        sets is_causal=True; both TRT and the PyTorch reference see the same
-        post-lowering graph so the comparison is valid.
+        (attn_bias_is_causal=True) with a causal attn_bias built in
+        the graph, which the pass replaces with is_causal=True.  This checks
+        the numbers only; test_force_causal_efficient_attention in the lowering
+        tests checks the replacement.
         (decompose_attention=False, attn_bias_is_causal=True)
 
     Note: bool attn_bias is not accepted by _scaled_dot_product_efficient_attention
@@ -819,21 +819,29 @@ class TestEfficientAttention(DispatchTestCase):
         self, name, batch, num_heads, seq, head_dim, scale, dtype, atol
     ):
         class EfficientAttnBiasOpt(nn.Module):
-            def forward(self, q, k, v, bias):
+            def forward(self, q, k, v):
+                position = torch.arange(seq, device=q.device)
+                bias = torch.zeros(seq, seq, dtype=dtype, device=q.device).masked_fill(
+                    position[:, None] < position[None], float("-inf")
+                )
                 out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
-                    q, k, v, bias, False, 0.0, False, scale=scale
+                    q,
+                    k,
+                    v,
+                    bias.expand(batch, num_heads, seq, seq),
+                    False,
+                    0.0,
+                    False,
+                    scale=scale,
                 )
                 return out[0]
 
         q = torch.randn(batch, num_heads, seq, head_dim, dtype=dtype)
         k = torch.randn(batch, num_heads, seq, head_dim, dtype=dtype)
         v = torch.randn(batch, num_heads, seq, head_dim, dtype=dtype)
-        bias = torch.randn(
-            batch, num_heads, seq, seq, dtype=dtype
-        )  # values ignored; pass replaces with is_causal=True
         self.run_test(
             EfficientAttnBiasOpt(),
-            [q, k, v, bias],
+            [q, k, v],
             rtol=1e-2,
             atol=atol,
             enable_passes=True,

@@ -1822,6 +1822,7 @@ def _index_put_accumulate_validator(
     torch.ops.aten.index_put.default,
     capability_validator=_index_put_accumulate_validator,
     supports_dynamic_shapes=True,
+    requires_pytorch_plugin=True,
 )
 @enforce_tensor_types(
     {
@@ -3283,7 +3284,6 @@ def aten_ops_sub(
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -3324,6 +3324,24 @@ def aten_ops_div(
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"
         )
+
+
+@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
+def aten_ops_prims_div(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.prims_div(
+        ctx,
+        target,
+        get_ir(target),
+        name,
+        args[0],
+        args[1],
+    )
 
 
 @dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)

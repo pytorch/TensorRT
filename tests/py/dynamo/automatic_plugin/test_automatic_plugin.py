@@ -105,6 +105,29 @@ class TestAutomaticPlugin(DispatchTestCase):
 
         self.run_test(elementwise_mul(), inputs)
 
+    def test_jit_plugin_marks_the_engine_as_running_pytorch(self):
+        class elementwise_mul(nn.Module):
+            def forward(self, lhs, rhs):
+                return torch.ops.torchtrt_ex.elementwise_mul.default(lhs, rhs)
+
+        inputs = (
+            torch.randn(64, 64, device="cuda"),
+            torch.randn(64, 64, device="cuda"),
+        )
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(elementwise_mul(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+        )
+        (engine,) = [
+            module
+            for module in compiled.modules()
+            if isinstance(module, torch_tensorrt.dynamo.runtime.TorchTensorRTModule)
+        ]
+        self.assertEqual(
+            engine.pytorch_plugin_ops, ["torch.ops.torchtrt_ex.elementwise_mul.default"]
+        )
+
 
 if __name__ == "__main__":
     run_tests()

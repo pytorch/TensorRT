@@ -4,10 +4,17 @@
 import operator
 import sys
 import tempfile
+from unittest import mock
 
 import torch
 import torch_tensorrt
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    _check_causal,
+    force_causal_efficient_attention,
+)
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -548,57 +555,237 @@ class TestPreserveAttentionOutputLayout(TestCase):
 
 class TestRewriteEfficientAttention(TestCase):
     def test_force_causal_efficient_attention(self):
-        class RewriteEfficientAttention(torch.nn.Module):
-            def forward(
-                self,
-                query,
-                key,
-                value,
-                attn_bias=None,
-                compute_log_sumexp=False,
-                dropout_p=0.0,
-                is_causal=False,
-                scale=None,
-            ):
+        class CausalEfficientAttention(torch.nn.Module):
+            def forward(self, query, key, value):
+                position = torch.arange(query.size(-2), device=query.device)
+                attn_bias = torch.zeros(
+                    query.size(-2), query.size(-2), device=query.device
+                ).masked_fill(position[:, None] < position[None], float("-inf"))
                 out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
-                    query,
-                    key,
-                    value,
-                    attn_bias,
-                    compute_log_sumexp,
-                    dropout_p,
-                    is_causal,
-                    scale=scale,
+                    query, key, value, attn_bias.expand(4, 8, -1, -1), False
                 )
                 return out[0]
 
-        attn_bias = torch.zeros(4, 8, 32, 32, device="cuda")
-        upper = torch.triu(
-            torch.ones((32, 32), dtype=torch.bool, device="cuda"), diagonal=1
-        )
-        attn_bias = attn_bias.masked_fill(upper, float("-inf"))
-
-        inputs = [
-            torch.randn(4, 8, 32, 16).cuda(),
-            torch.randn(4, 8, 32, 16).cuda(),
-            torch.randn(4, 8, 32, 16).cuda(),
-            attn_bias,
-            True,
-            0.0,
-            True,
-        ]
-        model = RewriteEfficientAttention().cuda()
-        pytorch_out = model(*inputs)
+        inputs = [torch.randn(4, 8, 32, 16).cuda() for _ in range(3)]
+        model = CausalEfficientAttention().cuda()
         ep = torch.export.export(model, tuple(inputs))
+        # torch.compile runs the lowering passes under a fake mode.
+        with FakeTensorMode():
+            gm = force_causal_efficient_attention(ep.module(), CompilationSettings())
+        (attention,) = [
+            node
+            for node in gm.graph.nodes
+            if node.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        ]
+        self.assertIsNone(attention.args[3])
+        self.assertTrue(attention.args[6])
+
         trt_module = torch_tensorrt.dynamo.compile(
-            ep,
-            inputs,
+            ep, inputs, min_block_size=1, decompose_attention=False
+        )
+        torch.testing.assert_close(
+            model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    def test_force_causal_efficient_attention_trusts_an_unchecked_bias_only_when_asked(
+        self,
+    ):
+        upper = torch.ones(32, 32, dtype=torch.bool, device="cuda").triu(1)
+        causal = torch.zeros(4, 8, 32, 32, device="cuda").masked_fill(
+            upper, float("-inf")
+        )
+
+        class InputBias(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, False
+                )
+                return out[0]
+
+        class BufferBias(InputBias):
+            def __init__(self, bias):
+                super().__init__()
+                self.register_buffer("bias", bias)
+
+            def forward(self, query):
+                return super().forward(query, self.bias)
+
+        query = torch.randn(4, 8, 32, 16, device="cuda")
+        seq = torch.export.Dim("seq", min=2, max=64)
+        dynamic_seq = ({2: seq}, {2: seq, 3: seq})
+        # (model, inputs, dynamic shapes, settings, whether the bias is replaced)
+        cases = [
+            (InputBias(), (query, causal), None, CompilationSettings(), False),
+            (
+                InputBias(),
+                (query, causal),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                True,
+            ),
+            (
+                InputBias(),
+                (query, causal),
+                dynamic_seq,
+                CompilationSettings(attn_bias_is_causal=True),
+                True,
+            ),
+            (BufferBias(causal), (query,), None, CompilationSettings(), True),
+            (
+                BufferBias(causal),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=False),
+                False,
+            ),
+            # A sliding window: blocks every position above the diagonal, and some below.
+            (
+                BufferBias(causal.masked_fill(upper.mT.tril(-4), float("-inf"))),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                False,
+            ),
+            # Zeros on the lower triangle, but positions above it are not blocked.
+            (
+                BufferBias(causal.nan_to_num(neginf=5.0)),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                False,
+            ),
+        ]
+        for model, inputs, dynamic_shapes, settings, replaced in cases:
+            with self.subTest(
+                type(model).__name__,
+                dynamic=dynamic_shapes is not None,
+                attn_bias_is_causal=settings.attn_bias_is_causal,
+            ):
+                ep = torch.export.export(model, inputs, dynamic_shapes=dynamic_shapes)
+                gm = force_causal_efficient_attention(ep.module(), settings)
+                (attention,) = [
+                    node
+                    for node in gm.graph.nodes
+                    if node.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                ]
+                self.assertEqual(attention.args[3] is None, replaced)
+
+        # A check that fails, for example by running out of memory, keeps the bias.
+        ep = torch.export.export(BufferBias(causal), (query,))
+        with mock.patch(
+            "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention._check_causal",
+            side_effect=torch.OutOfMemoryError,
+        ):
+            gm = force_causal_efficient_attention(
+                ep.module(), CompilationSettings(attn_bias_is_causal=True)
+            )
+        (attention,) = [
+            node
+            for node in gm.graph.nodes
+            if node.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        ]
+        self.assertIsNotNone(attention.args[3])
+
+    def test_causal_check_memory(self):
+        seq = 4096
+        bias = torch.zeros(seq, seq, dtype=torch.float16, device="cuda").masked_fill(
+            torch.ones(seq, seq, dtype=torch.bool, device="cuda").triu(1),
+            float("-inf"),
+        )
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+        before = torch.cuda.memory_allocated()
+        self.assertTrue(_check_causal(bias, seq))
+        # Indexing out the blocked positions needed several times the bias.
+        self.assertLess(torch.cuda.max_memory_allocated() - before, 4 * bias.nbytes)
+
+    def test_force_causal_efficient_attention_keeps_a_bias_with_unused_log_sumexp(
+        self,
+    ):
+        # The converter refuses compute_log_sumexp, so this compiles only if the
+        # pass clears the flag that nothing reads.
+        class LogSumExp(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True
+                )
+                return out[0]
+
+        query = torch.randn(4, 8, 32, 16, device="cuda")
+        attn_bias = torch.randn(4, 8, 32, 32, device="cuda")
+        model = LogSumExp()
+        trt_module = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (query, attn_bias)),
+            [query, attn_bias],
             min_block_size=1,
-            decompose_attention=False,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(
+            model(query, attn_bias), trt_module(query, attn_bias), rtol=1e-2, atol=1e-2
+        )
+
+        # A log_sumexp that is read, or a dropout, keeps the flag and the node in PyTorch.
+        class ReadsLogSumExp(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True
+                )
+                return out[0], out[1]
+
+        class Dropout(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, True, 0.5
+                )
+                return out[0]
+
+        for model in (ReadsLogSumExp(), Dropout()):
+            with self.subTest(type(model).__name__):
+                gm = torch.export.export(model, (query, attn_bias)).module()
+                # Lowering drops the unused getitems that export keeps.
+                gm.graph.eliminate_dead_code()
+                gm = force_causal_efficient_attention(gm, CompilationSettings())
+                (attention,) = [
+                    node
+                    for node in gm.graph.nodes
+                    if node.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                ]
+                self.assertTrue(attention.args[4])
+
+    def test_force_causal_efficient_attention_keeps_block_causal_mask(self):
+        # Complex RoPE makes the complex lowering retrace scaled_dot_product_attention
+        # into efficient attention, with the block-causal mask as its attn_bias.
+        seq, block = 98, 49
+
+        class RopeBlockCausalAttention(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "freqs", torch.polar(torch.ones(seq, 8), torch.randn(seq, 8))
+                )
+
+            def forward(self, x):
+                q = torch.view_as_complex(x.reshape(seq, 8, 2)) * self.freqs
+                q = torch.view_as_real(q).reshape(1, 1, seq, 16)
+                frame = torch.arange(seq, device=x.device) // block
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, q, q, attn_mask=frame[:, None] >= frame[None]
+                )
+
+        x = torch.randn(seq, 16).cuda()
+        model = RopeBlockCausalAttention().cuda().eval()
+        trt_module = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            [x],
+            min_block_size=1,
+            disable_tf32=True,
             attn_bias_is_causal=True,
         )
-        trt_out = trt_module(*inputs)
-        torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+        torch.testing.assert_close(model(x), trt_module(x), rtol=1e-3, atol=1e-3)
 
     def test_force_causal_efficient_attention_with_non_causal_attn_bias(self):
         class RewriteEfficientAttention(torch.nn.Module):

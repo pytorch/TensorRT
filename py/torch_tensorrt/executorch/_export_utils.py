@@ -131,18 +131,38 @@ def validate_engine_info(
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
+        SERIALIZED_METADATA_IDX,
+        TorchTensorRTModule,
     )
 
+    node_suffix = f" for node '{node_name}'" if node_name else ""
     if (
         len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
         and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
     ):
-        node_suffix = f" for node '{node_name}'" if node_name else ""
         raise RuntimeError(
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
         ) from cause
+    serialized_metadata = (
+        engine_info[SERIALIZED_METADATA_IDX]
+        if len(engine_info) > SERIALIZED_METADATA_IDX
+        else ""
+    )
+    metadata = (
+        TorchTensorRTModule.decode_metadata(serialized_metadata)
+        if serialized_metadata
+        else {}
+    )
+    plugin_ops = metadata.get("pytorch_plugin_ops")
+    if plugin_ops:
+        raise RuntimeError(
+            f"ExecuTorch export does not support the TensorRT engine{node_suffix}: it "
+            f"runs {', '.join(plugin_ops)} with TensorRT plugins that run PyTorch, and "
+            "the ExecuTorch TensorRT runtime does not load PyTorch. Compile with "
+            "fallback_pytorch_plugin_ops=True to keep those operators out of TensorRT."
+        )
 
 
 def _schema_name(node: Any) -> str:

@@ -164,7 +164,8 @@ def _kv_write_will_alias(
     source *is* the buffer's new contents -- and the ones that raise never get as far
     as needing one. One more never reaches a converter: a ``slice_scatter`` written
     on a dynamic dim, which its validator runs in PyTorch, and which needs the
-    copy-back like any other.
+    copy-back like any other. Nor does a write that makes a uint8 tensor, which the
+    partitioners keep in PyTorch.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -176,6 +177,13 @@ def _kv_write_will_alias(
     # compile() later fails its own aliased_io cross-check. It still gets lifted and
     # copied back like any other non-aliasing write.
     if _write_op_is_torch_executed(value_node, settings):
+        return False
+    # The partitioners keep a write that makes a uint8 tensor in PyTorch, too.
+    from torch_tensorrt.dynamo.partitioning._global_partitioner import (
+        TorchTensorRTOperatorSupport,
+    )
+
+    if TorchTensorRTOperatorSupport._makes_uint8_tensor(value_node):
         return False
     # The KV layer aliases the cache only if it is a direct network input; after
     # lifting, the mutated buffer is a placeholder the write op reads from.

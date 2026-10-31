@@ -85,6 +85,7 @@ class TRTInterpreterResult(NamedTuple):
     aliased_io: dict[str, tuple[str, str]] = {}
     # Explicit count: a user return may itself be an aliased output.
     num_user_outputs: Optional[int] = None
+    pytorch_plugin_ops: List[str] = []
 
 
 def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
@@ -642,6 +643,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice,
             engine_aliased_io,
             self._num_user_outputs,
+            sorted(self.ctx.pytorch_plugin_ops),
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -823,6 +825,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_aliased_plugin_io", False):
             self.ctx.requires_aliased_plugin_io = True
             _LOGGER.debug(f"{target} requires aliased plugin I/O")
+
+        if converter_info.get("requires_pytorch_plugin", False):
+            self.ctx.pytorch_plugin_ops.add(CONVERTERS.qualified_name_or_str(target))
+            _LOGGER.debug(f"{target} adds a plugin that runs PyTorch")
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
