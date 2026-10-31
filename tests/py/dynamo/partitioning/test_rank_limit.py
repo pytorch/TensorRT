@@ -94,7 +94,7 @@ class TestTensorRankPartitioning(TestCase):
         self.assertEqual(compiled(x), model(x))
 
     @parameterized.expand([("fast", True), ("global", False)])
-    def test_view_left_to_pytorch_is_a_reshape(self, _, use_fast_partitioner):
+    def test_view_left_to_pytorch_is_core_aten(self, _, use_fast_partitioner):
         # aten._reshape_copy is not a core ATen op, so AOTInductor has no kernel for it.
         x = torch.rand(2, 4, 8, device="cuda")
         for model in (HighRankView(), HighRankViewAfterConvertibleOp()):
@@ -113,7 +113,7 @@ class TestTensorRankPartitioning(TestCase):
                     for node in module.graph.nodes
                 }
                 self.assertNotIn(torch.ops.aten._reshape_copy.default, targets)
-                self.assertIn(torch.ops.aten.reshape.default, targets)
+                self.assertIn(torch.ops.aten.view.default, targets)
                 self.assertEqual(compiled(x), model(x))
 
     def test_view_left_to_pytorch_does_not_alias_the_input(self):
