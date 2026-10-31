@@ -376,7 +376,11 @@ class TestUInt8Support(TestCase):
         compiled = torch.compile(
             Fill(),
             backend="tensorrt",
-            options={"min_block_size": 1, "pass_through_build_failures": True},
+            options={
+                "min_block_size": 1,
+                "pass_through_build_failures": True,
+                "require_full_compilation": True,
+            },
         )
         torch.testing.assert_close(compiled(mask, a), Fill()(mask, a))
 
