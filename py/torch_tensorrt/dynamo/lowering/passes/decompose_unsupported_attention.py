@@ -2,6 +2,8 @@ import logging
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
+from torch._guards import detect_fake_mode
+from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
@@ -110,13 +112,21 @@ def _upcast_breaks_attention_layer(node: torch.fx.Node) -> bool:
     return True
 
 
-def _example_val(x: Any) -> Any:
+def _example_val(x: Any, fake_mode: Optional[FakeTensorMode]) -> Any:
     if isinstance(x, torch.fx.Node):
         val = x.meta.get("val")
         if val is None:
             raise RuntimeError(
                 f"Cannot decompose attention node: {x} has no meta['val']"
             )
+        # make_fx needs its inputs in one fake mode, but a retrace with real tensors, as in the complex
+        # lowering, gives each constant it records a fake mode of its own.
+        if (
+            fake_mode is not None
+            and isinstance(val, FakeTensor)
+            and val.fake_mode is not fake_mode
+        ):
+            return fake_mode.from_tensor(val, static_shapes=True)
         return val
     return x
 
@@ -129,8 +139,12 @@ def _inline_traced_decomp(
 ) -> None:
     """Replace ``node`` with the aten subgraph from tracing ``decomp_fn``."""
 
-    example_args = tuple(_example_val(a) for a in node.args)
-    example_kwargs = {k: _example_val(v) for k, v in node.kwargs.items()}
+    # The graph inputs share one fake mode; constants may not.
+    fake_mode = detect_fake_mode(
+        [n.meta.get("val") for n in gm.graph.nodes if n.op == "placeholder"]
+    )
+    example_args = tuple(_example_val(a, fake_mode) for a in node.args)
+    example_kwargs = {k: _example_val(v, fake_mode) for k, v in node.kwargs.items()}
     example_kwargs["use_fp32_acc"] = settings.use_fp32_acc
 
     def wrapped(*args: Any) -> Any:

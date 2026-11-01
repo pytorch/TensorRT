@@ -5,6 +5,7 @@ from unittest import mock
 
 import torch
 import torch.nn as nn
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -356,6 +357,36 @@ class TestDecomposeUnsupportedAttention(TestCase):
         torch.testing.assert_close(
             trt_model(*inputs), model(*inputs), rtol=1e-4, atol=1e-4
         )
+
+    def test_attention_with_a_mask_in_another_fake_mode_is_decomposed(self):
+        # The complex lowering retraces with real tensors, which gives each constant a fake mode of its own.
+        class Attention(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("bias", torch.randn(1, 2, 6, 8))
+
+            def forward(self, q, k, v):
+                q, k, v = (
+                    torch.ops.aten._to_copy.default(t, dtype=torch.float32)
+                    for t in (q, k, v)
+                )
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    q, k, v, self.bias
+                )
+
+        model = Attention()
+        inputs = tuple(
+            torch.randn(1, 2, length, 8, dtype=torch.bfloat16) for length in (6, 8, 8)
+        )
+        gm = torch.export.export(model, inputs).module()
+        bias = next(n for n in gm.graph.nodes if n.op == "get_attr")
+        with FakeTensorMode():
+            bias.meta["val"] = torch.empty(1, 2, 6, 8)
+        gm = decompose_unsupported_attention(
+            gm, CompilationSettings(min_block_size=1, decompose_attention=False)
+        )
+        self.assertFalse([n for n in gm.graph.nodes if "attention" in str(n.target)])
+        torch.testing.assert_close(gm(*inputs), model(*inputs))
 
     def test_attentions_sharing_a_bf16_query_are_decomposed(self):
         # Wan2.1's image-to-video cross-attention reads one query against text and image keys.
