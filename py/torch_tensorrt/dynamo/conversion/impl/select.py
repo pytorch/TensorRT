@@ -760,8 +760,9 @@ def index_put_scatter_elements(
     values = cast_trt_tensor(ctx, values, compute_dtype, f"{name}_values_cast")
 
     registry = trt.get_plugin_registry()
-    # TensorRT 11.4 on Thor merges version 2, an IPluginV3, into the compiler region around
-    # it, which multiplies the build's host memory, so use version 1 while TensorRT has it.
+    # TensorRT on Thor merges version 2, an IPluginV3, into the compiler region around
+    # it, which multiplies the build's host memory. Version 1 stays its own layer, at
+    # some run-time cost on Thor, so use it while TensorRT has it.
     v1_creator = registry.get_creator("ScatterElements", "1", "")
     fields = trt.PluginFieldCollection(
         [

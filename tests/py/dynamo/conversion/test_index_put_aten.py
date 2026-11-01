@@ -1222,7 +1222,7 @@ class TestIndexPutConverter(DispatchTestCase):
         self.assertTrue(all(engine.pytorch_plugin_ops for engine in engines))
         trt_mod, (engine,) = compile_with(fallback_pytorch_plugin_ops=True)
         self.assertEqual(engine.pytorch_plugin_ops, [])
-        # Version 1 is an IPluginV2 and stays its own layer. Some TensorRT builds merge the
+        # Version 1 is an IPluginV2 and stays its own layer. TensorRT on Thor merges the
         # IPluginV3 version 2 into a compiler region that needs far more build memory.
         import tensorrt
 
