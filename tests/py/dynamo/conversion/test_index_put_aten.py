@@ -761,8 +761,8 @@ class TestIndexPutConverter(DispatchTestCase):
                     torch.arange(15.0, device="cuda").reshape(3, 5),
                 ),
             ),
-            # A 0-d mask from a comparison fills all of data, as masked_fill does.
-            (Gate(), (torch.arange(12.0, device="cuda").reshape(3, 4), index)),
+            # A 0-d mask from a comparison stays a mask.
+            (Gate(), (torch.arange(4.0, device="cuda").reshape(1, 4), index)),
         ]
         for model, inputs in cases:
             with self.subTest(type(model).__name__):
