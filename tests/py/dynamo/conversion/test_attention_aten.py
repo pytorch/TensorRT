@@ -502,6 +502,69 @@ class TestScaledDotProductAttention(DispatchTestCase):
                     not constant,
                 )
 
+    @parameterized.expand([("sdpa", 1, 8), ("efficient", 6, 4)])
+    def test_causal_with_unequal_lengths(self, op, query_len, key_len):
+        # PyTorch aligns the causal mask to the top left, so a decode step attends to the first key only.
+        class Causal(nn.Module):
+            def forward(self, query, key, value):
+                if op == "sdpa":
+                    return torch.ops.aten.scaled_dot_product_attention.default(
+                        query, key, value, None, 0.0, True
+                    )
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, value, None, False, 0.0, True
+                )[0]
+
+        query = torch.randn(2, 4, query_len, 32, dtype=torch.float16)
+        key, value = (
+            torch.randn(2, 4, key_len, 32, dtype=torch.float16) for _ in range(2)
+        )
+        self.run_test(
+            Causal(), [query, key, value], rtol=1e-2, atol=1e-2, enable_passes=True
+        )
+
+    def test_causal_mask_kind(self):
+        # TensorRT's LOWER_RIGHT is PyTorch's mask for equal lengths and for its flash kernel.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        flash = torch.ops.aten._scaled_dot_product_flash_attention.default
+        efficient = torch.ops.aten._scaled_dot_product_efficient_attention.default
+
+        class Attention(nn.Module):
+            def forward(self, x, memory):
+                return (
+                    sdpa(x, x, x, None, 0.0, True),
+                    efficient(x, memory, memory, None, False, 0.0, True)[0],
+                )
+
+        # Equal example lengths, so only the symbols can tell the second attention's lengths apart.
+        ep = torch.export.export(
+            Attention(),
+            (torch.randn(1, 2, 4, 8), torch.randn(1, 2, 4, 8)),
+            dynamic_shapes=({2: torch.export.Dim("x")}, {2: torch.export.Dim("m")}),
+        )
+        nodes = {n.target: n for n in ep.graph.nodes}
+        same, different = nodes[sdpa], nodes[efficient]
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        four, six, dynamic = (
+            network.add_input(name, trt.float16, (1, 2, length, 8))
+            for name, length in (("four", 4), ("six", 6), ("dynamic", -1))
+        )
+        lower, upper = trt.CausalMaskKind.LOWER_RIGHT, trt.CausalMaskKind.UPPER_LEFT
+        for node, target, query, key, kind in (
+            (None, sdpa, four, four, lower),
+            (None, sdpa, four, six, upper),
+            (None, flash, four, six, lower),
+            (same, sdpa, dynamic, dynamic, lower),
+            (different, efficient, dynamic, dynamic, upper),
+        ):
+            with self.subTest(target=target, query=query.name, key=key.name, node=node):
+                ctx = ConversionContext(network, current_node=node)
+                self.assertEqual(
+                    impl.attention._causal_mask_kind(ctx, target, query, key), kind
+                )
+
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
     @parameterized.expand(
