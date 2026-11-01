@@ -1008,7 +1008,7 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
     return (
         value.device.type == "cpu"
         and statically_known_true(value.numel() == 1)
-        and indices[0].dtype == torch.bool
+        and indices[0].dtype is torch.bool
         and indices[0].device == data.device
     )
 
