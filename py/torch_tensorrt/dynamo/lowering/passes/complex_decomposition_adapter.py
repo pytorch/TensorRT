@@ -153,10 +153,10 @@ def complex_decomposition_adapter(
         gc.collect()
     gm = decomposed_gm
 
-    # A real-mode make_fx retrace gives each tensor it computes from constants alone
-    # a fake mode of its own. Later passes trace such constants together with the
-    # graph's other tensors, which needs one fake mode, so move them into the
-    # retrace's.
+    # A real-mode make_fx retrace gives each constant it records, and each tensor it
+    # computes from constants alone, a fake mode of its own. Later passes trace such
+    # constants together with the graph's other tensors, which needs one fake mode,
+    # so move them into the fake mode of the graph's inputs.
     fake_mode = detect_fake_mode(flat_args)
     if fake_mode is not None:
         for node in gm.graph.nodes:
@@ -214,7 +214,6 @@ def _decompose_complex_symbolically(
     """
     from torch._functorch._aot_autograd import complex_decomposition as upstream
     from torch.fx.experimental.proxy_tensor import make_fx
-    from torch.utils import _pytree as pytree
 
     upstream._assert_no_incorrect_aliasing_mutation(gm)
 
