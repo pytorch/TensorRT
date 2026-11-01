@@ -920,6 +920,24 @@ class TestIndexPutConverter(DispatchTestCase):
         for mask in masks:
             torch.testing.assert_close(compiled(data, mask), Fill()(data, mask))
 
+        # masked_fill also ignores a None after the mask.
+        class FillWithTrailingNone(torch.nn.Module):
+            def forward(self, data, mask):
+                value = torch.tensor(7.0)
+                return torch.ops.aten.index_put.default(data, [mask, None], value)
+
+        inputs = (
+            torch.zeros(2, 3, device="cuda"),
+            torch.tensor([[True, False, True], [False, True, False]], device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(FillWithTrailingNone(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*inputs), FillWithTrailingNone()(*inputs))
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):

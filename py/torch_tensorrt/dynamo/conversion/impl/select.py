@@ -1023,6 +1023,7 @@ def _check_index_entries(node_args: Sequence[object]) -> None:
     too_many = f"index_put: too many indices for an input of rank {data.dim()}"
     if len(entries) > data.dim():
         raise ValueError(too_many)
+    masked_fill = _runs_as_masked_fill(node_args)
     dim = 0
     for entry in entries:
         mask = _graph_tensor(entry)
@@ -1038,6 +1039,9 @@ def _check_index_entries(node_args: Sequence[object]) -> None:
                 f"input dims {covered} it covers"
             )
         dim += mask.dim()
+        if masked_fill:
+            # masked_fill takes its one mask and ignores the Nones after it.
+            return
     if dim > data.dim():
         raise ValueError(too_many)
 
