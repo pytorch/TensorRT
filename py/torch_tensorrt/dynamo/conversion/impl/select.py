@@ -937,9 +937,9 @@ def _broadcast_index_put_values(
         )
         _check_broadcast(ctx, target, source_ir, f"{name}_{k}", got, want, what)
     if 0 in tuple(values.shape) or 0 in result_shape:
-        # With no elements in values or in input[indices] there is nothing to lay out: the
-        # scatter checks the values count at runtime, and an empty index writes nothing.
-        # Laying them out trips TensorRT's engine build.
+        # With no elements in values or in input[indices] there is nothing to lay out, and
+        # the checks above already matched the values to input[indices]. Laying them out
+        # trips TensorRT's engine build.
         return impl.shuffle.reshape(
             ctx, target, source_ir, f"{name}_flatten", values, (-1,)
         )
@@ -1008,7 +1008,7 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
     return (
         value.device.type == "cpu"
         and statically_known_true(value.numel() == 1)
-        and indices[0].dtype in (torch.bool, torch.uint8)
+        and indices[0].dtype == torch.bool
         and indices[0].device == data.device
     )
 
@@ -1030,7 +1030,7 @@ def _check_index_entries(node_args: Sequence[object]) -> None:
         if mask is None and entry is not None:
             # How many dims an entry without metadata covers is not known.
             return
-        if mask is None or mask.dtype not in (torch.bool, torch.uint8):
+        if mask is None or mask.dtype != torch.bool:
             dim += 1
             continue
         covered = tuple(data.shape[dim : dim + mask.dim()])
