@@ -1014,39 +1014,40 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
 
 
 def _check_index_entries(node_args: Sequence[object]) -> None:
-    """Raise, as PyTorch does, for more indices than input dims and for a mask whose shape
-    is not that of the input dims it covers."""
+    """Raise, as PyTorch does, for more indices than input dims, and for an index tensor
+    that does not fit the input dims it covers, such as a mask of the wrong shape."""
     data = _graph_tensor(node_args[0]) if node_args else None
     entries = node_args[1] if len(node_args) > 1 else None
     if data is None or not isinstance(entries, (list, tuple)):
         return
-    too_many = f"index_put: too many indices for an input of rank {data.dim()}"
     if len(entries) > data.dim():
-        raise ValueError(too_many)
-    masked_fill = _runs_as_masked_fill(node_args)
+        raise ValueError(
+            f"index_put: too many indices for an input of rank {data.dim()}"
+        )
     dim = 0
     for entry in entries:
-        mask = _graph_tensor(entry)
-        if mask is None and entry is not None:
+        index = _graph_tensor(entry)
+        if entry is not None and index is None:
             # How many dims an entry without metadata covers is not known.
             return
-        if mask is None or mask.dtype != torch.bool:
-            dim += 1
-            continue
-        covered = tuple(data.shape[dim : dim + mask.dim()])
-        if len(covered) < mask.dim() or any(
-            statically_known_true(m != d) for m, d in zip(mask.shape, covered)
+        # A None or an integer index covers one dim, and a mask as many as it has. PyTorch
+        # lets Nones run past the last dim, but not index tensors.
+        covers = index.dim() if index is not None and index.dtype is torch.bool else 1
+        covered = tuple(data.shape[dim : dim + covers])
+        if index is not None and (
+            len(covered) < covers
+            or (
+                index.dtype is torch.bool
+                and any(
+                    statically_known_true(m != d) for m, d in zip(index.shape, covered)
+                )
+            )
         ):
             raise ValueError(
-                f"index_put: a mask of shape {tuple(mask.shape)} does not match the "
+                f"index_put: an index of shape {tuple(index.shape)} does not fit the "
                 f"input dims {covered} it covers"
             )
-        dim += mask.dim()
-        if masked_fill:
-            # masked_fill takes its one mask and ignores the Nones after it.
-            return
-    if dim > data.dim():
-        raise ValueError(too_many)
+        dim += covers
 
 
 def index_put_converter(

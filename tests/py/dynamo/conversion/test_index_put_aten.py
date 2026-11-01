@@ -453,6 +453,17 @@ class TestIndexPutConverter(DispatchTestCase):
                 ),
                 value_tensor=torch.arange(5, dtype=torch.float32),
             ),
+            param(
+                test_name="mask_between_nones_after_0d_index",
+                source_tensor=torch.zeros([2, 3, 2, 1], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor(0),
+                    None,
+                    torch.tensor([[True], [False]]),
+                    None,
+                ),
+                value_tensor=torch.tensor(7.0),
+            ),
         ]
     )
     def test_index_put(
