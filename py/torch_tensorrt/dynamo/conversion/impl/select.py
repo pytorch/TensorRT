@@ -1027,6 +1027,9 @@ def _check_index_entries(node_args: Sequence[object]) -> None:
     dim = 0
     for entry in entries:
         mask = _graph_tensor(entry)
+        if mask is None and entry is not None:
+            # How many dims an entry without metadata covers is not known.
+            return
         if mask is None or mask.dtype not in (torch.bool, torch.uint8):
             dim += 1
             continue
