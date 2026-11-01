@@ -1843,7 +1843,11 @@ def _index_put_scatter_elements_validator(
         _has_fewer_than_2_31_elements(shape) for shape in (data.shape, updates_shape)
     ):
         return False
-    return trt.get_plugin_registry().get_creator("ScatterElements", "2", "") is not None
+    registry = trt.get_plugin_registry()
+    return any(
+        registry.get_creator("ScatterElements", version, "") is not None
+        for version in ("1", "2")
+    )
 
 
 @dynamo_tensorrt_converter(

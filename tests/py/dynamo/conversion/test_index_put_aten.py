@@ -1222,6 +1222,14 @@ class TestIndexPutConverter(DispatchTestCase):
         self.assertTrue(all(engine.pytorch_plugin_ops for engine in engines))
         trt_mod, (engine,) = compile_with(fallback_pytorch_plugin_ops=True)
         self.assertEqual(engine.pytorch_plugin_ops, [])
+        # Version 1 is an IPluginV2 and stays its own layer. Some TensorRT builds merge the
+        # IPluginV3 version 2 into a compiler region that needs far more build memory.
+        import tensorrt
+
+        v1 = tensorrt.get_plugin_registry().get_creator("ScatterElements", "1", "")
+        self.assertIn(
+            "[PLUGIN_V2]" if v1 is not None else "[PLUGIN_V3]", engine.get_layer_info()
+        )
         torch.testing.assert_close(
             trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
         )

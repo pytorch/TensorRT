@@ -759,8 +759,10 @@ def index_put_scatter_elements(
     data = cast_trt_tensor(ctx, input_tensor, compute_dtype, f"{name}_input_cast")
     values = cast_trt_tensor(ctx, values, compute_dtype, f"{name}_values_cast")
 
-    creator = trt.get_plugin_registry().get_creator("ScatterElements", "2", "")
-    assert creator is not None, "TensorRT's ScatterElements plugin is not registered"
+    registry = trt.get_plugin_registry()
+    # TensorRT 11.4 on Thor merges version 2, an IPluginV3, into the compiler region around
+    # it, which multiplies the build's host memory, so use version 1 while TensorRT has it.
+    v1_creator = registry.get_creator("ScatterElements", "1", "")
     fields = trt.PluginFieldCollection(
         [
             trt.PluginField(
@@ -768,13 +770,24 @@ def index_put_scatter_elements(
             ),
             trt.PluginField(
                 "reduction",
-                np.frombuffer(b"add", dtype=np.int8),
+                # Version 1 reads up to a NUL, and version 2 reads exactly the field's length.
+                np.frombuffer(
+                    b"add" if v1_creator is None else b"add\0", dtype=np.int8
+                ),
                 trt.PluginFieldType.CHAR,
             ),
         ]
     )
-    plugin = creator.create_plugin(name, fields, trt.TensorRTPhase.BUILD)
-    layer = ctx.net.add_plugin_v3([data, index, values], [], plugin)
+    if v1_creator is not None:
+        plugin = v1_creator.create_plugin(name, fields)
+        layer = ctx.net.add_plugin_v2([data, index, values], plugin)
+    else:
+        creator = registry.get_creator("ScatterElements", "2", "")
+        assert (
+            creator is not None
+        ), "TensorRT's ScatterElements plugin is not registered"
+        plugin = creator.create_plugin(name, fields, trt.TensorRTPhase.BUILD)
+        layer = ctx.net.add_plugin_v3([data, index, values], [], plugin)
     set_layer_name(layer, target, f"{name}_scatter_add", source_ir)
     return cast_trt_tensor(
         ctx, layer.get_output(0), input_tensor.dtype, f"{name}_output_cast"
