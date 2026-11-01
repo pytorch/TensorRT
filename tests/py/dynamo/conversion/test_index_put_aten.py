@@ -881,8 +881,15 @@ class TestIndexPutConverter(DispatchTestCase):
             ),
         }
         for case, (model, inputs) in at_build.items():
-            with self.subTest(case), self.assertRaises((ValueError, RuntimeError)):
-                compile_(model, inputs)
+            with self.subTest(case):
+                if ENABLED_FEATURES.tensorrt_rtx and any(
+                    t.dtype == torch.bool for t in inputs
+                ):
+                    self.skipTest(
+                        "Skipped on tensorrt_rtx due to nonzero not supported"
+                    )
+                with self.assertRaises((ValueError, RuntimeError)):
+                    compile_(model, inputs)
 
         # Sizes that disagree only at runtime fail there.
         data = torch.zeros(4, 4, device="cuda")
