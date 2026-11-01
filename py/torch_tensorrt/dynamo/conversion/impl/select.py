@@ -1013,6 +1013,35 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
     )
 
 
+def _check_index_entries(node_args: Sequence[object]) -> None:
+    """Raise, as PyTorch does, for more indices than input dims and for a mask whose shape
+    is not that of the input dims it covers."""
+    data = _graph_tensor(node_args[0]) if node_args else None
+    entries = node_args[1] if len(node_args) > 1 else None
+    if data is None or not isinstance(entries, (list, tuple)):
+        return
+    too_many = f"index_put: too many indices for an input of rank {data.dim()}"
+    if len(entries) > data.dim():
+        raise ValueError(too_many)
+    dim = 0
+    for entry in entries:
+        mask = _graph_tensor(entry)
+        if mask is None or mask.dtype not in (torch.bool, torch.uint8):
+            dim += 1
+            continue
+        covered = tuple(data.shape[dim : dim + mask.dim()])
+        if len(covered) < mask.dim() or any(
+            statically_known_true(m != d) for m, d in zip(mask.shape, covered)
+        ):
+            raise ValueError(
+                f"index_put: a mask of shape {tuple(mask.shape)} does not match the "
+                f"input dims {covered} it covers"
+            )
+        dim += mask.dim()
+    if dim > data.dim():
+        raise ValueError(too_many)
+
+
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
@@ -1022,12 +1051,13 @@ def index_put_converter(
     input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
     values: ITensor,
 ) -> ITensor:
-    # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
-    # would move the values in input[indices]. Give such an index its rank in the graph.
-    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
     node_args: Sequence[object] = (
         ctx.current_node.args if ctx.current_node is not None else ()
     )
+    _check_index_entries(node_args)
+    # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
+    # would move the values in input[indices]. Give such an index its rank in the graph.
+    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
     graph_indices = node_args[1] if len(node_args) > 1 else None
     ranks = (
         [_rank_in_graph(index) for index in graph_indices]

@@ -842,6 +842,18 @@ class TestIndexPutConverter(DispatchTestCase):
                     seven.reshape(1, 1),
                 ),
             ),
+            "a mask of two for an input of four": (
+                PutOne(),
+                (
+                    torch.zeros(4, device="cuda"),
+                    torch.tensor([True, True], device="cuda"),
+                    seven,
+                ),
+            ),
+            "two indices for an input of one dim": (
+                Put(),
+                (torch.zeros(4, device="cuda"), cuda(0), cuda(1), seven),
+            ),
             "values of four for rows of three and an empty index": (
                 PutOne(),
                 (
