@@ -993,23 +993,29 @@ def _rank_in_graph(arg: object) -> Optional[int]:
     return None if val is None else val.dim()
 
 
-def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
-    """Whether PyTorch runs this index_put as masked_fill, which takes the value as a scalar.
+def _runs_as_masked_fill(node_args: Sequence[object]) -> Optional[bool]:
+    """Whether PyTorch runs this index_put as masked_fill, which takes the value as a scalar,
+    or None when the graph does not say.
 
     It does for a single bool mask and a CPU value of one element, as
     canDispatchToMaskedFill in ATen decides.
     """
-    if len(node_args) < 3 or not isinstance(node_args[1], (list, tuple)):
+    entries = node_args[1] if len(node_args) > 2 else None
+    if not isinstance(entries, (list, tuple)):
+        return None
+    indices = [entry for entry in entries if entry is not None]
+    if len(indices) != 1:
         return False
-    data, value = _graph_tensor(node_args[0]), _graph_tensor(node_args[2])
-    indices = [_graph_tensor(i) for i in node_args[1] if i is not None]
-    if data is None or value is None or len(indices) != 1 or indices[0] is None:
-        return False
+    data, mask, value = (
+        _graph_tensor(arg) for arg in (node_args[0], indices[0], node_args[2])
+    )
+    if data is None or mask is None or value is None:
+        return None
     return (
         value.device.type == "cpu"
         and statically_known_true(value.numel() == 1)
-        and indices[0].dtype is torch.bool
-        and indices[0].device == data.device
+        and mask.dtype is torch.bool
+        and mask.device == data.device
     )
 
 
@@ -1119,14 +1125,17 @@ def index_put_converter(
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
     values_rank = _rank_in_graph(node_args[2]) if len(node_args) > 2 else None
     if values_rank is not None and values_rank > len(F) + len(index_shape):
-        if not _runs_as_masked_fill(node_args):
+        # Raise only when the graph shows that PyTorch would.
+        masked_fill = _runs_as_masked_fill(node_args)
+        if masked_fill is False:
             raise ValueError(
                 f"index_put: values of rank {values_rank} have more dims than input[indices]"
             )
-        # PyTorch fills a bool mask with a one-element CPU value, whatever its shape.
-        values = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_fill_value", values, ()
-        )
+        if masked_fill:
+            # PyTorch fills a bool mask with a one-element CPU value, whatever its shape.
+            values = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_fill_value", values, ()
+            )
 
     # Compute shapes and volume for the free dimensions.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
