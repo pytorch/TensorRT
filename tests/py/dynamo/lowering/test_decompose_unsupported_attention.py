@@ -190,6 +190,39 @@ class TestDecomposeUnsupportedAttention(TestCase):
             [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
         )
 
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_decomposed_attention_with_a_constant_bool_mask_builds(self):
+        # The decomposition turns a bool mask into a logical_not after constant folding has run.
+        import torch_tensorrt
+
+        class MLA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "mask", torch.ones(16, 16, device="cuda").tril() > 0
+                )
+
+            def forward(self, q, k, v):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=self.mask
+                )
+
+        inputs = tuple(
+            torch.randn(1, 2, 16, dim, device="cuda", dtype=torch.float16)
+            for dim in (64, 64, 32)
+        )
+        model = MLA()
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+        )
+
     def test_attentions_sharing_a_bf16_query_are_decomposed(self):
         # Wan2.1's image-to-video cross-attention reads one query against text and image keys.
         class TwoAttentions(nn.Module):
