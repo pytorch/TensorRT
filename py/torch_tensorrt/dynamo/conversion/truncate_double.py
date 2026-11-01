@@ -83,6 +83,7 @@ def _repair_64bit_input(
     gm: torch.fx.GraphModule,
     position: int,
     submodule_name: str,
+    input_metadata: Dict[str, Any],
 ) -> None:
     """Downcast a single double input at a TRT boundary to float32."""
     logger.info(
@@ -99,7 +100,9 @@ def _repair_64bit_input(
             args=(node_64bit,),
             kwargs={"dtype": dtype_32bit},
         )
-        node_32bit.meta = _metadata_to_dtype(node_64bit.meta, dtype_32bit)
+        # Use the engine's own placeholder metadata: an input that comes from a
+        # partition left to PyTorch has no metadata in this graph.
+        node_32bit.meta = _metadata_to_dtype(input_metadata, dtype_32bit)
 
     module_node.replace_input_with(node_64bit, node_32bit)
 
@@ -219,6 +222,9 @@ def repair_double_inputs(
     name = submodule_name if submodule_name is not None else submodule._get_name()
     output_node = next(node for node in submodule.graph.nodes if node.op == "output")
     is_collection_output = isinstance(output_node.args[0], (tuple, list))
+    submodule_input_metadata = [
+        node.meta for node in submodule.graph.nodes if node.op == "placeholder"
+    ]
     submodule_output_metadata = get_output_metadata(submodule)
 
     # For each input to the TRT subgraph, check if its type is double.
@@ -226,7 +232,9 @@ def repair_double_inputs(
         param = submodule_torch_inputs[position]
 
         if isinstance(param, torch.Tensor) and param.dtype == torch.float64:
-            _repair_64bit_input(parent_graph, position, name)
+            _repair_64bit_input(
+                parent_graph, position, name, submodule_input_metadata[position]
+            )
 
             # Repair submodule inputs in accordance with inserted casts
             dtype_32bit = torch.float32

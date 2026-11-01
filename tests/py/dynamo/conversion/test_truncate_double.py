@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
+import os
+import tempfile
 import unittest
 from unittest.mock import Mock
 
@@ -238,6 +240,41 @@ class TestTruncateDoubleMetadata(TestCase):
             and node.kwargs.get("dtype") == torch.float64
         ]
         self.assertEqual(len(restoring_casts), 1)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "requires CUDA")
+    def test_float64_input_from_pytorch_partition_can_be_saved(self):
+        class IntToDouble(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                # float32 cannot hold every int64, so this cast to float64 stays in
+                # PyTorch and gives the engine after it a float64 input.
+                return (x + 1).double() * 0.5
+
+        model = IntToDouble().eval().cuda()
+        input_tensor = torch.arange(8, device="cuda")
+        exported = torch.export.export(model, (input_tensor,))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[input_tensor],
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+
+        input_cast = next(
+            node
+            for node in compiled.graph.nodes
+            if node.target == torch.ops.aten._to_copy.default
+            and node.kwargs.get("dtype") == torch.float32
+        )
+        self.assertEqual(input_cast.args[0].op, "call_module")
+        self.assertEqual(input_cast.meta["val"].dtype, torch.float32)
+        self.assertEqual(input_cast.meta["val"].shape, input_tensor.shape)
+
+        # Saving without retracing checks that every node has metadata.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            torch_tensorrt.save(
+                compiled, os.path.join(tmpdir, "compiled.ep"), retrace=False
+            )
 
 
 if __name__ == "__main__":
