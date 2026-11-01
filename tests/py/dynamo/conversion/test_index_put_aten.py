@@ -774,6 +774,98 @@ class TestIndexPutConverter(DispatchTestCase):
                 )
                 torch.testing.assert_close(compiled(*inputs), model(*inputs))
 
+    def test_shapes_that_do_not_broadcast_raise(self):
+        # torch.export accepts these, so the converter has to reject them as PyTorch does.
+        class Put(torch.nn.Module):
+            def forward(self, data, a, b, values):
+                return torch.ops.aten.index_put.default(data, [a, b], values)
+
+        class PutOne(torch.nn.Module):
+            def forward(self, data, a, values):
+                return torch.ops.aten.index_put.default(data, [a], values)
+
+        class PutRows(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows = rows.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
+        class PutPairs(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows, columns = rows.nonzero().squeeze(1), columns.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
+        def compile_(model, inputs):
+            return torchtrt.dynamo.compile(
+                torch.export.export(model, inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+
+        def cuda(*values):
+            return torch.tensor(values, device="cuda")
+
+        seven = torch.tensor(7.0, device="cuda")
+        at_build = {
+            "index shapes (1, 2) and (1, 3)": (
+                Put(),
+                (
+                    torch.zeros(4, 4, device="cuda"),
+                    cuda([0, 2]),
+                    cuda([0, 1, 2]),
+                    seven,
+                ),
+            ),
+            "two values for rows of three": (
+                PutOne(),
+                (torch.zeros(4, 3, device="cuda"), cuda(0, 2), cuda(5.0, 7.0)),
+            ),
+            "no values for rows of three": (
+                PutPairs(),
+                (
+                    torch.zeros(4, 4, 3, device="cuda"),
+                    cuda(0, 0, 0, 0),
+                    cuda(0, 0, 0, 0),
+                    torch.zeros(0, device="cuda"),
+                ),
+            ),
+            "values with a dim more than x[i]": (
+                PutOne(),
+                (
+                    torch.zeros(4, device="cuda"),
+                    torch.tensor(2, device="cuda"),
+                    seven.reshape(1, 1),
+                ),
+            ),
+        }
+        for case, (model, inputs) in at_build.items():
+            with self.subTest(case), self.assertRaises((ValueError, RuntimeError)):
+                compile_(model, inputs)
+
+        # Index lengths that disagree only at runtime fail there.
+        data = torch.zeros(4, 4, device="cuda")
+        two, three = cuda(1, 0, 1, 0), cuda(1, 1, 1, 0)
+        at_runtime = {
+            "three rows and two fixed columns": (
+                PutRows(),
+                (two, cuda(0, 2)),
+                (three, cuda(0, 2)),
+            ),
+            "two rows and three selected columns": (
+                PutPairs(),
+                (two, cuda(0, 1, 0, 1)),
+                (two, three),
+            ),
+        }
+        for case, (model, valid, invalid) in at_runtime.items():
+            compiled = compile_(model, (data, *valid, seven))
+            with self.subTest(case):
+                torch.testing.assert_close(
+                    compiled(data, *valid, seven), model(data, *valid, seven)
+                )
+                with self.assertRaises((RuntimeError, IndexError)):
+                    compiled(data, *invalid, seven)
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):
