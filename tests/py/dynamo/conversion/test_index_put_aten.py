@@ -727,8 +727,8 @@ class TestIndexPutConverter(DispatchTestCase):
             compiled(data_3d, one_column, torch.tensor([5.0, 6.0], device="cuda"))
 
     def test_computed_0d_index_and_value(self):
-        # TensorRT holds a computed 0-d tensor, such as value + 1, as a 1-D tensor of one
-        # element, a dim more than PyTorch gives it.
+        # A converter can turn a computed 0-d tensor, such as value + 1, into a 1-D tensor
+        # of one element, a dim more than PyTorch gives it.
         class AddOne(torch.nn.Module):
             def forward(self, data, index, value):
                 return torch.ops.aten.index_put.default(data, [index], value + 1)

@@ -912,8 +912,8 @@ def _broadcast_index_put_values(
     # own dims, then repeat the values over the leading dims they lack.
     lead = len(result_shape) - len(values.shape)
     if lead < 0:
-        # TensorRT can hold a 0-d value, such as value + 1, as a 1-D tensor of one element,
-        # which has a dim more than input[indices] when every index is 0-d.
+        # A converter can turn a 0-d value, such as value + 1, into a 1-D tensor of one
+        # element, a dim more than input[indices] when that is 0-d.
         values = impl.shuffle.reshape(
             ctx,
             target,
