@@ -464,6 +464,12 @@ class TestIndexPutConverter(DispatchTestCase):
                 ),
                 value_tensor=torch.tensor(7.0),
             ),
+            param(
+                test_name="index_after_mask_and_none_past_last_dim",
+                source_tensor=torch.zeros([2, 1, 1], dtype=torch.float32),
+                indices_tensor=(torch.tensor([[True], [False]]), None, torch.tensor(0)),
+                value_tensor=torch.tensor(7.0),
+            ),
         ]
     )
     def test_index_put(

@@ -1014,8 +1014,8 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
 
 
 def _check_index_entries(node_args: Sequence[object]) -> None:
-    """Raise, as PyTorch does, for more indices than input dims, and for an index tensor
-    that does not fit the input dims it covers, such as a mask of the wrong shape."""
+    """Raise, as PyTorch does, for more indices than input dims and for a mask whose shape
+    is not that of the input dims it covers."""
     data = _graph_tensor(node_args[0]) if node_args else None
     entries = node_args[1] if len(node_args) > 1 else None
     if data is None or not isinstance(entries, (list, tuple)):
@@ -1030,24 +1030,20 @@ def _check_index_entries(node_args: Sequence[object]) -> None:
         if entry is not None and index is None:
             # How many dims an entry without metadata covers is not known.
             return
-        # A None or an integer index covers one dim, and a mask as many as it has. PyTorch
-        # lets Nones run past the last dim, but not index tensors.
-        covers = index.dim() if index is not None and index.dtype is torch.bool else 1
-        covered = tuple(data.shape[dim : dim + covers])
-        if index is not None and (
-            len(covered) < covers
-            or (
-                index.dtype is torch.bool
-                and any(
-                    statically_known_true(m != d) for m, d in zip(index.shape, covered)
-                )
-            )
+        # A None or an integer index covers one dim. Past the last dim PyTorch drops them
+        # or fails later, depending on the other indices, so only masks are checked.
+        if index is None or index.dtype is not torch.bool:
+            dim += 1
+            continue
+        covered = tuple(data.shape[dim : dim + index.dim()])
+        if len(covered) < index.dim() or any(
+            statically_known_true(m != d) for m, d in zip(index.shape, covered)
         ):
             raise ValueError(
-                f"index_put: an index of shape {tuple(index.shape)} does not fit the "
+                f"index_put: a mask of shape {tuple(index.shape)} does not match the "
                 f"input dims {covered} it covers"
             )
-        dim += covers
+        dim += index.dim()
 
 
 def index_put_converter(
