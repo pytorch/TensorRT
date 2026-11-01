@@ -1009,14 +1009,18 @@ def _runs_as_masked_fill(node_args: Sequence[object]) -> Optional[bool]:
     data, mask, value = (
         _graph_tensor(arg) for arg in (node_args[0], indices[0], node_args[2])
     )
+    # Evidence against masked_fill decides even when other metadata is missing.
+    if (
+        (mask is not None and mask.dtype is not torch.bool)
+        or (value is not None and value.device.type != "cpu")
+        or (value is not None and statically_known_true(value.numel() != 1))
+        or (mask is not None and data is not None and mask.device != data.device)
+    ):
+        return False
     if data is None or mask is None or value is None:
         return None
-    return (
-        value.device.type == "cpu"
-        and statically_known_true(value.numel() == 1)
-        and mask.dtype is torch.bool
-        and mask.device == data.device
-    )
+    # A value whose size is known only at runtime may still have one element.
+    return True if statically_known_true(value.numel() == 1) else None
 
 
 def _check_index_entries(node_args: Sequence[object]) -> None:
