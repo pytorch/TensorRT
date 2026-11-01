@@ -1034,6 +1034,31 @@ def index_put_converter(
         if isinstance(graph_indices, (list, tuple))
         else []
     )
+    # A 0-d mask covers no dim of input, and PyTorch takes one only as masked_fill, which
+    # fills all of input or none of it.
+    if _runs_as_masked_fill(node_args) and 0 in ranks:
+        (mask,) = [idx for idx in input_indices if idx is not None]
+        ones = (1,) * len(input_tensor.shape)
+        mask = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_fill_mask",
+            get_trt_tensor(ctx, mask, f"{name}_mask"),
+            ones,
+        )
+        fill = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_fill_value",
+            get_trt_tensor(ctx, values, f"{name}_value", min_rank=0),
+            ones,
+        )
+        fill = cast_trt_tensor(ctx, fill, input_tensor.dtype, f"{name}_fill_cast")
+        return impl.condition.select(
+            ctx, target, source_ir, f"{name}_fill", fill, input_tensor, mask
+        )
     input_indices = [
         (
             impl.shuffle.reshape(
