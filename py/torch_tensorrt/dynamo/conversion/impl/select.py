@@ -8,6 +8,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from tensorrt import ITensor
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.node import Target
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -980,10 +981,36 @@ def _broadcast_index_put_values(
     )
 
 
+def _graph_tensor(arg: object) -> Optional[torch.Tensor]:
+    """The tensor an FX node stands for, from its metadata, or None when it is not known."""
+    val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+    return val if isinstance(val, torch.Tensor) else None
+
+
 def _rank_in_graph(arg: object) -> Optional[int]:
     """The rank of an FX node's value, or None when it is not known."""
-    val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
-    return val.dim() if isinstance(val, torch.Tensor) else None
+    val = _graph_tensor(arg)
+    return None if val is None else val.dim()
+
+
+def _runs_as_masked_fill(node_args: Sequence[object]) -> bool:
+    """Whether PyTorch runs this index_put as masked_fill, which takes the value as a scalar.
+
+    It does for a single bool mask and a CPU value of one element, as
+    canDispatchToMaskedFill in ATen decides.
+    """
+    if len(node_args) < 3 or not isinstance(node_args[1], (list, tuple)):
+        return False
+    data, value = _graph_tensor(node_args[0]), _graph_tensor(node_args[2])
+    indices = [_graph_tensor(i) for i in node_args[1] if i is not None]
+    if data is None or value is None or len(indices) != 1 or indices[0] is None:
+        return False
+    return (
+        value.device.type == "cpu"
+        and statically_known_true(value.numel() == 1)
+        and indices[0].dtype in (torch.bool, torch.uint8)
+        and indices[0].device == data.device
+    )
 
 
 def index_put_converter(
@@ -1052,15 +1079,20 @@ def index_put_converter(
     F = [i for i in range(rank) if indices[i] is None]  # Free dimensions
     I = [i for i in range(rank) if indices[i] is not None]  # Indexed dimensions
     K = len(I)
-    values_rank = _rank_in_graph(node_args[2]) if len(node_args) > 2 else None
-    if values_rank is not None and values_rank > len(F) + len(index_shape):
-        raise ValueError(
-            f"index_put: values of rank {values_rank} have more dims than input[indices]"
-        )
     N = _volume(ctx, target, source_ir, f"{name}_index_volume", index_shape)
 
     if not isinstance(values, ITensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
+    values_rank = _rank_in_graph(node_args[2]) if len(node_args) > 2 else None
+    if values_rank is not None and values_rank > len(F) + len(index_shape):
+        if not _runs_as_masked_fill(node_args):
+            raise ValueError(
+                f"index_put: values of rank {values_rank} have more dims than input[indices]"
+            )
+        # PyTorch fills a bool mask with a one-element CPU value, whatever its shape.
+        values = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_fill_value", values, ()
+        )
 
     # Compute shapes and volume for the free dimensions.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).

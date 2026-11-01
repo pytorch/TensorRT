@@ -883,6 +883,31 @@ class TestIndexPutConverter(DispatchTestCase):
                 with self.assertRaises((RuntimeError, IndexError)):
                     compiled(data, *invalid)
 
+    def test_one_element_cpu_value_fills_a_mask_whatever_its_shape(self):
+        # PyTorch runs this as masked_fill, which takes a one-element CPU value as a scalar.
+        class Fill(torch.nn.Module):
+            def forward(self, data, mask):
+                value = torch.full((1, 1, 1), 7.0)
+                return torch.ops.aten.index_put.default(data, [None, mask], value)
+
+        # torch.export takes the CPU value only next to CPU inputs.
+        exported = torch.export.export(
+            Fill(), (torch.zeros(2, 1, 1), torch.ones(1, 1, dtype=torch.bool))
+        )
+        data = torch.zeros(2, 1, 1, device="cuda")
+        masks = [
+            torch.tensor([[True]], device="cuda"),
+            torch.tensor([[False]], device="cuda"),
+        ]
+        compiled = torchtrt.dynamo.compile(
+            exported,
+            arg_inputs=(data, masks[0]),
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        for mask in masks:
+            torch.testing.assert_close(compiled(data, mask), Fill()(data, mask))
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):
