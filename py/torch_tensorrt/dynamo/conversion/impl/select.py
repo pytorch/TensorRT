@@ -785,19 +785,31 @@ def _check_broadcast(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    size: ITensor,
+    size: Union[int, ITensor],
     want: Union[int, ITensor],
     what: str,
 ) -> None:
-    """Fail at runtime unless ``size`` is 1 or ``want``, as PyTorch broadcasting requires."""
-    fits = impl.elementwise.logical_or(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_fits",
-        impl.elementwise.eq(ctx, target, source_ir, f"{name}_one", size, 1),
-        impl.elementwise.eq(ctx, target, source_ir, f"{name}_same", size, want),
-    )
+    """Make sure ``size`` is 1 or ``want``, as PyTorch broadcasting requires.
+
+    Raises when both are known now, and fails at runtime otherwise.
+    """
+    if isinstance(size, ITensor):
+        fits = impl.elementwise.logical_or(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_fits",
+            impl.elementwise.eq(ctx, target, source_ir, f"{name}_one", size, 1),
+            impl.elementwise.eq(ctx, target, source_ir, f"{name}_same", size, want),
+        )
+    elif size == 1:
+        return
+    elif isinstance(want, ITensor):
+        fits = impl.elementwise.eq(ctx, target, source_ir, f"{name}_same", want, size)
+    elif size == want:
+        return
+    else:
+        raise ValueError(f"index_put: {what} do not broadcast")
     check = ctx.net.add_assertion(fits, f"index_put: {what} do not broadcast")
     set_layer_name(check, target, f"{name}_check", source_ir)
 
@@ -911,19 +923,22 @@ def _broadcast_index_put_values(
         )
         lead = 0
     # PyTorch rejects a size that is neither 1 nor the size it broadcasts to, while expand
-    # would repeat or drop values, so check static sizes here and runtime sizes at runtime.
+    # would repeat or drop values.
+    what = (
+        f"values of shape {tuple(values.shape)} and input[indices] of shape "
+        f"{[s if isinstance(s, int) else -1 for s in result_shape]}"
+    )
     for k, (size, want) in enumerate(zip(tuple(values.shape), result_shape[lead:])):
-        if size == DYNAMIC_DIM:
-            got = get_shape(ctx, target, source_ir, f"{name}_size_{k}", values, k)
-            _check_broadcast(ctx, target, source_ir, f"{name}_{k}", got, want, "values")
-        elif isinstance(want, int) and size not in (1, want):
-            raise ValueError(
-                f"index_put: values of shape {tuple(values.shape)} do not broadcast to "
-                f"{[s if isinstance(s, int) else -1 for s in result_shape]}"
-            )
-    if 0 in tuple(values.shape):
-        # Values with no elements only fit an empty input[indices], which the scatter checks
-        # at runtime. Laying them out trips TensorRT's engine build.
+        got = (
+            get_shape(ctx, target, source_ir, f"{name}_size_{k}", values, k)
+            if size == DYNAMIC_DIM
+            else size
+        )
+        _check_broadcast(ctx, target, source_ir, f"{name}_{k}", got, want, what)
+    if 0 in tuple(values.shape) or 0 in result_shape:
+        # With no elements in values or in input[indices] there is nothing to lay out: the
+        # scatter checks the values count at runtime, and an empty index writes nothing.
+        # Laying them out trips TensorRT's engine build.
         return impl.shuffle.reshape(
             ctx, target, source_ir, f"{name}_flatten", values, (-1,)
         )
@@ -1046,12 +1061,6 @@ def index_put_converter(
 
     if not isinstance(values, ITensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
-    if isinstance(N, int) and N == 0:
-        # Empty index -> no-op. Building the scatter path anyway trips a
-        # TensorRT squeezeDims assertion on DGX Spark (GB10, SM 12.1).
-        identity_layer = ctx.net.add_identity(input_tensor)
-        set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
-        return identity_layer.get_output(0)
 
     # Compute shapes and volume for the free dimensions.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
@@ -1073,6 +1082,18 @@ def index_put_converter(
         else:
             F_shape_values.append(_s)
     F_volume = _volume(ctx, target, source_ir, f"{name}_fvol", F_shape_values)
+
+    flattened_values = _broadcast_index_put_values(
+        ctx, target, source_ir, f"{name}_values", values, I, index_shape, F_shape_values
+    )
+    if 0 in index_shape or 0 in F_shape_values:
+        # Nothing to write (an empty index, or a size of 0 in a dimension that is not
+        # indexed) -> no-op, once the values are known to fit. Building the scatter path
+        # anyway fails: TensorRT cannot reshape the empty tensors, and on DGX Spark (GB10,
+        # SM 12.1) it trips a squeezeDims assertion.
+        identity_layer = ctx.net.add_identity(input_tensor)
+        set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
+        return identity_layer.get_output(0)
 
     # Process indexed dimensions (I)
     I_tensors = []
@@ -1229,9 +1250,6 @@ def index_put_converter(
         (-1, rank),
     )
 
-    flattened_values = _broadcast_index_put_values(
-        ctx, target, source_ir, f"{name}_values", values, I, index_shape, F_shape_values
-    )
     if flattened_values.dtype != input_tensor.dtype:
         flattened_values = cast_trt_tensor(
             ctx,

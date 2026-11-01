@@ -794,6 +794,11 @@ class TestIndexPutConverter(DispatchTestCase):
                 rows, columns = rows.nonzero().squeeze(1), columns.nonzero().squeeze(1)
                 return torch.ops.aten.index_put.default(data, [rows, columns], values)
 
+        class PutMesh(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows, columns = rows.nonzero(), columns.nonzero().T
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
         def compile_(model, inputs):
             return torchtrt.dynamo.compile(
                 torch.export.export(model, inputs),
@@ -837,34 +842,46 @@ class TestIndexPutConverter(DispatchTestCase):
                     seven.reshape(1, 1),
                 ),
             ),
+            "values of four for rows of three and an empty index": (
+                PutOne(),
+                (
+                    torch.zeros(4, 3, device="cuda"),
+                    torch.zeros(0, dtype=torch.int64, device="cuda"),
+                    torch.ones(1, 4, device="cuda"),
+                ),
+            ),
         }
         for case, (model, inputs) in at_build.items():
             with self.subTest(case), self.assertRaises((ValueError, RuntimeError)):
                 compile_(model, inputs)
 
-        # Index lengths that disagree only at runtime fail there.
+        # Sizes that disagree only at runtime fail there.
         data = torch.zeros(4, 4, device="cuda")
         two, three = cuda(1, 0, 1, 0), cuda(1, 1, 1, 0)
+        ones = torch.ones(2, 3, device="cuda")
         at_runtime = {
             "three rows and two fixed columns": (
                 PutRows(),
-                (two, cuda(0, 2)),
-                (three, cuda(0, 2)),
+                (two, cuda(0, 2), seven),
+                (three, cuda(0, 2), seven),
             ),
             "two rows and three selected columns": (
                 PutPairs(),
-                (two, cuda(0, 1, 0, 1)),
-                (two, three),
+                (two, cuda(0, 1, 0, 1), seven),
+                (two, three, seven),
+            ),
+            "values of shape (2, 3) for three rows and two columns": (
+                PutMesh(),
+                (two, three, ones),
+                (three, two, ones),
             ),
         }
         for case, (model, valid, invalid) in at_runtime.items():
-            compiled = compile_(model, (data, *valid, seven))
+            compiled = compile_(model, (data, *valid))
             with self.subTest(case):
-                torch.testing.assert_close(
-                    compiled(data, *valid, seven), model(data, *valid, seven)
-                )
+                torch.testing.assert_close(compiled(data, *valid), model(data, *valid))
                 with self.assertRaises((RuntimeError, IndexError)):
-                    compiled(data, *invalid, seven)
+                    compiled(data, *invalid)
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
@@ -1294,6 +1311,25 @@ class TestIndexPutConverter(DispatchTestCase):
         assert torch.allclose(
             result, torch_output, atol=1e-4, rtol=1e-4
         ), f"Empty-index no-op mismatch: {result} vs {torch_output}"
+
+    def test_zero_size_free_dimension_no_op(self):
+        """A size of 0 in a dimension that is not indexed also leaves nothing to write."""
+
+        class PutRows(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values)
+
+        inputs = (
+            torch.zeros(4, 0, device="cuda"),
+            torch.zeros(2, 0, device="cuda"),
+            torch.tensor([1, 2], device="cuda"),
+        )
+        trt_mod = torchtrt.dynamo.compile(
+            torch.export.export(PutRows(), inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+        )
+        torch.testing.assert_close(trt_mod(*inputs), PutRows()(*inputs))
 
     def test_index_ind_dtype_int_vs_long(self):
         """int32 and int64 index tensors must produce identical results.
