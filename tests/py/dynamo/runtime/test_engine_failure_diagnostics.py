@@ -88,6 +88,11 @@ class TestEngineFailureDiagnostics(TestCase):
         config.add_optimization_profile(profile)
         plan = bytes(builder.build_serialized_network(network, config))
 
+        # An engine that needs the output allocator refuses to run under CUDA graphs,
+        # and an earlier test in the same process can leave that mode on.
+        self.addCleanup(torch_tensorrt.runtime.set_cudagraphs_mode, False)
+        torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
         # The assertion fails while TensorRT infers the shapes, before the engine runs.
         for requires_output_allocator in (False, True):
             with self.subTest(requires_output_allocator=requires_output_allocator):
