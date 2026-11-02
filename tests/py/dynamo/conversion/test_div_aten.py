@@ -103,15 +103,16 @@ class TestDivConverter(DispatchTestCase):
             inputs,
         )
 
-    def test_prims_div_truncates_integers(self):
+    @parameterized.expand([("int32", torch.int32), ("int64", torch.int64)])
+    def test_prims_div_truncates_integers(self, _, dtype):
         class div(nn.Module):
             def forward(self, lhs_val, rhs_val):
                 # Multiplying back keeps the truncation visible; a cast of the output would hide it.
                 return torch.ops.prims.div.default(lhs_val, rhs_val) * rhs_val
 
         inputs = [
-            torch.tensor([-7, 7, -9, 9, 5, -5, 13, -13]),
-            torch.tensor([2, 2, 4, 4, 3, 3, 5, 5]),
+            torch.tensor([-7, 7, -9, 9, 5, -5, 13, -13], dtype=dtype),
+            torch.tensor([2, 2, 4, 4, 3, 3, 5, 5], dtype=dtype),
         ]
         self.run_test(div(), inputs)
 
