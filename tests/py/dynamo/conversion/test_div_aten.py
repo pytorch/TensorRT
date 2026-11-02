@@ -103,6 +103,29 @@ class TestDivConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_prims_div_truncates_integers(self):
+        class div(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                # Multiplying back keeps the truncation visible; a cast of the output would hide it.
+                return torch.ops.prims.div.default(lhs_val, rhs_val) * rhs_val
+
+        inputs = [
+            torch.tensor([-7, 7, -9, 9, 5, -5, 13, -13]),
+            torch.tensor([2, 2, 4, 4, 3, 3, 5, 5]),
+        ]
+        self.run_test(div(), inputs)
+
+    def test_div_odd_dynamic_size_gives_float(self):
+        class div(nn.Module):
+            def forward(self, x):
+                return x * (x.shape[0] / 2)
+
+        # The harness runs the max shape, so 15 / 2 has to give 7.5 and not 7.
+        input_specs = [
+            Input(min_shape=(2, 3), opt_shape=(8, 3), max_shape=(15, 3)),
+        ]
+        self.run_test_with_dynamic_shape(div(), input_specs, use_dynamo_tracer=True)
+
 
 if __name__ == "__main__":
     run_tests()
