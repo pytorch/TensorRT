@@ -160,6 +160,16 @@ in place. `torch_tensorrt.save()` plans memory on 256-byte boundaries. ExecuTorc
 16 bytes, so a program finalized with `to_executorch()` directly should pass
 `MemoryPlanningPass(alignment=256)`, or its planned buffers are copied too.
 
+TensorRT also reads every input in row-major order. ExecuTorch can give an input another dim order,
+for example a channels-last program input, or the output of efficient attention in the CUDA backend.
+The delegate copies such an input into row-major order before every call, so the answer is right,
+and logs this once per engine. The cost depends on the layout. Attention's output and channels-last
+need only a few copy calls: about 0.25 ms for a 640x480 float32 image on an A100. A transposed
+matrix needs one call per row: about 6 ms for 1024x1024. From host memory the copy is much slower,
+tens of milliseconds or more for an image, so export such an input in row-major order where you can.
+An input that the engine updates in place must be row-major, or the call fails with
+`Error::InvalidArgument`.
+
 ### CUDA streams
 
 - With no stream chosen, the delegate runs on `cudaStreamPerThread`, the default stream of the

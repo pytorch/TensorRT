@@ -747,6 +747,67 @@ bool is_tensor_address_aligned(const void* ptr) {
   return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
 }
 
+// Size-1 dims are skipped, since they move no element, and a tensor built without strides is row-major.
+int innermost_non_row_major_dim(const exec_aten::Tensor& t) {
+  const auto strides = t.strides();
+  if (strides.data() == nullptr) {
+    return -1;
+  }
+  int64_t row_major_stride = 1;
+  for (int d = static_cast<int>(t.dim()) - 1; d >= 0; --d) {
+    if (t.size(d) != 1 && strides[d] != row_major_stride) {
+      return d;
+    }
+    row_major_stride *= t.size(d);
+  }
+  return -1;
+}
+
+// Each row of the 2-D copies is a run of the row-major inner dims, so no CUDA kernel is needed. An outer dim whose
+// stride spans all the rows so far joins them, so channels-last costs one copy per channel, not one per image row.
+cudaError_t copy_to_row_major(void* dst, const exec_aten::Tensor& src, cudaStream_t stream) {
+  const int dim = innermost_non_row_major_dim(src);
+  const size_t element_size = static_cast<size_t>(src.element_size());
+  size_t row_bytes = element_size;
+  for (int d = dim + 1; d < src.dim(); ++d) {
+    row_bytes *= static_cast<size_t>(src.size(d));
+  }
+  const size_t pitch = static_cast<size_t>(src.strides()[dim]);
+  size_t rows = static_cast<size_t>(src.size(dim));
+  int top = dim;
+  while (top > 0 && static_cast<size_t>(src.strides()[top - 1]) == rows * pitch) {
+    rows *= static_cast<size_t>(src.size(--top));
+  }
+  size_t blocks = 1;
+  for (int d = 0; d < top; ++d) {
+    blocks *= static_cast<size_t>(src.size(d));
+  }
+  const auto* src_bytes = static_cast<const uint8_t*>(src.const_data_ptr());
+  auto* dst_bytes = static_cast<uint8_t*>(dst);
+  for (size_t block = 0; block < blocks; ++block) {
+    size_t src_offset = 0;
+    size_t index = block;
+    for (int d = top - 1; d >= 0; --d) {
+      const size_t size = static_cast<size_t>(src.size(d));
+      src_offset += index % size * static_cast<size_t>(src.strides()[d]);
+      index /= size;
+    }
+    const cudaError_t err = cudaMemcpy2DAsync(
+        dst_bytes + block * rows * row_bytes,
+        row_bytes,
+        src_bytes + src_offset * element_size,
+        pitch * element_size,
+        row_bytes,
+        rows,
+        cudaMemcpyDefault,
+        stream);
+    if (err != cudaSuccess) {
+      return err;
+    }
+  }
+  return cudaSuccess;
+}
+
 bool is_cuda_accessible_ptr(const void* ptr) {
   if (ptr == nullptr) {
     return false;
@@ -1905,6 +1966,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           name.c_str());
       return Error::InvalidArgument;
     }
+    // TensorRT reads row-major, and ExecuTorch can plan another dim order, such as efficient attention's output.
+    const bool row_major = innermost_non_row_major_dim(et_in) < 0;
+    if (engine->input_is_alias_target[i] && !row_major) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: aliased input '%s' must be row-major, because the engine updates it in place",
+          name.c_str());
+      return Error::InvalidArgument;
+    }
 
     void* bind_ptr = nullptr;
     if (et_in.nbytes() == 0) {
@@ -1916,11 +1986,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (device_reachable && is_tensor_address_aligned(et_in.const_data_ptr())) {
+    } else if (device_reachable && row_major && is_tensor_address_aligned(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
-      if (device_reachable) {
+      if (device_reachable && row_major) {
         report_unaligned(name, et_in.const_data_ptr());
+      } else if (!row_major && !engine->reordered_input_reported) {
+        engine->reordered_input_reported = true;
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: input '%s' is not in row-major dim order, and TensorRT reads row-major, so "
+            "it is copied into row-major order on every call (reported once per engine)",
+            name.c_str());
       }
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
@@ -1936,7 +2013,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream);
+      cuda_err = row_major ? cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream)
+                           : copy_to_row_major(bind_ptr, et_in, stream);
       drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(

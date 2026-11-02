@@ -94,6 +94,8 @@ struct EngineHandle {
   bool pin_ignored_reported = false;
   // Same reasoning: an unaligned buffer is usually the same view on every call.
   bool unaligned_io_reported = false;
+  // And a program gives an input the same dim order on every call.
+  bool reordered_input_reported = false;
 
   ~EngineHandle();
 };
