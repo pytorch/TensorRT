@@ -64,7 +64,8 @@ class TestGlobalPartitioning(TestCase):
             except Exception as e:
                 pytest.fail(f"unexpected exception raised: {e}")
 
-    def test_pytorch_node_keeps_its_folded_constant(self):
+    @parameterized.expand([(False,), (True,)])
+    def test_pytorch_node_keeps_its_folded_constant(self, offload_module_to_cpu):
         class Model(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -79,12 +80,14 @@ class TestGlobalPartitioning(TestCase):
 
         model = Model().cuda().eval()
         x = torch.randn(2, 8, device="cuda")
+        expected = model(x)
         trt_mod = torch_tensorrt.dynamo.compile(
             torch.export.export(model, (x,)),
             arg_inputs=[x],
             min_block_size=1,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
             use_fast_partitioner=False,
+            offload_module_to_cpu=offload_module_to_cpu,
         )
 
         acc = [name for name, _ in trt_mod.named_children() if "_run_on_acc" in name]
@@ -93,7 +96,7 @@ class TestGlobalPartitioning(TestCase):
         read = {n.target for n in trt_mod.graph.nodes if n.op == "get_attr"}
         self.assertEqual(len(kept), 1)
         self.assertEqual(kept, read - {"p"})
-        torch.testing.assert_close(trt_mod(x), model(x))
+        torch.testing.assert_close(trt_mod(x), expected)
 
     def test_partition_fully_supported_one_op(self):
         class FullySupportedOneOp(torch.nn.Module):
