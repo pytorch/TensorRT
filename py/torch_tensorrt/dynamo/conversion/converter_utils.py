@@ -194,23 +194,40 @@ def cast_trt_tensor(
 
 def cast_int_int_div_trt_tensor(
     ctx: ConversionContext,
-    lhs_val: TRTTensor,
-    rhs_val: TRTTensor,
+    lhs_val: Union[TRTTensor, torch.Tensor, int, float],
+    rhs_val: Union[TRTTensor, torch.Tensor, int, float],
     name: str,
-) -> List[TRTTensor]:
+) -> List[Union[TRTTensor, torch.Tensor, int, float]]:
     """
-    Given two `int` data type TRT Tensor to div operation, cast the TRT Tensor to float type
+    Given the operands of a true division, cast them to float32 if both are integer or bool,
+    since PyTorch returns a floating point result for them (e.g. ``torch.arange(4) / 2``)
     Args:
         ctx (ConversionContext): A ConversionContext object
-        lhs_val (TRTTensor): A TRT Tensor numerator
-        rhs_val (TRTTensor): A TRT Tensor numerator
+        lhs_val: Numerator, a TRT Tensor, a PyTorch tensor or a Python scalar
+        rhs_val: Denominator, a TRT Tensor, a PyTorch tensor or a Python scalar
         name (str): Name of calling layer
     Returns:
         A list of lhs_val and rhs_val casted to the appropriate datatype
     """
-    if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
-        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
-        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, name)
+
+    def is_integer_or_bool(val: Any) -> bool:
+        if isinstance(val, TRTTensor):
+            return val.dtype in (trt.bool, trt.uint8, trt.int8, trt.int32, trt.int64)
+        if isinstance(val, torch.Tensor):
+            return not val.is_floating_point() and not val.is_complex()
+        # bool is a subclass of int
+        return isinstance(val, int)
+
+    def to_float32(val: Any, suffix: str) -> Any:
+        if isinstance(val, TRTTensor):
+            return cast_trt_tensor(ctx, val, trt.float32, f"{name}_{suffix}")
+        if isinstance(val, torch.Tensor):
+            return val.to(torch.float32)
+        return float(val)
+
+    if is_integer_or_bool(lhs_val) and is_integer_or_bool(rhs_val):
+        lhs_val = to_float32(lhs_val, "lhs")
+        rhs_val = to_float32(rhs_val, "rhs")
     return [lhs_val, rhs_val]
 
 
