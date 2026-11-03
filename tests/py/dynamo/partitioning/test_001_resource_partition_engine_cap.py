@@ -68,8 +68,8 @@ class TestResourcePartitionEngineCap(TestCase):
             _engines(rss=rss, cpu_memory_budget=None, engine_cap=2 * _MiB)
             for rss in (16 * _MiB, 1024 * _MiB, 64 * 1024 * _MiB)
         }
-        # 8 x 1 MiB layers at a 2 MiB cap; the splitter overshoots by a layer: 3, 3 and 2 MiB.
-        self.assertEqual(splits, {3})
+        # Eight 1 MiB layers at a 2 MiB cap: four engines of 2 MiB.
+        self.assertEqual(splits, {4})
 
     def test_cap_takes_precedence_over_budget(self) -> None:
         self.assertEqual(_engines(rss=0, cpu_memory_budget=1024 * _MiB), 1)
@@ -103,7 +103,7 @@ class TestResourcePartitionEngineCap(TestCase):
             resource_partition_engine_cap=2 * _MiB,
         )
         engines = [n for n, _ in trt.named_children() if "_run_on_acc" in n]
-        self.assertEqual(len(engines), 3)
+        self.assertEqual(len(engines), 4)
         torch.testing.assert_close(trt(x), model(x), rtol=1e-3, atol=1e-3)
         torch._dynamo.reset()
 

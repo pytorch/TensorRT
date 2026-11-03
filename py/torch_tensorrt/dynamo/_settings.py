@@ -153,8 +153,9 @@ class CompilationSettings:
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine
-            the partitioner splits to. Used instead of the budget derived from ``cpu_memory_budget`` and the process's
-            resident memory, so the same model and cap always give the same split. Default is None.
+            the partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces when set. The size
+            is then not derived from the budget and the process's resident memory, so the same model and cap always give
+            the same split. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers into smaller operations

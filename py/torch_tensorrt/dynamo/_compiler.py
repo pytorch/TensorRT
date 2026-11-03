@@ -221,7 +221,7 @@ def cross_compile_for_windows(
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
-        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces when set. The size is then not derived from the budget and the process's resident memory, so the same model and cap always give the same split.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -646,7 +646,7 @@ def compile(
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
-        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces when set. The size is then not derived from the budget and the process's resident memory, so the same model and cap always give the same split.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
