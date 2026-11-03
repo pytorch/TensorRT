@@ -83,6 +83,7 @@ DECOMPOSE_ATTENTION = False
 DISABLED_CONSTANT_FOLD_EXCLUSIONS = frozenset[str]()
 ATTN_BIAS_IS_CAUSAL = True
 FOLD_SHARED_KV_ATTENTION = False
+DEDUPLICATE_WEIGHTS = False
 FALLBACK_DATA_DEPENDENT_OPS = False
 
 # Global Performance Tuning (TensorRT build-route knobs)

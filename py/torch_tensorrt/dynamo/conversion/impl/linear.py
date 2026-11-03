@@ -11,7 +11,11 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import broadcast, get_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast,
+    get_transposed_trt_tensor,
+    get_trt_tensor,
+)
 
 
 def linear(
@@ -24,10 +28,19 @@ def linear(
     bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
 ) -> TRTTensor:
     # Process weight terms
+    weight_matrix_op = trt.MatrixOperation.TRANSPOSE
     if not isinstance(weight, (TRTTensor, torch.Tensor, np.ndarray)):
         raise RuntimeError(
             f"Linear layer {name} has weight of type {type(weight)}, Expect Union[TRTTensor, torch.Tensor, np.ndarray],"
         )
+    elif isinstance(weight, (torch.Tensor, np.ndarray)) and _transpose_once(ctx):
+        # TensorRT can keep a host copy of a weight for every layer that reads it
+        # transposed, so a weight that several linear layers read is transposed
+        # once for all of them.
+        weight = get_transposed_trt_tensor(
+            ctx, weight, f"{name}_weight", len(input.shape)
+        )
+        weight_matrix_op = trt.MatrixOperation.NONE
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
 
@@ -48,7 +61,7 @@ def linear(
         input,
         weight,
         input_matrix_op=trt.MatrixOperation.NONE,
-        other_matrix_op=trt.MatrixOperation.TRANSPOSE,
+        other_matrix_op=weight_matrix_op,
     )
 
     if bias is not None:
@@ -70,3 +83,18 @@ def linear(
         )
 
     return out
+
+
+def _transpose_once(ctx: ConversionContext) -> bool:
+    """Whether to transpose the weight of the linear node being converted once for
+    all the linear nodes that read it (see the deduplicate_weights setting)."""
+    node = ctx.current_node
+    if (
+        not ctx.compilation_settings.deduplicate_weights
+        or node is None
+        or len(node.args) < 2
+        or not isinstance(node.args[1], torch.fx.Node)
+    ):
+        return False
+    readers = [user for user in node.args[1].users if user.target == node.target]
+    return len(readers) > 1

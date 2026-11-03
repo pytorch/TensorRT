@@ -26,6 +26,7 @@ from torch_tensorrt.dynamo._defaults import (
     CACHE_BUILT_ENGINES,
     CPU_MEMORY_BUDGET,
     DECOMPOSE_ATTENTION,
+    DEDUPLICATE_WEIGHTS,
     DISABLE_TF32,
     DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     DLA_GLOBAL_DRAM_SIZE,
@@ -165,6 +166,7 @@ class CompilationSettings:
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Under torch.compile the weights are engine inputs, not constants, so they are not shared. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -245,6 +247,7 @@ class CompilationSettings:
     )
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
     fold_shared_kv_attention: bool = FOLD_SHARED_KV_ATTENTION
+    deduplicate_weights: bool = DEDUPLICATE_WEIGHTS
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
@@ -295,6 +298,7 @@ class CompilationSettings:
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
         state.setdefault("fold_shared_kv_attention", FOLD_SHARED_KV_ATTENTION)
+        state.setdefault("deduplicate_weights", DEDUPLICATE_WEIGHTS)
         state.setdefault("build_route", BUILD_ROUTE)
         state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
         state.setdefault("tune_build_route_file", TUNE_BUILD_ROUTE_FILE)
@@ -336,6 +340,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",
     "fold_shared_kv_attention",
+    "deduplicate_weights",
     "build_route",
 }
 
