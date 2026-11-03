@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -546,12 +546,18 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="This is the PyTorch-canonical pattern for streaming inference: the cache lives inside the model..."><img alt="" src="../../../_images/sphx_glr_aliased_io_buffers_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aliased_io_buffers.py</span></p>
   <div class="sphx-glr-thumbnail-title">In-place aliased I/O: module-owned buffers</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="cutile_op is the cuTile counterpart of cuda_kernel_op, and the declarative form of the hand-wri..."><img alt="" src="../../../_images/sphx_glr_cutile_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_cutile_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Register a cuTile kernel as an AOT QDP plugin via torch_tensorrt.kernels.cutile_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci..."><img alt="" src="../../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py</span></p>
   <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee..."><img alt="" src="../../../_images/sphx_glr_pre_allocated_output_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This is the productized form of aot_plugin. That example shows the raw mechanism — a @triton.ji..."><img alt="" src="../../../_images/sphx_glr_triton_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_triton_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Register a Triton kernel as an AOT QDP plugin via torch_tensorrt.kernels.triton_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to register a custom Triton kernel as a TensorRT plugin using the..."><img alt="" src="../../../_images/sphx_glr_auto_generate_plugins_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py</span></p>
   <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
@@ -588,12 +594,15 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="JIT vs AOT — the key difference:"><img alt="" src="../../../_images/sphx_glr_aot_plugin_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py</span></p>
   <div class="sphx-glr-thumbnail-title">This example builds on auto_generate_plugins by showing the AOT (Ahead-of-Time)</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i..."><img alt="" src="../../../_images/sphx_glr_ptx_op_thumb.png" />
-<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py</span></p>
-  <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example shows how to use TensorRT&#x27;s Global Performance Tuning (GPT) from Torch-TensorRT: d..."><img alt="" src="../../../_images/sphx_glr_global_perf_tuning_attention_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_global_perf_tuning_attention_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Global Performance Tuning (Attention)</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Autoregressive LLMs run in two very different shape regimes that share one set of weights (and ..."><img alt="" src="../../../_images/sphx_glr_multi_optimization_profiles_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_multi_optimization_profiles.py</span></p>
   <div class="sphx-glr-thumbnail-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i..."><img alt="" src="../../../_images/sphx_glr_ptx_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil..."><img alt="" src="../../../_images/sphx_glr_hierarchical_partitioner_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_hierarchical_partitioner_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Hierarchical Partitioner Example</div>

@@ -93,6 +93,8 @@ jobs:
           path: test-infra
       - name: Setup Windows
         uses: ./test-infra/.github/actions/setup-windows
+        with:
+          cuda-version: ${{ env.CU_VERSION }}
       - name: Setup SSH
         uses: ./test-infra/.github/actions/setup-ssh
         with:

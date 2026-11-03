@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=d9553575"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -488,13 +488,15 @@ document.write(`
   <section id="file-tensorrtblobheader-h">
 <span id="file-cpp-include-torch-tensorrt-executorch-tensorrtblobheader-h"></span><h1>File TensorRTBlobHeader.h<a class="headerlink" href="#file-tensorrtblobheader-h" title="Link to this heading">#</a></h1>
 <p>↰ <a class="reference internal" href="dir_cpp_include_torch_tensorrt_executorch.html#dir-cpp-include-torch-tensorrt-executorch"><span class="std std-ref">Parent directory</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch</span></code>)</p>
+<p>The TR01/TR02/TR03 processed-blob layout the ExecuTorch delegate is handed.</p>
 <nav class="contents local" id="contents">
 <p class="topic-title">Contents</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtblobheader-h" id="id1">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBlobHeader.h</span></code>)</a></p></li>
-<li><p><a class="reference internal" href="#includes" id="id2">Includes</a></p></li>
-<li><p><a class="reference internal" href="#namespaces" id="id3">Namespaces</a></p></li>
-<li><p><a class="reference internal" href="#classes" id="id4">Classes</a></p></li>
+<li><p><a class="reference internal" href="#detailed-description" id="id2">Detailed Description</a></p></li>
+<li><p><a class="reference internal" href="#includes" id="id3">Includes</a></p></li>
+<li><p><a class="reference internal" href="#namespaces" id="id4">Namespaces</a></p></li>
+<li><p><a class="reference internal" href="#classes" id="id5">Classes</a></p></li>
 </ul>
 </nav>
 <section id="definition-cpp-include-torch-tensorrt-executorch-tensorrtblobheader-h">
@@ -504,6 +506,10 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h.html">Program Listing for File TensorRTBlobHeader.h</a></li>
 </ul>
 </div>
+</section>
+<section id="detailed-description">
+<h2>Detailed Description<a class="headerlink" href="#detailed-description" title="Link to this heading">#</a></h2>
+<p>Written by py/torch_tensorrt/executorch/serialization.py: a 32-byte fixed header carrying a magic and four offset/size fields, then JSON metadata, then the serialized TensorRT engine. The magic is <code class="docutils literal notranslate"><span class="pre">TR03</span></code> when the engine is stored as named data (<code class="docutils literal notranslate"><span class="pre">engine_key</span></code>) and the blob carries none, otherwise <code class="docutils literal notranslate"><span class="pre">TR02</span></code> when the metadata carries <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> entries and <code class="docutils literal notranslate"><span class="pre">TR01</span></code> when it does not; the layout is the same. Deliberately standalone, so loading a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> needs neither the legacy Torch-TensorRT C++ runtime nor libtorch.</p>
 </section>
 <section id="includes">
 <h2>Includes<a class="headerlink" href="#includes" title="Link to this heading">#</a></h2>
@@ -559,6 +565,7 @@ document.write(`
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtblobheader-h">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBlobHeader.h</span></code>)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#detailed-description">Detailed Description</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#includes">Includes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namespaces">Namespaces</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>

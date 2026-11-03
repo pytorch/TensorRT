@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -479,30 +479,41 @@ document.write(`
 
 <span class="sd">"""Public entry points for ``torch_tensorrt.kernels``.</span>
 
-<span class="sd">Two functions, two paths into the same registration funnel:</span>
+<span class="sd">Four functions, four paths into the same registration funnel:</span>
 
 <span class="sd">* :func:`cuda_kernel_op` — declarative entry for CUDA C++ source. Reads</span>
 <span class="sd">  a :class:`KernelSpec` and derives meta / eager / aot / schema, with</span>
 <span class="sd">  override keyword arguments for cases outside the DSL.</span>
 <span class="sd">* :func:`ptx_op` — escape hatch for pre-compiled PTX bytes (Triton output,</span>
 <span class="sd">  cached NVRTC artifact). User supplies meta / eager / aot directly.</span>
+<span class="sd">* :func:`triton_op` — declarative entry for a ``@triton.jit`` kernel. Compiles</span>
+<span class="sd">  the kernel to PTX for you and derives the AOT launch, so callers don't</span>
+<span class="sd">  hand-write the ``@trtp.aot_impl`` compile boilerplate.</span>
+<span class="sd">* :func:`cutile_op` — declarative entry for a ``@ct.kernel`` cuTile program.</span>
+<span class="sd">  Compiles the kernel to PTX for you, reorders its parameters into TensorRT's</span>
+<span class="sd">  launch order, and derives the AOT launch.</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConverterPriority</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_derive</span><span class="p">,</span> <span class="n">_validation</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._cuda_python_spec</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">CudaPythonSpec</span><span class="p">,</span>
-    <span class="n">_default_cuda_include_paths</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_common</span><span class="p">,</span> <span class="n">_derive</span><span class="p">,</span> <span class="n">_validation</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._dsl</span><span class="w"> </span><span class="kn">import</span> <span class="n">KernelSpec</span><span class="p">,</span> <span class="n">ScalarInput</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_require_qdp_plugin</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Raise unless the installed TensorRT exposes Quick Deployable Plugins."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">"TensorRT QDP plugins are not available. "</span>
+            <span class="s2">"Requires TensorRT &gt;= 10.7.0 (and not 10.14.x)."</span>
+        <span class="p">)</span>
 
 
 <div class="viewcode-block" id="cuda_kernel_op">
@@ -542,15 +553,22 @@ document.write(`
 <span class="sd">    The kernel must follow the calling convention</span>
 <span class="sd">    ``(input_ptrs..., scalar_inputs..., extras..., output_ptrs...)``.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"TensorRT QDP plugins are not available. "</span>
-            <span class="s2">"Requires TensorRT &gt;= 10.7.0 (and not 10.14.x)."</span>
-        <span class="p">)</span>
+    <span class="n">_require_qdp_plugin</span><span class="p">()</span>
 
     <span class="c1"># Late import to avoid circular imports and keep the decorator cheap.</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_cuda_python_plugin</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">register_precompiled_qdp_plugin</span><span class="p">,</span>
+        <span class="n">validate_registration</span><span class="p">,</span>
+    <span class="p">)</span>
 
+    <span class="n">validate_registration</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">check_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">aot_fn</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="n">_validation</span><span class="o">.</span><span class="n">_validate_spec</span><span class="p">(</span>
         <span class="n">spec</span><span class="p">,</span>
         <span class="n">has_meta_fn</span><span class="o">=</span><span class="n">meta_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span>
@@ -574,22 +592,8 @@ document.write(`
     <span class="k">elif</span> <span class="n">spec</span><span class="o">.</span><span class="n">inputs</span> <span class="ow">and</span> <span class="n">spec</span><span class="o">.</span><span class="n">outputs</span><span class="p">:</span>
         <span class="n">final_schema</span> <span class="o">=</span> <span class="n">_derive</span><span class="o">.</span><span class="n">_build_schema</span><span class="p">(</span><span class="n">spec</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="c1"># Let register_cuda_python_plugin fall back to _infer_schema(meta_fn).</span>
+        <span class="c1"># Let the common registrar fall back to _infer_schema(meta_fn).</span>
         <span class="n">final_schema</span> <span class="o">=</span> <span class="kc">None</span>
-
-    <span class="n">cuda_spec</span> <span class="o">=</span> <span class="n">CudaPythonSpec</span><span class="p">(</span>
-        <span class="n">kernel_source</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">kernel_source</span><span class="p">,</span>
-        <span class="n">kernel_name</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
-        <span class="n">aot_fn</span><span class="o">=</span><span class="n">final_aot</span><span class="p">,</span>
-        <span class="n">eager_fn</span><span class="o">=</span><span class="n">final_eager</span><span class="p">,</span>
-        <span class="n">include_paths</span><span class="o">=</span><span class="p">(</span>
-            <span class="nb">list</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">include_paths</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">include_paths</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="k">else</span> <span class="n">_default_cuda_include_paths</span><span class="p">()</span>
-        <span class="p">),</span>
-        <span class="n">compile_std</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">compile_std</span><span class="p">,</span>
-        <span class="n">arch_override</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">arch_override</span><span class="p">,</span>
-    <span class="p">)</span>
 
     <span class="c1"># A user-supplied aot_fn takes ownership of the AOT path; only the</span>
     <span class="c1"># auto-derived path needs the ScalarInput → JIT fallback because QDP</span>
@@ -601,17 +605,18 @@ document.write(`
             <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_spec</span><span class="p">,</span> <span class="n">ScalarInput</span><span class="p">)</span> <span class="k">for</span> <span class="n">input_spec</span> <span class="ow">in</span> <span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">inputs</span> <span class="ow">or</span> <span class="p">[])</span>
         <span class="p">)</span>
 
-    <span class="n">register_cuda_python_plugin</span><span class="p">(</span>
+    <span class="n">register_precompiled_qdp_plugin</span><span class="p">(</span>
         <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
-        <span class="n">spec</span><span class="o">=</span><span class="n">cuda_spec</span><span class="p">,</span>
+        <span class="n">ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
+        <span class="n">kernel_name</span><span class="o">=</span><span class="n">spec</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">final_aot</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">final_eager</span><span class="p">,</span>
         <span class="n">meta_fn</span><span class="o">=</span><span class="n">final_meta</span><span class="p">,</span>
         <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="o">=</span><span class="n">requires_output_allocator</span><span class="p">,</span>
         <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
         <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
-        <span class="n">register_torch_op</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">schema</span><span class="o">=</span><span class="n">final_schema</span><span class="p">,</span>
-        <span class="n">precompiled_ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
         <span class="n">use_aot_if_available</span><span class="o">=</span><span class="n">use_aot</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"cuda_kernel_op '</span><span class="si">%s</span><span class="s2">' registered (schema: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">final_schema</span><span class="p">)</span></div>
@@ -625,7 +630,7 @@ document.write(`
     <span class="n">ptx</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
     <span class="n">kernel_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
     <span class="n">aot_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -639,32 +644,402 @@ document.write(`
 <span class="sd">    Use this when the PTX comes from an external compiler (Triton, a cached</span>
 <span class="sd">    NVRTC output, etc.) and NVRTC compilation should be skipped.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">qdp_plugin</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"TensorRT QDP plugins are not available. "</span>
-            <span class="s2">"Requires TensorRT &gt;= 10.7.0 (and not 10.14.x)."</span>
-        <span class="p">)</span>
+    <span class="n">_require_qdp_plugin</span><span class="p">()</span>
 
-    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_cuda_python_plugin</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_precompiled_qdp_plugin</span>
 
-    <span class="n">spec</span> <span class="o">=</span> <span class="n">CudaPythonSpec</span><span class="p">(</span>
-        <span class="n">kernel_source</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span>
+    <span class="n">register_precompiled_qdp_plugin</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
+        <span class="n">ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
         <span class="n">kernel_name</span><span class="o">=</span><span class="n">kernel_name</span><span class="p">,</span>
         <span class="n">aot_fn</span><span class="o">=</span><span class="n">aot_fn</span><span class="p">,</span>
         <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="n">register_cuda_python_plugin</span><span class="p">(</span>
-        <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
-        <span class="n">spec</span><span class="o">=</span><span class="n">spec</span><span class="p">,</span>
         <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
         <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="o">=</span><span class="n">requires_output_allocator</span><span class="p">,</span>
         <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
         <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
-        <span class="n">register_torch_op</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">schema</span><span class="o">=</span><span class="n">schema</span><span class="p">,</span>
-        <span class="n">precompiled_ptx</span><span class="o">=</span><span class="n">ptx</span><span class="p">,</span>
     <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="triton_op">
+<a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.triton_op">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">triton_op</span><span class="p">(</span>
+    <span class="n">op_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">kernel</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">signature</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">constexprs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">extra_args_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_warps</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_stages</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register a ``@triton.jit`` kernel as a TensorRT AOT QDP plugin.</span>
+
+<span class="sd">    This is the Triton analogue of :func:`cuda_kernel_op`: it compiles the</span>
+<span class="sd">    Triton kernel to PTX at registration time and wires it through the</span>
+<span class="sd">    same registration funnel as ``ptx_op`` — registering the PyTorch custom op,</span>
+<span class="sd">    the TRT plugin descriptor, the AOT impl (embedding the PTX), and the</span>
+<span class="sd">    Torch-TensorRT converter. It removes the hand-written ``@trtp.aot_impl``</span>
+<span class="sd">    compile boilerplate shown in ``examples/dynamo/aot_plugin.py``.</span>
+
+<span class="sd">    Calling convention — the Triton kernel's *runtime* parameters (everything</span>
+<span class="sd">    except ``tl.constexpr`` args) must be declared in this order::</span>
+
+<span class="sd">        (input_ptrs..., extra_scalars..., output_ptrs...)</span>
+
+<span class="sd">    and ``signature`` must list those same parameters in the same order. This</span>
+<span class="sd">    matches the order TensorRT passes tensor pointers and AOT extra args, so no</span>
+<span class="sd">    PTX rewriting is needed.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        op_name: qualified op name ``"ns::name"``. After registration</span>
+<span class="sd">            ``torch.ops.ns.name`` exists and is lowered to the QDP plugin</span>
+<span class="sd">            during ``torch_tensorrt.compile``.</span>
+<span class="sd">        kernel: the ``@triton.jit`` kernel function.</span>
+<span class="sd">        signature: Triton signature for the non-constexpr parameters, in</span>
+<span class="sd">            declaration order, e.g.</span>
+<span class="sd">            ``{"x_ptr": "*fp32", "n_elements": "i32", "y_ptr": "*fp32"}``.</span>
+<span class="sd">        constexprs: ``tl.constexpr`` values baked into the PTX,</span>
+<span class="sd">            e.g. ``{"BLOCK_SIZE": 256}``.</span>
+<span class="sd">        grid: ``callable(inputs, outputs) -&gt; int | tuple`` returning the launch</span>
+<span class="sd">            grid, where ``inputs`` / ``outputs`` are ``trtp.TensorDesc`` objects</span>
+<span class="sd">            (use ``.shape_expr`` for symbolic dims). Up to three dims are used</span>
+<span class="sd">            for ``grid_x`` / ``grid_y`` / ``grid_z``.</span>
+<span class="sd">        meta_fn: the fake / meta kernel used for shape+dtype inference. The</span>
+<span class="sd">            PyTorch schema is inferred from its type hints unless ``schema`` is</span>
+<span class="sd">            passed. Triton registrations currently require a Tensor-only Torch</span>
+<span class="sd">            schema; kernel ``i32`` extras are derived separately from tensor</span>
+<span class="sd">            descriptors by ``extra_args_fn``.</span>
+<span class="sd">        extra_args_fn: optional ``callable(inputs, outputs) -&gt; list`` returning</span>
+<span class="sd">            exactly one runtime argument per scalar signature entry. Every</span>
+<span class="sd">            value must be an ``int`` or ``trtp.SymInt32`` and every scalar</span>
+<span class="sd">            signature entry must be ``i32``. Omit if the kernel has no scalar</span>
+<span class="sd">            args.</span>
+<span class="sd">        eager_fn: optional CUDA eager implementation registered on the torch</span>
+<span class="sd">            op. Omit if the op is only used through ``torch_tensorrt.compile``.</span>
+<span class="sd">        num_warps: warps per block for the compiled kernel, and hence the</span>
+<span class="sd">            launch's threads-per-block. Defaults to Triton's own choice.</span>
+<span class="sd">        num_stages: software pipelining depth. Defaults to Triton's own choice.</span>
+<span class="sd">        capability_validator: optional extra predicate gating conversion. It is</span>
+<span class="sd">            combined with the dtype check derived from ``signature`` — both</span>
+<span class="sd">            must pass for the op to be lowered to the plugin.</span>
+<span class="sd">        schema: optional explicit Tensor-only Torch schema. Use this when</span>
+<span class="sd">            ``meta_fn`` cannot carry complete resolvable type annotations.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: if ``signature`` does not exactly match the kernel's runtime</span>
+<span class="sd">            declaration order, does not follow the calling convention, has an</span>
+<span class="sd">            unsupported type, disagrees with ``meta_fn``'s tensor arity, or has</span>
+<span class="sd">            no source for its scalar arguments.</span>
+<span class="sd">        RuntimeError: if Triton's compiled launch metadata is incomplete or</span>
+<span class="sd">            requires a feature the TensorRT AOT path cannot reproduce.</span>
+
+<span class="sd">    .. note::</span>
+<span class="sd">        Compilation targets the current CUDA device. Register inside</span>
+<span class="sd">        ``torch.cuda.device(device)`` for a specific target; conversion rejects</span>
+<span class="sd">        a different GPU architecture. PTX is embedded exactly as Triton emits</span>
+<span class="sd">        it, and repeated compilations reuse Triton's own cache.</span>
+
+<span class="sd">        This initial implementation compiles a single PTX for the given</span>
+<span class="sd">        ``signature`` (fixed input dtypes) and ``constexprs`` (single config).</span>
+<span class="sd">        Inputs whose dtypes don't match the compiled ones are declined at</span>
+<span class="sd">        conversion time. Such inputs can fall back to PyTorch only when the</span>
+<span class="sd">        surrounding partition and ``eager_fn`` permit it. Multi-config</span>
+<span class="sd">        autotuning and dtype specialization are follow-up work.</span>
+<span class="sd">    """</span>
+    <span class="n">_require_qdp_plugin</span><span class="p">()</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_triton</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">analyze_op_schema</span><span class="p">,</span>
+        <span class="n">register_precompiled_qdp_plugin</span><span class="p">,</span>
+        <span class="n">validate_registration</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">validate_registration</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">check_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_triton</span><span class="o">.</span><span class="n">validate_compile_options</span><span class="p">(</span><span class="n">num_warps</span><span class="p">,</span> <span class="n">num_stages</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">grid</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"grid for triton_op '</span><span class="si">{</span><span class="n">op_name</span><span class="si">}</span><span class="s2">' must be callable."</span><span class="p">)</span>
+
+    <span class="n">schema_info</span> <span class="o">=</span> <span class="n">analyze_op_schema</span><span class="p">(</span>
+        <span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">schema</span><span class="p">,</span>
+        <span class="n">require_complete_hints</span><span class="o">=</span><span class="n">schema</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">tensor_inputs_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Validate before compiling: nothing here needs the kernel built, and every</span>
+    <span class="c1"># rule it enforces would otherwise surface as wrong numbers, not an error.</span>
+    <span class="n">layout</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">validate_triton_config</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">kernel</span><span class="p">,</span>
+        <span class="n">signature</span><span class="p">,</span>
+        <span class="n">constexprs</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">schema_info</span><span class="o">.</span><span class="n">tensor_arg_names</span><span class="p">),</span> <span class="n">schema_info</span><span class="o">.</span><span class="n">num_outputs</span><span class="p">),</span>
+        <span class="n">extra_args_fn</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">compile_triton_to_ptx</span><span class="p">(</span>
+        <span class="n">kernel</span><span class="p">,</span> <span class="n">signature</span><span class="p">,</span> <span class="n">constexprs</span><span class="p">,</span> <span class="n">num_warps</span><span class="o">=</span><span class="n">num_warps</span><span class="p">,</span> <span class="n">num_stages</span><span class="o">=</span><span class="n">num_stages</span>
+    <span class="p">)</span>
+
+    <span class="n">final_validator</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">make_dtype_capability_validator</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">capability_validator</span><span class="p">,</span> <span class="n">artifact</span><span class="o">=</span><span class="n">artifact</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">final_aot</span><span class="p">(</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">outputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_tactic</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">_triton</span><span class="o">.</span><span class="n">validate_target</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
+        <span class="n">dims</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">validate_launch_grid</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">grid</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">))</span>
+        <span class="n">launch_params</span> <span class="o">=</span> <span class="n">trtp</span><span class="o">.</span><span class="n">KernelLaunchParams</span><span class="p">(</span>
+            <span class="n">grid_x</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">grid_y</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="n">grid_z</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="c1"># Triton reports occupancy in warps; TRT wants threads per block.</span>
+            <span class="n">block_x</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">num_warps</span> <span class="o">*</span> <span class="mi">32</span><span class="p">,</span>
+            <span class="n">shared_mem</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">shared_mem</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">extra_args_fn</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">extra_args_fn</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+        <span class="n">extra_args</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">make_symint32_args</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="o">.</span><span class="n">scalars</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">launch_params</span><span class="p">,</span> <span class="n">extra_args</span>
+
+    <span class="n">register_precompiled_qdp_plugin</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
+        <span class="n">ptx</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">ptx</span><span class="p">,</span>
+        <span class="n">kernel_name</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">_common</span><span class="o">.</span><span class="n">check_aot_dtypes</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span>
+            <span class="n">final_aot</span><span class="p">,</span>
+            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">inputs</span><span class="p">],</span>
+            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">outputs</span><span class="p">],</span>
+        <span class="p">),</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
+        <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">final_validator</span><span class="p">,</span>
+        <span class="n">schema</span><span class="o">=</span><span class="n">schema_info</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span>
+        <span class="n">use_aot_if_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"triton_op '</span><span class="si">%s</span><span class="s2">' registered (kernel: </span><span class="si">%s</span><span class="s2">, target: </span><span class="si">%s</span><span class="s2">, PTX ISA: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">artifact</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">artifact</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+        <span class="n">artifact</span><span class="o">.</span><span class="n">ptx_version</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cutile_op">
+<a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.cutile_op">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cutile_op</span><span class="p">(</span>
+    <span class="n">op_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">kernel</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">signature</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">constants</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ndim</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">block_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">aot_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">arch_override</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">max_ptx_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register a ``@ct.kernel`` cuTile program as a TensorRT AOT QDP plugin.</span>
+
+<span class="sd">    The cuTile analogue of :func:`cuda_kernel_op`: compiles the kernel once with</span>
+<span class="sd">    ``cuda.tile.compilation.export_kernel``, permutes the compiled PTX into</span>
+<span class="sd">    TensorRT's launch order, and hands the result to :func:`ptx_op`.</span>
+
+<span class="sd">    A cuTile kernel declares its *array* parameters first, inputs then outputs,</span>
+<span class="sd">    followed by its ``ct.Constant`` parameters::</span>
+
+<span class="sd">        @ct.kernel</span>
+<span class="sd">        def relu(x, out, tile_size: ct.Constant[int]): ...</span>
+
+<span class="sd">    ``signature`` names the arrays in that order; ``constants`` supplies the</span>
+<span class="sd">    ``ct.Constant`` values. The cuTile entry-point documentation explains why</span>
+<span class="sd">    the PTX has to be permuted.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        op_name: qualified op name ``"ns::name"``. After registration</span>
+<span class="sd">            ``torch.ops.ns.name`` exists and is lowered to the QDP plugin</span>
+<span class="sd">            during ``torch_tensorrt.compile``.</span>
+<span class="sd">        kernel: the ``@ct.kernel`` program object.</span>
+<span class="sd">        signature: the kernel's array parameters in declaration order, inputs</span>
+<span class="sd">            then outputs, mapped to their element type — e.g.</span>
+<span class="sd">            ``{"x": "fp32", "out": "fp32"}``. Values may be a</span>
+<span class="sd">            :class:`torch.dtype` or its name (``"float32"``, ``"fp32"``).</span>
+<span class="sd">        meta_fn: the fake / meta kernel used for shape+dtype inference. The</span>
+<span class="sd">            PyTorch schema is inferred from its type hints unless ``schema`` is</span>
+<span class="sd">            passed.</span>
+<span class="sd">        grid: ``callable(inputs, outputs) -&gt; int | tuple`` returning the launch</span>
+<span class="sd">            grid in tiles, where ``inputs`` / ``outputs`` are ``trtp.TensorDesc``</span>
+<span class="sd">            objects (use ``.shape_expr`` for symbolic dims). Up to three dims</span>
+<span class="sd">            become ``grid_x`` / ``grid_y`` / ``grid_z``. Required unless</span>
+<span class="sd">            ``aot_fn`` is given, which replaces it.</span>
+<span class="sd">        constants: ``ct.Constant`` parameter values, in declaration order,</span>
+<span class="sd">            baked into the compiled symbol — e.g. ``{"tile_size": 256}``. The</span>
+<span class="sd">            AOT launch path cannot supply runtime scalars, so every non-array</span>
+<span class="sd">            parameter must be a constant.</span>
+<span class="sd">        ndim: the rank each array is compiled for. Defaults to 1, matching</span>
+<span class="sd">            kernels written against a flattened view; a rank-1 array's extent is</span>
+<span class="sd">            the tensor's element count, so such an op accepts any input shape.</span>
+<span class="sd">        block_size: one to three block dimensions. Defaults to the ``.reqntid``</span>
+<span class="sd">            the compiled kernel declares, which is authoritative. Pass this only</span>
+<span class="sd">            for kernels that declare none and only with the derived ``grid`` path.</span>
+<span class="sd">        aot_fn: optional replacement for the derived AOT launch</span>
+<span class="sd">            (``callable(inputs, outputs, tactic) -&gt; (KernelLaunchParams,</span>
+<span class="sd">            extra_args)``), used instead of ``grid``. The PTX is still permuted,</span>
+<span class="sd">            so the override must emit extra arguments in cuTile ABI order:</span>
+<span class="sd">            every input array's extents and strides, then every output's, in a</span>
+<span class="sd">            ``trtp.SymIntExprs`` container. The wrapper checks the container,</span>
+<span class="sd">            item type, and count, but the caller owns the values and order. Its</span>
+<span class="sd">            block dimensions must be static and exactly match the compiled</span>
+<span class="sd">            kernel's ``.reqntid`` when one is declared; dynamic shared memory</span>
+<span class="sd">            must be zero.</span>
+<span class="sd">        eager_fn: optional CUDA eager implementation registered on the torch</span>
+<span class="sd">            op. Omit if the op is only used through ``torch_tensorrt.compile``.</span>
+<span class="sd">        arch_override: target architecture such as ``"sm_100"``. Defaults to the</span>
+<span class="sd">            current device's compute capability. An override for a different</span>
+<span class="sd">            architecture is a cross-compile, so its PTX cannot be driver-checked</span>
+<span class="sd">            locally and must be verified on the target device.</span>
+<span class="sd">        max_ptx_version: explicit ISA ceiling for the embedded PTX, as a</span>
+<span class="sd">            ``92``-style int (``.version 9.2``), minimum 92. It does not bypass</span>
+<span class="sd">            the CUDA 13.2+ driver/toolkit requirements. The compiler's header is left</span>
+<span class="sd">            unchanged by default. A capped candidate is verified by the driver.</span>
+<span class="sd">        capability_validator: optional extra predicate gating conversion. It is</span>
+<span class="sd">            combined with the dtype check derived from ``signature`` — both must</span>
+<span class="sd">            pass for the op to be lowered to the plugin.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: if ``signature`` disagrees with ``meta_fn``'s arity, names a</span>
+<span class="sd">            dtype cuTile cannot be compiled for, overlaps ``constants``, or if</span>
+<span class="sd">            neither / both of ``grid`` and ``aot_fn`` are given.</span>
+<span class="sd">        RuntimeError: if the compiled kernel's PTX parameter list does not match</span>
+<span class="sd">            the signature — most often a rank mismatch or a runtime scalar the</span>
+<span class="sd">            AOT launch path cannot supply.</span>
+
+<span class="sd">    .. note::</span>
+<span class="sd">        Compiles a single PTX for the dtypes in ``signature`` and the values in</span>
+<span class="sd">        ``constants``. Inputs of other dtypes are declined at conversion time and</span>
+<span class="sd">        left to PyTorch. Multi-config autotuning is follow-up work.</span>
+<span class="sd">    """</span>
+    <span class="n">_require_qdp_plugin</span><span class="p">()</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_cutile</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_registration</span>
+
+    <span class="n">validate_registration</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">check_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">aot_fn</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">schema_info</span> <span class="o">=</span> <span class="n">_cutile</span><span class="o">.</span><span class="n">analyze_tensor_schema</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">meta_fn</span><span class="p">,</span> <span class="n">schema</span><span class="p">)</span>
+    <span class="n">raw_constants</span> <span class="o">=</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">constants</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">constants</span>
+
+    <span class="c1"># Validate before compiling: nothing here needs the kernel built, and every</span>
+    <span class="c1"># rule it enforces would otherwise surface as wrong numbers, not an error.</span>
+    <span class="n">layout</span> <span class="o">=</span> <span class="n">_cutile</span><span class="o">.</span><span class="n">validate_cutile_config</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">signature</span><span class="p">,</span>
+        <span class="n">raw_constants</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">schema_info</span><span class="o">.</span><span class="n">tensor_arg_names</span><span class="p">),</span> <span class="n">schema_info</span><span class="o">.</span><span class="n">num_outputs</span><span class="p">),</span>
+        <span class="n">default_ndim</span><span class="o">=</span><span class="n">ndim</span><span class="p">,</span>
+        <span class="n">input_names</span><span class="o">=</span><span class="n">schema_info</span><span class="o">.</span><span class="n">tensor_arg_names</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">constants_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">raw_constants</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">aot_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">grid</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"cutile_op '</span><span class="si">{</span><span class="n">op_name</span><span class="si">}</span><span class="s2">' needs a callable grid= to derive the "</span>
+                <span class="s2">"launch, or a callable aot_fn= to replace it."</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">grid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"cutile_op '</span><span class="si">{</span><span class="n">op_name</span><span class="si">}</span><span class="s2">' was given both grid= and aot_fn=; the "</span>
+                <span class="s2">"custom aot_fn builds the whole launch, so grid would be ignored."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">block_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"cutile_op '</span><span class="si">{</span><span class="n">op_name</span><span class="si">}</span><span class="s2">' block_size is only used with the derived "</span>
+                <span class="s2">"grid launch and would be ignored by the custom aot_fn."</span>
+            <span class="p">)</span>
+
+    <span class="n">ptx</span><span class="p">,</span> <span class="n">kernel_name</span><span class="p">,</span> <span class="n">reqntid</span> <span class="o">=</span> <span class="n">_cutile</span><span class="o">.</span><span class="n">compile_cutile_to_ptx</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">constants_dict</span><span class="p">,</span> <span class="n">arch_override</span><span class="p">,</span> <span class="n">max_ptx_version</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">aot_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">grid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">aot_fn</span> <span class="o">=</span> <span class="n">_cutile</span><span class="o">.</span><span class="n">make_aot_fn</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span>
+            <span class="n">layout</span><span class="p">,</span>
+            <span class="n">grid</span><span class="p">,</span>
+            <span class="n">_cutile</span><span class="o">.</span><span class="n">resolve_block_dims</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">kernel_name</span><span class="p">,</span> <span class="n">reqntid</span><span class="p">,</span> <span class="n">block_size</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">aot_fn</span> <span class="o">=</span> <span class="n">_cutile</span><span class="o">.</span><span class="n">make_checked_aot_fn</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span> <span class="n">kernel_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">reqntid</span><span class="p">,</span> <span class="n">aot_fn</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Compilation can execute arbitrary toolchain code, so check again in case</span>
+    <span class="c1"># it registered the name re-entrantly before handing off to ``ptx_op``.</span>
+    <span class="n">validate_registration</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">check_available</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Everything past this point is "register pre-compiled PTX", which is</span>
+    <span class="c1"># exactly what ptx_op is; the only cuTile-specific addition is the dtype</span>
+    <span class="c1"># gate derived from the signature.</span>
+    <span class="n">ptx_op</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">ptx</span><span class="p">,</span>
+        <span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">_common</span><span class="o">.</span><span class="n">check_aot_dtypes</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span>
+            <span class="n">aot_fn</span><span class="p">,</span>
+            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">inputs</span><span class="p">],</span>
+            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">outputs</span><span class="p">],</span>
+        <span class="p">),</span>
+        <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="o">=</span><span class="n">requires_output_allocator</span><span class="p">,</span>
+        <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">_cutile</span><span class="o">.</span><span class="n">make_dtype_capability_validator</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">capability_validator</span>
+        <span class="p">),</span>
+        <span class="n">schema</span><span class="o">=</span><span class="n">schema_info</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"cutile_op '</span><span class="si">%s</span><span class="s2">' registered (kernel: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">kernel_name</span><span class="p">)</span></div>
 
 </pre></div>
 

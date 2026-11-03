@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=d9553575"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -488,14 +488,17 @@ document.write(`
   <section id="file-tensorrtbackend-h">
 <span id="file-cpp-include-torch-tensorrt-executorch-tensorrtbackend-h"></span><h1>File TensorRTBackend.h<a class="headerlink" href="#file-tensorrtbackend-h" title="Link to this heading">#</a></h1>
 <p>↰ <a class="reference internal" href="dir_cpp_include_torch_tensorrt_executorch.html#dir-cpp-include-torch-tensorrt-executorch"><span class="std std-ref">Parent directory</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch</span></code>)</p>
+<p>ExecuTorch backend delegate that runs TensorRT engines serialized by torch_tensorrt.</p>
 <nav class="contents local" id="contents">
 <p class="topic-title">Contents</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtbackend-h" id="id1">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBackend.h</span></code>)</a></p></li>
-<li><p><a class="reference internal" href="#includes" id="id2">Includes</a></p></li>
-<li><p><a class="reference internal" href="#namespaces" id="id3">Namespaces</a></p></li>
-<li><p><a class="reference internal" href="#classes" id="id4">Classes</a></p></li>
-<li><p><a class="reference internal" href="#typedefs" id="id5">Typedefs</a></p></li>
+<li><p><a class="reference internal" href="#detailed-description" id="id2">Detailed Description</a></p></li>
+<li><p><a class="reference internal" href="#includes" id="id3">Includes</a></p></li>
+<li><p><a class="reference internal" href="#namespaces" id="id4">Namespaces</a></p></li>
+<li><p><a class="reference internal" href="#classes" id="id5">Classes</a></p></li>
+<li><p><a class="reference internal" href="#typedefs" id="id6">Typedefs</a></p></li>
+<li><p><a class="reference internal" href="#variables" id="id7">Variables</a></p></li>
 </ul>
 </nav>
 <section id="definition-cpp-include-torch-tensorrt-executorch-tensorrtbackend-h">
@@ -506,15 +509,19 @@ document.write(`
 </ul>
 </div>
 </section>
+<section id="detailed-description">
+<h2>Detailed Description<a class="headerlink" href="#detailed-description" title="Link to this heading">#</a></h2>
+<p>The processed blob uses the standalone TR01 wire format from py/torch_tensorrt/executorch/serialization.py and is parsed directly here. This runtime path intentionally does not depend on the legacy Torch-TensorRT C++ runtime or libtorch.</p>
+</section>
 <section id="includes">
 <h2>Includes<a class="headerlink" href="#includes" title="Link to this heading">#</a></h2>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">NvInfer.h</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cstdint</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">executorch/runtime/backend/interface.h</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">memory</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">mutex</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">vector</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt/executorch/OptimizationProfileSelection.h</span></code> (<a class="reference internal" href="file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h.html#file-cpp-include-torch-tensorrt-executorch-optimizationprofileselection-h"><span class="std std-ref">File OptimizationProfileSelection.h</span></a>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">type_traits</span></code></p></li>
 </ul>
 </section>
 <section id="namespaces">
@@ -527,9 +534,9 @@ document.write(`
 <section id="classes">
 <h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1enginehandle"><span class="std std-ref">Struct EngineHandle</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1inputprofilebounds"><span class="std std-ref">Struct InputProfileBounds</span></a></p></li>
+<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1optimizationprofileguard-1-1autotag"><span class="std std-ref">Struct OptimizationProfileGuard::AutoTag</span></a></p></li>
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1trtdeleter"><span class="std std-ref">Struct TRTDeleter</span></a></p></li>
+<li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1optimizationprofileguard"><span class="std std-ref">Class OptimizationProfileGuard</span></a></p></li>
 <li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1tensorrtbackend"><span class="std std-ref">Class TensorRTBackend</span></a></p></li>
 <li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1trtlogger"><span class="std std-ref">Class TRTLogger</span></a></p></li>
 </ul>
@@ -538,6 +545,14 @@ document.write(`
 <h2>Typedefs<a class="headerlink" href="#typedefs" title="Link to this heading">#</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13.html#exhale-typedef-tensorrtbackend-8h-1acdb398aaccae05cc399de3a885797c13"><span class="std std-ref">Typedef torch_tensorrt::executorch_backend::TRTUniquePtr</span></a></p></li>
+</ul>
+</section>
+<section id="variables">
+<h2>Variables<a class="headerlink" href="#variables" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="variable_TensorRTBackend_8h_1a27092406344aaf7c875381e8b55088b0.html#exhale-variable-tensorrtbackend-8h-1a27092406344aaf7c875381e8b55088b0"><span class="std std-ref">Variable torch_tensorrt::executorch_backend::kCudaGraphsKey</span></a></p></li>
+<li><p><a class="reference internal" href="variable_TensorRTBackend_8h_1aaa620d42a4544b852fdf716ec5f90954.html#exhale-variable-tensorrtbackend-8h-1aaa620d42a4544b852fdf716ec5f90954"><span class="std std-ref">Variable torch_tensorrt::executorch_backend::kSharedActivationScratchKey</span></a></p></li>
+<li><p><a class="reference internal" href="variable_TensorRTBackend_8h_1a76e2f00695cc5f8173af78f35180e3e9.html#exhale-variable-tensorrtbackend-8h-1a76e2f00695cc5f8173af78f35180e3e9"><span class="std std-ref">Variable torch_tensorrt::executorch_backend::kSharedEnginesKey</span></a></p></li>
 </ul>
 </section>
 </section>
@@ -571,10 +586,12 @@ document.write(`
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtbackend-h">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBackend.h</span></code>)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#detailed-description">Detailed Description</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#includes">Includes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namespaces">Namespaces</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#typedefs">Typedefs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables">Variables</a></li>
 </ul>
   </nav></div>
 

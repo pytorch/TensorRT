@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=d9553575"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -597,10 +597,16 @@ subgraph compilations are complete.</p></li>
 </div></blockquote>
 <p><strong>Process killed (OOM) on CPU</strong></p>
 <blockquote>
-<div><p>TRT compilation can use up to 5× the model size in CPU memory.</p>
+<div><p>Compilation typically peaks at about 1× the model size in CPU memory, plus about
+2 GB for TensorRT’s builder, or about 2× with <code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu=True</span></code>. In
+some cases TensorRT’s engine build itself still reaches 2–3× the model size, for
+example when a large model is built as a single engine.</p>
 <ul class="simple">
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1</span></code> to reduce to ~3× model size.</p></li>
+<li><p>Make sure <code class="docutils literal notranslate"><span class="pre">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span></code> is not set to <code class="docutils literal notranslate"><span class="pre">0</span></code>; trimming
+the builder’s freed memory is on by default on Linux.</p></li>
 <li><p>Disable <code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code> (<code class="docutils literal notranslate"><span class="pre">False</span></code>) to drop another 1× copy.</p></li>
+<li><p>Enable resource partitioning (<code class="docutils literal notranslate"><span class="pre">enable_resource_partitioning=True</span></code>) so each
+engine build holds only part of the model; see <a class="reference internal" href="../tutorials/resource_memory/resource_management.html#resource-management"><span class="std std-ref">Resource Management</span></a>.</p></li>
 </ul>
 </div></blockquote>
 </section>

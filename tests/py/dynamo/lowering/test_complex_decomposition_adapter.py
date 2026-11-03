@@ -197,6 +197,62 @@ def test_interior_complex_region_leaves_nothing_trt_cannot_convert():
     torch.testing.assert_close(out(x), expected)
 
 
+def test_interior_complex_region_keeps_exported_signature():
+    """The retrace returns a module taking positional flat args; the exported
+    program's codegen must survive so the module still takes its inputs by
+    name (e.g. Llama 4's complex rotary embedding, called with input_ids=...)."""
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            z = torch.view_as_complex(x.reshape(1, 2, 1, 1, 2))
+            return torch.view_as_real(z * z)
+
+    model = M().eval()
+    x = torch.randn(1, 2, 1, 2)
+    gm = (
+        torch.export.export(model, (x,))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    torch.testing.assert_close(out(x=x), model(x))
+
+
+def test_interior_complex_region_keeps_a_namedtuple_output():
+    """make_fx records building a namedtuple output as one node, so the retrace
+    must run on the graph's flat outputs for the restored codegen to rebuild the
+    namedtuple, by position and by keyword."""
+    import collections
+
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    Pair = collections.namedtuple("Pair", ["a", "b"])
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            z = torch.view_as_complex(x.reshape(1, 2, 1, 1, 2))
+            y = torch.view_as_real(z * z)
+            return Pair(y, y * 2)
+
+    model = M().eval()
+    x = torch.randn(1, 2, 1, 2)
+    gm = (
+        torch.export.export(model, (x,))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    expected = model(x)
+    for result in (out(x), out(x=x)):
+        assert isinstance(result, Pair)
+        torch.testing.assert_close(result, expected)
+
+
 # ---------------------------------------------------------------------------
 # feature gate / fallback
 # ---------------------------------------------------------------------------
@@ -364,3 +420,90 @@ def test_fake_flat_args_raises_on_symbolic_tensor_meta_without_val():
 
     with pytest.raises(RuntimeError, match="symbolic dimension"):
         cda._fake_flat_args(gm)
+
+
+def test_dynamic_dims_stay_dynamic():
+    """Rotary angles from arange(seq) must not freeze seq at its traced value."""
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            angles = torch.outer(torch.arange(x.shape[1]).float(), torch.ones(4))
+            z = torch.view_as_complex(x.reshape(x.shape[0], x.shape[1], 4, 2))
+            return torch.view_as_real(z * torch.polar(torch.ones_like(angles), angles))
+
+    model = M().eval()
+    seq = torch.export.Dim("seq", min=2, max=16)
+    gm = (
+        torch.export.export(model, (torch.randn(2, 6, 8),), dynamic_shapes=({1: seq},))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    x = torch.randn(2, 5, 8)
+    torch.testing.assert_close(out(x), model(x))
+
+
+@pytest.mark.skipif(
+    not cda.has_complex_decomposition(),
+    reason="decompose_complex_in_graph requires torch>=2.14.dev",
+)
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(lambda z: z.prod(dim=1), id="prod"),
+        pytest.param(lambda z: z + (1 + 2j), id="add_complex_scalar"),
+        pytest.param(lambda z: z * (2 - 1j), id="mul_complex_scalar"),
+        pytest.param(lambda z: torch.complex(z.real * 2, z.imag), id="complex"),
+    ],
+)
+@pytest.mark.parametrize("symbolic_factory", [False, True])
+def test_dynamic_complex_ops_keep_upstream_semantics(
+    monkeypatch, operation, symbolic_factory
+):
+    """Dynamic complex inputs must retain upstream's arithmetic and I/O layout.
+
+    Include a symbolic arange alongside the complex op so preserving rotary
+    shapes cannot come at the cost of correctness elsewhere in the same graph.
+    """
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, z):
+            result = operation(z)
+            if symbolic_factory:
+                result = result + torch.arange(z.shape[0]).reshape(
+                    [-1] + [1] * (result.ndim - 1)
+                )
+            return result
+
+    def unexpected_legacy(*args, **kwargs):
+        pytest.fail("supported dynamic complex ops must not use the legacy rewriter")
+
+    monkeypatch.setattr(cda, "complex_graph_detection", unexpected_legacy)
+    model = M().eval()
+    batch = torch.export.Dim("batch", min=1, max=8)
+    gm = (
+        torch.export.export(
+            model,
+            (torch.randn(3, 4, dtype=torch.complex64),),
+            dynamic_shapes=({0: batch},),
+        )
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    # Refit verifies against this lowered module using the original complex input.
+    placeholder = next(n for n in out.graph.nodes if n.op == "placeholder")
+    assert placeholder.meta["val"].dtype == torch.complex64
+    assert isinstance(placeholder.meta["val"].shape[0], torch.SymInt)
+    assert out.meta["complex_input_names"] == ["z"]
+    assert out.meta["complex_output_indices"] == [0]
+    for size in (2, 5):
+        z = torch.randn(size, 4, dtype=torch.complex64)
+        actual = out(z)
+        torch.testing.assert_close(torch.view_as_complex(actual), model(z))

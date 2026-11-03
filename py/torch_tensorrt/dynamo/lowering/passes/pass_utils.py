@@ -6,15 +6,69 @@ from typing import Any, Dict, List, Sequence
 import torch
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
+# When True, clean_up_graph_after_modifications only marks the graph dirty and
+# skips DCE/lint/recompile. post_lowering enables this around the pass list so
+# multiple cheap FX repairs share one cleanup cycle (Naren: "one iteration").
+_defer_graph_cleanup: bool = False
+_graph_cleanup_pending: bool = False
+
+
+def _has_side_effect(node: torch.fx.Node) -> bool:
+    """Whether dead-code elimination must keep this node even though nothing uses it.
+
+    Until run_decompositions, an exported graph still calls functorch's vmap
+    bookkeeping (_vmap_increment_nesting, _vmap_decrement_nesting,
+    lazy_load_decompositions) only for its side effects. FX does not count those
+    calls as impure, so plain dead-code elimination deletes them, and the vmap they
+    bracket then fails to decompose ("tensor may have escaped from inside a
+    function being vmapped").
+    """
+    return node.is_impure() or (
+        node.op == "call_function"
+        and getattr(node.target, "__module__", None) == "torch._functorch.predispatch"
+    )
+
+
+def set_defer_graph_cleanup(enabled: bool) -> None:
+    """Enable/disable deferred FX cleanup for the current post_lowering run."""
+    global _defer_graph_cleanup, _graph_cleanup_pending
+    _defer_graph_cleanup = enabled
+    if not enabled:
+        _graph_cleanup_pending = False
+
+
+def flush_deferred_graph_cleanup(
+    gm: torch.fx.GraphModule,
+) -> torch.fx.GraphModule:
+    """Run a real cleanup if any deferred clean_up call happened."""
+    global _graph_cleanup_pending
+    if _graph_cleanup_pending:
+        _graph_cleanup_pending = False
+        return _run_graph_cleanup(gm)
+    return gm
+
+
+def _run_graph_cleanup(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Runs dead-code elimination, linting, and recompilation for graph, in-place"""
+    gm.graph.eliminate_dead_code(is_impure_node=_has_side_effect)
+    gm.graph.lint()
+    gm.recompile()
+    return gm
+
 
 def clean_up_graph_after_modifications(
     gm: torch.fx.GraphModule,
 ) -> torch.fx.GraphModule:
-    """Runs dead-code elimination, linting, and recompilation for graph, in-place"""
-    gm.graph.eliminate_dead_code()
-    gm.graph.lint()
-    gm.recompile()
-    return gm
+    """Runs dead-code elimination, linting, and recompilation for graph, in-place.
+
+    If deferred cleanup is enabled (see ``set_defer_graph_cleanup``), records that
+    a cleanup is needed and returns immediately so callers can batch mutations.
+    """
+    global _graph_cleanup_pending
+    if _defer_graph_cleanup:
+        _graph_cleanup_pending = True
+        return gm
+    return _run_graph_cleanup(gm)
 
 
 def iter_cond_subgraphs(gm: torch.fx.GraphModule) -> List[torch.fx.GraphModule]:

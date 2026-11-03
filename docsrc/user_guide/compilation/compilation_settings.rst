@@ -342,6 +342,19 @@ Graph Partitioning
        converters. When combined with ``use_fp32_acc=True``, decomposed FP16 attention
        keeps its intermediate calculation in FP32 and casts only the final output back
        to FP16.
+   * - ``fold_shared_kv_attention``
+     - ``False``
+     - For attention where all query heads share one key/value head (multi-query
+       attention), compute it against that one head instead of the copies that
+       Hugging Face models make for each query head. TensorRT then runs two plain
+       matrix products instead of its fused attention kernel. This can be faster or
+       slower depending on the GPU, so measure it. In FP16 the result can round
+       differently; ``use_fp32_acc=True`` reduces that. Only static shapes are
+       rewritten, and ``scaled_dot_product_attention`` also needs
+       ``decompose_attention=True``. Both preserved matmuls and the reshape/``bmm``
+       form produced by AOT tracing under ``torch.compile`` are supported for
+       ``repeat_kv`` style graphs. In the ``bmm`` form, broadcasting a single KV
+       head with ``enable_gqa=True`` is not folded.
 
 ----
 
@@ -442,7 +455,8 @@ rebuilt from scratch:
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
-``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``.
+``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``,
+``fold_shared_kv_attention``.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

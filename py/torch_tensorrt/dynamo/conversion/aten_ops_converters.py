@@ -1753,7 +1753,27 @@ def aten_ops_scatter(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int, supports_dynamic_shapes=True)
+def select_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep a select of a uint8 tensor on the PyTorch path.
+
+    TensorRT allows uint8 only at engine inputs and at outputs made by a cast or
+    identity layer, so the gather's uint8 result fails the engine build, as it does
+    for aten.gather.
+    """
+    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
+    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
+        _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.select.int,
+    capability_validator=select_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_select(
     ctx: ConversionContext,
     target: Target,
@@ -2142,12 +2162,42 @@ def aten_ops_permute(
     )
 
 
+def _truncatable_float64_copy(node: Node, source: Argument) -> bool:
+    """Whether a float64 copy can run as a float32 copy and give PyTorch's result.
+
+    The source has to be a type float32 holds exactly, the same rule impl.cast.to_copy
+    applies, and the PyTorch result has to have the contiguous layout a TensorRT copy
+    produces. The check does not depend on where the copy sits, because partitioning
+    can turn any copy into an engine output and the converter is validated again then.
+    """
+    input_meta = source.meta.get("val") if isinstance(source, Node) else None
+    if (
+        not isinstance(input_meta, torch.Tensor)
+        or input_meta.dtype not in impl.cast.FLOAT64_TRUNCATABLE_SOURCES
+    ):
+        return False
+    # Alone on a placeholder after partitioning, a dynamic copy must also pass
+    # _dynamic_placeholder_copy_supported, which refuses any explicit memory_format.
+    if node.kwargs.get("memory_format") is not None and node_has_dynamic_shapes(node):
+        return False
+    output_meta = node.meta.get("val")
+    if not isinstance(output_meta, torch.Tensor):
+        return False
+    # A data-dependent stride cannot be decided here, so leave the copy to PyTorch.
+    try:
+        return bool(output_meta.is_contiguous())
+    except Exception:
+        return False
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
     """Return validator for to_copy node with placeholder restrictions"""
 
-    def validate_dtype(to_copy_node: Node) -> bool:
+    def validate_dtype(
+        to_copy_node: Node, settings: Optional[CompilationSettings]
+    ) -> bool:
         """Returns true if the to_copy node can be converted to TRT
 
         Based on data type being casted to
@@ -2187,6 +2237,15 @@ def to_copy_dtype_validator(
         if "dtype" in to_copy_node.kwargs:
             if to_copy_node.kwargs["dtype"] in allowed_casts:
                 return True
+            # truncate_double means the caller accepts float32 for float64, and
+            # the converter maps it.
+            elif (
+                to_copy_node.kwargs["dtype"] is torch.float64
+                and settings is not None
+                and settings.truncate_double
+                and _truncatable_float64_copy(to_copy_node, to_copy_node.args[0])
+            ):
+                return True
             else:
                 _LOGGER.debug(
                     f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
@@ -2206,7 +2265,7 @@ def to_copy_dtype_validator(
         """
         # The placeholder restriction is satsfied if placeholder_only is the same
         # truth value as is_only_operator_on_placeholder(to_copy_node)
-        return validate_dtype(to_copy_node) and (
+        return validate_dtype(to_copy_node, settings) and (
             (not placeholder_only) ^ is_only_operator_on_placeholder(to_copy_node)
         )
 
@@ -3764,8 +3823,8 @@ def turing_rejects_forward_convolution(
     """Whether a forward convolution over ``spatial_rank`` spatial dims must fall back.
 
     No valid kernel config for 3D ConvFwd on SM 7.5 for TensorRT-RTX, a known gap.
-    Transposed 3D is a distinct layer and is unaffected, so callers must only ask about
-    non-transposed convolutions.
+    Transposed convolutions have a separate, dtype-dependent guard in
+    convolution_capability_validator, so callers must only ask about forward ones.
     """
     unsupported_spatial_rank = 3
     if spatial_rank != unsupported_spatial_rank:
@@ -3787,7 +3846,8 @@ def convolution_capability_validator(
     stride > 1 with dilation > 1 on TensorRT-RTX — there is no kernel
     for this case and the build fails with "Strided & Dilated Deconv
     are currently not supported". Applies to 1D / 2D / 3D ConvTranspose;
-    regular convolutions are unaffected.
+    regular convolutions are unaffected. FP32 3D deconvolution also falls back
+    when Turing is a build target.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
@@ -3809,12 +3869,23 @@ def convolution_capability_validator(
     # aten.convolution input is (N, C, *spatial), so ndim - 2 is the spatial rank.
     # Like every validator in this module this relies on meta["val"] and fails open
     # when it is absent.
+    input_node = node.args[_CONV_ARG_INPUT]
+    val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
+    spatial_rank = val.ndim - 2 if val is not None else None
     if not args_bounds_check(node.args, _CONV_ARG_TRANSPOSED):
-        input_node = node.args[_CONV_ARG_INPUT]
-        val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
-        spatial_rank = val.ndim - 2 if val is not None else None
         if turing_rejects_forward_convolution(node, spatial_rank, settings):
             return False
+    elif (
+        spatial_rank == 3
+        and val.dtype == torch.float32
+        and trt_rtx_targets_turing(settings)
+    ):
+        _LOGGER.debug(
+            "FP32 3D deconvolution '%s' is not supported on TensorRT-RTX for "
+            "Turing (SM 7.5). Falling back to PyTorch.",
+            node.name,
+        )
+        return False
 
     return True
 
@@ -4738,7 +4809,22 @@ def aten_ops_trunc(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.copy.default, supports_dynamic_shapes=True)
+def _copy_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    output_meta = node.meta.get("val")
+    if not isinstance(output_meta, torch.Tensor) or output_meta.dtype != torch.float64:
+        return True
+    return (
+        settings is not None
+        and settings.truncate_double
+        and _truncatable_float64_copy(node, node.args[1])
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.copy.default,
+    capability_validator=_copy_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         1: (TRTTensor,),
@@ -4752,6 +4838,25 @@ def aten_ops_copy(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     dest, src = args[0], args[1]
+    # copy broadcasts src, so the result always has the shape of dest.
+    if tuple(src.shape) != tuple(dest.shape):
+        src = impl.slice.expand(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_expand",
+            src,
+            [
+                (
+                    impl.shape.shape(
+                        ctx, target, SourceIR.ATEN, f"{name}_dest_dim{i}", dest, i
+                    )
+                    if size == DYNAMIC_DIM
+                    else size
+                )
+                for i, size in enumerate(dest.shape)
+            ],
+        )
     return impl.cast.to_copy(
         ctx,
         target,
@@ -5182,10 +5287,100 @@ def attention_capability_validator(
     return True
 
 
+# Ops that only reshape, copy or cast a tensor. TensorRT can fold them away, so tensors reached through them
+# from one producer may become one tensor in the network.
+_PASS_THROUGH_OPS = {
+    torch.ops.aten.view.default,
+    torch.ops.aten._unsafe_view.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.transpose.int,
+    torch.ops.aten.permute.default,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.clone.default,
+    torch.ops.aten._to_copy.default,
+}
+
+
+def _pass_through_source(arg: Argument) -> Argument:
+    while isinstance(arg, Node) and arg.target in _PASS_THROUGH_OPS:
+        arg = arg.args[0]
+    return arg
+
+
+def _is_bf16(arg: Argument) -> bool:
+    val = arg.meta.get("val") if isinstance(arg, Node) else None
+    return getattr(val, "dtype", None) == torch.bfloat16
+
+
+def _shares_bf16_query_with_another_attention(node: Node) -> bool:
+    if not _is_bf16(node.args[0]):
+        return False
+    query = _pass_through_source(node.args[0])
+    return any(
+        other is not node
+        and other.target == torch.ops.aten.scaled_dot_product_attention.default
+        and _is_bf16(other.args[0])
+        and _pass_through_source(other.args[0]) is query
+        for other in node.graph.nodes
+    )
+
+
+def _output_quantized_to_fp8(node: Node) -> bool:
+    # Imported here: the lowering passes import this module.
+    from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
+        _is_fp8_quantize_op,
+    )
+
+    users = list(node.users)
+    while users:
+        user = users.pop()
+        if _is_fp8_quantize_op(user):
+            return True
+        if user.target in _PASS_THROUGH_OPS:
+            users.extend(user.users)
+    return False
+
+
+def _inputs_quantized_to_fp8(node: Node) -> bool:
+    from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
+        _is_fp8_quantize_op,
+    )
+
+    # Directly, as annotate_fp8_sdpa requires for the fused FP8 attention.
+    return all(
+        isinstance(arg, Node) and _is_fp8_quantize_op(arg) for arg in node.args[:3]
+    )
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     if not attention_capability_validator(node, settings):
+        return False
+
+    # TensorRT 11.3 and 11.4 crash or fail while building two attention layers that read the same
+    # bfloat16 query (float16 builds). Seen on a Jetson AGX Thor and an H100, and declined on every
+    # version, because the decomposition is always correct.
+    if _shares_bf16_query_with_another_attention(node):
+        _LOGGER.debug(
+            "Decomposing attention %s: it reads the same bfloat16 query as another attention, which "
+            "TensorRT's attention layer cannot build.",
+            node.name,
+        )
+        return False
+    # TensorRT 11.4 fails to build an attention layer whose output is quantized to FP8, unless its query,
+    # key and value are FP8 too (the fused FP8 attention that annotate_fp8_sdpa sets up). Seen on a Jetson
+    # AGX Thor and an H100, and declined on every version for the same reason.
+    if _output_quantized_to_fp8(node) and not _inputs_quantized_to_fp8(node):
+        _LOGGER.debug(
+            "Decomposing attention %s: its output is quantized to FP8, which TensorRT's attention layer "
+            "cannot build unless its inputs are FP8 too.",
+            node.name,
+        )
         return False
 
     attn_mask = args_bounds_check(node.args, 3, None)

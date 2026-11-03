@@ -157,8 +157,11 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     output_shape = list(input.shape)
 
     if input.shape[dim] != -1 and isinstance(start, int) and isinstance(stop, int):
-        start = get_positive_dim(start, input.shape[dim])
-        stop = get_positive_dim(stop, input.shape[dim])
+        # Clamp out-of-range bounds like Python slicing instead of wrapping them
+        # like a dimension index: x[-15:] on a size-10 dim is the whole dim.
+        dim_size = input.shape[dim]
+        start = max(start + dim_size, 0) if start < 0 else min(start, dim_size)
+        stop = max(stop + dim_size, 0) if stop < 0 else min(stop, dim_size)
         start_slice[dim] = start
     else:
         # the start and stop or None is dynamic along dim or or start or stop is an ITensor
@@ -272,7 +275,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             layer.set_input(3, stride_slice_tensor)
             return layer.get_output(0)
 
-    output_shape[dim] = math.ceil((stop - start) / step)
+    output_shape[dim] = max(math.ceil((stop - start) / step), 0)
     return slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
     )
@@ -307,6 +310,14 @@ def expand(
     # After the above padding, the shape and tensor rank must be equal
     assert len(input_t.shape) == shape_rank
 
+    # PyTorch only expands a dim larger than 1 to its own size, so a runtime
+    # target there must equal the static input dim. Keep the dim instead of
+    # broadcasting its first element.
+    shape = [
+        i if isinstance(o, TRTTensor) and i not in (1, DYNAMIC_DIM) else o
+        for i, o in zip(input_t.shape, shape)
+    ]
+
     # Configure the start, strides and output shape tensors
     start = tuple([0] * shape_rank)
 
@@ -314,7 +325,7 @@ def expand(
     # stride should be 1 for all non-broadcasted dims
     stride = []
     input_tensor_shape = tuple(input_t.shape)
-    for i, o in zip(input_tensor_shape, shape):
+    for k, (i, o) in enumerate(zip(input_tensor_shape, shape)):
         # If input dim and target shape dim are static, broadcast if they are not equal
         # If input dim is known and target shape dim is dynamic we treat it as a broadcasted dim
         if (
@@ -326,6 +337,15 @@ def expand(
             stride.append(int(i == o))
         elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
             stride.append(0)
+        elif i == DYNAMIC_DIM and isinstance(o, int) and o != DYNAMIC_DIM:
+            # A runtime dim is either 1, and broadcasts, or already the target size.
+            size = get_shape(
+                ctx, target, source_ir, f"{name}_stride_dim{k}", input_t, k
+            )
+            is_full = impl.elementwise.gt(
+                ctx, target, source_ir, f"{name}_stride_gt{k}", size, 1
+            )
+            stride.append(cast_trt_tensor(ctx, is_full, trt.int32, f"{name}_stride{k}"))
         else:
             # No broadcasting is happening. The output should have the same size as input at this dimension.
             stride.append(1)
@@ -343,7 +363,7 @@ def expand(
 
     target_shape_t = target_shape
     # Handle dynamic shapes case where shape has dynamic dimension
-    if any(isinstance(ele, TRTTensor) for ele in target_shape_t):
+    if any(isinstance(ele, TRTTensor) for ele in (*target_shape_t, *stride)):
         target_shape_t = cat(
             ctx,
             target,

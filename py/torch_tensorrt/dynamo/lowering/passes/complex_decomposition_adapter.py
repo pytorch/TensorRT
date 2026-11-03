@@ -11,6 +11,8 @@ interior complex -> real expansion to PyTorch's ``decompose_complex_in_graph``
   1. capture the complex I/O signature before rewriting (drives the boundary
      adapters in ``_compiler._insert_complex_io_adapters``);
   2. call upstream to expand every complex op into real ops on separate re/im;
+     for dynamic inputs, use its wrapper with symbolic tracing to avoid
+     specializing dimensions in tensor factories such as ``arange(seq)``;
   3. put back what the retrace undid: upstream returns a module rebuilt from
      scratch, so the decomposition and constant-folding stages that ran earlier
      find their work partly reverted;
@@ -25,12 +27,15 @@ older torch (the upstream API only exists in torch>=2.14.0.dev), or if
 such as ``aten.log2``/``aten.log10`` as of torch 2.14.dev).
 """
 
+import gc
 import logging
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator, Optional
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
 from torch.fx import GraphModule
+from torch.fx.experimental.symbolic_shapes import free_symbols
 from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
@@ -40,6 +45,7 @@ from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import 
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.lowering.passes.remove_alias import remove_alias
 
 # Reuse the I/O-signature capture helpers already written for the legacy pass.
 from .complex_graph_rewrite import (
@@ -82,6 +88,7 @@ def complex_decomposition_adapter(
     # the unflatten step is silently skipped and callers get a raw tuple.
     original_in_spec = getattr(gm, "_in_spec", None)
     original_out_spec = getattr(gm, "_out_spec", None)
+    original_codegen = gm.graph._codegen
     if not complex_input_names and not complex_output_indices:
         # No complex I/O and no interior complex work -> nothing to do.  (Interior-
         # only complex still shows up via inputs/outputs of the complex region, so
@@ -96,17 +103,28 @@ def complex_decomposition_adapter(
 
     flat_args = _fake_flat_args(gm)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
+    # The retrace calls the module with flat positional args. Under the exported
+    # program's pytree codegen it would return the user's output structure, which
+    # make_fx records as built by the graph (a namedtuple becomes one node); under
+    # a plain codegen it returns the graph's flat outputs, which the original
+    # codegen then unflattens again.
+    gm.graph._codegen = torch.fx.graph.CodeGen()
+    gm.recompile()
+    decomposed_gm: Optional[GraphModule] = None
     try:
-        # NOTE: returns a new module -- assign to a fresh name so that on
-        # failure `gm` still refers to the original, untouched module (this
-        # call either fully succeeds or raises; it never partially mutates
-        # anything, since it builds a new GraphModule rather than editing
-        # the existing one in place).
-        decomposed_gm = decompose_complex_in_graph(
-            gm,
-            flat_args,
-            decompositions=_trt_decomposition_table(settings, gm),
+        # Both retraces return a new graph. Keep the original for the existing
+        # unsupported-op fallback rather than replacing it before success.
+        decompose = (
+            _decompose_complex_symbolically
+            if any(free_symbols(arg) for arg in flat_args)
+            else decompose_complex_in_graph
         )
+        with _offloaded_constants_on_device(gm) as offloaded:
+            decomposed_gm = decompose(
+                gm,
+                flat_args,
+                decompositions=_trt_decomposition_table(settings, gm),
+            )
     except Exception as e:
         # decompose_complex_in_graph is upstream, experimental PyTorch code
         # (torch._functorch._aot_autograd.complex_decomposition) with
@@ -119,8 +137,22 @@ def complex_decomposition_adapter(
             f"complex decomposition failed ({type(e).__name__}: {e}); "
             "falling back to the legacy complex_graph_detection pass."
         )
+    gm.graph._codegen = original_codegen  # the caller's module, as it was
+    gm.recompile()
+    if decomposed_gm is None:
+        # Not inside the except block: there the failed retrace's frames are still
+        # alive, and with them its device copies of the offloaded constants.
         return complex_graph_detection(gm, settings)
+    _restore_offloaded_constants(decomposed_gm, offloaded)
+    if offloaded:
+        # The retrace leaves the device copies in reference cycles. Free them now
+        # rather than holding them through the engine build.
+        gc.collect()
     gm = decomposed_gm
+
+    # The retrace brings back alias nodes. aten.alias has no converter, so the
+    # partitioner would split the graph around them.
+    gm = remove_alias(gm, settings)
 
     # (3) Fold constants again. The retrace builds the module from scratch, so
     #     a constant that the constant-folding stage had already reduced to one
@@ -142,7 +174,39 @@ def complex_decomposition_adapter(
         gm._in_spec = original_in_spec
     if original_out_spec is not None:
         gm._out_spec = original_out_spec
+    # The retrace returns a plain codegen (positional flat args); restore the
+    # exported program's, which takes the inputs by name
+    gm.graph._codegen = original_codegen
+    gm.recompile()
     return gm
+
+
+def _decompose_complex_symbolically(
+    gm: GraphModule, flat_args: list[Any], decompositions: dict[Any, Any]
+) -> GraphModule:
+    """Use upstream's complex dispatch with a symbolic make_fx retrace.
+
+    Upstream's entry point hardcodes real tracing, which specializes symbols in
+    factories such as arange(seq). Until it accepts a tracing mode, mirror its
+    wrapper here while keeping its dispatch and mutation checks. Sending dynamic
+    graphs to the legacy rewriter instead regresses complex operator correctness.
+    """
+    from torch._functorch._aot_autograd import complex_decomposition as upstream
+    from torch.fx.experimental.proxy_tensor import make_fx
+    from torch.utils import _pytree as pytree
+
+    upstream._assert_no_incorrect_aliasing_mutation(gm)
+
+    def wrapper(*args: Any) -> Any:
+        wrapped = tuple(upstream._maybe_wrap(arg) for arg in args)
+        with upstream.WrapComplexMode():
+            result = torch.fx.Interpreter(gm).run(*wrapped)
+        return pytree.tree_map(upstream._maybe_unwrap, result)
+
+    with torch.fx.traceback.preserve_node_meta():
+        return make_fx(
+            wrapper, decomposition_table=decompositions, tracing_mode="symbolic"
+        )(*flat_args)
 
 
 def _trt_decomposition_table(
@@ -154,16 +218,16 @@ def _trt_decomposition_table(
     it returns is built from whatever ``ComplexTensor`` dispatched to, not from
     the ops that survived the decomposition run at export time. Without a table
     that retrace re-introduces ops the flow has already decided to expand
-    (``aten.stack``) or to drop (``aten.alias``), long after the stage that
-    would have handled them, and the partitioner then cuts the graph around
-    them. Handing the retrace the same table keeps the two in step.
+    (``aten.stack``), long after the stage that would have handled them, and
+    the partitioner then cuts the graph around them. Handing the retrace the
+    same table keeps the two in step.
     """
     from torch_tensorrt.dynamo.lowering import (
         filter_decomposition_table,
         get_decompositions,
     )
 
-    return filter_decomposition_table(
+    decompositions: dict[Any, Any] = filter_decomposition_table(
         get_decompositions(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
@@ -172,6 +236,7 @@ def _trt_decomposition_table(
         ),
         graph_module,
     )
+    return decompositions
 
 
 def _graph_has_complex(gm: GraphModule) -> bool:
@@ -182,6 +247,54 @@ def _graph_has_complex(gm: GraphModule) -> bool:
         if val is not None and getattr(val, "dtype", None) in COMPLEX_DTYPES:
             return True
     return False
+
+
+@contextmanager
+def _offloaded_constants_on_device(
+    gm: GraphModule,
+) -> Iterator[dict[int, torch.Tensor]]:
+    """Hand the retrace each CPU-offloaded constant on the device it was computed on.
+
+    With offload_module_to_cpu, constant folding keeps the folded values on the CPU
+    while their metadata still records the device that computed them. The retrace
+    runs the graph, so a CPU constant next to device activations fails with a device
+    mismatch. Copy each such constant to its metadata device for the retrace only;
+    yields a map from the id of each copy to its CPU tensor, for
+    _restore_offloaded_constants.
+    """
+    swapped = {}
+    for node in gm.graph.nodes:
+        target = str(node.target)
+        if node.op != "get_attr" or not hasattr(gm, target):
+            continue
+        real, val = getattr(gm, target), node.meta.get("val", None)
+        if (
+            isinstance(real, torch.Tensor)
+            and isinstance(val, torch.Tensor)
+            and real.device != val.device
+        ):
+            swapped[target] = (real, real.to(val.device))
+    for target, (_, copy) in swapped.items():
+        delattr(gm, target)
+        setattr(gm, target, copy)
+    try:
+        yield {id(copy): real for real, copy in swapped.values()}
+    finally:
+        for target, (real, _) in swapped.items():
+            delattr(gm, target)
+            setattr(gm, target, real)
+
+
+def _restore_offloaded_constants(
+    gm: GraphModule, offloaded: dict[int, torch.Tensor]
+) -> None:
+    """Put the CPU tensors back wherever the retraced module kept a device copy."""
+    for node in gm.graph.nodes:
+        if node.op != "get_attr":
+            continue
+        real = offloaded.get(id(getattr(gm, str(node.target), None)))
+        if real is not None:
+            setattr(gm, str(node.target), real)
 
 
 def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:

@@ -142,10 +142,24 @@ def unified_dtype_converter(
         raise TypeError("%s is not a supported dtype" % dtype)
 
 
+def _module_occupies_cuda(module: torch.nn.Module) -> bool:
+    """True if any parameter or buffer still lives on CUDA."""
+    for tensor in module.parameters():
+        if tensor.is_cuda:
+            return True
+    for tensor in module.buffers():
+        if tensor.is_cuda:
+            return True
+    return False
+
+
 def deallocate_module(
     module: torch.nn.Module, release_every_bytes: int = 1 << 30
 ) -> None:
     """Move ``module``'s parameters and buffers to the CPU and release their GPU memory.
+
+    No-op when nothing is on CUDA, so a second call after compile() already
+    offloaded (and CPU-only compiles) skip the move, ``empty_cache``, and ``gc``.
 
     ``module.to("cpu")`` leaves every freed block in PyTorch's CUDA cache until it
     returns, so for the length of the move the process holds both the GPU and the CPU
@@ -153,6 +167,9 @@ def deallocate_module(
     Instead the cache is emptied each time ``release_every_bytes`` have moved, so the
     GPU copy shrinks as the CPU copy grows.
     """
+    if not torch.cuda.is_available() or not _module_occupies_cuda(module):
+        return
+
     moved_since_release = 0
 
     def to_cpu(t: torch.Tensor) -> torch.Tensor:
@@ -1055,10 +1072,11 @@ def get_cpu_memory_usage() -> Any:
 def release_host_and_device_memory() -> None:
     gc.collect()
     if torch.cuda.is_available():
+        # One sync so builder work has finished before empty_cache; a second
+        # sync after ipc_collect does not free extra blocks.
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
-        torch.cuda.synchronize()
 
     trim_host_heap()
 

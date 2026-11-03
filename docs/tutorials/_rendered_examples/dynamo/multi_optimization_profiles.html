@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,6 +474,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 <li class="toctree-l3"><a class="reference internal" href="cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
 <li class="toctree-l3"><a class="reference internal" href="ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="triton_op.html">Example: Triton Kernel AOT Plugins via triton_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cutile_op.html">Example: cuTile Kernel AOT Plugins via cutile_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -607,7 +609,8 @@ document.write(`
 </ul>
 <p>A single dynamic range <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">in</span> <span class="pre">[1,</span> <span class="pre">max]</span></code> works, but TensorRT can only tune kernels for <strong>one</strong> <code class="docutils literal notranslate"><span class="pre">opt</span></code> point. Tuning for the prefill length leaves decode (the latency-critical, most-frequently-executed phase) running on kernels picked for a sequence it never sees.</p>
 <p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input(profiles=[...])</span></code> declares <strong>N optimization profiles</strong> on a single input. The engine is built once (a single <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> over the union of all profiles), each profile gets its own TensorRT kernel tuning, and you select the active profile per call (by index, or <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>).</p>
-<p>This example compiles <a class="reference external" href="https://huggingface.co/google/gemma-3-1b-it">google/gemma-3-1b-it</a> <strong>twice</strong> – once with a single profile and once with separate prefill/decode profiles – and compares the decode and prefill latency of the two engines.</p>
+<p>This example compiles <a class="reference external" href="https://huggingface.co/google/gemma-3-1b-it">google/gemma-3-1b-it</a> <strong>once</strong> into a two-profile engine and then runs the same engine two ways: every call on the prefill profile (which accepts <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> as well) versus each phase on its own profile. One engine, one set of weights; the only difference is which profile is active when the call runs. What that isolates is what the <em>active profile</em> is worth, holding the engine fixed. It is not a stand-in for a separately
+compiled single-profile engine: that is a different build, and on the same A40 it makes decode look 1.14x faster rather than the 1.30x measured here. The two-engine pairing is in the <code class="docutils literal notranslate"><span class="pre">tutorial</span> <span class="pre">&lt;multi_optimization_profiles_tutorial&gt;</span></code>.</p>
 <div class="admonition note">
 <div class="admonition-title"><h4></div><p>Note</p>
 </h4><p><p><code class="docutils literal notranslate"><span class="pre">google/gemma-3-1b-it</span></code> is a <strong>gated</strong> model: you must accept its license on the Hugging Face Hub and authenticate (<code class="docutils literal notranslate"><span class="pre">hf</span> <span class="pre">auth</span> <span class="pre">login</span></code> or the <code class="docutils literal notranslate"><span class="pre">HF_TOKEN</span></code> environment variable) before running this example. It downloads ~2 GB of weights on first use and requires a CUDA GPU.</p>
@@ -618,7 +621,7 @@ document.write(`
 </p></div>
 <section id="Imports-and-Setup">
 <h2>Imports and Setup<a class="headerlink" href="#Imports-and-Setup" title="Link to this heading">#</a></h2>
-<p>The HuggingFace attention path needs a TensorRT-friendly SDPA lowering. The reusable LLM helpers <code class="docutils literal notranslate"><span class="pre">register_sdpa</span></code> (a Gemma-3-specific SDPA pass) and <code class="docutils literal notranslate"><span class="pre">export_llm</span></code> live under <code class="docutils literal notranslate"><span class="pre">tools/llm</span></code> in the Torch-TensorRT repo, so we add that directory to <code class="docutils literal notranslate"><span class="pre">sys.path</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">export_llm</span></code>, a reusable helper that traces a decoder over a dynamic sequence length, lives under <code class="docutils literal notranslate"><span class="pre">tools/llm</span></code> in the Torch-TensorRT repo, so we add that directory to <code class="docutils literal notranslate"><span class="pre">sys.path</span></code>.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -647,7 +650,7 @@ DECODE_IDX, PREFILL_IDX = 0, 1
 </section>
 <section id="Load-the-Model">
 <h2>Load the Model<a class="headerlink" href="#Load-the-Model" title="Link to this heading">#</a></h2>
-<p>Load with <code class="docutils literal notranslate"><span class="pre">use_cache=False</span></code> (this example recomputes over the full sequence rather than using a KV cache, which keeps the export simple) and the <code class="docutils literal notranslate"><span class="pre">sdpa</span></code> attention implementation, then register the Gemma-3 SDPA lowering pass.</p>
+<p>Load with <code class="docutils literal notranslate"><span class="pre">use_cache=False</span></code> (this example recomputes over the full sequence rather than using a KV cache, which keeps the export simple). The <code class="docutils literal notranslate"><span class="pre">sdpa</span></code> attention implementation makes HuggingFace emit <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code>, which Torch-TensorRT converts to a single TensorRT attention layer.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -667,9 +670,6 @@ DECODE_IDX, PREFILL_IDX = 0, 1
             .cuda()
             .to(torch.float16)
         )
-    from torchtrt_ext import register_sdpa
-
-    register_sdpa.enable_sdpa_converter(MODEL_ID, model.config)
     return model
 
 
@@ -696,7 +696,8 @@ def make_inputs(seq_len: int):
 <li><p>index <code class="docutils literal notranslate"><span class="pre">0</span></code> -&gt; <strong>decode</strong>: <code class="docutils literal notranslate"><span class="pre">seq</span></code> pinned to 1 (a fully static profile)</p></li>
 <li><p>index <code class="docutils literal notranslate"><span class="pre">1</span></code> -&gt; <strong>prefill</strong>: <code class="docutils literal notranslate"><span class="pre">seq</span></code> in <code class="docutils literal notranslate"><span class="pre">[1,</span> <span class="pre">MAX_SEQ]</span></code>, tuned at <code class="docutils literal notranslate"><span class="pre">PREFILL_SEQ</span></code></p></li>
 </ul>
-<p>Profile order matters for auto-selection: the profiles overlap at <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> and auto-selection picks the <em>first</em> profile whose <code class="docutils literal notranslate"><span class="pre">[min,</span> <span class="pre">max]</span></code> accepts the input, so declaring <code class="docutils literal notranslate"><span class="pre">decode</span></code> first lets it win the <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> overlap.</p>
+<p>Profile order matters for auto-selection, but only on a rescan. Auto-selection is sticky: it keeps the active profile whenever that profile still accepts the input (switching invalidates the captured CUDA graph and forces shape re-inference), and only when it does not does it rescan and take the <em>lowest</em> index that fits. So declaring <code class="docutils literal notranslate"><span class="pre">decode</span></code> first wins the <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> overlap on a rescan, but it does not claw <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> back from <code class="docutils literal notranslate"><span class="pre">prefill</span></code>: prefill’s range is <code class="docutils literal notranslate"><span class="pre">[1,</span> <span class="pre">MAX_SEQ]</span></code>, which
+still fits, so an alternating prefill/decode loop stays on prefill. Pin the profile (below) to make decode run under its own.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -717,9 +718,9 @@ multi_profile_inputs = [
 </div>
 </div>
 </section>
-<section id="Export-Once,-Compile-Twice">
-<h2>Export Once, Compile Twice<a class="headerlink" href="#Export-Once,-Compile-Twice" title="Link to this heading">#</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">export_llm</span></code> traces the model over a dynamic <code class="docutils literal notranslate"><span class="pre">seq</span></code> range. We reuse the exported program for both the single-profile baseline (tuned at the prefill length, the conventional choice) and the multi-profile engine.</p>
+<section id="Export-Once,-Compile-Once">
+<h2>Export Once, Compile Once<a class="headerlink" href="#Export-Once,-Compile-Once" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">export_llm</span></code> traces the model over a dynamic <code class="docutils literal notranslate"><span class="pre">seq</span></code> range, and one compile turns that into one engine holding both profiles. There is no second compile: the prefill profile already accepts <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code>, so pinning every call to it is the comparison point, and both sides of the measurement below then share one engine and one set of weights.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -730,26 +731,18 @@ example_ids, _ = make_inputs(PREFILL_SEQ)
 with torch.inference_mode():
     exported = export_llm(model, example_ids, min_seq_len=1, max_seq_len=MAX_SEQ)
 
+print("Compiling multi-profile engine (decode + prefill) ...")
 # ``offload_module_to_cpu`` must stay False here: it is currently incompatible
 # with the multi-profile ``Input(profiles=...)`` path (CPU/CUDA device mismatch).
-common = dict(
+trt_model = torch_tensorrt.dynamo.compile(
+    exported,
+    arg_inputs=multi_profile_inputs,
     use_fp32_acc=True,
     disable_tf32=True,
     offload_module_to_cpu=False,
     min_block_size=1,
     require_full_compilation=True,
     device=DEVICE,
-)
-
-print("Compiling single-profile engine (tuned at prefill length) ...")
-bench_ids, bench_pos = make_inputs(PREFILL_SEQ)
-trt_single = torch_tensorrt.dynamo.compile(
-    exported, inputs=[bench_ids, bench_pos], **common
-)
-
-print("Compiling multi-profile engine (decode + prefill) ...")
-trt_multi = torch_tensorrt.dynamo.compile(
-    exported, arg_inputs=multi_profile_inputs, **common
 )
 </pre></div>
 </div>
@@ -775,10 +768,10 @@ with torch.inference_mode():
     ref_decode = logits(model(decode_ids, position_ids=decode_pos))
     ref_prefill = logits(model(prefill_ids, position_ids=prefill_pos))
 
-    with optimization_profile(trt_multi, DECODE_IDX):
-        trt_decode = logits(trt_multi(decode_ids, decode_pos))
-    with optimization_profile(trt_multi, PREFILL_IDX):
-        trt_prefill = logits(trt_multi(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, DECODE_IDX):
+        trt_decode = logits(trt_model(decode_ids, decode_pos))
+    with optimization_profile(trt_model, PREFILL_IDX):
+        trt_prefill = logits(trt_model(prefill_ids, prefill_pos))
 
 
 def top1_match(a, b):
@@ -793,7 +786,7 @@ print(f"prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_prefill
 </section>
 <section id="Latency-Comparison">
 <h2>Latency Comparison<a class="headerlink" href="#Latency-Comparison" title="Link to this heading">#</a></h2>
-<p>Time each regime on each engine. For the multi-profile engine we pin the matching profile around the loop (the realistic serving pattern). We report the min over several rounds to reduce noise.</p>
+<p>Decode is timed twice against the one engine: once on the prefill profile and once on its own. The profile is pinned around the whole loop rather than per call, which is the realistic serving pattern and keeps profile switches out of the measurement. We report the min over several rounds to reduce noise.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -813,30 +806,28 @@ print(f"prefill top-1 token match vs eager: {top1_match(trt_prefill, ref_prefill
 
 
 with torch.inference_mode():
-    single_decode = benchmark(lambda: trt_single(decode_ids, decode_pos))
-    single_prefill = benchmark(lambda: trt_single(prefill_ids, prefill_pos))
-    with optimization_profile(trt_multi, DECODE_IDX):
-        multi_decode = benchmark(lambda: trt_multi(decode_ids, decode_pos))
-    with optimization_profile(trt_multi, PREFILL_IDX):
-        multi_prefill = benchmark(lambda: trt_multi(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, PREFILL_IDX):
+        decode_on_prefill = benchmark(lambda: trt_model(decode_ids, decode_pos))
+        prefill_on_prefill = benchmark(lambda: trt_model(prefill_ids, prefill_pos))
+    with optimization_profile(trt_model, DECODE_IDX):
+        decode_on_decode = benchmark(lambda: trt_model(decode_ids, decode_pos))
 </pre></div>
 </div>
 </div>
-<p>Results. Decode is the win: the multi-profile engine dedicates a <em>static</em> profile (<code class="docutils literal notranslate"><span class="pre">seq</span></code> pinned to 1) to decode, so TensorRT specializes that path instead of serving it from kernels tuned for the long prefill length. Prefill is unchanged (both engines tune it at the same <code class="docutils literal notranslate"><span class="pre">opt</span></code>).</p>
+<p>Results. Decode is the win: the decode profile pins <code class="docutils literal notranslate"><span class="pre">seq</span></code> to 1, so TensorRT specializes that path instead of serving it from kernels tuned for the long prefill length. Prefill appears once because the decode profile does not accept a 128-token input at all – prefill has only one profile it can run on, so it is the same call in both scenarios.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print("\nPer-call latency (ms), batch=1")
-print(f"{'regime':&lt;20}{'single-profile':&gt;16}{'multi-profile':&gt;16}{'speedup':&gt;10}")
-print("-" * 62)
+print(f"{'call':&lt;24}{'active profile':&gt;18}{'ms':&gt;10}")
+print("-" * 52)
+print(f"{f'decode (seq={DECODE_SEQ})':&lt;24}{'prefill':&gt;18}{decode_on_prefill:&gt;10.3f}")
+print(f"{f'decode (seq={DECODE_SEQ})':&lt;24}{'decode':&gt;18}{decode_on_decode:&gt;10.3f}")
+print(f"{f'prefill (seq={PREFILL_SEQ})':&lt;24}{'prefill':&gt;18}{prefill_on_prefill:&gt;10.3f}")
 print(
-    f"{f'decode (seq={DECODE_SEQ})':&lt;20}{single_decode:&gt;16.3f}"
-    f"{multi_decode:&gt;16.3f}{single_decode / multi_decode:&gt;9.2f}x"
-)
-print(
-    f"{f'prefill (seq={PREFILL_SEQ})':&lt;20}{single_prefill:&gt;16.3f}"
-    f"{multi_prefill:&gt;16.3f}{single_prefill / multi_prefill:&gt;9.2f}x"
+    f"\nGiving decode its own profile: {decode_on_prefill / decode_on_decode:.2f}x "
+    f"faster per token ({decode_on_prefill - decode_on_decode:+.3f} ms)"
 )
 </pre></div>
 </div>
@@ -847,7 +838,8 @@ print(
 <ul class="simple">
 <li><p>Declare <code class="docutils literal notranslate"><span class="pre">N</span></code> profiles on an <code class="docutils literal notranslate"><span class="pre">Input</span></code> with <code class="docutils literal notranslate"><span class="pre">profiles=[{min_shape,</span> <span class="pre">opt_shape,</span> <span class="pre">max_shape},</span> <span class="pre">...]</span></code> (one per dynamic model input – here <code class="docutils literal notranslate"><span class="pre">input_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">position_ids</span></code>).</p></li>
 <li><p>One export + one engine; each profile gets its own TensorRT kernel tuning.</p></li>
-<li><p>Select at runtime by <strong>index</strong> (<code class="docutils literal notranslate"><span class="pre">optimization_profile(m,</span> <span class="pre">i)</span></code>) or let <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> pick the first profile that fits the input shapes.</p></li>
+<li><p>A profile whose range covers the other regime is the comparison point: pinning every call to the prefill profile isolates what the active profile is worth on one engine. A separately compiled single-profile engine is a different build and lands elsewhere – see the tutorial for that pairing.</p></li>
+<li><p>Select at runtime by <strong>index</strong> (<code class="docutils literal notranslate"><span class="pre">optimization_profile(m,</span> <span class="pre">i)</span></code>) or with <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>, which keeps the active profile while it still fits and rescans from index 0 only once it does not.</p></li>
 <li><p>Dedicating a static <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> profile to decode lets TensorRT tune that latency-critical path independently of the prefill length.</p></li>
 </ul>
 <div class="nbinput nblast docutils container">
@@ -910,7 +902,7 @@ print(
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Imports-and-Setup">Imports and Setup</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Load-the-Model">Load the Model</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Declaring-the-Optimization-Profiles">Declaring the Optimization Profiles</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Export-Once,-Compile-Twice">Export Once, Compile Twice</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Export-Once,-Compile-Once">Export Once, Compile Once</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Correctness">Correctness</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Latency-Comparison">Latency Comparison</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#Summary">Summary</a></li>

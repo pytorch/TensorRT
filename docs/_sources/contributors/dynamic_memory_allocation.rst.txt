@@ -20,9 +20,10 @@ resident GPU memory can exceed the device limit even if each module runs
 sequentially.
 
 The solution is **dynamic memory allocation**: instead of allocating device memory
-for an engine when it is loaded, allocation is deferred to execution time. The
-memory is released immediately after inference completes, so only one engine holds
-GPU activation memory at a time.
+for an engine when it is loaded, allocation is deferred to execution time. In the
+C++ runtime, the memory is released when the call returns, so engines that run one
+after another do not hold activation memory at the same time. See Limitations for
+the cases that keep memory between calls.
 
 User API
 ---------
@@ -46,9 +47,9 @@ Two strategies are available:
 
 * ``"static"`` (default) — device memory is allocated when the engine is loaded
   (via ``createExecutionContext``). Memory is held for the lifetime of the engine.
-* ``"dynamic"`` — device memory is allocated on each forward pass
+* ``"dynamic"`` — device memory is allocated at execution time instead of load time
   (via ``createExecutionContextWithoutDeviceMemory`` + manual device-memory
-  assignment), and released immediately after the call returns.
+  assignment). See Limitations for how long each runtime keeps it.
 
 Internal Implementation
 ------------------------
@@ -89,7 +90,7 @@ During ``execute_engine``, when dynamic allocation is active, a temporary
             exec_ctx_->setDeviceMemory(dynamic_workspace.data_ptr());
         }
         // ... run inference ...
-        // dynamic_workspace freed here (goes out of scope)
+        // dynamic_workspace is freed here, unless a captured CUDA graph keeps it
     }
 
 Python Exposure
@@ -107,6 +108,11 @@ Limitations
   engine is idle.
 * The per-inference allocation/free overhead is small but non-zero; avoid dynamic
   allocation for latency-critical paths where ``static`` would fit in memory.
+* With CUDA graphs on, the C++ runtime keeps an engine's memory for as long as its
+  captured graph, because a replay writes to the memory the graph was recorded with.
+* The Python runtime keeps each engine's memory from its last call, with or without
+  CUDA graphs, until a later call replaces it or a settings change drops it.
+* So in both cases, several engines can hold their memory at the same time.
 
 Related
 -------

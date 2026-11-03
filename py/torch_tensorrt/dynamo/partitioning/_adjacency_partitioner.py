@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+from collections import defaultdict, deque
 from typing import Collection, Dict, List, Optional, Set, Tuple
 
 import torch
@@ -10,6 +11,7 @@ from torch.fx.node import Target
 from torch.fx.passes.splitter_base import (
     FxNetAccFusionsFinder,
     FxNetAccNodesFinder,
+    FxNetSplitterInternalError,
     Subgraph,
     _SplitterBase,
     _SplitterSettingBase,
@@ -411,6 +413,67 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         }
 
         return starter_non_acc_nodes, starter_acc_nodes
+
+    def put_nodes_into_subgraphs(self) -> List[Subgraph]:
+        """Builds the same subgraphs as _SplitterBase.put_nodes_into_subgraphs
+
+        starter_nodes puts every callable node in the frontier, and the base
+        class can rescan that whole frontier for a ready node at every step,
+        which is quadratic on large graphs. Counting the unplaced dependencies
+        of each node finds ready nodes in time proportional to the nodes plus
+        their dependency entries. Each subgraph still takes every node of its
+        kind whose dependencies are placed, so the node sets match. Fusion
+        groups need no extra step: every callable node is counted from the
+        start, and their constraints are already in deps.
+        """
+        pending = {
+            node: len(self.deps[node])
+            for node in self.module.graph.nodes
+            if node.op in CALLABLE_NODE_OPS
+        }
+        dependents: Dict[torch.fx.Node, List[torch.fx.Node]] = defaultdict(list)
+        for node in pending:
+            for dep in self.deps[node]:
+                dependents[dep].append(node)
+
+        ready = {
+            is_acc: deque(
+                node
+                for node, count in pending.items()
+                if count == 0 and (node in self.acc_nodes) == is_acc
+            )
+            for is_acc in (False, True)
+        }
+        acc_subgraph = not ready[False]
+        current_subgraph_nodes: List[torch.fx.Node] = []
+        subgraphs: List[Subgraph] = []
+        remaining = len(pending)
+        while remaining:
+            if not ready[acc_subgraph]:
+                if not current_subgraph_nodes:
+                    raise FxNetSplitterInternalError("Subgraph can't be empty")
+                subgraphs.append(
+                    Subgraph(is_acc=acc_subgraph, nodes=current_subgraph_nodes)
+                )
+                acc_subgraph = not acc_subgraph
+                current_subgraph_nodes = []
+                continue
+
+            node = ready[acc_subgraph].popleft()
+            current_subgraph_nodes.append(node)
+            remaining -= 1
+            for user in dependents[node]:
+                pending[user] -= 1
+                if pending[user] == 0:
+                    ready[user in self.acc_nodes].append(user)
+
+        if current_subgraph_nodes:
+            subgraphs.append(
+                Subgraph(is_acc=acc_subgraph, nodes=current_subgraph_nodes)
+            )
+        if not subgraphs:
+            raise FxNetSplitterInternalError("Couldn't create subgraphs")
+        return subgraphs
 
 
 def partition(
