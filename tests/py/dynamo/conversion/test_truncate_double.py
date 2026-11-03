@@ -183,6 +183,62 @@ class TestTruncateDoubleMetadata(TestCase):
         self.assertEqual(engine_node.meta["val"].dtype, torch.float32)
         self.assertEqual(casts[0].meta["val"].dtype, torch.float64)
 
+    def test_input_dtypes_are_read_without_copying_the_inputs(self):
+        tensor32 = torch.empty((2, 3), dtype=torch.float32)
+        tensor64 = torch.empty((2, 3), dtype=torch.float64)
+        values = [tensor32, tensor64, 2]
+
+        subgraph = torch.fx.Graph()
+        inputs = [subgraph.placeholder(name) for name in ("x", "y", "n")]
+        for node, value in zip(inputs, values):
+            node.meta["val"] = value
+        output = subgraph.call_function(
+            torch.ops.aten.add.Tensor, args=tuple(inputs[:2])
+        )
+        output.meta["val"] = tensor64
+        subgraph.output(output)
+        submodule = torch.fx.GraphModule({}, subgraph)
+
+        root = nn.Module()
+        root.add_module("run_on_acc_0", submodule)
+        parent_graph = torch.fx.Graph()
+        parent_inputs = [parent_graph.placeholder(name) for name in ("x", "y", "n")]
+        for node, value in zip(parent_inputs, values):
+            node.meta["val"] = value
+        engine_node = parent_graph.call_module(
+            "run_on_acc_0", args=tuple(parent_inputs)
+        )
+        engine_node.meta["val"] = tensor64
+        parent_graph.output(engine_node)
+        parent = torch.fx.GraphModule(root, parent_graph)
+
+        # Meta tensors have no data, so copying one to another device raises. The size
+        # input is a shape tensor, whose example used to come back as a Python int.
+        input_specs = [
+            Input((2, 3), dtype=torch.float32, torch_tensor=tensor32.to("meta")),
+            Input((2, 3), dtype=torch.float64, torch_tensor=tensor64.to("meta")),
+            Input(
+                min_shape=(1,),
+                opt_shape=(2,),
+                max_shape=(8,),
+                dtype=torch.int64,
+                is_shape_tensor=True,
+            ),
+        ]
+        repaired = repair_double_inputs(
+            parent, submodule, input_specs, torch.device("cpu"), "run_on_acc_0"
+        )
+
+        self.assertEqual(
+            [spec.dtype for spec in repaired],
+            [dtype.float32, dtype.float32, dtype.int64],
+        )
+        self.assertEqual(
+            [spec.torch_tensor.device.type for spec in repaired[:2]], ["meta"] * 2
+        )
+        self.assertEqual(repaired[1].torch_tensor.dtype, torch.float32)
+        self.assertEqual(engine_node.args[1].kwargs["dtype"], torch.float32)
+
     def test_symbolic_shape_metadata_uses_truncated_binding_dtype(self):
         _, submodule, _ = self._make_graphs(with_scalar_output=True)
 

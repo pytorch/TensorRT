@@ -10,7 +10,7 @@ import torch
 from torch.fx.node import _get_qualified_name
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo.utils import get_output_metadata, get_torch_inputs
+from torch_tensorrt.dynamo.utils import get_output_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -213,12 +213,11 @@ def repair_double_inputs(
         parent_graph: FX GraphModule enclosing the TRT subgraph
         submodule: Child submodule to repair inputs on
         submodule_inputs: Input tensor(s) of TRT-accelerated subgraph (used for dtypes/structure)
+        device: Unused. The inputs are no longer copied to the device to read their dtypes.
         submodule_name: Optionally specify the name of the submodule target in the parent graph
     Returns:
         New submodule inputs, updated for float64 truncation
     """
-    submodule_torch_inputs = get_torch_inputs(submodule_inputs, device)
-    num_submodule_inputs = len(submodule_inputs)
     name = submodule_name if submodule_name is not None else submodule._get_name()
     output_node = next(node for node in submodule.graph.nodes if node.op == "output")
     is_collection_output = isinstance(output_node.args[0], (tuple, list))
@@ -227,31 +226,18 @@ def repair_double_inputs(
     ]
     submodule_output_metadata = get_output_metadata(submodule)
 
-    # For each input to the TRT subgraph, check if its type is double.
-    for position in range(num_submodule_inputs):
-        param = submodule_torch_inputs[position]
+    # Read each input's dtype where its example tensor already is. Copying them all to the
+    # device just to read their dtypes can take many GiB on a large model.
+    for position, submodule_input in enumerate(submodule_inputs):
+        example = submodule_input.torch_tensor
+        if example.dtype != torch.float64:
+            continue
 
-        if isinstance(param, torch.Tensor) and param.dtype == torch.float64:
-            _repair_64bit_input(
-                parent_graph, position, name, submodule_input_metadata[position]
-            )
-
-            # Repair submodule inputs in accordance with inserted casts
-            dtype_32bit = torch.float32
-            submodule_torch_inputs = (
-                list(submodule_torch_inputs[:position])
-                + [
-                    param.to(dtype_32bit),
-                ]
-                + list(submodule_torch_inputs[position + 1 :])
-            )
-
-            # Set the 32bit inputs and their types to the submodule Inputs
-            for idx in range(len(submodule_inputs)):
-                submodule_inputs[idx].torch_tensor = submodule_torch_inputs[idx]
-                submodule_inputs[idx].dtype = dtype._from(
-                    submodule_torch_inputs[idx].dtype
-                )
+        _repair_64bit_input(
+            parent_graph, position, name, submodule_input_metadata[position]
+        )
+        submodule_input.torch_tensor = example.to(torch.float32)
+        submodule_input.dtype = dtype._from(torch.float32)
 
     # A partition can have a float64 output (e.g. from a float64 weight) even
     # when no runtime input was float64, so this runs unconditionally.
