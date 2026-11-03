@@ -138,6 +138,7 @@ def cross_compile_for_windows(
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
@@ -231,6 +232,7 @@ def cross_compile_for_windows(
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
     Returns:
@@ -391,6 +393,7 @@ def cross_compile_for_windows(
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
 
@@ -532,6 +535,7 @@ def compile(
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     build_route: Optional[str] = _defaults.BUILD_ROUTE,
     tune_build_routes: Optional[str] = _defaults.TUNE_BUILD_ROUTES,
@@ -648,6 +652,7 @@ def compile(
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -854,6 +859,7 @@ def compile(
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
         "build_route": build_route,
         "tune_build_routes": tune_build_routes,
@@ -2013,6 +2019,7 @@ def convert_exported_program_to_serialized_trt_engine(
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
     fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
     kwarg_input_binding_names: Any = None,
@@ -2127,6 +2134,7 @@ def convert_exported_program_to_serialized_trt_engine(
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -2302,6 +2310,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
         "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
     }
 
     settings = CompilationSettings(**compilation_options)
