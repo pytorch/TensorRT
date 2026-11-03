@@ -25,7 +25,11 @@ def _native_creator(name: str, namespace: str) -> Any:
     import tensorrt as trt
 
     for creator in trt.get_plugin_registry().all_creators:
-        if creator.name == name and creator.plugin_namespace == namespace and creator.plugin_version == "1":
+        if (
+            creator.name == name
+            and creator.plugin_namespace == namespace
+            and creator.plugin_version == "1"
+        ):
             return creator
     return None
 
@@ -73,7 +77,6 @@ def _snapshot_qdp_registration(op_name: str) -> _QDPRegistrationState:
     """Capture the exact slots ``custom_op`` may mutate for ``op_name``."""
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -123,7 +126,6 @@ def _rollback_qdp_registration(op_name: str, state: _QDPRegistrationState) -> No
     import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
