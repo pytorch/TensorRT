@@ -33,7 +33,6 @@ import logging
 import re
 import struct
 import subprocess
-from math import prod
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -44,7 +43,6 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    cast,
 )
 
 import torch
@@ -338,15 +336,12 @@ def make_dtype_capability_validator(
     user_validator: Optional[Callable[..., bool]] = None,
 ) -> Callable[..., bool]:
     """Require tensor metadata matching every compiled cuTile array."""
-    return cast(
-        Callable[..., bool],
-        _common.make_dtype_capability_validator(
-            op_name,
-            "cuTile",
-            [param.dtype for param in layout.inputs],
-            [param.dtype for param in layout.outputs],
-            user_validator,
-        ),
+    return _common.make_dtype_capability_validator(
+        op_name,
+        "cuTile",
+        [param.dtype for param in layout.inputs],
+        [param.dtype for param in layout.outputs],
+        user_validator,
     )
 
 
@@ -389,20 +384,10 @@ def cutile_param_order(layout: SignatureLayout) -> Tuple[int, ...]:
 
 _ELF_MAGIC = b"\x7fELF"
 
-_ENTRY_RE = re.compile(
-    r"((?:(?:\.(?:visible|weak))\s+)?\.entry\s+([\w$%]+)\s*\()([^)]*)(\))",
-    re.DOTALL,
-)
-_PTX_INT = r"(?:0[xX][0-9a-fA-F]+|0[bB][01]+|0[0-7]*|[1-9]\d*)"
-_REQNTID_RE = re.compile(
-    rf"\.reqntid\s+({_PTX_INT})(?:\s*,\s*({_PTX_INT}))?"
-    rf"(?:\s*,\s*({_PTX_INT}))?(?![A-Za-z0-9_])"
-)
 _UNSUPPORTED_LAUNCH_RE = re.compile(
     r"\.(?:maxntid|explicitcluster|reqnctapercluster|maxclusterrank)\b"
 )
 _PTX_VERSION_RE = re.compile(r"\.version\s+(\d+)\.(\d+)")
-_PTX_COMMENT_RE = re.compile(r"//[^\r\n]*|/\*.*?\*/", re.DOTALL)
 
 
 def _elf_section(cubin: bytes, wanted: bytes) -> Optional[bytes]:
@@ -497,36 +482,18 @@ def extract_ptx_from_cubin(cubin: bytes) -> Optional[str]:
     return "\n".join(line for line in text.splitlines() if line.strip()) + "\n"
 
 
-ParsedEntry = Tuple[Optional["re.Match[str]"], str, List[str]]
-
-
-def _mask_ptx_comments(ptx: str) -> str:
-    """Hide comments without changing offsets used to rewrite the source."""
-    return _PTX_COMMENT_RE.sub(lambda match: " " * len(match.group()), ptx)
-
-
-def parse_entry(ptx: str) -> ParsedEntry:
-    """``(match, kernel name, params)`` for one unambiguous PTX entry."""
-    matches = list(_ENTRY_RE.finditer(_mask_ptx_comments(ptx)))
-    if len(matches) != 1:
-        return None, "", []
-    match = matches[0]
-    params = [p.strip() for p in match.group(3).split(",") if p.strip()]
-    return match, match.group(2), params
-
-
 def reorder_entry_params(
-    ptx: str, order: Sequence[int], parsed: Optional[ParsedEntry] = None
+    ptx: str, order: Sequence[int], parsed: Optional[_common.ParsedEntry] = None
 ) -> str:
     """Permute the ``.entry`` parameter declarations so slot ``i`` holds ``order[i]``.
 
     Only the declaration list is rewritten; the body keeps referring to each
     parameter by its own name, so moving the declarations is what changes which
     incoming argument each name binds to. ``parsed`` reuses an earlier
-    :func:`parse_entry` result rather than re-scanning the whole module.
+    :func:`_common.parse_entry` result rather than re-scanning the whole module.
     """
     if parsed is None:
-        parsed = parse_entry(ptx)
+        parsed = _common.parse_entry(ptx)
     match, _name, params = parsed
     if match is None:
         raise RuntimeError(
@@ -550,45 +517,10 @@ def reorder_entry_params(
     )
 
 
-def parse_reqntid(ptx: str) -> Optional[Tuple[int, int, int]]:
-    """The ``.reqntid`` (required threads per CTA) a cuTile kernel declares.
-
-    cuTile vectorizes (e.g. ``f32x2``), so the thread count is often smaller
-    than the tile size; the kernel must be launched with exactly this many
-    threads or it traps.
-    """
-    uncommented = _mask_ptx_comments(ptx)
-    entry, _, _ = parse_entry(uncommented)
-    if entry is None:
-        return None
-    body_start = uncommented.find("{", entry.end())
-    if body_start < 0:
-        return None
-    matches = list(_REQNTID_RE.finditer(uncommented, entry.end(), body_start))
-    if len(matches) != 1:
-        return None
-    match = matches[0]
-    x, y, z = match.groups()
-
-    def _ptx_int(value: Optional[str]) -> int:
-        text = value or "1"
-        if text.lower().startswith("0x"):
-            base = 16
-        elif text.lower().startswith("0b"):
-            base = 2
-        elif len(text) > 1 and text.startswith("0"):
-            base = 8
-        else:
-            base = 10
-        return int(text, base)
-
-    return _ptx_int(x), _ptx_int(y), _ptx_int(z)
-
-
 def unsupported_launch_directive(ptx: str) -> Optional[str]:
     """Return a PTX launch contract this frontend cannot represent, if any."""
-    uncommented = _mask_ptx_comments(ptx)
-    entry, _, _ = parse_entry(uncommented)
+    uncommented = _common.mask_ptx_comments(ptx)
+    entry, _, _ = _common.parse_entry(uncommented)
     if entry is None:
         return None
     body_start = uncommented.find("{", entry.end())
@@ -600,7 +532,7 @@ def unsupported_launch_directive(ptx: str) -> Optional[str]:
 
 def parse_ptx_version(ptx: str) -> Optional[int]:
     """``.version 9.3`` -> ``93``, the encoding used for ISA comparisons."""
-    match = _PTX_VERSION_RE.search(_mask_ptx_comments(ptx))
+    match = _PTX_VERSION_RE.search(_common.mask_ptx_comments(ptx))
     if match is None:
         return None
     return int(match.group(1)) * 10 + int(match.group(2))
@@ -620,7 +552,7 @@ def cap_ptx_version(ptx: str, max_version: int) -> str:
 
 def set_ptx_version(ptx: str, version: int) -> str:
     """Rewrite the ``.version`` header, e.g. ``90`` -> ``.version 9.0``."""
-    match = _PTX_VERSION_RE.search(_mask_ptx_comments(ptx))
+    match = _PTX_VERSION_RE.search(_common.mask_ptx_comments(ptx))
     if match is None:
         return ptx
     replacement = f".version {version // 10}.{version % 10}"
@@ -708,28 +640,6 @@ def validate_cutile_toolchain(op_name: str) -> Tuple[int, int]:
     return driver
 
 
-def _load_ptx(ptx: str, kernel_name: str) -> Any:
-    """Ask the driver to JIT the module and resolve its expected entry."""
-    try:
-        from cuda.bindings import driver as cuda
-    except ImportError:  # cuda-python < 12.8
-        from cuda import cuda
-
-    # cuModuleLoadData needs a current context. Asking PyTorch for its current
-    # stream establishes the primary context without allocating a tensor.
-    torch.cuda.init()
-    torch.cuda.current_stream()
-
-    err, module = cuda.cuModuleLoadData(ptx.encode("utf-8"))
-    if err != cuda.CUresult.CUDA_SUCCESS:
-        return err
-    try:
-        err, _function = cuda.cuModuleGetFunction(module, kernel_name.encode())
-    finally:
-        cuda.cuModuleUnload(module)
-    return err
-
-
 def verify_driver_accepts_ptx(op_name: str, kernel_name: str, ptx: str) -> None:
     """Fail unless the running driver JITs the exact PTX that will be embedded.
 
@@ -751,7 +661,7 @@ def verify_driver_accepts_ptx(op_name: str, kernel_name: str, ptx: str) -> None:
         from cuda import cuda
 
     try:
-        err = _load_ptx(ptx, kernel_name)
+        err = _common.load_ptx(ptx, kernel_name)
     except Exception as exc:  # pragma: no cover - environment dependent
         raise RuntimeError(
             f"cutile_op '{op_name}' could not verify the PTX for kernel "
@@ -927,10 +837,10 @@ def compile_cutile_to_ptx(
             f"cutile_op '{op_name}': expected PTX ISA 9.2+ from CUDA Toolkit "
             "13.2+. Select matching CUDA 13.2+ compiler components."
         )
-    parsed = parse_entry(ptx)
+    parsed = _common.parse_entry(ptx)
     _, kernel_name, params = parsed
     if not kernel_name:
-        entry_count = len(list(_ENTRY_RE.finditer(ptx)))
+        entry_count = len(list(_common.ENTRY_RE.finditer(ptx)))
         raise RuntimeError(
             f"cutile_op '{op_name}': expected exactly one compiled PTX '.entry' "
             f"declaration, found {entry_count}; its parameters cannot be matched "
@@ -965,7 +875,7 @@ def compile_cutile_to_ptx(
             f"directive {unsupported}, which this frontend cannot represent. "
             "Refusing a launch whose requirements would be silently ignored."
         )
-    reqntid = parse_reqntid(ptx)
+    reqntid = _common.parse_reqntid(ptx)
     _LOGGER.debug(
         "Compiled cuTile kernel '%s' -> PTX (%d bytes, reqntid=%s)",
         kernel_name,
@@ -1084,36 +994,6 @@ def build_extra_args(
     return _common.pack_symint32_args(values, trtp)
 
 
-def _normalize_block_dims(op_name: str, block_size: Any) -> Tuple[int, int, int]:
-    """Validate a static CUDA block size and normalize it to three dimensions."""
-    if isinstance(block_size, bool):
-        dims: Tuple[Any, ...] = (block_size,)
-    elif isinstance(block_size, int):
-        dims = (block_size,)
-    elif isinstance(block_size, Sequence) and not isinstance(
-        block_size, (str, bytes, bytearray)
-    ):
-        dims = tuple(block_size)
-    else:
-        dims = (block_size,)
-
-    if not 1 <= len(dims) <= 3 or any(
-        isinstance(dim, bool) or not isinstance(dim, int) or dim <= 0 for dim in dims
-    ):
-        raise ValueError(
-            f"cutile_op '{op_name}' block_size must contain 1 to 3 positive "
-            f"integers; got {block_size!r}."
-        )
-    padded = tuple(dims) + (1,) * (3 - len(dims))
-    limits = (1024, 1024, 64)
-    if any(dim > limit for dim, limit in zip(padded, limits)) or prod(padded) > 1024:
-        raise ValueError(
-            f"cutile_op '{op_name}' block_size {block_size!r} exceeds CUDA's "
-            "per-dimension or 1024 threads-per-block limit."
-        )
-    return int(padded[0]), int(padded[1]), int(padded[2])
-
-
 def resolve_block_dims(
     op_name: str,
     kernel_name: str,
@@ -1132,11 +1012,13 @@ def resolve_block_dims(
                 ".reqntid, so the threads-per-block cannot be derived. Pass "
                 "block_size= explicitly."
             )
-        return _normalize_block_dims(op_name, block_size)
+        return _common.normalize_block_dims(op_name, block_size, frontend="cutile_op")
 
-    required = _normalize_block_dims(op_name, reqntid)
+    required = _common.normalize_block_dims(op_name, reqntid, frontend="cutile_op")
     requested = (
-        None if block_size is None else _normalize_block_dims(op_name, block_size)
+        None
+        if block_size is None
+        else _common.normalize_block_dims(op_name, block_size, frontend="cutile_op")
     )
     if requested is not None and requested != required:
         raise ValueError(
@@ -1148,44 +1030,13 @@ def resolve_block_dims(
 
 
 def validate_launch_grid(op_name: str, value: Any) -> Tuple[Any, ...]:
-    """Validate a concrete or symbolic CUDA launch grid."""
-    dims = tuple(value) if isinstance(value, (tuple, list)) else (value,)
-    if not 1 <= len(dims) <= 3:
-        raise ValueError(
-            f"cutile_op '{op_name}' grid returned {len(dims)} dimension(s); "
-            "TensorRT launches accept 1 to 3."
+    try:
+        return _common.validate_launch_grid(
+            op_name, value, frontend="cutile_op", trtp=_trtp()
         )
-
-    trtp = _trtp()
-    import tensorrt as trt
-
-    symint32 = getattr(trtp, "SymInt32", None)
-    symint_expr = getattr(symint32, "__base__", None)
-    symbolic_types = tuple(
-        cls
-        for cls in (symint32, symint_expr, getattr(trt, "IDimensionExpr", None))
-        if isinstance(cls, type) and cls is not object
-    )
-    limits = (2**31 - 1, 65535, 65535)
-    for index, (dim, limit) in enumerate(zip(dims, limits)):
-        constant = _common.constant_int(dim)
-        if isinstance(dim, bool):
-            valid = False
-        elif constant is not None:
-            valid = 1 <= constant <= limit
-        else:
-            valid = bool(symbolic_types) and isinstance(dim, symbolic_types)
-        if not valid:
-            try:
-                shown = repr(dim) if constant is None else repr(constant)
-            except Exception:  # pragma: no cover - defensive for TRT wrappers
-                shown = type(dim).__name__
-            raise ValueError(
-                f"cutile_op '{op_name}' grid dimension {index} must be a "
-                f"positive integer <= {limit} or symbolic TensorRT dimension; "
-                f"got {shown}."
-            )
-    return dims
+    except TypeError as exc:
+        # Keep this frontend's existing validation exception contract.
+        raise ValueError(str(exc)) from exc
 
 
 def _static_launch_dim(op_name: str, field: str, value: Any) -> int:
@@ -1196,7 +1047,7 @@ def _static_launch_dim(op_name: str, field: str, value: Any) -> int:
             f"cutile_op '{op_name}' custom aot_fn must set {field} to a "
             "build-time integer."
         )
-    return cast(int, constant)
+    return constant
 
 
 def make_checked_aot_fn(
@@ -1243,7 +1094,9 @@ def make_checked_aot_fn(
             ) from exc
 
         validate_launch_grid(op_name, grid)
-        actual_block = _normalize_block_dims(op_name, block)
+        actual_block = _common.normalize_block_dims(
+            op_name, block, frontend="cutile_op"
+        )
         if shared_mem != 0:
             raise ValueError(
                 f"cutile_op '{op_name}' custom aot_fn set shared_mem to "

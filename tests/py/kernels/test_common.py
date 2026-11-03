@@ -130,6 +130,37 @@ def test_frontend_dtype_guard(frontend, monkeypatch):
     )
 
 
+@pytest.mark.parametrize("target_tied", [False, True])
+def test_hardware_compatible_engines_decline_target_tied_kernels(target_tied):
+    seen = []
+    validate = _common.make_dtype_capability_validator(
+        "test_common::op",
+        "kernel",
+        [torch.float32],
+        [torch.float32],
+        target_validator=seen.append if target_tied else None,
+    )
+    settings = SimpleNamespace(hardware_compatible=True)
+    assert validate(_FakeNode([torch.float32], torch.float32), settings) is (
+        not target_tied
+    )
+    assert seen == []
+
+
+def test_unspecified_target_uses_current_device():
+    seen = []
+    validate = _common.make_dtype_capability_validator(
+        "test_common::op",
+        "kernel",
+        [torch.float32],
+        [torch.float32],
+        target_validator=seen.append,
+    )
+    settings = SimpleNamespace(device=SimpleNamespace(gpu_id=-1))
+    assert validate(_FakeNode([torch.float32], torch.float32), settings)
+    assert seen == [None]
+
+
 @skip_no_qdp
 @pytest.mark.parametrize(
     "preserve_input_dtype", [False, True], ids=["cast", "preserve"]
