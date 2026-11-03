@@ -1234,6 +1234,59 @@ class TestIndexPutConverter(DispatchTestCase):
             trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
         )
 
+    def test_accumulate_values_that_do_not_broadcast_raise(self):
+        """With fallback_pytorch_plugin_ops, values that do not broadcast to x[index] raise, as in eager."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # Two values for rows of three.
+        inputs = (
+            torch.zeros(4, 3, device="cuda"),
+            torch.tensor([0, 2], device="cuda"),
+            torch.tensor([5.0, 7.0], device="cuda"),
+        )
+        with self.assertRaises(RuntimeError):
+            Accumulate()(*inputs)
+        with self.assertRaisesRegex(ValueError, "do not broadcast"):
+            torchtrt.dynamo.compile(
+                torch.export.export(Accumulate(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                fallback_pytorch_plugin_ops=True,
+                pass_through_build_failures=True,
+            )
+
+        # Four values for rows of three, a count known only at runtime, fail there.
+        class AccumulateSelected(torch.nn.Module):
+            def forward(self, x, index, values, mask):
+                return x.index_put(
+                    (index,), values[mask.nonzero().squeeze(1)], accumulate=True
+                )
+
+        x, index = inputs[:2]
+        values = torch.tensor([5.0, 7.0, 9.0, 11.0], device="cuda")
+        three, four = (
+            torch.tensor([True, True, True, False], device="cuda"),
+            torch.tensor([True, True, True, True], device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(AccumulateSelected(), (x, index, values, three)),
+            arg_inputs=(x, index, values, three),
+            min_block_size=1,
+            fallback_pytorch_plugin_ops=True,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(
+            compiled(x, index, values, three),
+            AccumulateSelected()(x, index, values, three),
+        )
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(x, index, values, four)
+
     def test_accumulate_index_forms_with_fallback_setting(self):
         """With fallback_pytorch_plugin_ops, a bool mask stays in TensorRT and a 2-D index does not."""
         if ENABLED_FEATURES.tensorrt_rtx:

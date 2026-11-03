@@ -746,6 +746,21 @@ def index_put_scatter_elements(
     index = impl.slice.expand(
         ctx, target, source_ir, f"{name}_index_expand", index, tuple(updates_shape)
     )
+    # PyTorch rejects values that do not broadcast to input[..., index, ...], while expand
+    # would repeat or drop them.
+    what = (
+        f"values of shape {tuple(values.shape)} and input[indices] of shape "
+        f"{[s if isinstance(s, int) else -1 for s in updates_shape]}"
+    )
+    for k, (size, want) in enumerate(
+        zip(reversed(tuple(values.shape)), reversed(updates_shape))
+    ):
+        got = (
+            get_shape(ctx, target, source_ir, f"{name}_values_size_{k}", values, -1 - k)
+            if size == DYNAMIC_DIM
+            else size
+        )
+        _check_broadcast(ctx, target, source_ir, f"{name}_values_{k}", got, want, what)
     values = impl.slice.expand(
         ctx, target, source_ir, f"{name}_values_expand", values, tuple(updates_shape)
     )
