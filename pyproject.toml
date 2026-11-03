@@ -18,11 +18,11 @@ build-backend = "setuptools.build_meta"
 name = "torch_tensorrt"
 authors = [{ name = "NVIDIA Corporation", email = "narens@nvidia.com" }]
 description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
-license = { file = "LICENSE" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: GPU :: NVIDIA CUDA",
-    "License :: OSI Approved :: BSD License",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
