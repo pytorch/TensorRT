@@ -1593,9 +1593,13 @@ def compile_module(
     # Generate the corresponding TRT Module for those
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
-    # This is done to release CPU memory.
+    # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
+    # the ones they still read.
+    still_read = {
+        n.target for n in partitioned_module.graph.nodes if n.op == "get_attr"
+    }
     for attr in dir(gm):
-        if attr.startswith("_frozen_param"):
+        if attr.startswith("_frozen_param") and attr not in still_read:
             delattr(gm, attr)
 
     for name, _ in partitioned_module.named_children():
@@ -1744,6 +1748,11 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+
+    # compile() offloaded gm before this call. The global partitioner leaves the PyTorch
+    # nodes in this graph, so the state they read must go back to the device.
+    if settings.offload_module_to_cpu and not settings.use_fast_partitioner:
+        pin_torch_executed_state(partitioned_module, to_torch_device(settings.device))
 
     # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
     # so the wrapper graph reflects the exact graph that will be executed/built.

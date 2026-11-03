@@ -64,6 +64,40 @@ class TestGlobalPartitioning(TestCase):
             except Exception as e:
                 pytest.fail(f"unexpected exception raised: {e}")
 
+    @parameterized.expand([(False,), (True,)])
+    def test_pytorch_node_keeps_its_folded_constant(self, offload_module_to_cpu):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("w", torch.randn(2, 8))
+                self.register_buffer("v", torch.randn(2, 8))
+                self.p = torch.nn.Parameter(torch.randn(2, 8))
+
+            def forward(self, x):
+                # w + 1 folds into a constant that the PyTorch muls read, and v * 2 into
+                # one that only TensorRT reads.
+                return torch.ops.aten.mul.Tensor(x, self.w + 1) * self.p + self.v * 2
+
+        model = Model().cuda().eval()
+        x = torch.randn(2, 8, device="cuda")
+        expected = model(x)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+            use_fast_partitioner=False,
+            offload_module_to_cpu=offload_module_to_cpu,
+        )
+
+        acc = [name for name, _ in trt_mod.named_children() if "_run_on_acc" in name]
+        self.assertEqual(len(acc), 1)
+        kept = {name for name in dir(trt_mod) if name.startswith("_frozen_param")}
+        read = {n.target for n in trt_mod.graph.nodes if n.op == "get_attr"}
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(kept, read - {"p"})
+        torch.testing.assert_close(trt_mod(x), expected)
+
     def test_partition_fully_supported_one_op(self):
         class FullySupportedOneOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
