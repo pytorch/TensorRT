@@ -152,9 +152,9 @@ jobs:
       USE_TRT_RTX: ${{ inputs.use-rtx }}
       PYTHON_ONLY: ${{ inputs.python-only && '1' || '0' }}
       # Sign ARM64 cross-built wheels only on release tag pushes (including RCs).
-      # SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
-      # Temporary: allow PR signing tests. Restore both release-only conditions after testing.
-      SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
+      SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      # Temporary PR signing override (disabled).
+      # SIGN_ARM64_WHEELS: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
     name: build-${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
@@ -678,9 +678,9 @@ jobs:
 
   sign-arm64:
     needs: build
-    # if: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
-    # Temporary: allow PR signing tests. Restore both release-only conditions after testing.
-    if: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
+    if: ${{ inputs.cross-compile && !inputs.is-release-tarball && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    # Temporary PR signing override (disabled).
+    # if: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
     name: sign-${{ matrix.build_name }}
     runs-on: windows-latest
     environment: artifact-signing
