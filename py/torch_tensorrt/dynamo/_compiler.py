@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import operator
 import os
 import platform
 import warnings
@@ -47,6 +48,7 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
@@ -138,6 +140,8 @@ def cross_compile_for_windows(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
@@ -226,10 +230,13 @@ def cross_compile_for_windows(
         disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
-            need to register them. Disabling a rule makes its matching nodes
-            foldable. Supported IDs: ``"attention_mask_arange"``.
+            need to register them. Disabling a rule makes the nodes that only
+            it matches foldable. Supported IDs: ``"attention_mask_arange"``,
+            ``"scatter_add_positions"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
     Returns:
@@ -390,6 +397,8 @@ def cross_compile_for_windows(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
 
@@ -421,18 +430,23 @@ def cross_compile_for_windows(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
+    unlowered_gm = gm
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # Complex lowering can return a new module without the weights that only
+        # constant folding read, so offload the module lowering started from too.
+        deallocate_module(unlowered_gm)
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
@@ -528,6 +542,8 @@ def compile(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     build_route: Optional[str] = _defaults.BUILD_ROUTE,
     tune_build_routes: Optional[str] = _defaults.TUNE_BUILD_ROUTES,
@@ -639,10 +655,13 @@ def compile(
         disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
-            need to register them. Disabling a rule makes its matching nodes
-            foldable. Supported IDs: ``"attention_mask_arange"``.
+            need to register them. Disabling a rule makes the nodes that only
+            it matches foldable. Supported IDs: ``"attention_mask_arange"``,
+            ``"scatter_add_positions"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -849,6 +868,8 @@ def compile(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
         "build_route": build_route,
         "tune_build_routes": tune_build_routes,
@@ -879,6 +900,7 @@ def compile(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
@@ -909,6 +931,7 @@ def compile(
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
+    unlowered_gm = gm
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
@@ -921,6 +944,9 @@ def compile(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # Complex lowering can return a new module without the weights that only
+        # constant folding read, so offload the module lowering started from too.
+        deallocate_module(unlowered_gm)
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
@@ -1063,8 +1089,18 @@ def _insert_complex_io_adapters(
         src = outputs[idx]
         if not isinstance(src, torch.fx.Node):
             continue
-        if src.op == "call_module" and (
-            "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+        # A block with several outputs returns this one through a getitem
+        block = (
+            src.args[0]
+            if src.op == "call_function" and src.target is operator.getitem
+            else src
+        )
+        if (
+            isinstance(block, torch.fx.Node)
+            and block.op == "call_module"
+            and (
+                "_run_on_acc" in str(block.target) or "_run_on_gpu" in str(block.target)
+            )
         ):
             with partitioned_module.graph.inserting_before(output_node):
                 complex_node = partitioned_module.graph.call_function(
@@ -1072,7 +1108,7 @@ def _insert_complex_io_adapters(
                 )
             logger.info(
                 f"Inserted view_as_complex for complex output index {idx} "
-                f"from TRT block '{src.target}'"
+                f"from TRT block '{block.target}'"
             )
             outputs[idx] = complex_node
             graph_modified = True
@@ -1086,15 +1122,17 @@ def _insert_complex_io_adapters(
 
     # Ensure the final module's own forward() unflattens its result back to
     # the user's original return shape (e.g. a bare tensor instead of a
-    # 1-tuple). complex_decomposition_adapter's make_fx retrace produces a
-    # plain (non-pytree) codegen partway through the pipeline, and that loss
-    # survives partitioning. Applied here -- after partitioning and boundary
-    # adapter insertion, once the module's true final leaf count is settled
-    # -- because setting it earlier (on the pre-partition graph) mismatches
-    # the leaf count at that intermediate stage and crashes on unflatten.
+    # 1-tuple). The exported program's pytree codegen normally survives
+    # lowering and partitioning, and it takes the inputs by the user's names:
+    # keep it. Rebuild one only if it was lost, from the placeholder names,
+    # which then take the inputs by position only.
     in_spec = getattr(gm, "_in_spec", None)
     out_spec = getattr(gm, "_out_spec", None)
-    if in_spec is not None and out_spec is not None:
+    if (
+        in_spec is not None
+        and out_spec is not None
+        and not isinstance(partitioned_module.graph._codegen, _PyTreeCodeGen)
+    ):
         orig_args = [
             node.name
             for node in partitioned_module.graph.nodes
@@ -1588,9 +1626,13 @@ def compile_module(
     # Generate the corresponding TRT Module for those
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
-    # This is done to release CPU memory.
+    # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
+    # the ones they still read.
+    still_read = {
+        n.target for n in partitioned_module.graph.nodes if n.op == "get_attr"
+    }
     for attr in dir(gm):
-        if attr.startswith("_frozen_param"):
+        if attr.startswith("_frozen_param") and attr not in still_read:
             delattr(gm, attr)
 
     for name, _ in partitioned_module.named_children():
@@ -1739,6 +1781,11 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+
+    # compile() offloaded gm before this call. The global partitioner leaves the PyTorch
+    # nodes in this graph, so the state they read must go back to the device.
+    if settings.offload_module_to_cpu and not settings.use_fast_partitioner:
+        pin_torch_executed_state(partitioned_module, to_torch_device(settings.device))
 
     # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
     # so the wrapper graph reflects the exact graph that will be executed/built.
@@ -1998,6 +2045,8 @@ def convert_exported_program_to_serialized_trt_engine(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
+    deduplicate_weights: bool = _defaults.DEDUPLICATE_WEIGHTS,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
     kwarg_input_binding_names: Any = None,
@@ -2106,10 +2155,13 @@ def convert_exported_program_to_serialized_trt_engine(
         disabled_constant_fold_exclusions (Collection[str]): IDs of predefined
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
-            need to register them. Disabling a rule makes its matching nodes
-            foldable. Supported IDs: ``"attention_mask_arange"``.
+            need to register them. Disabling a rule makes the nodes that only
+            it matches foldable. Supported IDs: ``"attention_mask_arange"``,
+            ``"scatter_add_positions"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
+        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Default is False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -2284,6 +2336,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
+        "deduplicate_weights": deduplicate_weights,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -2300,6 +2354,7 @@ def convert_exported_program_to_serialized_trt_engine(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
@@ -2437,7 +2492,7 @@ def convert_exported_program_to_serialized_trt_engine(
         settings,
     )
 
-    serialized_engine: bytes = interpreter_result.serialized_engine
+    serialized_engine: bytes = bytes(interpreter_result.serialized_engine)
     return serialized_engine
 
 

@@ -1,11 +1,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import tensorrt as trt
 import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    attention_capability_validator,
+)
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
@@ -406,6 +414,157 @@ class TestScaledDotProductAttention(DispatchTestCase):
             )
         self.run_test_with_dynamic_shape(SDPA(), input_specs, output_dtypes=[dtype])
 
+    def test_sdpa_default_scale_bf16(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class SDPA(nn.Module):
+            def forward(self, query, key, value):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query, key, value
+                )
+
+        # A peaked softmax magnifies any bfloat16 rounding of the scaled query,
+        # and sqrt(80) is not a power of two, so dividing by it rounds.
+        shape = (2, 8, 64, 80)
+        query = 4 * torch.randn(shape, dtype=torch.bfloat16)
+        key = 4 * torch.randn(shape, dtype=torch.bfloat16)
+        value = torch.randn(shape, dtype=torch.bfloat16)
+        self.run_test(
+            SDPA(), [query, key, value], rtol=1e-2, atol=1e-2, enable_passes=True
+        )
+
+    @parameterized.expand(
+        [(trt.float16, True), (trt.float32, True), (trt.bfloat16, False)]
+    )
+    def test_default_scale_comes_from_query_shape_except_in_bf16(
+        self, dtype, from_shape
+    ):
+        for attention in (
+            impl.attention.scaled_dot_product_attention,
+            impl.attention.scaled_dot_product_efficient_attention,
+        ):
+            network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+                1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+            )
+            query, key, value = (
+                network.add_input(n, dtype, (2, 8, 64, 80)) for n in "qkv"
+            )
+            attention(
+                ConversionContext(network),
+                torch.ops.aten.scaled_dot_product_attention.default,
+                SourceIR.ATEN,
+                "attention",
+                query,
+                key,
+                value,
+            )
+            layers = {network.get_layer(i).type for i in range(network.num_layers)}
+            with self.subTest(attention=attention.__name__):
+                self.assertEqual(trt.LayerType.SHAPE in layers, from_shape)
+
+    @parameterized.expand([("query", 0), ("value", 2)])
+    def test_sdpa_constant_input(self, _, index):
+        shape = (2, 8, 32, 16)
+
+        class SDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "constant", torch.randn(shape, dtype=torch.float16)
+                )
+
+            def forward(self, query, other):
+                args = [query, other, other]
+                args[index] = self.constant
+                return torch.ops.aten.scaled_dot_product_attention.default(*args)
+
+        inputs = [torch.randn(shape, dtype=torch.float16) for _ in range(2)]
+        self.run_test(SDPA(), inputs, rtol=1e-2, atol=1e-2, enable_passes=True)
+
+    def test_only_a_constant_key_is_declined(self):
+        graph = torch.fx.Graph()
+        query, value, start = (graph.placeholder(n) for n in ("q", "v", "start"))
+        key = graph.get_attr("k")
+        is_constant = {
+            key: True,
+            graph.call_function(torch.ops.aten.view.default, (key, [-1])): True,
+            graph.call_function(torch.ops.aten.slice.Tensor, (key, 0, 0, 1)): True,
+            # The slice offset comes from an input, so the key is not a constant.
+            graph.call_function(torch.ops.aten.slice.Tensor, (key, 0, start)): False,
+        }
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        for k, constant in is_constant.items():
+            k.meta["val"] = torch.empty(1, dtype=torch.float16, device="meta")
+            with self.subTest(key=k.name):
+                node = graph.call_function(sdpa, (query, k, value))
+                self.assertEqual(
+                    attention_capability_validator(node, CompilationSettings()),
+                    not constant,
+                )
+
+    @parameterized.expand([("sdpa", 1, 8), ("efficient", 6, 4)])
+    def test_causal_with_unequal_lengths(self, op, query_len, key_len):
+        # PyTorch aligns the causal mask to the top left, so a decode step attends to the first key only.
+        class Causal(nn.Module):
+            def forward(self, query, key, value):
+                if op == "sdpa":
+                    return torch.ops.aten.scaled_dot_product_attention.default(
+                        query, key, value, None, 0.0, True
+                    )
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, value, None, False, 0.0, True
+                )[0]
+
+        query = torch.randn(2, 4, query_len, 32, dtype=torch.float16)
+        key, value = (
+            torch.randn(2, 4, key_len, 32, dtype=torch.float16) for _ in range(2)
+        )
+        self.run_test(
+            Causal(), [query, key, value], rtol=1e-2, atol=1e-2, enable_passes=True
+        )
+
+    def test_causal_mask_kind(self):
+        # TensorRT's LOWER_RIGHT is PyTorch's mask for equal lengths and for its flash kernel.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        flash = torch.ops.aten._scaled_dot_product_flash_attention.default
+        efficient = torch.ops.aten._scaled_dot_product_efficient_attention.default
+
+        class Attention(nn.Module):
+            def forward(self, x, memory):
+                return (
+                    sdpa(x, x, x, None, 0.0, True),
+                    efficient(x, memory, memory, None, False, 0.0, True)[0],
+                )
+
+        # Equal example lengths, so only the symbols can tell the second attention's lengths apart.
+        ep = torch.export.export(
+            Attention(),
+            (torch.randn(1, 2, 4, 8), torch.randn(1, 2, 4, 8)),
+            dynamic_shapes=({2: torch.export.Dim("x")}, {2: torch.export.Dim("m")}),
+        )
+        nodes = {n.target: n for n in ep.graph.nodes}
+        same, different = nodes[sdpa], nodes[efficient]
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        four, six, dynamic = (
+            network.add_input(name, trt.float16, (1, 2, length, 8))
+            for name, length in (("four", 4), ("six", 6), ("dynamic", -1))
+        )
+        lower, upper = trt.CausalMaskKind.LOWER_RIGHT, trt.CausalMaskKind.UPPER_LEFT
+        for node, target, query, key, kind in (
+            (None, sdpa, four, four, lower),
+            (None, sdpa, four, six, upper),
+            (None, flash, four, six, lower),
+            (same, sdpa, dynamic, dynamic, lower),
+            (different, efficient, dynamic, dynamic, upper),
+        ):
+            with self.subTest(target=target, query=query.name, key=key.name, node=node):
+                ctx = ConversionContext(network, current_node=node)
+                self.assertEqual(
+                    impl.attention._causal_mask_kind(ctx, target, query, key), kind
+                )
+
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
     @parameterized.expand(
@@ -650,6 +809,22 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             enable_passes=True,
         )
+
+    def test_efficient_sdpa_constant_value(self):
+        shape = (2, 8, 32, 16)
+
+        class EfficientSDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("value", torch.randn(shape, dtype=torch.float16))
+
+            def forward(self, query, key):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, self.value, None, False
+                )[0]
+
+        inputs = [torch.randn(shape, dtype=torch.float16) for _ in range(2)]
+        self.run_test(EfficientSDPA(), inputs, rtol=1e-2, atol=1e-2, enable_passes=True)
 
 
 if __name__ == "__main__":

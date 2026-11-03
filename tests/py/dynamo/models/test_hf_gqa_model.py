@@ -32,10 +32,10 @@ if importlib.util.find_spec("transformers"):
 def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
     if (
         torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
-        and not is_tensorrt_rtx_version_supported("1.6")
+        and not is_tensorrt_rtx_version_supported("1.7")
     ):
         pytest.skip(
-            "TensorRT-RTX >= 1.6 is required because it fixed some accuracy issues for FP16"
+            "TensorRT-RTX >= 1.7 is required because it fixed some accuracy issues for FP16"
         )
         return
 

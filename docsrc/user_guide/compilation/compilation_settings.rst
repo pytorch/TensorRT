@@ -309,6 +309,16 @@ Memory and Resource Management
      - ``False``
      - Let TRT dynamically allocate memory for intermediate tensors at runtime rather
        than pre-allocating. Can reduce peak memory footprint at a small runtime cost.
+   * - ``deduplicate_weights``
+     - ``False``
+     - Add a weight that several layers read to the TRT network once instead of once
+       per layer, and give the linear layers that share a weight one transposed copy
+       of it. This cuts engine-build host memory for models that reuse weights, such
+       as a denoising loop unrolled into one graph, most of all in FP32 builds with
+       ``disable_tf32=True`` and in refittable engines. TRT may pick other kernels, so
+       results can round differently, and some models need more memory instead, so
+       measure it. Under ``torch.compile`` the weights are engine inputs, not
+       constants, so they are not shared.
 
 ----
 
@@ -347,6 +357,19 @@ Graph Partitioning
        converters. When combined with ``use_fp32_acc=True``, decomposed FP16 attention
        keeps its intermediate calculation in FP32 and casts only the final output back
        to FP16.
+   * - ``fold_shared_kv_attention``
+     - ``False``
+     - For attention where all query heads share one key/value head (multi-query
+       attention), compute it against that one head instead of the copies that
+       Hugging Face models make for each query head. TensorRT then runs two plain
+       matrix products instead of its fused attention kernel. This can be faster or
+       slower depending on the GPU, so measure it. In FP16 the result can round
+       differently; ``use_fp32_acc=True`` reduces that. Only static shapes are
+       rewritten, and ``scaled_dot_product_attention`` also needs
+       ``decompose_attention=True``. Both preserved matmuls and the reshape/``bmm``
+       form produced by AOT tracing under ``torch.compile`` are supported for
+       ``repeat_kv`` style graphs. In the ``bmm`` form, broadcasting a single KV
+       head with ``enable_gqa=True`` is not folded.
 
 ----
 
@@ -447,7 +470,8 @@ rebuilt from scratch:
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
-``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``.
+``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``,
+``fold_shared_kv_attention``, ``deduplicate_weights``.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

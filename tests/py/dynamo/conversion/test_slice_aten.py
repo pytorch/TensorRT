@@ -19,6 +19,9 @@ class TestSliceConverter(DispatchTestCase):
             ("slice_dim_start_stop_step_max_int", 2, 0, 2**63 - 1, 1),
             ("slice_dim_start_stop_step_past_end", 2, 0, 2048, 1),
             ("slice_dim_start_stop_step_none", 2, None, None, 1),
+            ("slice_dim_start_before_begin", 1, -15, None, 1),
+            ("slice_dim_stop_before_begin", 1, 0, -15, 1),
+            ("slice_dim_start_after_stop", 1, 7, 3, 1),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):

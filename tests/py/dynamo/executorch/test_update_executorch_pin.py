@@ -207,7 +207,17 @@ def test_main_uses_selected_channel(monkeypatch, channel):
         f"https://download.pytorch.org/whl/nightly/{channel}",
     ]
     queried = [args[-1].rsplit("/", 1)[-1] for args in calls]
-    assert sorted(queried) == updater.delegate_channels()
+    assert sorted(set(queried)) == updater.delegate_channels()
+    targets = {
+        (args[args.index("--platform") + 1], args[args.index("--python-version") + 1])
+        for args in calls
+        if "--platform" in args
+    }
+    assert targets == {
+        (platform, python)
+        for platform in updater.delegate_platforms()
+        for python in ("3.11", "3.12", "3.13")
+    }
 
 
 @pytest.mark.unit
@@ -475,11 +485,10 @@ def test_the_updater_does_not_pin_the_root_project():
 
 @pytest.mark.unit
 def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
-    """A history-free pin bump must pass every guard, lock included.
+    """A pin bump updates source sites; the workflow refreshes the lock separately.
 
-    It used to fail the lock check, because the lock mirrored the pin and a bump made it
-    stale at once. The companion carries the version now, so the lock stays valid across
-    a bump and the whole suite passes. That is the point of the change.
+    The project's direct ExecuTorch range is recorded in lock metadata, so a bump
+    leaves that metadata stale until uv lock runs. Every other pin guard must pass.
     """
     import xml.etree.ElementTree as ET
 
@@ -525,12 +534,12 @@ def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
     cases = ET.parse(report).findall(".//testcase")
     assert not [case for case in cases if case.find("error") is not None], result.stdout
-    assert not [
-        case for case in cases if case.find("failure") is not None
-    ], result.stdout
+    assert [
+        case.attrib["name"] for case in cases if case.find("failure") is not None
+    ] == ["test_the_lockfile_executorch_matches_the_pin"], result.stdout
 
 
 @pytest.mark.unit

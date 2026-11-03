@@ -1,0 +1,97 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Register a cuTile kernel as an AOT QDP plugin via ``torch_tensorrt.kernels.cutile_op``\n\n``cutile_op`` is the cuTile counterpart of `cuda_kernel_op`, and the\ndeclarative form of the hand-written AOT plugin in `aot_plugin`: it takes\na ``@ct.kernel`` program, compiles it ahead of time, and registers the PyTorch\ncustom op, the TensorRT plugin descriptor, the AOT impl (with the compiled PTX\nembedded in the engine), and the Torch-TensorRT converter \u2014 in one call.\n\nThe piece ``cutile_op`` exists to handle is the calling convention. cuTile\nexpands every array parameter into ``(ptr, extents..., strides...)``, grouped\nper array in declaration order. TensorRT's AOT plugin launcher instead passes\n``(input_ptrs..., extra_args..., output_ptrs...)``. Those two orders do not\nagree, and a mismatch does not fail \u2014 the kernel reads whatever landed in each\nslot and returns plausible-looking garbage. ``cutile_op`` permutes the compiled\nPTX's parameter list and supplies the matching extents and strides as AOT extra\narguments, so the kernel binds what it expects.\n\nThis example requires ``cuda-tile>=1.3,<2`` and ``tileiras`` from a system CUDA\nToolkit compatible with that package, on ``PATH`` or under ``CUDA_HOME``.\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import argparse\n\nimport cuda.tile as ct\nimport tensorrt.plugin as trtp\nimport torch\n\nimport torch_tensorrt\nimport torch_tensorrt.kernels as ttk\n\nparser = argparse.ArgumentParser()\nparser.add_argument(\"--min_block_size\", type=int, default=1)\nARGS, _ = parser.parse_known_args()"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 1: Define the cuTile kernel (pure cuTile, nothing TensorRT-specific)\n\nArray parameters come first \u2014 inputs then outputs \u2014 followed by the\n``ct.Constant`` parameters, which are baked into the compiled symbol.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "TILE_SIZE = 128\n\n\n@ct.kernel\ndef add_one_kernel(x, out, tile_size: ct.Constant[int]):\n    pid = ct.bid(0)\n    tile = ct.load(x, index=(pid,), shape=(tile_size,))\n    ct.store(out, index=(pid,), tile=tile + 1.0)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 2: Describe the op and register it with a single ``cutile_op`` call\n\n* ``signature`` \u2014 the array parameters and their element types, in\n  declaration order. ``ndim`` defaults to 1, matching a kernel written\n  against a flattened view, so a rank-1 array's extent is the tensor's\n  element count and the op accepts any input shape.\n* ``constants`` \u2014 the ``ct.Constant`` values to compile for.\n* ``grid`` \u2014 the launch grid in tiles, computed from ``trtp.TensorDesc``\n  inputs. Using ``.shape_expr`` keeps it symbolic so one engine covers a\n  range of shapes.\n* ``meta_fn`` \u2014 shape/dtype inference for FakeTensors (the Torch schema is\n  inferred from its type hints).\n* ``eager_fn`` \u2014 optional; lets ``torch.ops.cutile_example.add_one`` also run outside\n  TensorRT.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "def add_one_meta(x: torch.Tensor) -> torch.Tensor:\n    return torch.empty_like(x, memory_format=torch.contiguous_format)\n\n\ndef add_one_eager(x: torch.Tensor) -> torch.Tensor:\n    # The flat kernel must write a view of the returned allocation, including\n    # when x is transposed or uses another noncontiguous layout.\n    out = torch.empty_like(x, memory_format=torch.contiguous_format)\n    flat_x = x.contiguous().reshape(-1)\n    flat_out = out.reshape(-1)\n    ct.launch(\n        torch.cuda.current_stream().cuda_stream,\n        (ct.cdiv(flat_x.numel(), TILE_SIZE), 1, 1),\n        add_one_kernel,\n        (flat_x, flat_out, TILE_SIZE),\n    )\n    return out\n\n\nttk.cutile_op(\n    \"cutile_example::add_one\",\n    kernel=add_one_kernel,\n    signature={\"x\": \"fp32\", \"out\": \"fp32\"},\n    meta_fn=add_one_meta,\n    grid=lambda inputs, outputs: (trtp.cdiv(inputs[0].shape_expr.numel(), TILE_SIZE),),\n    constants={\"tile_size\": TILE_SIZE},\n    eager_fn=add_one_eager,\n)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 3: Use it \u2014 the op lowers to the AOT QDP plugin inside the engine\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class AddOne(torch.nn.Module):\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return torch.ops.cutile_example.add_one(x)\n\n\nif __name__ == \"__main__\":\n    x = torch.randn(4, 256, device=\"cuda\", dtype=torch.float32)\n    model = AddOne().cuda().eval()\n\n    ref = x + 1\n    assert torch.allclose(model(x), ref), \"eager path mismatch\"\n    print(\"eager path OK\")\n\n    trt_model = torch_tensorrt.compile(\n        model,\n        inputs=[x],\n        min_block_size=ARGS.min_block_size,\n    )\n    print(\"engine compiled with the AOT QDP plugin\")\n\n    trt_out = trt_model(x)\n    assert torch.allclose(trt_out, ref, atol=1e-5), \"cutile_op TRT output mismatch\"\n    print(\"cutile_op AOT QDP plugin ran correctly under Torch-TensorRT\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.18"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

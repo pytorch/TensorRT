@@ -18,20 +18,22 @@ def mark_constant_fold_exclusions(
     """Apply the registered rules that exclude FX nodes from constant folding.
 
     This pass is the single authority on which rules are in effect. It runs
-    immediately before ``constant_fold`` and is the only marking path that sees
-    ``settings``: rules that mark nodes while a decomposition is traced run
-    during ``run_decompositions``, long before a settings object is reachable.
-    Those marks are therefore revoked here rather than suppressed where they are
-    made, so a caller only has to communicate the disabled rules once.
+    immediately before ``constant_fold`` and is the only code that marks nodes:
+    decompositions run during ``run_decompositions``, long before a settings
+    object is reachable, so they only tag nodes for a rule to select here. As a
+    guard, it also revokes marks of disabled rules that a node already carries,
+    so a caller only has to communicate the disabled rules once.
     """
     disabled_rule_ids = validate_disabled_constant_fold_exclusions(
         settings.disabled_constant_fold_exclusions if settings is not None else ()
     )
 
-    for node in gm.graph.nodes:
-        for rule_id, rule in _CONSTANT_FOLD_EXCLUSION_RULES.items():
-            if rule_id in disabled_rule_ids:
-                continue
+    # One rule covers the whole graph before the next starts, so a rule can read
+    # the marks of the rules registered before it.
+    for rule_id, rule in _CONSTANT_FOLD_EXCLUSION_RULES.items():
+        if rule_id in disabled_rule_ids:
+            continue
+        for node in gm.graph.nodes:
             _mark_constant_fold_exclusion(rule(node), rule_id)
 
     if disabled_rule_ids:

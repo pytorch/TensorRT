@@ -55,8 +55,10 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     SerializedTensorRTEngineFmt,
+    create_cpp_engine,
     deserialize_binding_names,
     parse_device_info,
+    plan_buffer,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
@@ -208,7 +210,7 @@ def _reconstruct_trt_engine(serialized_info: List[Any]) -> Any:
         serialized_info[ENGINE_IDX] = base64.b64decode(engine_field)
 
     if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-        return torch.classes.tensorrt.Engine(tuple(serialized_info))
+        return create_cpp_engine(serialized_info)
 
     return TRTEngine(serialized_info)
 
@@ -225,7 +227,9 @@ class EngineSerializer(OpaqueBase):  # type: ignore[misc]
         or a Python ``TRTEngine``, so a single saved artifact works on both.
         """
         state = list(self.serialized_info)
-        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
+        state[ENGINE_IDX] = base64.b64encode(cast(bytes, state[ENGINE_IDX])).decode(
+            "utf-8"
+        )
         return (_reconstruct_trt_engine, (state,))
 
 
@@ -262,6 +266,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self._bound_inputs_by_name: Dict[str, torch.Tensor] = {}
+        self._shape_input_buffers: List[Any] = []
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
@@ -344,11 +349,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._context
 
     def invalidate_context(self) -> None:
-        """Drop the live execution context. Next ``self.context`` read
-        rebuilds it with the then-current ``runtime_settings``. Called from
-        every settings-mutation path so reads of ``self.context`` always
-        observe up-to-date settings."""
+        """Drop the live execution context, the CUDA graph captured on it, and
+        the dynamic workspace.
+        Next ``self.context`` read rebuilds it with the then-current
+        ``runtime_settings``, and with CUDA graphs on the next execution records
+        a new graph. Called from every settings-mutation path so reads of
+        ``self.context`` always observe up-to-date settings."""
+        # The graph replays this context's kernels and memory, so it must go first.
+        self.reset_captured_graph()
+        self.runtime_states.context_changed = True
         self._context = None
+        self._dynamic_workspace = None
 
     def has_context(self) -> bool:
         """True iff the execution context has been materialized. Probes
@@ -381,7 +392,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         """
         serialized_info = list(self.serialized_info)
         serialized_info[ENGINE_IDX] = base64.b64encode(
-            serialized_info[ENGINE_IDX]
+            cast(bytes, serialized_info[ENGINE_IDX])
         ).decode("utf-8")
         return (serialized_info, "TRTEngine")
 
@@ -397,6 +408,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers = []
         self._output_buffers = []
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         self._caller_stream = None
         self._engine_stream = None
         self._owned_pool_stream = None
@@ -453,9 +465,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.version = str(self.serialized_info[ABI_TARGET_IDX])
         self.name = str(self.serialized_info[NAME_IDX]).replace(".", "_")
         self.serialized_device_info = str(self.serialized_info[DEVICE_IDX])
-        self.serialized_engine = self.serialized_info[ENGINE_IDX]
-        if not isinstance(self.serialized_engine, (bytes, bytearray)):
-            raise TypeError("Expected serialized engine as bytes")
+        plan = self.serialized_info[ENGINE_IDX]
+        if not isinstance(plan, (bytes, bytearray)):
+            # e.g. a view of a C++ engine's plan from TorchTensorRTModule._pack_engine_info.
+            # This engine keeps its plan, so it keeps it as bytes.
+            try:
+                plan = bytes(memoryview(plan_buffer(plan)))
+            except TypeError:
+                raise TypeError(
+                    "Expected the serialized engine as bytes or a buffer"
+                ) from None
+            self.serialized_info[ENGINE_IDX] = plan
+        self.serialized_engine = plan
 
         self.in_binding_names = deserialize_binding_names(
             str(self.serialized_info[INPUT_BINDING_NAMES_IDX])
@@ -740,7 +761,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
             self.runtime_settings.cuda_graph_strategy != "disabled"
         )
-        self.runtime_states.context_changed = True
 
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
@@ -837,8 +857,29 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         the enqueue stream). Used by auto-selection, which switches on
         ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
         """
-        if self.num_optimization_profiles <= 1:
+        # An index this engine does not have cannot be honored. A single-profile
+        # engine is the one case where that is not a mistake to fail on: it has
+        # profile 0 and nothing to switch to, so a pin aimed at some other engine
+        # is ignored with a warning rather than raising. A multi-profile engine
+        # handed an index it lacks could have done something different, and a
+        # negative index is a computed value gone wrong on any engine, so both
+        # stay errors -- silently running on mistuned kernels is worse than
+        # stopping. Kept identical to the C++ runtime, which this mirrors.
+        #
+        # Reachable only by calling the engine directly; optimization_profile()
+        # validates the index first.
+        if self.num_optimization_profiles <= 1 and profile_index > 0:
+            logger.warning(
+                f"Ignoring optimization profile index {profile_index}: this engine has "
+                f"{self.num_optimization_profiles} optimization profile(s), so it stays on "
+                f"profile {self._active_profile_index}."
+            )
             return
+        if not 0 <= profile_index < self.num_optimization_profiles:
+            raise ValueError(
+                f"Optimization profile index {profile_index} is out of range: this engine "
+                f"has {self.num_optimization_profiles} optimization profile(s)."
+            )
         if profile_index == self._active_profile_index:
             return
         self.context.set_optimization_profile_async(profile_index, stream.cuda_stream)
@@ -1002,10 +1043,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if budget_bytes < 0:
             budget_bytes = self.streamable_device_memory_budget
         # TRT 11+ rejects setWeightStreamingBudgetV2 while a live
-        # IExecutionContext exists (its use_count must be 1). A captured
-        # cudagraph also keeps the context alive, so drop the graph first and
-        # then the context -- matching the C++ TRTEngine::set_device_memory_budget.
-        self.reset_captured_graph()
+        # IExecutionContext exists (its use_count must be 1), so drop it first,
+        # matching the C++ TRTEngine::set_device_memory_budget.
         self.invalidate_context()
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
@@ -1022,7 +1061,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             self.enable_profiling()
         else:
             _ = self.context
-        self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
         if self.cudagraph:
@@ -1035,7 +1073,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             return
         self.resource_allocation_strategy = new_strategy
         self.invalidate_context()
-        self.runtime_states.context_changed = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         self.output_tensors_are_unowned = enabled
@@ -1058,7 +1095,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         torch.cuda.synchronize()
         self.invalidate_context()
         self._profile_execution = False
-        self.runtime_states.context_changed = True
 
     def get_engine_layer_info(self) -> str:
         inspector = self.cuda_engine.create_engine_inspector()
@@ -1158,6 +1194,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # create_output_tensors / the output-binding loop to alias outputs to
         # their source-input storage.
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         for i, binding in enumerate(self._input_binding_infos):
             input_name = binding.name
 
@@ -1174,6 +1211,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             if binding.is_shape_tensor:
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                # TensorRT reads this host memory when the engine runs, so the
+                # array must outlive this loop.
+                self._shape_input_buffers.append(inputs_cpu)
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
                 self.context.set_input_shape(
@@ -1371,7 +1411,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                if self.resource_allocation_strategy:
+                # A captured graph replays into the workspace it was recorded with.
+                if self.resource_allocation_strategy and self.cudagraph is None:
                     workspace_bytes = self.cuda_engine.device_memory_size_v2
                     self._dynamic_workspace = torch.empty(
                         workspace_bytes,

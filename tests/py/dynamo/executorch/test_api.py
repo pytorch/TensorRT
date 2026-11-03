@@ -475,7 +475,7 @@ def test_cmake_discovery_rejects_removed_guards(monkeypatch, tmp_path, removed):
     if removed == "required":
         text, count = re.subn(
             r"find_package_handle_standard_args\(\s*executorch_backend_tensorrt\s*"
-            r"REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY\s*\)",
+            r"REQUIRED_VARS \$\{_executorch_backend_tensorrt_required_vars\}\s*\)",
             "",
             text,
         )
@@ -946,7 +946,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     assert (
         "SHARED IMPORTED" in config_text
     ), "the config does not define an imported shared library target"
-    assert "/lib/libexecutorch_backend_tensorrt.so" in config_text, (
+    assert "/lib/${_executorch_backend_tensorrt_filename}" in config_text, (
         "the config does not look for the delegate under lib/, where the wheel installs it and "
         "where ExecuTorch keeps its own backends"
     )
@@ -1018,7 +1018,11 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
         "the config never calls find_package_handle_standard_args, so a prefix with no delegate "
         "still reports success"
     )
-    assert "REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY" in config_text, (
+    assert (
+        "REQUIRED_VARS ${_executorch_backend_tensorrt_required_vars}" in config_text
+        and "set(_executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)"
+        in config_text
+    ), (
         "the library is not listed in REQUIRED_VARS, so find_package succeeds when the delegate is "
         "absent and exports a target with an empty IMPORTED_LOCATION"
     )
@@ -1923,7 +1927,9 @@ def test_the_guard_is_wired_into_the_build():
     assert (
         not disabled
     ), "TORCH_TENSORRT_READELF is reassigned before the guard block, so the guard may never run"
-    assert enclosing == ["TORCH_TENSORRT_READELF"], (
+    assert enclosing == [
+        'TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux"'
+    ], (
         "the guard's POST_BUILD command must be reached whenever readelf exists, but it sits "
         f"under {enclosing}"
     )
@@ -2385,8 +2391,9 @@ def test_ci_runtime_check_asserts_the_delegate_loads_and_registers():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("companion", ["0.1.0.dev20200103+cu130", "0.1.0"])
 @pytest.mark.parametrize("cuda", [None, "12.6", "12.8", "13.0", "13.2", "14.0"])
-def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
+def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda, companion):
     """Run setup with simulated installed versions and inspect the metadata it hands setuptools."""
     import runpy
 
@@ -2396,9 +2403,7 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
     fake_torch.version = types.SimpleNamespace(cuda=cuda)
     fake_torch.__version__ = "2.15.0.dev20200103+cu130"
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setenv(
-        "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "0.1.0.dev20200103+cu130"
-    )
+    monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", companion)
     # No torch-tensorrt entry: the build no longer asks for its version, and leaving it here would
     # make the query assertion below pass against a build that had started asking again.
     versions = {
@@ -2426,14 +2431,19 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
     else:
         runpy.run_path(str(_RUNTIME_SETUP_PY))
         assert queries == list(versions)
-        assert metadata["version"] == "0.1.0.dev20200103+cu130"
-        # Only what the delegate links, and ExecuTorch keeps the label because the delegate links one
+        assert metadata["version"] == companion
+        # Only what the delegate links, and ExecuTorch keeps the label (except on PyPI, below) because the delegate links one
         # specific build of it. The inference library and the CUDA runtime have no label to keep.
         # PyTorch and Torch-TensorRT are deliberately absent: neither is linked, requiring the second
         # would make this wheel depend on the project that builds it, and ExecuTorch leaves the choice
         # of PyTorch build to the user rather than pinning one.
+        # A wheel for PyPI has no label, so neither does its ExecuTorch requirement: PyPI's
+        # ExecuTorch has none to match.
+        executorch = versions["executorch"]
+        if "+" not in companion:
+            executorch = executorch.partition("+")[0]
         assert set(metadata["install_requires"]) == {
-            f"executorch=={versions['executorch']}",
+            f"executorch=={executorch}",
             "torch",
             f"tensorrt-cu13=={versions['tensorrt-cu13'].partition('+')[0]}",
             f"nvidia-cuda-runtime=={versions['nvidia-cuda-runtime'].partition('+')[0]}",
@@ -2455,11 +2465,10 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        # The delegate, since finding it by hand is what this extra saves. It carries the
-        # ExecuTorch version, so a range beside it would state that version twice and the
-        # two cannot agree on the day the pin moves.
+        # Authoring follows the source pin. A published build adds its companion after
+        # this literal, where its own index also carries the ExecuTorch the companion pins.
         named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
-        assert named == ["EXECUTORCH_RUNTIME_REQUIREMENT"], named
+        assert named == ["EXECUTORCH_REQUIREMENT"], named
 
     setup_call = next(
         node
@@ -2812,7 +2821,7 @@ def _patch_executorch_lowering(monkeypatch, captured):
 def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
     import torch_tensorrt._compile as tc
-    from executorch.exir import EdgeCompileConfig
+    from executorch.exir import EdgeCompileConfig, ExecutorchBackendConfig
 
     captured = {}
     _patch_executorch_lowering(monkeypatch, captured)
@@ -2823,6 +2832,7 @@ def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     out = str(tmp_path / "model.pte")
 
     ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    default_alignment = ExecutorchBackendConfig().memory_planning_pass.alignment
     tc._save_as_executorch(
         ep,
         out,
@@ -2848,8 +2858,12 @@ def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     # _check_ir_validity=True).
     assert captured["compile_config"] is caller_cfg
     assert captured["compile_config"]._check_ir_validity is True
-    # backend_config flows to edge_program.to_executorch(config=...).
-    assert captured["backend_config"] is None
+    # With no backend_config, to_executorch() gets ExecuTorch's defaults with memory
+    # planned on TensorRT's 256-byte boundary.
+    assert captured["backend_config"].memory_planning_pass.alignment == 256
+    # ExecutorchBackendConfig's default planner is one instance shared by every config in the
+    # process, so it must be copied rather than raised in place.
+    assert ExecutorchBackendConfig().memory_planning_pass.alignment == default_alignment
     # ETRecord persisted next to the .pte per ET's "<base>_etrecord.bin" convention.
     assert (tmp_path / "model_etrecord.bin").exists()
 
@@ -3049,6 +3063,47 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
 
 
 @pytest.mark.unit
+@_needs_torch_tensorrt
+def test_public_save_graphmodule_to_executorch_skips_retrace_by_default(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    import torch_tensorrt.dynamo._exporter as _exporter
+
+    calls = _stub_save_as_executorch(monkeypatch)
+    stub_ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    exporter_calls = []
+
+    def _fake_export(*args, **kwargs):
+        exporter_calls.append(kwargs)
+        return stub_ep
+
+    monkeypatch.setattr(_exporter, "export", _fake_export)
+
+    # Neither retrace nor inputs: a retrace would refuse to run without inputs.
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    torch_tensorrt.save(gm, str(tmp_path / "gm.pte"), output_format="executorch")
+
+    assert len(exporter_calls) == 1
+    assert exporter_calls[0]["use_legacy_exporter"] is True
+    assert len(calls) == 1
+    assert calls[0]["module"] is stub_ep
+
+
+@pytest.mark.unit
+@_needs_torch_tensorrt
+def test_public_save_graphmodule_to_exported_program_still_retraces_by_default(
+    tmp_path,
+):
+    import torch_tensorrt
+
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    with pytest.raises(ValueError, match="retrace is True"):
+        torch_tensorrt.save(gm, str(tmp_path / "gm.ep"))
+
+
+@pytest.mark.unit
 def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
     """A real lowering with generate_etrecord=True writes a sidecar that ExecuTorch's
     devtools can parse back into an Inspector-consumable ETRecord."""
@@ -3098,6 +3153,9 @@ def _elf_object(architecture: str) -> bytes:
     [
         ("well_formed", True),
         ("aarch64_tag", True),
+        # A wheel for PyPI has no label, and its ExecuTorch requirement must not have one either.
+        ("pypi_release", True),
+        ("pypi_release_keeps_the_executorch_label", False),
         ("payload_for_the_other_architecture", False),
         ("truncated_payload", False),
         ("unrepaired_tag", False),
@@ -3329,13 +3387,25 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             r + "+cu130" if r.startswith("tensorrt-cu13==") else r for r in requires
         ]
 
+    wheel_version = "0.1.0+cu132"
+    if case.startswith("pypi_release"):
+        wheel_version = "0.1.0"
+        if case == "pypi_release":
+            requires = [
+                r.partition("+")[0] if r.startswith("executorch==") else r
+                for r in requires
+            ]
+
     object_bytes = _elf_object(elf_machine or arch)
     if case == "truncated_payload":
         # Slicing past the end is not an error and int.from_bytes accepts a short slice, so the
         # machine word read out of nineteen bytes still matched and the object passed.
         object_bytes = object_bytes[:19]
 
-    wheel = tmp_path / f"torch_tensorrt_executorch_runtime-0.1.0-py3-none-{tag}.whl"
+    wheel = (
+        tmp_path
+        / f"torch_tensorrt_executorch_runtime-{wheel_version}-py3-none-{tag}.whl"
+    )
     with WheelFile(wheel, "w") as archive:
         for name in payload:
             archive.writestr(name, object_bytes)
@@ -3350,7 +3420,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
                     f"{package}lib/cmake/executorch_backend_tensorrt/{cmake_name}",
                     "# stub\n",
                 )
-        info = "torch_tensorrt_executorch_runtime-0.1.0.dist-info"
+        info = f"torch_tensorrt_executorch_runtime-{wheel_version}.dist-info"
         metadata_tag = "any" if case == "wheel_tag_mismatch" else tag
         archive.writestr(
             f"{info}/WHEEL",
@@ -3359,7 +3429,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         if case != "no_metadata_at_all":
             archive.writestr(
                 f"{info}/METADATA",
-                "Metadata-Version: 2.1\nName: torch-tensorrt-executorch-runtime\nVersion: 0.1.0\n"
+                "Metadata-Version: 2.1\nName: torch-tensorrt-executorch-runtime\n"
+                + f"Version: {wheel_version}\n"
                 + "".join(f"Requires-Dist: {r}\n" for r in requires),
             )
 

@@ -3,10 +3,15 @@
 
 import operator
 import sys
+import tempfile
 
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    force_causal_efficient_attention,
+)
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -59,6 +64,51 @@ class TestInputAsOutput(TestCase):
             msg=f"InputAsOutput TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
+
+    class ReturnsInput(torch.nn.Module):
+        def __init__(self, copies):
+            super().__init__()
+            self.copies = copies
+
+        def forward(self, x, y):
+            return (x + y,) + (y,) * self.copies
+
+    def _assert_matches_eager(self, mod, **settings):
+        inputs = (torch.randn(5, 7).cuda(), torch.randn(5, 7).cuda())
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, inputs),
+            list(inputs),
+            min_block_size=1,
+            require_full_compilation=True,
+            **settings,
+        )
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+    def test_input_returned_next_to_a_computed_output(self):
+        self._assert_matches_eager(self.ReturnsInput(copies=1))
+
+    def test_input_returned_twice(self):
+        self._assert_matches_eager(self.ReturnsInput(copies=2))
+
+    def test_computed_output_returned_twice(self):
+        class M(torch.nn.Module):
+            def forward(self, x, y):
+                z = x + y
+                return z, z
+
+        self._assert_matches_eager(M())
+
+    def test_input_returned_twice_from_the_engine_cache(self):
+        """An engine loaded from the cache has as many outputs as a fresh build."""
+        with tempfile.TemporaryDirectory() as cache_dir:
+            for _ in range(2):
+                self._assert_matches_eager(
+                    self.ReturnsInput(copies=2),
+                    immutable_weights=False,
+                    cache_built_engines=True,
+                    reuse_cached_engines=True,
+                    engine_cache_dir=cache_dir,
+                )
 
 
 class TestLoweringPassMembership(TestCase):
@@ -284,6 +334,34 @@ class TestRemoveSymIntNodes(TestCase):
         self.assertTrue(True)
 
 
+class TestPreDispatchSideEffects(TestCase):
+    def test_vmap_survives_assert_removal(self):
+        # The dtype casts put _assert_tensor_metadata nodes in the exported graph, and
+        # removing them runs dead-code elimination over the whole graph while the vmap's
+        # nesting calls (used by nothing, kept for their side effect) are still in it.
+        # transformers builds attention masks this way.
+        class VmapMask(torch.nn.Module):
+            def forward(self, x, y):
+                mask = torch.vmap(lambda row: row > 0)(x)
+                return (x * mask).to(torch.float16) + y.to(torch.float16)
+
+        model = VmapMask().eval().cuda()
+        inputs = (
+            torch.randn(4, 8).cuda(),
+            torch.randn(4, 8, dtype=torch.float64).cuda(),
+        )
+        exported = torch.export.export(model, inputs)
+        trt_module = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            truncate_double=True,
+        )
+        torch.testing.assert_close(
+            trt_module(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+        )
+
+
 class TestNormalizeNegativeSliceStop(TestCase):
     def test_normalizes_negative_symbolic_start_bound(self):
         from torch_tensorrt.dynamo.lowering.passes.normalize_negative_slice_stop import (
@@ -378,6 +456,98 @@ class TestEliminateSymMinInt64Max(TestCase):
 
         output_node = next(node for node in gm.graph.nodes if node.op == "output")
         self.assertEqual(output_node.args[0], (x, x))
+
+
+class TestPreserveAttentionOutputLayout(TestCase):
+    def test_view_after_decomposed_attention(self):
+        # Fused attention returns this transposed query's layout, so export drops the
+        # .contiguous() below and records a view that only works on that layout. The
+        # attention output must stay a tensor of its own (detach_), the in-place
+        # update through the view must reach it, and the no_grad region puts all of
+        # it in a subgraph.
+        class ViewAfterAttention(torch.nn.Module):
+            def forward(self, query, key, value):
+                with torch.no_grad():
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out.detach_()
+                    flat = out.transpose(1, 2).contiguous()
+                    flat = flat.view(flat.shape[0], flat.shape[1], -1)
+                    flat.add_(1)
+                return out, flat
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = ViewAfterAttention().cuda()
+        ep = torch.export.export(model, tuple(inputs))
+        # With a contiguous attention output, export keeps the .contiguous() and
+        # this test passes without the pass.
+        (attention,) = (
+            node
+            for module in ep.graph_module.modules()
+            if isinstance(module, torch.fx.GraphModule)
+            for node in module.graph.nodes
+            if node.target == torch.ops.aten.scaled_dot_product_attention.default
+        )
+        self.assertFalse(attention.meta["val"].is_contiguous())
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, inputs, min_block_size=1, decompose_attention=True
+        )
+        torch.testing.assert_close(
+            model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    def test_view_after_attention_in_cond_branch(self):
+        class CondViewAfterAttention(torch.nn.Module):
+            def forward(self, pred, query, key, value):
+                def attend(query, key, value):
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out = out.transpose(1, 2).contiguous()
+                    return out.view(out.shape[0], out.shape[1], -1)
+
+                def flatten(query, key, value):
+                    return query.flatten(2).clone()
+
+                return torch.cond(pred, attend, flatten, (query, key, value))
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = CondViewAfterAttention().cuda()
+        pred = torch.tensor(True).cuda()
+        ep = torch.export.export(model, (pred, *inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [pred, *inputs], min_block_size=1, decompose_attention=True
+        )
+        for pred in (True, False):
+            pred = torch.tensor(pred).cuda()
+            torch.testing.assert_close(
+                model(pred, *inputs), trt_module(pred, *inputs), rtol=1e-2, atol=1e-2
+            )
+
+    def test_attention_on_data_dependent_rows(self):
+        # Boolean indexing gives attention a batch size known only at runtime.
+        class MaskedAttention(torch.nn.Module):
+            def forward(self, x, mask):
+                query = x[mask].transpose(1, 2)
+                return torch.nn.functional.scaled_dot_product_attention(
+                    query, query, query
+                )
+
+        model = MaskedAttention().cuda()
+        x = torch.randn(3, 16, 4, 32).half().cuda()
+        mask = torch.tensor([True, False, True]).cuda()
+        ep = torch.export.export(model, (x, mask))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [x, mask], min_block_size=1, decompose_attention=True
+        )
+        for mask in ([True, False, False], [True, True, True]):
+            mask = torch.tensor(mask).cuda()
+            torch.testing.assert_close(
+                model(x, mask), trt_module(x, mask), rtol=1e-2, atol=1e-2
+            )
 
 
 class TestRewriteEfficientAttention(TestCase):
@@ -482,6 +652,40 @@ class TestRewriteEfficientAttention(TestCase):
         )
         trt_out = trt_module(*inputs)
         torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+
+    def test_force_causal_efficient_attention_only_for_lengths_known_to_be_equal(self):
+        class Attention(torch.nn.Module):
+            def forward(self, query, key, value, attn_bias):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, value, attn_bias, False
+                )[0]
+
+        q_len, k_len = torch.export.Dim("q_len"), torch.export.Dim("k_len")
+        inputs = [torch.randn(1, 2, 8, 16, device="cuda") for _ in range(3)]
+        inputs.append(torch.zeros(1, 2, 8, 8, device="cuda"))
+        # Separate length symbols can differ at run time even with equal example sizes; one shared symbol cannot.
+        for k_dim, forced in ((k_len, False), (q_len, True)):
+            with self.subTest(forced=forced):
+                gm = torch.export.export(
+                    Attention(),
+                    tuple(inputs),
+                    dynamic_shapes=(
+                        {2: q_len},
+                        {2: k_dim},
+                        {2: k_dim},
+                        {2: q_len, 3: k_dim},
+                    ),
+                ).module()
+                gm = force_causal_efficient_attention(
+                    gm, CompilationSettings(attn_bias_is_causal=True)
+                )
+                (node,) = (
+                    n
+                    for n in gm.graph.nodes
+                    if n.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                )
+                self.assertEqual(node.args[3] is None, forced)
 
 
 if __name__ == "__main__":
