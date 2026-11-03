@@ -160,9 +160,10 @@ def record_partition_inputs(partition_id: str, inputs: Any) -> None:
 def record_engine_metadata(name: str, result: Any) -> None:
     collector = current_collector()
     if collector is not None:
+        serialized_engine = memoryview(result.serialized_engine).cast("B")
         collector.engine_metadata[name] = {
-            "serialized_size_bytes": len(result.serialized_engine),
-            "serialized_sha256": hashlib.sha256(result.serialized_engine).hexdigest(),
+            "serialized_size_bytes": serialized_engine.nbytes,
+            "serialized_sha256": hashlib.sha256(serialized_engine).hexdigest(),
             "input_binding_names": list(result.input_names),
             "output_binding_names": list(result.output_names),
             "requires_output_allocator": result.requires_output_allocator,
