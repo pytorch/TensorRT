@@ -37,6 +37,40 @@ the weight size on the GPU. Delete the original PyTorch model if you no longer n
 Models whose lowering creates new weight tensors (for example by folding transposes or
 casts of weights) need more.
 
+The ways to lower that memory, each described below:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Technique
+     - Lowers
+     - How
+   * - Memory trimming
+     - Host memory kept after each build
+     - On by default (``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM``)
+   * - Offloading to the CPU
+     - GPU memory, for more host memory
+     - ``offload_module_to_cpu=True``
+   * - Compiling on the CPU
+     - GPU memory, with about the same host memory
+     - Export with CPU inputs, compile with GPU inputs
+   * - Several smaller engines
+     - Host memory of each build
+     - ``enable_resource_partitioning=True``, ``cpu_memory_budget``
+   * - Releasing weights as engines are built
+     - Weights held during compilation
+     - ``release_weights_after_build``
+   * - Mapping the weights from their file
+     - Host memory before and during compilation
+     - ``torch_tensorrt.dynamo.tools.map_weights``
+   * - Weight streaming
+     - GPU memory at run time
+     - ``enable_weight_streaming=True``
+
+They combine. ``torch_tensorrt.dynamo.low_memory`` maps the weights, which leaves the model
+on the CPU, and sets the partitioner and the weight release for every compile in a block;
+see `Compiling from Memory-Mapped Weights`_.
+
 CPU Memory
 ^^^^^^^^^^
 
@@ -87,15 +121,39 @@ CPU Memory
    The per-engine budget is ``(cpu_memory_budget - resident memory) / 4``. Resident memory
    is the process's RSS when partitioning runs, so it includes weights held on the host
    (on a CPU compile, every weight already read into memory, see below): set
-   ``cpu_memory_budget`` above that. Without ``cpu_memory_budget``, the budget is the available system memory divided
-   by 4. See :ref:`low_cpu_memory_compilation` for a runnable example.
+   ``cpu_memory_budget`` above that. Without ``cpu_memory_budget``, the budget is the
+   available system memory divided by 4. See :ref:`low_cpu_memory_compilation` for a
+   runnable example.
 
    Each engine boundary adds a little latency. A split that cuts through a region reusing
    the same weights, such as an unrolled loop, also costs memory: every engine that uses
-   those weights carries its own copy. For a 3B-parameter model with a 10-step unrolled
+   those weights carries its own copy. For a 3.6-billion-parameter model with a 10-step unrolled
    denoising loop compiled into 16 engines, the engines totaled 10.9 GB against 5.3 GB as
    one engine (GPU memory at inference: 11.5 GB against 5.5 GB), and inference was 2%
    slower.
+
+4. **Release weights as their engines are built**
+
+   Each TensorRT engine carries its own copy of its weights, so the model's copy of a
+   weight isn't needed for the rest of compilation once the last engine that reads it is
+   built. ``release_weights_after_build`` frees it then, and frees the weights no engine
+   reads before the first build. Weights read by layers left in PyTorch are kept.
+
+   * ``None`` (default): only weights mapped from a file (option 5) are released. Their
+     pages are dropped and re-read from the file if used again, so the model keeps working.
+   * ``True``: the model's other weights are freed too. The model shares that memory, so
+     it can't be used after compiling, even if compiling fails.
+   * ``False``: nothing is released.
+
+   With several engines (option 3), compilation then holds only the weights still to be
+   built. For the same model compiled on the CPU as 9 engines, the peak of host and GPU
+   memory together went from 25.7 to 18.9 GiB with ``True``.
+
+5. **Map the weights from their file**
+
+   Instead of loading the weights before compiling, point the model at its safetensors
+   file: a weight's pages are then read only while TensorRT builds the engine that uses
+   it. See `Compiling from Memory-Mapped Weights`_.
 
 GPU Memory
 ^^^^^^^^^^
@@ -119,16 +177,6 @@ GPU Memory
    time, and TensorRT reads them there in place. Peak GPU memory drops to about the size
    of the engine (**1x**), while CPU memory holds the weights for the rest of
    compilation (about **2x** at peak, while the engine is handed to the runtime).
-
-Unified Memory Systems
-^^^^^^^^^^^^^^^^^^^^^^
-
-On systems where the CPU and GPU share physical memory, such as Jetson or DGX Spark,
-CPU and GPU allocations come out of the same pool, so budget for their sum. Counting
-the model itself, compilation peaks at about **3.8x** the weight size with default
-settings and about **3.2x** with ``offload_module_to_cpu=True``. Moving the weights to
-the CPU frees no memory on these systems, but TensorRT then builds from them directly
-instead of from a second copy.
 
 2. **Compile on the CPU**
 
@@ -179,6 +227,16 @@ instead of from a second copy.
       with a dtype mismatch during export or conversion (for example
       ``IMatrixMultiplyLayer must have same input types``). Wrap those regions in
       ``torch.autocast("cpu", dtype=...)`` for the export.
+
+Unified Memory Systems
+^^^^^^^^^^^^^^^^^^^^^^
+
+On systems where the CPU and GPU share physical memory, such as Jetson or DGX Spark,
+CPU and GPU allocations come out of the same pool, so budget for their sum. Counting
+the model itself, compilation peaks at about **3.8x** the weight size with default
+settings and about **3.2x** with ``offload_module_to_cpu=True``. Moving the weights to
+the CPU frees no memory on these systems, but TensorRT then builds from them directly
+instead of from a second copy.
 
 ----
 
