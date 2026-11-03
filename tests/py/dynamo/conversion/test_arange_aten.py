@@ -3,7 +3,6 @@
 
 from unittest.mock import patch
 
-import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -14,7 +13,10 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
+
+# Import torch_tensorrt first to define the TensorRT-RTX alias.
+import tensorrt as trt  # isort: skip
 
 
 class TestArangeConverter(DispatchTestCase):
@@ -70,6 +72,9 @@ class TestArangeConverter(DispatchTestCase):
         ]
     )
     def test_static_arange_dtype_compatibility(self, dtype, start, end, step):
+        if dtype == torch.bfloat16:
+            skip_if_trt_rtx_turing(self, "bfloat16")
+
         class Arange(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.arange.start_step(
@@ -146,6 +151,8 @@ class TestArangeConverter(DispatchTestCase):
         )
 
     def test_arange_static_non_numpy_type(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
         class Arange(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.arange.start_step(

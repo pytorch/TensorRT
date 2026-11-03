@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCondConverter(DispatchTestCase):
@@ -109,6 +109,8 @@ class TestCondConverter(DispatchTestCase):
         ]
     )
     def test_cond_linear_outside(self, _, pred):
+        skip_if_trt_rtx_turing(self, "FP32 GEMM")
+
         class ConditionalModel(nn.Module):
             def __init__(self):
                 super().__init__()
