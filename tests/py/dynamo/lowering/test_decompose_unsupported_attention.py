@@ -353,8 +353,11 @@ class TestDecomposeUnsupportedAttention(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
         )
+        # TensorRT-RTX ignores disable_tf32, so it can only match to TF32 precision. That
+        # still fails attention run in BF16, which is off by more than 2e-3.
+        tol = 1e-3 if ENABLED_FEATURES.tensorrt_rtx else 1e-4
         torch.testing.assert_close(
-            trt_model(*inputs), model(*inputs), rtol=1e-4, atol=1e-4
+            trt_model(*inputs), model(*inputs), rtol=tol, atol=tol
         )
 
     def test_attentions_sharing_a_bf16_query_are_decomposed(self):
