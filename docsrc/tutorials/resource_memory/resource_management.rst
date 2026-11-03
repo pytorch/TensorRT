@@ -171,7 +171,9 @@ zero-copy views of a safetensors file:
 
 ``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
 building it allocates no weights, maps them, and drops their pages when the block ends, unless the block
-sets ``release_weights_after_build=False``.
+sets ``release_weights_after_build=False``. With the resource partitioner on, the model is built as
+several engines, each small enough to build within ``cpu_memory_budget``, so only about one engine's
+weights are resident at a time:
 
 .. code-block:: python
 
@@ -182,13 +184,23 @@ sets ``release_weights_after_build=False``.
     # Once, wherever the model loads: write its weights in the dtypes it runs in.
     save_weights_for_mapping(model, "weights.safetensors")
 
-    # To compile:
-    ctx = torch_tensorrt.dynamo.low_memory(lambda: MyModel().eval(), "weights.safetensors")
+    # To compile: map the weights, and build engines that fit an 8 GiB host memory budget.
+    ctx = torch_tensorrt.dynamo.low_memory(
+        lambda: MyModel().eval(),
+        "weights.safetensors",
+        enable_resource_partitioning=True,
+        cpu_memory_budget=8 << 30,
+    )
     with ctx as model:
         print(f"{ctx.report.mapped_bytes / 2**30:.2f} GiB mapped")
         example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
         exported = torch.export.export(model, (example,))
         trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example.cuda()])
+
+``cpu_memory_budget`` is the host memory the compiling process may use, counting what it already uses,
+and each engine gets up to a quarter of what's left. In :ref:`compile_from_mapped_weights`, a model with
+192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
+compiling, against all 192 MiB when built as one engine.
 
 ``low_memory`` also takes the compile settings that lower memory during compilation:
 ``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget`` and
@@ -249,8 +261,9 @@ A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins
 - **Releasing pages uses** ``madvise(MADV_DONTNEED)`` **(POSIX).** Elsewhere the mapping works, but the
   pages stay resident until the file is unmapped.
 
-Combined with CPU compilation and the resource partitioner, the host's peak stays near the largest
-single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host RSS before
-compilation went from 8.7 to 2.9 GiB. See :ref:`compile_from_mapped_weights` for a runnable example.
+With mapped weights, CPU compilation and the resource partitioner, the host's peak stays near the
+largest single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host
+RSS before compilation went from 8.7 to 2.9 GiB. See :ref:`compile_from_mapped_weights` for a runnable
+example.
 
 
