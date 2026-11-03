@@ -8,6 +8,10 @@ import tempfile
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    force_causal_efficient_attention,
+)
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -648,6 +652,40 @@ class TestRewriteEfficientAttention(TestCase):
         )
         trt_out = trt_module(*inputs)
         torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+
+    def test_force_causal_efficient_attention_only_for_lengths_known_to_be_equal(self):
+        class Attention(torch.nn.Module):
+            def forward(self, query, key, value, attn_bias):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, value, attn_bias, False
+                )[0]
+
+        q_len, k_len = torch.export.Dim("q_len"), torch.export.Dim("k_len")
+        inputs = [torch.randn(1, 2, 8, 16, device="cuda") for _ in range(3)]
+        inputs.append(torch.zeros(1, 2, 8, 8, device="cuda"))
+        # Separate length symbols can differ at run time even with equal example sizes; one shared symbol cannot.
+        for k_dim, forced in ((k_len, False), (q_len, True)):
+            with self.subTest(forced=forced):
+                gm = torch.export.export(
+                    Attention(),
+                    tuple(inputs),
+                    dynamic_shapes=(
+                        {2: q_len},
+                        {2: k_dim},
+                        {2: k_dim},
+                        {2: q_len, 3: k_dim},
+                    ),
+                ).module()
+                gm = force_causal_efficient_attention(
+                    gm, CompilationSettings(attn_bias_is_causal=True)
+                )
+                (node,) = (
+                    n
+                    for n in gm.graph.nodes
+                    if n.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                )
+                self.assertEqual(node.args[3] is None, forced)
 
 
 if __name__ == "__main__":

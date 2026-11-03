@@ -3278,6 +3278,14 @@ def aten_ops_sub(
     )
 
 
+def _is_integer(val: Any) -> bool:
+    """Is this operand an integer or boolean tensor, or a Python int?"""
+    dtype = getattr(val, "dtype", None)
+    if dtype is None:
+        return isinstance(val, int)
+    return not _enums.dtype._from(dtype).to(torch.dtype).is_floating_point
+
+
 @dynamo_tensorrt_converter(operator.truediv, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
@@ -3294,13 +3302,34 @@ def aten_ops_div(
     rounding_mode = kwargs.get("rounding_mode")
 
     if rounding_mode is None:
+        lhs_val, rhs_val = args[0], args[1]
+        # True division of two integers gives a float, but TensorRT divides integers as integers.
+        # prims.div truncates integers, so it is not cast here.
+        if target != torch.ops.prims.div.default and all(
+            _is_integer(val) for val in (lhs_val, rhs_val)
+        ):
+            lhs_val, rhs_val = (
+                (
+                    float(val)
+                    if isinstance(val, int)
+                    else impl.cast.to_copy(
+                        ctx,
+                        target,
+                        get_ir(target),
+                        f"{name}_{side}_to_float",
+                        val,
+                        torch.float32,
+                    )
+                )
+                for val, side in ((lhs_val, "lhs"), (rhs_val, "rhs"))
+            )
         return impl.elementwise.div(
             ctx,
             target,
             get_ir(target),
             name,
-            args[0],
-            args[1],
+            lhs_val,
+            rhs_val,
         )
     elif rounding_mode == "floor":
         return impl.elementwise.floor_divide(
@@ -5259,13 +5288,17 @@ def aten_ops_linear(
 def attention_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject fused attention TensorRT-RTX cannot serve when Turing (SM 7.5) is a target.
+    """Reject fused attention TensorRT cannot serve, so it runs in PyTorch.
 
-    A fused attention op carries the same FP32 GEMMs ``gemm_capability_validator``
-    rejects, but inside the converter, so the graph holds one node and no ``mm``/``bmm``
-    for that guard to see. On Turing TRT-RTX this results in failure. Only the q/k/v
-    dtypes matter, so FP16 attention keeps running on TensorRT.
+    One case is a constant key, see ``_has_constant_key``. The other is TensorRT-RTX
+    when Turing (SM 7.5) is a target. A fused attention op carries the same FP32 GEMMs
+    ``gemm_capability_validator`` rejects, but inside the converter, so the graph holds
+    one node and no ``mm``/``bmm`` for that guard to see. On Turing TRT-RTX this results
+    in failure. Only the q/k/v dtypes matter, so FP16 attention keeps running on TensorRT.
     """
+    if _has_constant_key(node):
+        return False
+
     if not trt_rtx_targets_turing(settings):
         return True
 
@@ -5354,6 +5387,42 @@ def _inputs_quantized_to_fp8(node: Node) -> bool:
     return all(
         isinstance(arg, Node) and _is_fp8_quantize_op(arg) for arg in node.args[:3]
     )
+
+
+def _has_constant_key(node: Node) -> bool:
+    # TensorRT 11.2 to 11.4 give wrong FP16 and BF16 results for an attention layer whose key is a
+    # constant: they fold the transpose of the key into the constant, and the fused kernel output is then
+    # wrong. Seen on an A100 and an H100, and declined on every version. Refittable engines do not fold
+    # the key, but then return NaN for a fully masked row, unlike with an input key, so they are declined
+    # too. FP32 attention does not use that kernel and gives the same results as with an input key. A key
+    # whose shape or offset comes from an input keeps the layer as before; TensorRT can still fold it when
+    # the optimization profile fixes the input sizes the key uses.
+    from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+        _aliases_input,
+    )
+
+    key = source = node.args[1]
+    # Constant folding keeps some views of a constant, such as one that is also a graph output.
+    while (
+        isinstance(source, Node)
+        and (source.target in _PASS_THROUGH_OPS or _aliases_input(source))
+        and source.all_input_nodes == [source.args[0]]
+    ):
+        source = source.args[0]
+    dtype = (
+        getattr(key.meta.get("val"), "dtype", None) if isinstance(key, Node) else None
+    )
+    if (
+        isinstance(source, Node)
+        and source.op == "get_attr"
+        and dtype in (torch.float16, torch.bfloat16)
+    ):
+        _LOGGER.debug(
+            "Declining attention %s: its key is a constant, which TensorRT's attention layer gets wrong.",
+            node.name,
+        )
+        return True
+    return False
 
 
 def scaled_dot_product_attention_validator(

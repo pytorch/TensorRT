@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=583ab113"></script>
+    <script src="../../../_static/documentation_options.js?v=62de6c45"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -502,6 +502,7 @@ document.write(`
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
+    <span class="n">DEDUPLICATE_WEIGHTS</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
@@ -643,6 +644,7 @@ document.write(`
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
+<span class="sd">        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Under torch.compile the weights are engine inputs, not constants, so they are not shared. Default is False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
 <span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
@@ -723,6 +725,7 @@ document.write(`
     <span class="p">)</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
     <span class="n">fold_shared_kv_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span>
+    <span class="n">deduplicate_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEDUPLICATE_WEIGHTS</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
     <span class="n">build_route</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">BUILD_ROUTE</span>
     <span class="n">tune_build_routes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTES</span>
@@ -773,6 +776,7 @@ document.write(`
         <span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"deduplicate_weights"</span><span class="p">,</span> <span class="n">DEDUPLICATE_WEIGHTS</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"build_route"</span><span class="p">,</span> <span class="n">BUILD_ROUTE</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_routes"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTES</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_route_file"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">)</span>
@@ -815,6 +819,7 @@ document.write(`
     <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
     <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>
     <span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span>
+    <span class="s2">"deduplicate_weights"</span><span class="p">,</span>
     <span class="s2">"build_route"</span><span class="p">,</span>
 <span class="p">}</span>
 
