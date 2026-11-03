@@ -7,7 +7,7 @@ import pytest
 import torch
 
 import torch_tensorrt.kernels as ttk
-from torch_tensorrt.kernels import _cutile, _register, _triton
+from torch_tensorrt.kernels import _cutedsl, _cutile, _register, _triton
 
 from .conftest import skip_no_qdp
 
@@ -33,7 +33,7 @@ def test_schema_rejects_inputs_that_shadow_callback_dependencies(name):
 
 
 @skip_no_qdp
-@pytest.mark.parametrize("frontend", ["triton", "cutile"])
+@pytest.mark.parametrize("frontend", ["triton", "cutile", "cutedsl"])
 @pytest.mark.parametrize("name", ["_kernel_name", "_generic_plugin_desc", "len"])
 def test_frontend_rejects_unsafe_schema_before_compilation_or_registration(
     monkeypatch, frontend, name
@@ -43,6 +43,7 @@ def test_frontend_rejects_unsafe_schema_before_compilation_or_registration(
 
     monkeypatch.setattr(_triton, "compile_triton_to_ptx", unexpected)
     monkeypatch.setattr(_cutile, "compile_cutile_to_ptx", unexpected)
+    monkeypatch.setattr(_cutedsl, "compile_to_ptx", unexpected)
     monkeypatch.setattr(_register, "_register_pytorch_op", unexpected)
 
     def meta(x: torch.Tensor) -> torch.Tensor:
@@ -59,6 +60,10 @@ def test_frontend_rejects_unsafe_schema_before_compilation_or_registration(
         if frontend == "triton":
             ttk.triton_op(
                 **kwargs, signature={name: "*fp32", "out": "*fp32"}, constexprs={}
+            )
+        elif frontend == "cutedsl":
+            ttk.cutedsl_op(
+                **kwargs, signature={name: "*fp32", "out": "*fp32"}, block_size=128
             )
         else:
             ttk.cutile_op(**kwargs, signature={name: "fp32", "out": "fp32"})
