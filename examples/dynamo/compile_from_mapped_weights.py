@@ -83,11 +83,10 @@ print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 # The mapped weights are CPU tensors, so the model and its example input stay on the CPU through
 # ``torch.export``. TensorRT takes weights as host pointers and reads each one in place from the mapping:
 # there's no GPU copy and no host copy. A weight's pages are dropped once the last engine that reads it
-# is built; the tensor stays valid and is re-read from the file if used. Keyword arguments such as
-# ``min_block_size`` are defaults for every ``compile`` inside the block.
+# is built; the tensor stays valid and is re-read from the file if used.
 
 x = torch.randn(4, 2048)
-ctx = torch_tensorrt.dynamo.low_memory(lambda: MLP().eval(), path, min_block_size=1)
+ctx = torch_tensorrt.dynamo.low_memory(lambda: MLP().eval(), path)
 with ctx as model, torch.no_grad():
     print(
         f"mapped {ctx.report.mapped_bytes / 2**20:.0f} MiB; "

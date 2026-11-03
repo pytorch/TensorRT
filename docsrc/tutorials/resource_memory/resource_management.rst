@@ -190,15 +190,19 @@ sets ``release_weights_after_build=False``.
         exported = torch.export.export(model, (example,))
         trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example.cuda()])
 
-Any other keyword of ``low_memory`` is a ``torch_tensorrt.dynamo.compile`` setting, used as the default
-for every call to it inside the block, including in a script you don't own, and so for
+``low_memory`` also takes the compile settings that lower memory during compilation:
+``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget`` and
+``release_weights_after_build``. They're the defaults for every call to
+``torch_tensorrt.dynamo.compile`` inside the block, including in a script you don't own, and so for
 ``torch_tensorrt.compile(..., ir="dynamo")``. ``torch.compile(backend="tensorrt")``,
 ``cross_compile_for_windows`` and ``convert_exported_program_to_serialized_trt_engine`` don't use them.
-An argument passed to ``compile`` wins over the block's:
+A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins over the block's:
 
 .. code-block:: python
 
-    with torch_tensorrt.dynamo.low_memory(enable_resource_partitioning=True, optimization_level=1):
+    with torch_tensorrt.dynamo.low_memory(
+        enable_resource_partitioning=True, cpu_memory_budget=8 << 30
+    ):
         run_export_script()
 
 ``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.

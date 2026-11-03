@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import inspect
+
 import pytest
 import torch
 import torch_tensorrt
@@ -34,20 +36,48 @@ def _settings(exported_program, **kwargs):
 
 def test_defaults_fill_in_what_the_caller_does_not_pass():
     assert _settings(None) == {}
-    with low_memory(optimization_level=1, min_block_size=3):
-        assert _settings(None, min_block_size=5) == {
-            "optimization_level": 1,
-            "min_block_size": 5,
+    with low_memory(offload_module_to_cpu=True, cpu_memory_budget=3 << 30):
+        assert _settings(None, cpu_memory_budget=5 << 30) == {
+            "offload_module_to_cpu": True,
+            "cpu_memory_budget": 5 << 30,
         }
-        with low_memory(optimization_level=2):
-            assert _settings(None) == {"optimization_level": 2, "min_block_size": 3}
-        assert _settings(None) == {"optimization_level": 1, "min_block_size": 3}
+        with low_memory(offload_module_to_cpu=False, enable_resource_partitioning=True):
+            assert _settings(None) == {
+                "offload_module_to_cpu": False,
+                "enable_resource_partitioning": True,
+                "cpu_memory_budget": 3 << 30,
+            }
+        assert _settings(None) == {
+            "offload_module_to_cpu": True,
+            "cpu_memory_budget": 3 << 30,
+        }
     assert _settings(None) == {}
+
+
+def test_a_setting_left_at_none_is_not_set():
+    with low_memory(release_weights_after_build=False):
+        with low_memory(release_weights_after_build=None, offload_module_to_cpu=None):
+            assert _settings(None) == {"release_weights_after_build": False}
+
+
+def test_the_settings_are_compile_settings():
+    # compile takes **kwargs, so a renamed setting would be ignored there, not rejected.
+    block = {
+        name
+        for name, p in inspect.signature(low_memory).parameters.items()
+        if p.kind is p.KEYWORD_ONLY
+    }
+    assert block and block <= set(
+        inspect.signature(torch_tensorrt.dynamo.compile).parameters
+    )
 
 
 def test_bad_arguments_raise():
     with pytest.raises(TypeError, match="optimisation_level"):
         low_memory(optimisation_level=1)
+    # Only settings that lower compilation memory: the rest go to compile itself.
+    with pytest.raises(TypeError, match="min_block_size"):
+        low_memory(min_block_size=1)
     with pytest.raises(TypeError, match="arg_inputs"):
         low_memory(arg_inputs=[])
     with pytest.raises(ValueError, match="together"):
@@ -72,7 +102,7 @@ def test_leaving_drops_the_pages_also_on_an_exception(tmp_path, monkeypatch):
         return dropped[-1]
 
     monkeypatch.setattr(_low_memory, "release_mapped_storage", spy)
-    ctx = low_memory(_Model, tmp_path / "w.safetensors", optimization_level=1)
+    ctx = low_memory(_Model, tmp_path / "w.safetensors", offload_module_to_cpu=True)
     with pytest.raises(RuntimeError, match="boom"):
         with ctx as model:
             assert not model.proj.weight.is_meta
@@ -109,17 +139,27 @@ def test_compile_inside_the_block(tmp_path, monkeypatch):
         torch_tensorrt.dynamo._weight_release, "release_mapped_storage", spy
     )
     x = torch.randn(3, 8)
-    with low_memory(_Model, tmp_path / "w.safetensors", min_block_size=1) as model:
+    with low_memory(_Model, tmp_path / "w.safetensors") as model:
         exported = torch.export.export(model.eval(), (x,))
-        trt_model = torch_tensorrt.compile(exported, ir="dynamo", inputs=[x.cuda()])
+        trt_model = torch_tensorrt.compile(
+            exported, ir="dynamo", inputs=[x.cuda()], min_block_size=1
+        )
     torch.testing.assert_close(
         trt_model(x.cuda()).cpu(), reference(x), rtol=1e-3, atol=1e-3
     )
-    assert any(  # the block's min_block_size=1: one op is enough for an engine
-        "_run_on_acc" in name for name, _ in trt_model.named_children()
-    )
     assert released and all(released)  # by default, mapped weights' pages are dropped
     torch.testing.assert_close(model.proj.weight, reference.proj.weight)
+
+    # The block's setting reaches compile: with release_weights_after_build=False, none are.
+    released.clear()
+    with low_memory(
+        _Model, tmp_path / "w.safetensors", release_weights_after_build=False
+    ) as model:
+        exported = torch.export.export(model.eval(), (x,))
+        torch_tensorrt.compile(
+            exported, ir="dynamo", inputs=[x.cuda()], min_block_size=1
+        )
+    assert not released
 
     # An ordinary model's weights are left alone by default.
     plain = _Model().eval()
