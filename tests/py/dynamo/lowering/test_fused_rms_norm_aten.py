@@ -281,6 +281,33 @@ class TestFusedRMSNormLoweringPass(DispatchTestCase):
             enable_passes=True,
         )
 
+    @parameterized.expand([("float16", torch.float16), ("bfloat16", torch.bfloat16)])
+    def test_rms_norm_half_precision_matches_pytorch(self, _, dtype):
+        class RMSNorm(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten._fused_rms_norm.default(x, [3072], weight, 1e-6)
+
+        torch.manual_seed(0)
+        inputs = (
+            torch.randn(2, 128, 3072, dtype=dtype).cuda(),
+            (torch.randn(3072) * 0.3 + 1).to(dtype).cuda(),
+        )
+        trt_gm = torch_tensorrt.dynamo.compile(
+            torch.export.export(RMSNorm(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+        )
+
+        output, rstd = trt_gm(*inputs)
+        expected_output, expected_rstd = RMSNorm()(*inputs)
+        # PyTorch normalizes in float32 and rounds once, so the results differ by at most one rounding.
+        torch.testing.assert_close(
+            output, expected_output, rtol=torch.finfo(dtype).eps, atol=0
+        )
+        # assert_close also checks that the reciprocal standard deviation stays float32.
+        torch.testing.assert_close(rstd, expected_rstd)
+        torch._dynamo.reset()
+
     def test_rms_norm_with_dynamic_shape_and_graph_break(self):
         """
         Test RMS norm with dynamic batch dimension and graph break.

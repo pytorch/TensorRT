@@ -6,6 +6,7 @@ import operator
 from typing import Any
 
 import torch
+from torch._prims_common import get_computation_dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -35,15 +36,18 @@ def replace_fused_rms_norm(
 
 
 def _call(
-    gm: torch.fx.GraphModule, target: torch._ops.OpOverload, args: tuple[Any, ...]
+    gm: torch.fx.GraphModule,
+    target: torch._ops.OpOverload,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any] | None = None,
 ) -> torch.fx.Node:
-    node = gm.graph.call_function(target, args=args)
+    node = gm.graph.call_function(target, args=args, kwargs=kwargs)
     # Later passes read meta["val"], so compute it from the inputs' fake values.
     vals = [
         arg.meta.get("val") if isinstance(arg, torch.fx.Node) else arg for arg in args
     ]
     if all(val is not None for val in vals):
-        node.meta["val"] = target(*vals)
+        node.meta["val"] = target(*vals, **(kwargs or {}))
     return node
 
 
@@ -61,7 +65,16 @@ def process_fused_rms_norm_node(
     for i in range(len(shape)):
         dims_to_reduce.append(x_dim - i - 1)
 
+    input_dtype = node.meta["val"][0].dtype
+    # As in PyTorch, float16 and bfloat16 inputs are normalized in float32 and rounded once at the end.
+    computation_dtype = get_computation_dtype(input_dtype)
+
     with gm.graph.inserting_before(node):
+        if computation_dtype != input_dtype:
+            x = _call(
+                gm, torch.ops.aten._to_copy.default, (x,), {"dtype": computation_dtype}
+            )
+
         # Replace fused rms norm with standard rms norm
         x_squared = _call(gm, torch.ops.aten.mul.Tensor, (x, x))
 
@@ -81,6 +94,14 @@ def process_fused_rms_norm_node(
 
         if weight is not None:
             x_normalized = _call(gm, torch.ops.aten.mul.Tensor, (x_normalized, weight))
+
+        if computation_dtype != input_dtype:
+            x_normalized = _call(
+                gm,
+                torch.ops.aten._to_copy.default,
+                (x_normalized,),
+                {"dtype": input_dtype},
+            )
 
         for i, user in enumerate(list(node.users)):
             if user.op == "call_function" and user.target == operator.getitem:
