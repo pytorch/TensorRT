@@ -101,6 +101,40 @@ class TestDecomposeUnsupportedAttention(TestCase):
         targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
         self.assertIn(torch.ops.aten.scaled_dot_product_attention.default, targets)
 
+    def test_attention_with_a_constant_key_is_left_for_pytorch(self):
+        # TensorRT's attention layer gets a constant key wrong in FP16 and BF16. FP32 matches an
+        # input key, and a key that takes its batch from an input keeps the layer as before.
+        class ConstantKey(nn.Module):
+            def __init__(self, dtype):
+                super().__init__()
+                self.register_buffer("k", torch.randn(1, 2, 4, 8, dtype=dtype))
+
+            def forward(self, q, v):
+                k = self.k.expand(q.shape[0], -1, -1, -1)
+                return torch.ops.aten.scaled_dot_product_attention.default(q, k, v)
+
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
+        batch = torch.export.Dim("batch")
+        for dtype, dynamic_shapes, supported in (
+            (torch.float16, None, False),
+            (torch.bfloat16, None, False),
+            (torch.float16, ({0: batch}, {0: batch}), True),
+            (torch.float32, None, True),
+        ):
+            with self.subTest(dtype=dtype, dynamic=dynamic_shapes is not None):
+                inputs = tuple(torch.randn(2, 2, 4, 8, dtype=dtype) for _ in range(2))
+                ep = torch.export.export(
+                    ConstantKey(dtype), inputs, dynamic_shapes=dynamic_shapes
+                )
+                gm = decompose_unsupported_attention(ep.module(), settings)
+                nodes = [n for n in gm.graph.nodes if n.target == sdpa]
+                self.assertEqual(len(nodes), 1)
+                self.assertEqual(
+                    scaled_dot_product_attention_validator(nodes[0], settings),
+                    supported,
+                )
+
     def test_post_lowering_mla_fully_supported(self):
         class MLA(nn.Module):
             def forward(self, q, k, v):
@@ -154,6 +188,173 @@ class TestDecomposeUnsupportedAttention(TestCase):
         )
         self.assertEqual(
             [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
+        )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_decomposed_attention_with_a_constant_bool_mask_builds(self):
+        # The decomposition turns a bool mask into a logical_not after constant folding has run.
+        import torch_tensorrt
+
+        class MLA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "mask", torch.ones(16, 16, device="cuda").tril() > 0
+                )
+
+            def forward(self, q, k, v):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=self.mask
+                )
+
+        inputs = tuple(
+            torch.randn(1, 2, 16, dim, device="cuda", dtype=torch.float16)
+            for dim in (64, 64, 32)
+        )
+        model = MLA()
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    def test_attention_on_inputs_cast_to_fp32_is_decomposed_where_tensorrt_fails(self):
+        # TensorRT folds the casts into its attention layer and builds only when the whole layer can run in
+        # one 16-bit type: all inputs folded (the query only with a given scale), no float mask, result cast back.
+        class Attention(nn.Module):
+            def __init__(
+                self,
+                cast,
+                op="sdpa",
+                scale=None,
+                mask=False,
+                out=None,
+                view=None,
+                lse=False,
+            ):
+                super().__init__()
+                self.cast, self.op, self.scale, self.mask = cast, op, scale, mask
+                self.out, self.view, self.lse = out, view, lse
+                self.register_buffer("bias", torch.randn(1, 2, 6, 8))
+
+            def forward(self, q, k, v):
+                q, k, v = (
+                    (
+                        torch.ops.aten._to_copy.default(t, dtype=torch.float32)
+                        if name in self.cast
+                        else t
+                    )
+                    for name, t in zip("qkv", (q, k, v))
+                )
+                if self.view == "transpose":
+                    q, k, v = (t.transpose(1, 2) for t in (q, k, v))
+                if self.view == "expand":
+                    k, v = (t.expand(1, 2, 8, 8) for t in (k, v))
+                mask = self.bias if self.mask else None
+                if self.op == "sdpa":
+                    out = torch.ops.aten.scaled_dot_product_attention.default(
+                        q, k, v, mask, scale=self.scale
+                    )
+                else:
+                    out = (
+                        torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                            q, k, v, mask, self.lse, scale=self.scale
+                        )[0]
+                    )
+                if self.out is not None:
+                    out = torch.ops.aten._to_copy.default(out, dtype=self.out)
+                return out
+
+        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
+        for cast, options, decomposed in (
+            ("qkv", {}, True),
+            ("k", {}, True),
+            ("v", {}, True),
+            ("q", {}, False),
+            ("q", {"scale": 0.5}, True),
+            ("qkv", {"scale": 0.5, "out": torch.bfloat16}, False),
+            ("qkv", {"scale": 0.5}, True),
+            ("qkv", {"scale": 0.5, "out": torch.float16}, True),
+            ("qkv", {"scale": 0.5, "out": torch.bfloat16, "fp16_kv": True}, True),
+            ("qkv", {"scale": 0.5, "mask": True, "out": torch.bfloat16}, True),
+            ("qkv", {"view": "transpose"}, True),
+            ("qkv", {"view": "expand"}, False),
+            ("qkv", {"op": "efficient", "mask": True}, True),
+            ("qkv", {"op": "efficient", "mask": True, "lse": True}, False),
+        ):
+            with self.subTest(cast=cast, **options):
+                fp16_kv = options.pop("fp16_kv", False)
+                model = Attention(cast, **options)
+                view = options.get("view")
+                shapes = {
+                    "transpose": ((1, 6, 2, 8), (1, 8, 2, 8), (1, 8, 2, 8)),
+                    "expand": ((1, 2, 6, 8), (1, 1, 8, 8), (1, 1, 8, 8)),
+                }.get(view, ((1, 2, 6, 8), (1, 2, 8, 8), (1, 2, 8, 8)))
+                half = dict.fromkeys(cast, torch.bfloat16)
+                if fp16_kv:
+                    half.update(k=torch.float16, v=torch.float16)
+                inputs = tuple(
+                    torch.randn(shape, dtype=half.get(name, torch.float32))
+                    for name, shape in zip("qkv", shapes)
+                )
+                gm = torch.export.export(model, inputs).module()
+                gm = decompose_unsupported_attention(gm, settings)
+                attention = [n for n in gm.graph.nodes if "attention" in str(n.target)]
+                self.assertEqual(not attention, decomposed)
+                if options.get("op") == "efficient" and not decomposed:
+                    continue  # the efficient op has no CPU kernel
+                q, k, v = (t.float() for t in inputs)
+                if view == "transpose":
+                    q, k, v = (t.transpose(1, 2) for t in (q, k, v))
+                expected = torch.nn.functional.scaled_dot_product_attention(
+                    q,
+                    k.expand(1, 2, 8, 8),
+                    v.expand(1, 2, 8, 8),
+                    attn_mask=model.bias if model.mask else None,
+                    scale=model.scale,
+                )
+                if model.out is not None:
+                    expected = expected.to(model.out)
+                torch.testing.assert_close(gm(*inputs), expected)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_attention_on_inputs_cast_to_fp32_builds(self):
+        import torch_tensorrt
+
+        class Attention(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("bias", torch.randn(1, 2, 8, 16))
+
+            def forward(self, q, k, v):
+                q, k, v = (
+                    torch.ops.aten._to_copy.default(t, dtype=torch.float32)
+                    for t in (q, k, v)
+                )
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    q, k, v, self.bias, False
+                )[0]
+
+        model = Attention().cuda()
+        inputs = [
+            torch.randn(1, 2, length, 32, device="cuda", dtype=torch.bfloat16)
+            for length in (8, 16, 16)
+        ]
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, tuple(inputs)),
+            arg_inputs=inputs,
+            min_block_size=1,
+            disable_tf32=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=1e-4, atol=1e-4
         )
 
     def test_attentions_sharing_a_bf16_query_are_decomposed(self):
