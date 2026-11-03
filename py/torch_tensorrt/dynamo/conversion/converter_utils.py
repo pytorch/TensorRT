@@ -180,6 +180,23 @@ UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.index_select.default,
 }
 
+# When the result type of a comparison is uint8, PyTorch converts the other integer operand to
+# uint8 first, so -1 equals 255. The interpreter does the same on the widened int32 tensor.
+UINT8_COMPARISONS = {
+    torch.ops.aten.eq.Scalar,
+    torch.ops.aten.eq.Tensor,
+    torch.ops.aten.ne.Scalar,
+    torch.ops.aten.ne.Tensor,
+    torch.ops.aten.lt.Scalar,
+    torch.ops.aten.lt.Tensor,
+    torch.ops.aten.le.Scalar,
+    torch.ops.aten.le.Tensor,
+    torch.ops.aten.gt.Scalar,
+    torch.ops.aten.gt.Tensor,
+    torch.ops.aten.ge.Scalar,
+    torch.ops.aten.ge.Tensor,
+}
+
 
 def makes_uint8_tensor(node: torch.fx.Node) -> bool:
     """Return True if the node would make a uint8 tensor inside a TensorRT engine.
@@ -281,6 +298,32 @@ def widen_uint8(
     ):
         return get_trt_tensor(ctx, value, name, dtype=torch.int32)
     return value
+
+
+def wrap_to_uint8(
+    ctx: ConversionContext,
+    target: Target,
+    value: Any,
+    name: str,
+) -> Any:
+    """Return an integer value modulo 256, which is how PyTorch converts it to uint8."""
+    if isinstance(value, TRTTensor):
+        # remainder() goes through trunc_div, which multiplies by the divisor and overflows
+        # near the integer limits. value - floor(value / 256) * 256 stays in range.
+        quotient = impl.elementwise.floor_divide(
+            ctx, target, SourceIR.ATEN, f"{name}_floor_div", value, 256
+        )
+        multiple = impl.elementwise.mul(
+            ctx, target, SourceIR.ATEN, f"{name}_mul", quotient, 256
+        )
+        return impl.elementwise.sub(
+            ctx, target, SourceIR.ATEN, f"{name}_sub", value, multiple
+        )
+    with unset_fake_temporarily():
+        # 256 does not fit in an int8 constant.
+        if isinstance(value, torch.Tensor):
+            value = value.to(torch.int64)
+        return value % 256
 
 
 def broadcastable(

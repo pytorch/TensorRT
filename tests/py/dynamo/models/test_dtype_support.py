@@ -372,6 +372,166 @@ class TestUInt8Support(TestCase):
                     self.assertEqual(len(engines), 2)
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
+    def test_uint8_compared_with_out_of_range_integer(self):
+        # When the result type is uint8, PyTorch converts the integer to uint8 first: -1 equals
+        # 255 and nothing is below 256. Two 0-d tensors, or a uint8 tensor and an integer tensor
+        # with dims, compare as int64 instead.
+        in_tensor = torch.randint(250, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        in_tensor[0] = 0
+        pixel = torch.tensor(255, dtype=torch.uint8, device="cuda")
+        comparisons = {
+            "permuted == -1": (
+                lambda image: image.permute(1, 0, 2) == -1,
+                (in_tensor,),
+            ),
+            "permuted < 256": (
+                lambda image: image.permute(1, 0, 2) < 256,
+                (in_tensor,),
+            ),
+            "permuted <= -1": (
+                lambda image: image.permute(1, 0, 2) <= -1,
+                (in_tensor,),
+            ),
+            "permuted > 256": (
+                lambda image: image.permute(1, 0, 2) > 256,
+                (in_tensor,),
+            ),
+            "permuted >= -2": (
+                lambda image: image.permute(1, 0, 2) >= -2,
+                (in_tensor,),
+            ),
+            "input != 256": (lambda image: image != 256, (in_tensor,)),
+            "permuted == tensor(-1)": (
+                lambda image: image.permute(1, 0, 2) == torch.tensor(-1),
+                (in_tensor,),
+            ),
+            "permuted == int8 tensor(-1)": (
+                lambda image: image.permute(1, 0, 2)
+                == torch.tensor(-1, dtype=torch.int8),
+                (in_tensor,),
+            ),
+            "tensor(-1) == permuted": (
+                lambda image: torch.tensor(-1) == image.permute(1, 0, 2),
+                (in_tensor,),
+            ),
+            "permuted == full((3,), -1)": (
+                lambda image: image.permute(1, 0, 2)
+                == torch.full((3,), -1, device=image.device),
+                (in_tensor,),
+            ),
+            "0-d == tensor(-1)": (lambda value: value == torch.tensor(-1), (pixel,)),
+            "permuted == runtime 0-d -1": (
+                lambda image, other: image.permute(1, 0, 2) == other,
+                (in_tensor, torch.tensor(-1, device="cuda")),
+            ),
+        }
+
+        class Compare(nn.Module):
+            def __init__(self, comparison):
+                super().__init__()
+                self.comparison = comparison
+
+            def forward(self, *inputs):
+                return self.comparison(*inputs)
+
+        for name, (comparison, inputs) in comparisons.items():
+            with self.subTest(name):
+                mod = Compare(comparison)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, inputs),
+                    inputs=list(inputs),
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+        mod = Compare(comparisons["permuted == tensor(-1)"][0])
+        compiled = torch.compile(
+            mod,
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
+        )
+        torch.testing.assert_close(compiled(in_tensor), mod(in_tensor))
+
+    def test_uint8_compared_with_a_dynamic_size(self):
+        # PyTorch converts the size to uint8 as well, so 256 equals 0 and 300 is 44.
+        comparisons = {
+            "permuted == size + 252": lambda image: image.permute(0)
+            == image.shape[0] + 252,
+            "input < size": lambda image: image < image.shape[0],
+        }
+
+        class Compare(nn.Module):
+            def __init__(self, comparison):
+                super().__init__()
+                self.comparison = comparison
+
+            def forward(self, image):
+                return self.comparison(image)
+
+        images = [torch.arange(n, device="cuda").to(torch.uint8) for n in (4, 300)]
+        for name, comparison in comparisons.items():
+            with self.subTest(name):
+                mod = Compare(comparison)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(
+                        mod,
+                        (images[0],),
+                        dynamic_shapes=({0: torch.export.Dim("n", min=2, max=300)},),
+                    ),
+                    inputs=[
+                        torch_tensorrt.Input(
+                            min_shape=(2,),
+                            opt_shape=(4,),
+                            max_shape=(300,),
+                            dtype=torch.uint8,
+                        )
+                    ],
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                for image in images:
+                    torch.testing.assert_close(trt_mod(image), mod(image))
+
+    def test_uint8_compared_with_runtime_integer_near_its_limits(self):
+        # PyTorch converts the runtime integer to uint8, so only its value modulo 256 counts.
+        in_tensor = torch.tensor(
+            [[0, 128], [254, 255]], dtype=torch.uint8, device="cuda"
+        )
+        values = {
+            "int32 max": (2**31 - 1, torch.int32),
+            "int32 max - 1": (2**31 - 2, torch.int32),
+            "int32 max - 127": (2**31 - 128, torch.int32),
+            "int32 min": (-(2**31), torch.int32),
+            "-2**30": (-(2**30), torch.int32),
+            "int64 max": (2**63 - 1, torch.int64),
+            "int64 min": (-(2**63), torch.int64),
+        }
+
+        class Compare(nn.Module):
+            def forward(self, image, other):
+                return image.permute(1, 0) == other
+
+        for name, (value, dtype) in values.items():
+            with self.subTest(name):
+                inputs = (in_tensor, torch.tensor(value, dtype=dtype, device="cuda"))
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(Compare(), inputs),
+                    inputs=list(inputs),
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), Compare()(*inputs))
+
     def test_uint8_where(self):
         # The where converter widens uint8 values before it reshapes a value of
         # lower rank or makes a constant, which TensorRT cannot do in uint8.
@@ -408,6 +568,17 @@ class TestUInt8Support(TestCase):
             "uint8 constant": (SelectBackground(b), (mask, a)),
             "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c)),
             "uint8 constant, float output": (SelectBackground(b), (mask, c)),
+            # A 0-d int64 value keeps the uint8 result type, so PyTorch wraps it to uint8.
+            "int64 0-d constant": (
+                SelectBackground(torch.tensor(-1, device="cuda")),
+                (mask, a),
+            ),
+            "int64 0-d input": (Select(), (mask, a, torch.tensor(300, device="cuda"))),
+            # An int64 tensor makes the result int64, so nothing is wrapped.
+            "int64 tensor": (
+                Select(),
+                (mask, a, torch.full_like(b, -1, dtype=torch.int64)),
+            ),
         }
         for name, (mod, inputs) in cases.items():
             with self.subTest(name):

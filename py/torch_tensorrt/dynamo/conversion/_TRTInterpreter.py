@@ -40,6 +40,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_COMPARISONS,
     UINT8_DATA_MOVEMENT_OPS,
     get_node_io,
     get_node_name,
@@ -47,6 +48,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     makes_uint8_tensor,
     to_torch,
     widen_uint8,
+    wrap_to_uint8,
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
@@ -864,6 +866,44 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             args = torch.fx.node.map_aggregate(
                 args, lambda arg: widen_uint8(self.ctx, arg, next(names))
             )
+
+        if target in UINT8_COMPARISONS or target == torch.ops.aten.where.self:
+            assert self._cur_node is not None
+            # The condition of where is not a value, so only the two values set the result type.
+            first = 1 if target == torch.ops.aten.where.self else 0
+            # The graph still shows a widened uint8 tensor as uint8, and a 0-d tensor as 0-d.
+            operands = [
+                arg.meta.get("val", value) if isinstance(arg, torch.fx.Node) else arg
+                for arg, value in zip(self._cur_node.args[first:], args[first:])
+            ]
+            # A symbolic number, such as a dynamic size, promotes as a Python number does.
+            operands = [
+                {torch.SymInt: 0, torch.SymFloat: 0.0, torch.SymBool: False}.get(
+                    type(operand), operand
+                )
+                for operand in operands
+            ]
+            if any(
+                getattr(operand, "dtype", None) == torch.uint8 for operand in operands
+            ) and all(
+                isinstance(operand, (torch.Tensor, int, float, bool))
+                for operand in operands
+            ):
+                to_uint8 = torch.result_type(*operands) == torch.uint8
+                names = (f"{self._cur_node_name}_uint8_{i}" for i in itertools.count())
+                args = args[:first] + tuple(
+                    (
+                        wrap_to_uint8(self.ctx, target, value, next(names))
+                        if to_uint8
+                        and (
+                            type(operand) is int
+                            or getattr(operand, "dtype", None)
+                            not in (None, torch.uint8, torch.bool)
+                        )
+                        else widen_uint8(self.ctx, value, next(names))
+                    )
+                    for operand, value in zip(operands, args[first:])
+                )
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
