@@ -1,14 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import weakref
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NamedTuple, Optional
+from typing import Any, Hashable, NamedTuple, Optional
 
 import torch
 import torch.fx
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.types import TRTNetwork
+from torch_tensorrt.dynamo.types import TRTNetwork, TRTTensor
 
 
 class AliasKind(str, Enum):
@@ -60,6 +61,19 @@ class ConversionContext:
     requires_aliased_plugin_io: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
     cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
+    # With the deduplicate_weights setting, the constants made from tensors and
+    # arrays, keyed by the memory they view, so all the layers that read a weight
+    # share one (see converter_utils.get_trt_tensor).
+    # Each entry holds a weak reference to its source: once the source is freed,
+    # another value can take its memory.
+    constant_cache: dict[Hashable, tuple[weakref.ref[Any], TRTTensor]] = field(
+        default_factory=dict
+    )
+    # One transposed view per constant and rank (see
+    # converter_utils.get_transposed_trt_tensor).
+    transposed_constants: dict[tuple[TRTTensor, int], TRTTensor] = field(
+        default_factory=dict
+    )
     current_node: Optional[torch.fx.Node] = field(default=None)
     # Aliased outputs registered by converters during conversion.
     # ``TRTInterpreter`` is responsible for ensuring each output_tensor that

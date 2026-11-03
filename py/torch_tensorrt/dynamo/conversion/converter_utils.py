@@ -4,10 +4,12 @@
 import collections
 import functools
 import logging
+import weakref
 from typing import (
     Any,
     Callable,
     Dict,
+    Hashable,
     Literal,
     Optional,
     Sequence,
@@ -523,6 +525,10 @@ def get_trt_tensor(
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
     An runtime error is raised if we're not able to do that.
+    With the deduplicate_weights setting, a tensor or array is added to the network
+    once: converting the same memory, viewed the same way, to the same dtype again,
+    while the first value is still alive, returns the same ITensor, so all the layers
+    that read a weight share one constant.
     Args:
         ctx (ConversionContext): A TensorRT ConversionContext. If we want to
             add a TensorRT Constant layer, we will add it to this network.
@@ -536,6 +542,17 @@ def get_trt_tensor(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    key = (
+        _constant_key(input_val, dtype, target_quantized_type)
+        if ctx.compilation_settings.deduplicate_weights
+        else None
+    )
+    cached = ctx.constant_cache.get(key)
+    # Once its source is freed, an entry's memory may hold another value.
+    if cached is not None and cached[0]() is not None:
+        return cached[1]
+    source = input_val
+
     # If the input is 64-bit, cast it to 32-bit for TRT freezing
     if isinstance(input_val, torch.Tensor) and ctx.compilation_settings.truncate_double:
         if input_val.dtype == torch.float64:
@@ -546,13 +563,79 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(
+        constant = create_constant(
             ctx, input_val, name, dtype, min_rank, target_quantized_type
         )
+        if key is not None:
+            ctx.constant_cache[key] = (weakref.ref(source), constant)
+        return constant
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
         raise AssertionError(f"Cannot convert {input_val} to TRT constant")
+
+
+def get_transposed_trt_tensor(
+    ctx: ConversionContext,
+    value: Union[torch.Tensor, np.ndarray],
+    name: str,
+    rank: int = 2,
+) -> TRTTensor:
+    """
+    Convert a matrix, such as the weight of a linear layer, to a TensorRT ITensor
+    holding its transpose, with leading dimensions of size 1 up to ``rank`` so a
+    batched matrix multiply can read it as it is. With the deduplicate_weights
+    setting, the result is added to the network once and shared, like the constant
+    itself (see ``get_trt_tensor``): TensorRT can keep a host copy of a constant for
+    every layer that transposes it, and in a refittable engine for every layer that
+    reshapes it. A 1-D value is returned as it is.
+    Args:
+        ctx (ConversionContext): A TensorRT ConversionContext
+        value (Union[torch.Tensor, np.ndarray]): A 1-D or 2-D tensor or array
+        name (str): The name of the constant layer, if one is added
+        rank (int): The rank of the matrix multiply that reads the result
+    Returns:
+        A TensorRT ITensor holding the transpose of ``value``.
+    """
+    constant = get_trt_tensor(ctx, value, name)
+    if len(constant.shape) < 2:
+        return constant
+    if (constant, rank) not in ctx.transposed_constants:
+        layer = ctx.net.add_shuffle(constant)
+        layer.first_transpose = (1, 0)
+        layer.reshape_dims = (1,) * (rank - 2) + tuple(constant.shape)[::-1]
+        layer.name = f"{name}_transpose"
+        ctx.transposed_constants[constant, rank] = layer.get_output(0)
+    return ctx.transposed_constants[constant, rank]
+
+
+def _constant_key(
+    value: Any,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
+    target_quantized_type: Optional[TRTDataType],
+) -> Optional[Hashable]:
+    """Identify a tensor or array by the memory it views, how it views it, and the
+    dtype it is converted to. Other values return None and are not cached."""
+    if isinstance(value, np.ndarray):
+        view: Tuple[Any, ...] = (
+            value.ctypes.data,
+            value.shape,
+            value.strides,
+            value.dtype,
+        )
+    # Not isinstance: a tensor subclass need not own the memory it reports, and
+    # wrapper subclasses all report address 0.
+    elif type(value) in (torch.Tensor, torch.nn.Parameter):
+        view = (
+            value.data_ptr(),
+            tuple(value.shape),
+            value.stride(),
+            value.dtype,
+            value.device,
+        )
+    else:
+        return None
+    return view, dtype, target_quantized_type
 
 
 @overload
