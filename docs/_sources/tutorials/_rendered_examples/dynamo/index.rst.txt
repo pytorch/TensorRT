@@ -423,23 +423,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_low_cpu_memory_compilation_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i...">
 
 .. only:: html
@@ -486,6 +469,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_low_cpu_memory_compilation_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
     </div>
 
 
@@ -825,10 +825,10 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/autocast_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
-   /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
    /tutorials/_rendered_examples/dynamo/aliased_io_kv_attention
    /tutorials/_rendered_examples/dynamo/converter_overloading
+   /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
    /tutorials/_rendered_examples/dynamo/global_perf_tuning_attention_example
