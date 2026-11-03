@@ -127,6 +127,52 @@ class TestDivConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(div(), input_specs, use_dynamo_tracer=True)
 
+    def test_prims_div_truncates_signed_integers(self):
+        # Doubling keeps a float quotient from being truncated back at the output.
+        class div(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.prims.div.default(lhs_val, rhs_val) * 2
+
+        # Large values catch a sign taken from a product that overflows.
+        lhs_val = torch.randint(-50, 50, (2, 8), dtype=torch.int32)
+        lhs_val[0, :2] = torch.tensor([3000000, -3000000])
+        rhs_val = torch.tensor([1, -2, 3, -4, 5, -6, 7, -8], dtype=torch.int32)
+        rhs_val = rhs_val.repeat(2, 1)
+        rhs_val[0, :2] = 1000
+        self.run_test(div(), [lhs_val, rhs_val])
+
+    def test_div_of_integers_is_float(self):
+        # Reciprocal lowers to 1 / x, so it is a true division too. 2**32 has no int32 constant.
+        class IntDiv(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return (
+                    lhs_val / rhs_val,
+                    lhs_val / 255,
+                    lhs_val / 2**32,
+                    torch.reciprocal(rhs_val),
+                )
+
+        inputs = [
+            torch.randint(0, 256, (2, 3), dtype=torch.int32),
+            torch.randint(1, 256, (2, 3), dtype=torch.int32),
+        ]
+        self.run_test(IntDiv(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
+    def test_div_and_pow_of_integers_by_a_half_constant_stay_half(self):
+        # The Linear needs both inputs in one type, so a float32 result does not build.
+        class HalfScale(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("scale", torch.tensor(4.0, dtype=torch.half))
+                self.register_buffer("root", torch.tensor(0.5, dtype=torch.half))
+                self.lin = nn.Linear(8, 4).half()
+
+            def forward(self, x):
+                return self.lin(x / self.scale + x**self.root)
+
+        inputs = [torch.randint(0, 256, (2, 8), dtype=torch.int32)]
+        self.run_test(HalfScale(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
 
 if __name__ == "__main__":
     run_tests()

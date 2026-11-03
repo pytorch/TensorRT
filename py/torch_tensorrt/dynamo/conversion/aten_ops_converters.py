@@ -3279,20 +3279,11 @@ def aten_ops_sub(
     )
 
 
-def _is_integer(val: Any) -> bool:
-    """Is this operand an integer or boolean tensor, or a Python int?"""
-    dtype = getattr(val, "dtype", None)
-    if dtype is None:
-        return isinstance(val, int)
-    return not _enums.dtype._from(dtype).to(torch.dtype).is_floating_point
-
-
 @dynamo_tensorrt_converter(operator.truediv, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -3303,34 +3294,13 @@ def aten_ops_div(
     rounding_mode = kwargs.get("rounding_mode")
 
     if rounding_mode is None:
-        lhs_val, rhs_val = args[0], args[1]
-        # True division of two integers gives a float, but TensorRT divides integers as integers.
-        # prims.div truncates integers, so it is not cast here.
-        if target != torch.ops.prims.div.default and all(
-            _is_integer(val) for val in (lhs_val, rhs_val)
-        ):
-            lhs_val, rhs_val = (
-                (
-                    float(val)
-                    if isinstance(val, int)
-                    else impl.cast.to_copy(
-                        ctx,
-                        target,
-                        get_ir(target),
-                        f"{name}_{side}_to_float",
-                        val,
-                        torch.float32,
-                    )
-                )
-                for val, side in ((lhs_val, "lhs"), (rhs_val, "rhs"))
-            )
         return impl.elementwise.div(
             ctx,
             target,
             get_ir(target),
             name,
-            lhs_val,
-            rhs_val,
+            args[0],
+            args[1],
         )
     elif rounding_mode == "floor":
         return impl.elementwise.floor_divide(
@@ -3354,6 +3324,24 @@ def aten_ops_div(
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"
         )
+
+
+@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
+def aten_ops_prims_div(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.prims_div(
+        ctx,
+        target,
+        get_ir(target),
+        name,
+        args[0],
+        args[1],
+    )
 
 
 @dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
