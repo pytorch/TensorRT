@@ -676,6 +676,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if isinstance(trt_node, trt.ITensor):
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
+            if isinstance(n.meta.get("val"), (float, torch.SymFloat)):
+                self.ctx.python_floats.add(trt_node)
 
         return trt_node
 

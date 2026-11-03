@@ -3386,7 +3386,7 @@ def aten_ops_div(
     rounding_mode = kwargs.get("rounding_mode")
 
     if rounding_mode is None:
-        return impl.elementwise.div(
+        quotient = impl.elementwise.div(
             ctx,
             target,
             get_ir(target),
@@ -3394,6 +3394,18 @@ def aten_ops_div(
             args[0],
             args[1],
         )
+        # Dividing sizes gives a Python float, which does not widen the tensors it meets.
+        # Sizes are 1-D here, so make the quotient 0-D to get the same type promotion.
+        if (
+            target is operator.truediv
+            and ctx.current_node is not None
+            and isinstance(ctx.current_node.meta.get("val"), (float, torch.SymFloat))
+            and tuple(quotient.shape) == (1,)
+        ):
+            quotient = impl.shuffle.reshape(
+                ctx, target, get_ir(target), f"{name}_scalar", quotient, ()
+            )
+        return quotient
     elif rounding_mode == "floor":
         return impl.elementwise.floor_divide(
             ctx,

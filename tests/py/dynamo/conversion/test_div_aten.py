@@ -3,9 +3,9 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -126,6 +126,131 @@ class TestDivConverter(DispatchTestCase):
             Input(min_shape=(2, 3), opt_shape=(8, 3), max_shape=(15, 3)),
         ]
         self.run_test_with_dynamic_shape(div(), input_specs, use_dynamo_tracer=True)
+
+    def test_div_dynamic_size_keeps_half(self):
+        class div(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.lin = nn.Linear(8, 4).half()
+
+            def forward(self, x):
+                return self.lin(x * (x.shape[0] / 2))
+
+        # A float32 scale would widen x, and the half Linear would then fail to build.
+        input_specs = [
+            Input(
+                min_shape=(2, 8), opt_shape=(8, 8), max_shape=(15, 8), dtype=torch.half
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            div(), input_specs, rtol=1e-2, atol=1e-2, use_dynamo_tracer=True
+        )
+
+    def test_div_dynamic_size_above_half_range(self):
+        class div(nn.Module):
+            def forward(self, x):
+                return (x * 1e-4) * (x.shape[0] / 3)
+
+        # At the max size the quotient is 100000, which float16 cannot hold.
+        input_specs = [
+            Input(
+                min_shape=(2, 6),
+                opt_shape=(1000, 6),
+                max_shape=(300000, 6),
+                dtype=torch.half,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            div(), input_specs, rtol=1e-2, atol=1e-2, use_dynamo_tracer=True
+        )
+
+    def test_div_dynamic_size_above_half_range_in_cond(self):
+        class div(nn.Module):
+            def forward(self, x):
+                return torch.cond(
+                    x.abs().amax() >= 0,
+                    lambda v: (v * 1e-4) * (v.shape[0] / 3),
+                    lambda v: v * 2,
+                    (x,),
+                )
+
+        # A branch is converted by its own interpreter, which has to track the quotient too.
+        # The run stays at the export size, which sets the engine's opt shape: TensorRT 11.4's
+        # conditional can leave the rows past the opt shape unwritten.
+        x = torch.rand(300000, 6, dtype=torch.half, device="cuda")
+        n = torch.export.Dim("n", min=2, max=300000)
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(div(), (x,), dynamic_shapes=({0: n},)),
+            arg_inputs=[
+                Input(
+                    min_shape=(2, 6),
+                    opt_shape=(300000, 6),
+                    max_shape=(300000, 6),
+                    dtype=torch.half,
+                )
+            ],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(x), div()(x), rtol=1e-2, atol=1e-2)
+
+    @parameterized.expand(
+        [
+            ("sum", lambda n, m: n / 3 + m / 3),
+            ("product", lambda n, m: (n / 4) * (m / 6)),
+            ("negation", lambda n, m: -(n / 3)),
+        ]
+    )
+    def test_div_dynamic_size_derived_value_above_half_range(self, _, scale):
+        class div(nn.Module):
+            def forward(self, x, y):
+                return (x * 1e-4) * scale(x.shape[0], y.shape[0])
+
+        # At the max sizes each scale is above 65504, which float16 cannot hold.
+        input_specs = [
+            Input(
+                min_shape=(2, 6),
+                opt_shape=(1000, 6),
+                max_shape=(300000, 6),
+                dtype=torch.half,
+            ),
+            Input(min_shape=(2,), opt_shape=(3,), max_shape=(6,), dtype=torch.half),
+        ]
+        self.run_test_with_dynamic_shape(
+            div(),
+            input_specs,
+            rtol=1e-2,
+            atol=1e-2,
+            use_dynamo_tracer=True,
+            torch_export_dynamic_shapes={
+                "x": {0: torch.export.Dim("n", min=2, max=300000)},
+                "y": {0: torch.export.Dim("m", min=2, max=6)},
+            },
+        )
+
+    def test_compare_half_with_dynamic_size_quotient(self):
+        class div(nn.Module):
+            def forward(self, x):
+                return (x * 0 + 3000) == (x.shape[0] / 3)
+
+        # At the max size the quotient is 2999.67, which float16 rounds to 3000.
+        input_specs = [
+            Input(
+                min_shape=(2, 6),
+                opt_shape=(1000, 6),
+                max_shape=(8999, 6),
+                dtype=torch.half,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(div(), input_specs, use_dynamo_tracer=True)
+
+    def test_truediv_of_tensor_keeps_rank(self):
+        class div(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.cat.default([x / 2, x])
+
+        # symbolic_trace records x / 2 as operator.truediv on a tensor, not on sizes.
+        self.run_test(div(), [torch.randn(1)], use_dynamo_tracer=False)
 
     def test_prims_div_truncates_signed_integers(self):
         # Doubling keeps a float quotient from being truncated back at the output.

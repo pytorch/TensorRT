@@ -77,6 +77,9 @@ class ConversionContext:
         default_factory=dict
     )
     current_node: Optional[torch.fx.Node] = field(default=None)
+    # Outputs of nodes whose value is a Python float, such as a quotient of sizes or a
+    # value computed from one (see impl.elementwise.base).
+    python_floats: set[TRTTensor] = field(default_factory=set)
     # Aliased outputs registered by converters during conversion.
     # ``TRTInterpreter`` is responsible for ensuring each output_tensor that
     # isn't already a user output is added to the network outputs, and for
