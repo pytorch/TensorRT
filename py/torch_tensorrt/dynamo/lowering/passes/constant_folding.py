@@ -15,6 +15,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     FOLDED_CONSTRUCTOR_META,
+    FOLDED_WITHOUT_PARAMETERS_META,
     _aliases_input,
     _storage_escapes,
 )
@@ -93,6 +94,23 @@ def constant_fold(
     skipped_alias = 0
     # Repeats of an op share the tensor folded first, so install it only once.
     installed: Dict[int, torch.fx.Node] = {}
+    # Whether each value reads a parameter, in one pass in graph order, which puts a node's inputs
+    # before it. The constant installed for a value that reads none inherits the mark from its meta.
+    parameters = {name for name, _ in gm.named_parameters(remove_duplicate=False)}
+    reads_parameter: Dict[torch.fx.Node, bool] = {}
+    for node in gm.graph.nodes:
+        if node.op == "get_attr":
+            reads_parameter[node] = (
+                not node.meta.get(FOLDED_WITHOUT_PARAMETERS_META)
+                if node.meta.get(FOLDED_CONSTRUCTOR_META)
+                else str(node.target) in parameters
+            )
+        else:
+            reads_parameter[node] = any(
+                reads_parameter[i] for i in node.all_input_nodes
+            )
+        if node in cf.node_replacements and not reads_parameter[node]:
+            node.meta[FOLDED_WITHOUT_PARAMETERS_META] = True
     for node, constant in cf.node_replacements.items():
         if (
             isinstance(constant, torch.Tensor)
