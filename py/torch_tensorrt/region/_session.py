@@ -6,13 +6,15 @@ from __future__ import annotations
 from contextvars import ContextVar, Token
 from functools import partial
 from types import TracebackType
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ._errors import RegionCaptureError
 
 if TYPE_CHECKING:
     from torch._ops import OpOverload
     from torch_tensorrt.kernels import KernelSpec
+
+    from ._generation import KernelGenerator
 
 _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
     "torch_tensorrt_region_session", default=None
@@ -28,8 +30,10 @@ class RegionCompilationSession:
         # Name of the fused_kernel scope whose options Dynamo is converting
         # ('' if unnamed), else None.
         self.pending_plugin: Optional[str] = None
-        self.plugins: dict[int, KernelSpec | partial[None]] = {}
+        self.plugins: dict[int, KernelSpec | partial[None] | KernelGenerator] = {}
         self.operators: dict[int, OpOverload] = {}
+        # Identical generated regions of one compilation share a validated kernel.
+        self.generated_kernels: dict[str, Any] = {}
         self._context_token: Optional[Token[Optional[RegionCompilationSession]]] = None
 
     def __enter__(self) -> RegionCompilationSession:

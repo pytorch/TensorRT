@@ -448,6 +448,24 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
+        # dynamo-regions installs no kernel toolchains, so cuTile and CUDA C++
+        # kernel generation only run here.
+        "regions-generation",
+        tier="l1",
+        lanes=("full", "nightly"),
+        paths=(
+            "regions/test_generation_backends.py",
+            "regions/test_generation_candidates.py",
+            "regions/test_generation_integration.py",
+            "regions/test_generation_launch.py",
+            "regions/test_generation_worker.py",
+        ),
+        setup=("cuda-core", "cuda-tile"),
+        jobs="2",
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
         "kernels-cutedsl",
         tier="l0",
         lanes=("fast", "full"),

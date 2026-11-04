@@ -907,7 +907,7 @@ def compile(
     )
 
     validate_region_mutations(exported_program)
-    gm = materialize_regions(exported_program.module(), captured)
+    gm = materialize_regions(exported_program.module(), captured, settings)
     if not validate_region_settings(gm, settings, region_hop_records(captured)):
         # Stop before lowering or offloading.
         _report_stopped_dryrun(gm, settings)

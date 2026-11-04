@@ -468,7 +468,12 @@ which require CUDA tensors.
   random numbers is rejected. Dynamic shapes and training are outside the
   initial scope.
 
-These APIs select supplied implementations; they do not generate kernels.
+``execute_in_torch`` and ``fused_op`` select supplied implementations.
+``fused_kernel`` uses a supplied kernel factory and launch configuration, or
+generates one during compilation with ``generator=KernelGenerator(...)``. See
+the :ref:`agent-generated kernel example <agentic_region_kernel_generation_example>`
+and the :ref:`region annotation API <torch_tensorrt_region_py>` for search,
+resume, and provider configuration.
 
 Inspect placement and measure performance
 ---------------------------------------------

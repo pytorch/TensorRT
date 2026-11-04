@@ -19,6 +19,7 @@ from ._constants import (
     TOKEN_KEY,
 )
 from ._errors import RegionCaptureError
+from ._generation import KernelGenerator
 from ._session import RegionCompilationSession, current_session
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,8 @@ def _expect_plugin(name: Optional[str]) -> None:
 
 @torch._dynamo.assume_constant_result  # type: ignore[misc]
 def _remember_plugin(
-    kernel: Callable[[], Any],
+    kernel: Optional[Callable[[], Any]],
+    generator: Optional[KernelGenerator],
     signature: Optional[dict[str, str]],
     constexprs: Optional[dict[str, Any]],
     grid: Optional[Callable[..., Any]],
@@ -123,22 +125,27 @@ def _remember_plugin(
     session.pending_plugin = None
     # Resolve the factory outside tracing: Dynamo cannot pass a raw JIT kernel.
     key = len(session.plugins)
-    session.plugins[key] = prepare_plugin(
-        kernel(),
-        signature=signature,
-        constexprs=constexprs,
-        grid=grid,
-        extra_args_fn=extra_args_fn,
-        num_warps=num_warps,
-        num_stages=num_stages,
-    )
+    if generator is not None:
+        session.plugins[key] = generator
+    else:
+        assert kernel is not None
+        session.plugins[key] = prepare_plugin(
+            kernel(),
+            signature=signature,
+            constexprs=constexprs,
+            grid=grid,
+            extra_args_fn=extra_args_fn,
+            num_warps=num_warps,
+            num_stages=num_stages,
+        )
     return key
 
 
 @contextmanager
 def fused_kernel(
-    kernel: Callable[[], Any],
+    kernel: Optional[Callable[[], Any]] = None,
     *,
+    generator: Optional[KernelGenerator] = None,
     inputs: Optional[Sequence[torch.Tensor]] = None,
     name: Optional[str] = None,
     signature: Optional[dict[str, str]] = None,
@@ -155,6 +162,12 @@ def fused_kernel(
     options follow ``kernels.triton_op``; omit them for a CUDA ``KernelSpec``,
     which provides its own launch configuration.
 
+    Alternatively, ``generator`` authors and evaluates a kernel during
+    compilation and supplies its launch configuration. Generated regions
+    require static, contiguous, nonempty float16, bfloat16 or float32 CUDA
+    tensor boundaries. A dry run executes the body instead of generating a
+    kernel.
+
     Only ``torch_tensorrt.compile(..., ir="dynamo", strict=True)`` captures
     the scope; non-strict compilation raises ``RegionCaptureError``. Eager
     execution runs the body as ordinary code, and so do traces such as
@@ -167,9 +180,13 @@ def fused_kernel(
             lambda written in ``forward`` must refer to globals, not ``self``
             or locals; create other factories before compilation, for example
             in ``__init__``.
+        generator: A :class:`KernelGenerator` to use instead of ``kernel``.
+            Construct it before compilation, for example once at module level or
+            in a closure, not inside the traced ``forward``.
         inputs: Every tensor the body reads, including parameters and buffers,
             in kernel parameter order. Omit it only when the body reads one
-            tensor.
+            tensor, or for a ``generator``, which writes its kernel for the
+            order the region first reads them.
         name: Diagnostic label.
         signature: Triton signature; pointer types and ``i32`` extras are
             inferred when it is omitted.
@@ -181,12 +198,31 @@ def fused_kernel(
         num_warps: Triton warps per block.
         num_stages: Triton software pipelining depth.
     """
+    if (kernel is None) == (generator is None):
+        raise ValueError("fused_kernel requires exactly one of kernel or generator")
+    if generator is not None:
+        if not isinstance(generator, KernelGenerator):
+            raise TypeError("fused_kernel generator must be a KernelGenerator")
+        if any(
+            value is not None
+            for value in (
+                signature,
+                constexprs,
+                grid,
+                extra_args_fn,
+                num_warps,
+                num_stages,
+            )
+        ):
+            raise ValueError(
+                "KernelGenerator supplies its own kernel launch configuration"
+            )
     if name is not None and not isinstance(name, str):
         raise TypeError("fused_kernel name must be a string or None")
     _check_inputs(inputs, "fused_kernel")
     # Compilation passes these to _remember_plugin as constants: Dynamo converts
     # functions and partials, but not kernel objects or bound methods.
-    if not isinstance(kernel, (FunctionType, partial)):
+    if generator is None and not isinstance(kernel, (FunctionType, partial)):
         raise TypeError(
             "fused_kernel kernel must be a function or functools.partial returning "
             f"the kernel, such as kernel=lambda: my_kernel; got {type(kernel).__name__}"
@@ -202,7 +238,14 @@ def fused_kernel(
         return
     _expect_plugin(name)
     key = _remember_plugin(
-        kernel, signature, constexprs, grid, extra_args_fn, num_warps, num_stages
+        kernel,
+        generator,
+        signature,
+        constexprs,
+        grid,
+        extra_args_fn,
+        num_warps,
+        num_stages,
     )
     with _scope(name=name, route="plugin", plugin=key, inputs=inputs):
         yield
