@@ -62,6 +62,7 @@ Submodules
 :doc:`torch_tensorrt.logging <logging>` |
 :doc:`torch_tensorrt.dynamo <dynamo>` |
 :doc:`torch_tensorrt.runtime <runtime>` |
+:doc:`torch_tensorrt.region <region>` |
 :doc:`torch_tensorrt.ts <ts>` |
 :doc:`torch_tensorrt.ptq <ptq>` |
 :doc:`torch_tensorrt.fx <fx>`

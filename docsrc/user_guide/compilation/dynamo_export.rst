@@ -39,6 +39,11 @@ Some of the frequently used options are as follows:
 * ``torch_executed_ops`` - Operators which are forced to be executed by Torch.
 * ``min_block_size`` - Minimum number of consecutive operators required to be executed as a TensorRT segment.
 
+To keep a particular invocation or group of operations in PyTorch, see
+:ref:`execute_in_torch`. Region annotations require direct
+``torch_tensorrt.compile(model, ir="dynamo", strict=True, ...)`` capture;
+standalone export does not preserve them.
+
 The complete list of options can be found `here <https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77>`_
 
 Under the hood

@@ -182,6 +182,13 @@ _L0: list[Suite] = [
         jobs=_HEAVY,
     ),
     Suite(
+        "dynamo-regions",
+        tier="l0",
+        lanes=("fast", "full", "nightly", "python-only"),
+        paths=("regions/",),
+        jobs=_HEAVY,
+    ),
+    Suite(
         "py-core",
         tier="l0",
         lanes=("fast", "full", "nightly"),
@@ -348,7 +355,11 @@ _L2: list[Suite] = [
         "executorch",
         tier="l2",
         lanes=("nightly",),
-        paths=("executorch/",),
+        paths=(
+            "executorch/",
+            # The regular region suite skips this case without ExecuTorch installed.
+            "regions/test_fused_op.py::test_export_retains_custom_op[executorch]",
+        ),
         keyword=(
             # The pairing test is the one check here that needs a real ExecuTorch installed, so
             # it has to survive this deselection. Everything else in that file is a
@@ -541,6 +552,7 @@ _PYTHON_ONLY: list[Suite] = [
             "executorch/test_export.py",
             "executorch/test_cuda_graphs.py",
             "executorch/test_partitioner_target_device.py",
+            "regions/test_fused_op.py::test_export_retains_custom_op[executorch]",
         ),
         setup=("executorch",),
         variants=("standard",),

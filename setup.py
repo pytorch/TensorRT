@@ -660,11 +660,13 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
+    "torch_tensorrt.dynamo.region_compilation",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.dynamo.tuning",
     "torch_tensorrt.executorch",
+    "torch_tensorrt.region",
     "torch_tensorrt.runtime",
 ]
 
@@ -701,11 +703,13 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.lowering.passes": "py/torch_tensorrt/dynamo/lowering/passes",
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
+    "torch_tensorrt.dynamo.region_compilation": "py/torch_tensorrt/dynamo/region_compilation",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
     "torch_tensorrt.dynamo.tuning": "py/torch_tensorrt/dynamo/tuning",
     "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
+    "torch_tensorrt.region": "py/torch_tensorrt/region",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 

@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""Temporary scope markers, registered by the compilation session before tracing."""
+
+from typing import Optional
+
+import torch
+
+_LIBRARY = torch.library.Library("torch_tensorrt_region", "DEF")
+_LIBRARY.define(
+    'begin(str name, str backend="eager", str route="torch", int plugin=-1, int operator=-1) -> Tensor'
+)
+_LIBRARY.define("end(Tensor sentinel) -> ()")
+
+
+def _begin(
+    name: str,
+    backend: str = "eager",
+    route: str = "torch",
+    plugin: int = -1,
+    operator: int = -1,
+) -> torch.Tensor:
+    # Composite dispatch handles this tensor-free call on any current device.
+    return torch.empty((), dtype=torch.uint8, device="cpu")
+
+
+def _end(sentinel: torch.Tensor) -> None:
+    return None
+
+
+_LIBRARY.impl("begin", _begin, "CompositeExplicitAutograd")
+_LIBRARY.impl("end", _end, "CompositeExplicitAutograd")
+torch.library.register_fake("torch_tensorrt_region::begin")(_begin)
+torch.library.register_fake("torch_tensorrt_region::end")(_end)
+
+BEGIN = torch.ops.torch_tensorrt_region.begin.default
+END = torch.ops.torch_tensorrt_region.end.default
+
+CAPTURE_ERROR: Optional[str] = None
+try:
+    from torch._library.effects import EffectType
+
+    register_effect = torch.library._register_effectful_op
+    annotate = torch.fx.traceback.annotate
+    error_on_graph_break = torch._dynamo.error_on_graph_break
+    register_effect(BEGIN, EffectType.ORDERED, lib=_LIBRARY)
+    register_effect(END, EffectType.ORDERED, lib=_LIBRARY)
+except (ImportError, AttributeError, TypeError) as error:
+    CAPTURE_ERROR = (
+        "execute_in_torch requires PyTorch ordered-effect markers, tracing "
+        f"annotations, and graph-break guards; this PyTorch version lacks them: {error}"
+    )

@@ -39,3 +39,6 @@ Model Zoo
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
 * :ref:`cutedsl_op`: Registering a CuTe DSL kernel as an AOT TensorRT plugin with dynamic shapes
+* :ref:`execute_in_torch_example`: Run annotated operations with PyTorch eager or Inductor while keeping surrounding operations in TensorRT
+* :ref:`fused_op_example`: Replace a region with an existing custom operator that executes in PyTorch
+* :ref:`fused_kernel_example`: Use ``fused_kernel`` to register a supplied Triton kernel automatically inside TensorRT

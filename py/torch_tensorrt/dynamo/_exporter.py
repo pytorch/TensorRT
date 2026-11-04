@@ -25,14 +25,59 @@ from torch.export.exported_program import (
     TensorArgument,
 )
 from torch.fx.graph import _PyTreeCodeGen
+
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.region_compilation import (
+    audit_region_placement,
+    get_region_records,
+    is_torch_region_node,
+)
+from torch_tensorrt.dynamo.region_compilation._types import (
+    RECORDS_META_KEY,
+    REGION_META_KEY,
+)
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
     plan_buffer,
 )
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    ENGINE_IDX,
+    NAME_IDX,
+    TorchTensorRTModule,
+)
+from torch_tensorrt.region._errors import RegionError
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_region_serialization(gm: torch.fx.GraphModule) -> None:
+    """Reject region execution contracts that the artifact cannot preserve."""
+    records = get_region_records(gm)
+    plugin_records = [record for record in records if record.route == "plugin"]
+    if plugin_records:
+        built_plugins = {
+            region_id
+            for module in gm.modules()
+            if isinstance(module, TorchTensorRTModule)
+            for region_id in getattr(module, "_torch_tensorrt_plugin_regions", ())
+        }
+        for record in plugin_records:
+            if record.id not in built_plugins:
+                raise RegionError(
+                    f"Saving fused_kernel region {record.id!r} requires a built "
+                    "TensorRT engine. Dry-run or unresolved plugin regions cannot "
+                    "be saved because their process-local operator registration "
+                    "is not part of the artifact. Compile with dryrun=False first."
+                )
+    for record in records:
+        backend = getattr(record, "backend", "eager")
+        if backend != "eager":
+            raise RegionError(
+                f"Saving execute_in_torch region {record.id!r} with "
+                f"backend={backend!r} is not supported: the exporter cannot "
+                "preserve its execution backend. Compile with backend='eager' "
+                "to save an ExportedProgram."
+            )
 
 
 def _resolve_lifted_custom_obj(
@@ -82,6 +127,12 @@ def export(
         inputs (torch.Tensor): Torch input tensors
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
+    _validate_region_serialization(gm)
+    if get_region_records(gm) and (not use_legacy_exporter or cross_compile_module):
+        raise RegionError(
+            "Annotated region serialization requires the legacy exported_program "
+            "path: retrace=False, use_legacy_exporter=True, without cross-compilation"
+        )
     patched_module = transform(
         gm, cross_compile_module, expose_aliased_mutations=bool(use_legacy_exporter)
     )
@@ -123,9 +174,22 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
-    # Make a copy the graph since this function transforms the input graph and changes it's attributes.
-    # This transformed graph is meant to be consumed by `create_trt_exp_program`
+    # Reject unsupported backends before deepcopy drops their compiled dispatchers.
+    _validate_region_serialization(gm)
+    original = gm
     gm = copy.deepcopy(gm)
+    if get_region_records(original):
+        # GraphModule deepcopy drops these execution annotations.
+        for name, child in original.named_modules():
+            for attr in (
+                "_torch_tensorrt_region_id",
+                "_torch_tensorrt_plugin_regions",
+            ):
+                if hasattr(child, attr):
+                    setattr(gm.get_submodule(name), attr, getattr(child, attr))
+
+    # Expand regions before their enclosing fallback partitions.
+    inline_torch_region_modules(gm)
 
     # Inline TensorRT submodules
     inline_trt_modules(gm, cross_compile_module, expose_aliased_mutations)
@@ -137,6 +201,7 @@ def transform(
     gm.delete_all_unused_submodules()
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
+    gm.recompile()
 
     return gm
 
@@ -299,6 +364,106 @@ def lift(
     return gm, graph_signature, state_dict, constants
 
 
+def _replace_module_call_outputs(call: torch.fx.Node, outputs: Any) -> None:
+    """Wire consumers to inlined outputs, including directly returned tuples."""
+    for user in list(call.users):
+        if (
+            isinstance(outputs, (tuple, list))
+            and user.op == "call_function"
+            and user.target is operator.getitem
+            and user.args[0] is call
+            and isinstance(user.args[1], int)
+        ):
+            user.replace_all_uses_with(outputs[user.args[1]])
+            call.graph.erase_node(user)
+        else:
+            user.args = torch.fx.map_arg(
+                user.args, lambda n: outputs if n is call else n
+            )
+            user.kwargs = torch.fx.map_arg(
+                user.kwargs, lambda n: outputs if n is call else n
+            )
+
+
+def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Inline PyTorch regions on the export clone, preserving engine boundaries."""
+    records = get_region_records(gm)
+    if not records:
+        return gm
+    audit_region_placement(gm, records)
+    # State names must remain unique when fallback children are later inlined.
+    reserved = set()
+    for module in gm.modules():
+        reserved.update(vars(module))
+        reserved.update(module._parameters)
+        reserved.update(module._buffers)
+        reserved.update(module._modules)
+    next_state_index = 0
+
+    def visit(parent: torch.fx.GraphModule) -> None:
+        nonlocal next_state_index
+        state_bindings: Dict[int, str] = {}
+        for call in list(parent.graph.nodes):
+            if call.op != "call_module":
+                continue
+            child = parent.get_submodule(str(call.target))
+            if not isinstance(child, torch.fx.GraphModule):
+                continue
+            if not is_torch_region_node(parent, call):
+                visit(child)
+                continue
+
+            placeholders = [n for n in child.graph.nodes if n.op == "placeholder"]
+            values = dict(zip(placeholders, call.args))
+            with parent.graph.inserting_before(call):
+                outputs = parent.graph.graph_copy(child.graph, values)
+                for node, copied in values.items():
+                    if node.op == "placeholder":
+                        continue
+                    if node.op == "call_module":
+                        raise RegionError(
+                            "Region serialization requires a normalized child"
+                        )
+                    copied.meta.pop(REGION_META_KEY, None)
+                    if node.op == "get_attr":
+                        value = operator.attrgetter(str(node.target))(child)
+                        if not isinstance(value, torch.Tensor):
+                            raise RegionError("Region state must be a read-only Tensor")
+                        state_name = state_bindings.get(id(value))
+                        if state_name is None:
+                            state_name = f"_ttrt_region_export_state_{next_state_index}"
+                            while state_name in reserved:
+                                next_state_index += 1
+                                state_name = (
+                                    f"_ttrt_region_export_state_{next_state_index}"
+                                )
+                            reserved.add(state_name)
+                            next_state_index += 1
+                            if isinstance(value, torch.nn.Parameter):
+                                parent.register_parameter(state_name, value)
+                            else:
+                                # Include non-persistent tensor constants in the artifact.
+                                parent.register_buffer(state_name, value)
+                            state_bindings[id(value)] = state_name
+                        copied.target = state_name
+            if outputs is None:
+                raise RegionError("Region child has no outputs during serialization")
+            _replace_module_call_outputs(call, outputs)
+            parent.graph.erase_node(call)
+        parent.meta.pop(RECORDS_META_KEY, None)
+        parent.graph.lint()
+        parent.recompile()
+
+    visit(gm)
+    custom = dict(gm.meta.get("custom", {}))
+    custom[RECORDS_META_KEY] = [
+        {"id": r.id, "name": r.name, "route": r.route, "owner": r.owner}
+        for r in records
+    ]
+    gm.meta["custom"] = custom
+    return gm
+
+
 def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Inline a submodule within the parent graph (gm). All `call_module` nodes
@@ -312,57 +477,15 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         if gm_node.op == "call_module" and "_run_on_gpu" in gm_node.name:
             submodule = getattr(gm, gm_node.name)
             with gm.graph.inserting_before(gm_node):
-                # Get inputs of submodule node which are most likely outputs of a previous TRT node
-                # or a placeholder of the main graph
-                submodule_inputs = gm_node.args
-
-                # Copy the submodule's nodes into gm, then wire its inputs POSITIONALLY.
-                #
-                # We deliberately do NOT pre-seed val_map by matching submodule input
-                # placeholders to gm nodes by NAME. Name matching silently binds an
-                # input to the WRONG node when names collide (e.g. a _run_on_gpu input
-                # placeholder whose name matches a different engine's getitem), which
-                # rewires a consumer to the wrong producer and orphans the real one --
-                # the orphan is then pruned by dead-code elimination, leaving a delegate
-                # short an output at runtime. It also leaks a mixed submodule's
-                # computed-intermediate inputs as spurious graph inputs. gm_node.args is
-                # the authoritative, ordered list of the real inputs, so we let
-                # graph_copy create a fresh (auto-renamed on collision) placeholder for
-                # every submodule input and rewire each to submodule_inputs[i] by
-                # position, then erase it.
-                val_map: Dict[Any, Any] = {}
-                submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
-
-                submodule_placeholders = [
+                # Bind by argument position; names can collide across partitions.
+                placeholders = [
                     node for node in submodule.graph.nodes if node.op == "placeholder"
                 ]
-                assert len(submodule_placeholders) == len(submodule_inputs)
-                for idx, submodule_placeholder in enumerate(submodule_placeholders):
-                    copied_placeholder = val_map[submodule_placeholder]
-                    copied_placeholder.replace_all_uses_with(submodule_inputs[idx])
-                    gm.graph.erase_node(copied_placeholder)
+                assert len(placeholders) == len(gm_node.args)
+                val_map = dict(zip(placeholders, gm_node.args))
+                submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
 
-                # Replace the pytorch submodule node (call_module) with the inlined subgraph output
-                # Special handling when submodule returns multiple outputs (tuple)
-                if isinstance(submodule_output, tuple):
-                    # The fallback module has multiple outputs
-                    # Find getitem nodes that extract from this module call and replace them directly
-                    getitem_users = [
-                        user
-                        for user in list(gm_node.users.keys())
-                        if user.op == "call_function"
-                        and user.target is operator.getitem
-                    ]
-                    for user in getitem_users:
-                        # getitem extracts element idx from the tuple
-                        _, idx = user.args
-                        # Replace this getitem with the actual node from the tuple
-                        user.replace_all_uses_with(submodule_output[idx])
-                        # Erase the getitem node since it's no longer needed
-                        gm.graph.erase_node(user)
-                else:
-                    # Single output - normal replacement
-                    gm_node.replace_all_uses_with(submodule_output)
+                _replace_module_call_outputs(gm_node, submodule_output)
 
                 # copy the attributes of the submodule into gm (graph_copy doesn't do this)
                 copy_submodule_attributes(gm, submodule, gm_node.name)
