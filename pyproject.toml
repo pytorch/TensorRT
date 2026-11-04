@@ -134,7 +134,7 @@ docs = [
 quantization = [
     # ModelOpt 0.47 caps Transformers below the release fixing BDSA-2026-31320.
     "nvidia-modelopt[hf]>=0.48.0rc1; python_version > '3.9' and python_version < '3.13'",
-    "torchao",
+    "torchao>=0.17",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,

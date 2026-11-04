@@ -4351,8 +4351,8 @@ lint = [
 ]
 quantization = [
     { name = "nvidia-modelopt", extras = ["hf"], marker = "python_full_version >= '3.10' and python_full_version < '3.13'", specifier = ">=0.48.0rc1" },
-    { name = "torchao", marker = "sys_platform != 'win32'" },
-    { name = "torchao", marker = "sys_platform == 'win32'", index = "https://download.pytorch.org/whl/nightly/cpu" },
+    { name = "torchao", marker = "sys_platform != 'win32'", specifier = ">=0.17" },
+    { name = "torchao", marker = "sys_platform == 'win32'", specifier = ">=0.17", index = "https://download.pytorch.org/whl/nightly/cpu" },
 ]
 test = [
     { name = "expecttest", specifier = "==0.1.6" },
