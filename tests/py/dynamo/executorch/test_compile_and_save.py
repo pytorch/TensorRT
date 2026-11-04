@@ -93,12 +93,29 @@ def test_keywords_go_to_compile_or_save_by_name(monkeypatch):
     assert calls["compile"] == {"arg_inputs": ["x"], "min_block_size": 1}
     assert calls["save"] == {
         "output_format": "executorch",
-        "arg_inputs": ["x"],
         "external_engine_data": "model",
     }
 
     with pytest.raises(TypeError, match="min_blok_size"):
         _compile_and_save.compile_and_save("program", "model.pte", min_blok_size=1)
+
+
+def test_a_fully_supported_graph_with_require_full_compilation(tmp_path, monkeypatch):
+    """require_full_compilation's single-engine path returns a bare engine module, which save() doesn't take,
+    so compile_and_save partitions instead."""
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    model = torch.nn.Sequential(torch.nn.Linear(64, 64), torch.nn.ReLU()).eval().cuda()
+    x = torch.randn(4, 64, device="cuda")
+    pte_path = tmp_path / "model.pte"
+    torch_tensorrt.executorch.compile_and_save(
+        torch.export.export(model, (x,)),
+        pte_path,
+        arg_inputs=[x],
+        min_block_size=1,
+        require_full_compilation=True,
+    )
+    assert pte_path.stat().st_size > 0
+    assert not glob.glob(str(tmp_path / "*.engine"))
 
 
 def test_engine_files_are_deleted_when_compilation_fails(tmp_path, monkeypatch):

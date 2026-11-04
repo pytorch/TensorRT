@@ -1457,11 +1457,13 @@ def compile_module(
     )
 
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
-    # convert the lowered graph as a single engine. Mixed graphs still partition.
+    # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
+    # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
+        and not keep_offloaded
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1713,7 +1715,7 @@ def compile_module(
             )
 
             if (
-                keep_offloaded
+                (settings.lazy_engine_init or keep_offloaded)
                 and _debugger_config
                 and (
                     _debugger_config.save_engine_profile

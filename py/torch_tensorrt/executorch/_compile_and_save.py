@@ -7,29 +7,21 @@ from __future__ import annotations
 
 import inspect
 import os
-from typing import Any, Callable, Set, Union
+import sys
+from typing import Any, Union
 
 from torch.export import ExportedProgram
 from torch_tensorrt._compile import _EXECUTORCH_SAVE_OPTIONS, save
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo.runtime._offloaded_engines import keep_offloaded_engines
 
-
-def _keywords(fn: Callable[..., Any]) -> Set[str]:
-    return {
-        name
-        for name, parameter in inspect.signature(fn).parameters.items()
-        if parameter.kind
-        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    }
-
-
-_COMPILE_KEYWORDS = _keywords(dynamo_compile) - {"exported_program"}
-_SAVE_KEYWORDS = (_keywords(save) | set(_EXECUTORCH_SAVE_OPTIONS)) - {
-    "module",
-    "file_path",
-    "output_format",
-}
+_COMPILE_KEYWORDS = {
+    name
+    for name, parameter in inspect.signature(dynamo_compile).parameters.items()
+    if parameter.kind
+    in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+} - {"exported_program"}
+_SAVE_KEYWORDS = set(_EXECUTORCH_SAVE_OPTIONS)
 
 
 def compile_and_save(
@@ -47,12 +39,21 @@ def compile_and_save(
 
     but each engine goes to a temporary file as soon as it is built, and is never loaded: the save streams
     the file into the program (or the ``.ptd`` with ``external_engine_data``). Neither compilation nor the
-    save holds an engine on the GPU or in host memory. The files go to the system temporary directory
-    (``TMPDIR``) and are deleted when the call returns, which returns nothing.
+    save holds an engine on the GPU or in host memory. The call returns nothing.
 
-    Each keyword argument goes to ``torch_tensorrt.dynamo.compile`` or ``torch_tensorrt.save``, whichever
-    takes it; ``inputs``, ``arg_inputs`` and ``kwarg_inputs`` go to both.
+    The files go to the system temporary directory (``TMPDIR``) and are deleted when the call returns. It
+    needs room for every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take the
+    memory this saves. Linux only, since Windows can't delete a file while it is memory-mapped.
+
+    Each keyword argument goes to ``torch_tensorrt.dynamo.compile``, except the ExecuTorch save options
+    (``external_engine_data``, ``use_cuda_graphs``, ``partitioners`` and the others ``torch_tensorrt.save``
+    takes for ``output_format="executorch"``), which go to ``torch_tensorrt.save``.
     """
+    if sys.platform == "win32":
+        raise NotImplementedError(
+            "compile_and_save keeps each engine in a memory-mapped file, which Windows can't delete; "
+            "use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."
+        )
     unknown = sorted(set(kwargs) - _COMPILE_KEYWORDS - _SAVE_KEYWORDS)
     if unknown:
         raise TypeError(

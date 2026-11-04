@@ -424,3 +424,22 @@ class TestLazyEngineInit(TestCase):
         assertions.assertIsNotNone(trt_mod.engine)
         with torch.no_grad():
             assert_close(trt_mod(x), model(x))
+
+    def test_lazy_engine_init_with_layer_info(self):
+        """The debugger reads each engine's layers as soon as it is built, so that engine is set up then."""
+        model = (
+            torch.nn.Sequential(torch.nn.Linear(64, 64), torch.nn.ReLU()).eval().cuda()
+        )
+        x = torch.randn(4, 64, device="cuda")
+        with torchtrt.dynamo.Debugger(
+            save_layer_info=True, logging_dir=tempfile.mkdtemp()
+        ):
+            trt_mod = torchtrt.dynamo.compile(
+                torch.export.export(model, (x,)),
+                arg_inputs=[x],
+                min_block_size=1,
+                lazy_engine_init=True,
+                torch_executed_ops={"torch.ops.aten.relu.default"},
+            )
+        with torch.no_grad():
+            assert_close(trt_mod(x), model(x))
