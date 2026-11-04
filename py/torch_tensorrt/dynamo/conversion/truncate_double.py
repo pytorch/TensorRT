@@ -226,18 +226,19 @@ def repair_double_inputs(
     ]
     submodule_output_metadata = get_output_metadata(submodule)
 
-    # Read each input's dtype where its example tensor already is. Copying them all to the
-    # device just to read their dtypes can take many GiB on a large model.
+    # Read the dtype from the spec: compile and refit make specs without examples.
     for position, submodule_input in enumerate(submodule_inputs):
-        example = submodule_input.torch_tensor
-        if example.dtype != torch.float64:
+        if submodule_input.dtype != dtype.float64:
             continue
 
         _repair_64bit_input(
             parent_graph, position, name, submodule_input_metadata[position]
         )
-        submodule_input.torch_tensor = example.to(torch.float32)
-        submodule_input.dtype = dtype._from(torch.float32)
+        submodule_input.dtype = dtype.float32
+        if submodule_input.torch_tensor is not None:
+            submodule_input.torch_tensor = submodule_input.torch_tensor.to(
+                torch.float32
+            )
 
     # A partition can have a float64 output (e.g. from a float64 weight) even
     # when no runtime input was float64, so this runs unconditionally.

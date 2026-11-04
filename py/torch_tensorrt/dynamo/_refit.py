@@ -405,7 +405,9 @@ def refit_module_weights(
             )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            new_submodule, example_tensors=False
+        )
         logger.debug(
             "Refitting Submodule name: %s\n",
             str(name),

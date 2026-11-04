@@ -1480,6 +1480,7 @@ def compile_module(
         convert_inputs = partitioning.construct_submodule_inputs(
             gm,
             user_symbol_bounds=user_symbol_bounds,
+            example_tensors=False,
         )
         return convert_module(
             gm,
@@ -1679,6 +1680,7 @@ def compile_module(
             profile_source_bounds=profile_source_bounds,
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
+            example_tensors=False,
         )
 
         assert submodule_inputs is not None
