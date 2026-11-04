@@ -140,6 +140,10 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         subgraphs = self.break_subgraphs(
             subgraphs, subgraph_size_budget=self.calculate_size_budget()
         )
+
+        if len(subgraphs) == 1:
+            return self.module
+
         engine_sizes = [
             size
             for subgraph, size in zip(subgraphs, self.size_of_subgraphs(subgraphs))
@@ -150,9 +154,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             + "with these weights, in MiB: "
             + ", ".join(f"{size / 2**20:.1f}" for size in engine_sizes)
         )
-
-        if len(subgraphs) == 1:
-            return self.module
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
