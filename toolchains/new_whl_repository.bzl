@@ -4,7 +4,7 @@
 """Expose an installed Python package as a repository with a supplied BUILD file.
 
 The repository name is independent of the Python import package name. The caller
-supplies the interpreter executable used by its Python toolchain; this rule does
+supplies the interpreter path or command used by its Python toolchain; this rule does
 not search other Python environments or import the requested package.
 """
 
@@ -25,8 +25,13 @@ print(locations[0])
 """
 
 def _new_whl_repository_impl(ctx):
+    requested = ctx.attr.python
+    python = ctx.path(requested) if "/" in requested else ctx.which(requested)
+    if not python or not python.exists:
+        fail("Cannot create @%s: cannot find Python interpreter %r" % (ctx.name, requested))
+
     result = ctx.execute([
-        ctx.path(ctx.attr.python),
+        python,
         "-c",
         _FIND_PACKAGE,
         ctx.attr.package,
@@ -50,8 +55,8 @@ new_whl_repository = repository_rule(
     attrs = {
         "build_file": attr.label(mandatory = True, allow_single_file = True),
         "package": attr.string(mandatory = True),
-        "python": attr.label(mandatory = True, allow_single_file = True),
+        "python": attr.string(mandatory = True),
     },
-    environ = ["PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE", "PYTHONUSERBASE"],
+    environ = ["PATH", "PYTHONHOME", "PYTHONPATH", "PYTHONNOUSERSITE", "PYTHONUSERBASE"],
     local = True,
 )

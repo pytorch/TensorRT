@@ -16,19 +16,14 @@ bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
 # Use the container's installed Python for wheel discovery and its local
 # toolchain. A downloaded interpreter does not contain the NGC-installed wheels.
-local_python_repository = use_repo_rule("//toolchains:local_python.bzl", "local_python_repository")
-
-local_python_repository(
-    name = "ngc_python",
-    interpreter_path = "python3",
-)
+NGC_PYTHON = "python3"
 
 local_runtime_repo = use_repo_rule("@rules_python//python/local_toolchains:repos.bzl", "local_runtime_repo")
 
 local_runtime_repo(
     name = "ngc_python_runtime",
     dev_dependency = True,
-    interpreter_target = "@ngc_python//:python",
+    interpreter_path = NGC_PYTHON,
     on_failure = "fail",
 )
 
@@ -74,7 +69,7 @@ new_whl_repository(
     name = "torch_tensorrt",
     build_file = "@//third_party/torch_tensorrt:BUILD",
     package = "torch_tensorrt",
-    python = "@ngc_python//:python",
+    python = NGC_PYTHON,
 )
 
 # CUDA should be installed on the system locally
@@ -94,7 +89,7 @@ new_whl_repository(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     package = "torch",
-    python = "@ngc_python//:python",
+    python = NGC_PYTHON,
 )
 
 # Use the source revision recorded by the pinned ExecuTorch wheel.
@@ -121,7 +116,7 @@ new_whl_repository(
     name = "torch_l4t",
     build_file = "@//third_party/libtorch:BUILD",
     package = "torch",
-    python = "@ngc_python//:python",
+    python = NGC_PYTHON,
 )
 
 new_local_repository(
