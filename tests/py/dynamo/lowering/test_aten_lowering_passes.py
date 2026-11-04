@@ -569,11 +569,11 @@ class TestRewriteEfficientAttention(TestCase):
         inputs = [torch.randn(4, 8, 32, 16).cuda() for _ in range(3)]
         model = CausalEfficientAttention().cuda()
         ep = torch.export.export(model, tuple(inputs))
-        # torch.compile runs the lowering passes under a fake mode. None replaces
+        # torch.compile runs the lowering passes under a fake mode. "proven" replaces
         # only a bias it proves causal, so the bias must be computed with real values.
         with FakeTensorMode():
             gm = force_causal_efficient_attention(
-                ep.module(), CompilationSettings(attn_bias_is_causal=None)
+                ep.module(), CompilationSettings(attn_bias_is_causal="proven")
             )
         (attention,) = [
             node
@@ -624,7 +624,7 @@ class TestRewriteEfficientAttention(TestCase):
                 InputBias(),
                 (query, causal),
                 None,
-                CompilationSettings(attn_bias_is_causal=None),
+                CompilationSettings(attn_bias_is_causal="proven"),
                 False,
             ),
             (
@@ -657,12 +657,12 @@ class TestRewriteEfficientAttention(TestCase):
                 CompilationSettings(attn_bias_is_causal=True),
                 False,
             ),
-            # Blocked only to -1e9: unknown, so kept with None and replaced with True.
+            # Blocked only to -1e9: unknown, so kept with "proven", replaced with True.
             (
                 BufferBias(causal.nan_to_num(neginf=-1e9)),
                 (query,),
                 None,
-                CompilationSettings(attn_bias_is_causal=None),
+                CompilationSettings(attn_bias_is_causal="proven"),
                 False,
             ),
             (
@@ -698,7 +698,8 @@ class TestRewriteEfficientAttention(TestCase):
                 self.assertEqual(attention.args[3] is None, replaced)
 
         # A check that fails, for example by running out of memory, and a mask too long
-        # to check are not proven: True replaces them, as before, and None keeps them.
+        # to check are not proven: True replaces them, as before, and "proven" keeps
+        # them.
         long_seq = 4097
         long_causal = torch.zeros(1, 1, long_seq, long_seq, device="cuda").masked_fill(
             torch.ones(long_seq, long_seq, dtype=torch.bool, device="cuda").triu(1),
@@ -712,7 +713,7 @@ class TestRewriteEfficientAttention(TestCase):
             ),
         }
         for name, (model, inputs) in unproven.items():
-            for setting, replaced in ((True, True), (None, False)):
+            for setting, replaced in ((True, True), ("proven", False)):
                 with (
                     self.subTest(name, attn_bias_is_causal=setting),
                     mock.patch(
@@ -732,6 +733,12 @@ class TestRewriteEfficientAttention(TestCase):
                     ]
                     self.assertEqual(attention.args[3] is None, replaced)
                     self.assertEqual(check.called, name == "failed check")
+
+    def test_attn_bias_is_causal_rejects_other_values(self):
+        # None means the default for other settings, and a misspelled mode is truthy.
+        for value in (None, "Proven"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                CompilationSettings(attn_bias_is_causal=value)
 
     def test_causal_check_memory(self):
         seq = 4096
@@ -766,7 +773,7 @@ class TestRewriteEfficientAttention(TestCase):
             [query, attn_bias],
             min_block_size=1,
             require_full_compilation=True,
-            attn_bias_is_causal=None,
+            attn_bias_is_causal="proven",
         )
         torch.testing.assert_close(
             model(query, attn_bias), trt_module(query, attn_bias), rtol=1e-2, atol=1e-2
@@ -793,7 +800,7 @@ class TestRewriteEfficientAttention(TestCase):
                 # Lowering drops the unused getitems that export keeps.
                 gm.graph.eliminate_dead_code()
                 gm = force_causal_efficient_attention(
-                    gm, CompilationSettings(attn_bias_is_causal=None)
+                    gm, CompilationSettings(attn_bias_is_causal="proven")
                 )
                 (attention,) = [
                     node

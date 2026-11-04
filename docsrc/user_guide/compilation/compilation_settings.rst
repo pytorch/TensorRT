@@ -116,13 +116,13 @@ Optimization Tuning
        that depends on no graph input and holds 0 on and below the diagonal and -inf
        (or the dtype's lowest value) above, and also a bias that cannot be proven,
        such as one built from an input, with a dynamic sequence length, or from a
-       module buffer under ``torch.compile``; you assert that it is causal. ``None``:
-       only a bias proven causal, for models whose input-built masks may not be
-       causal, such as masks with padding. A bias that is computed and found not
-       causal is always kept. A mask longer than 4096, or one whose check fails, is
-       not proven: ``True`` replaces it and ``None`` keeps it. ``False``: never
-       replace. A replaced bias is not read again, so refitting the weights it came
-       from does not change the engine.
+       module buffer under ``torch.compile``; you assert that it is causal.
+       ``"proven"``: only a bias proven causal, for models whose input-built masks
+       may not be causal, such as masks with padding. A bias that is computed and
+       found not causal is always kept. A mask longer than 4096, or one whose check
+       fails, is not proven: ``True`` replaces it and ``"proven"`` keeps it.
+       ``False``: never replace. A replaced bias is not read again, so refitting the
+       weights it came from does not change the engine.
 
 ----
 

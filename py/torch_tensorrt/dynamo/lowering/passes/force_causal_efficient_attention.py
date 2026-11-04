@@ -30,7 +30,7 @@ def force_causal_efficient_attention(
     accurate than a mask. ``settings.attn_bias_is_causal`` picks the biases of square
     attention (seq_q == seq_k) to replace:
 
-    * None: a bias proven causal (see _prove_causal).
+    * "proven": a bias proven causal (see _prove_causal).
     * True: also a bias the pass cannot prove, which the caller asserts is causal. A
       bias the pass checks and finds not causal, such as a block-causal mask, is kept.
     * False: none.
@@ -41,7 +41,7 @@ def force_causal_efficient_attention(
     keys, and the pass cannot see how the bias is aligned. The node is left unchanged and passed to
     IAttentionLayer, which supports non-square Q/K natively.
     """
-    if settings.attn_bias_is_causal is False:
+    if not settings.attn_bias_is_causal:
         return gm
 
     proofs: Dict[Tuple[torch.fx.Node, Any], Optional[bool]] = {}
@@ -80,7 +80,7 @@ def force_causal_efficient_attention(
         if key not in proofs:
             proofs[key] = _prove_causal(gm, attn_bias, seq_len)
         proof = proofs[key]
-        if not (proof or (proof is None and settings.attn_bias_is_causal)):
+        if not (proof or (proof is None and settings.attn_bias_is_causal != "proven")):
             logger.debug(
                 f"Keeping attn_bias of node {node} because it is "
                 + ("not causal" if proof is False else "not proven causal")
@@ -133,7 +133,8 @@ def _prove_causal(
     its zeros are anywhere else, or when a position above the diagonal is above
     -1e4. A bias in between, such as a -1e9 fill, is unknown. So is a bias longer
     than _MAX_CHECKED_SEQ_LEN, which would take a lot of memory at compile time, and
-    one whose check fails: True replaces these as it always did, and None keeps them.
+    one whose check fails: True replaces these as it always did, and "proven" keeps
+    them.
     """
     if not isinstance(seq_len, int) or seq_len > _MAX_CHECKED_SEQ_LEN:
         return None

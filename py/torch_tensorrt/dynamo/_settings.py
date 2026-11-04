@@ -165,7 +165,7 @@ class CompilationSettings:
             it matches foldable. Supported IDs: ``"attention_mask_arange"``,
             ``"scatter_add_positions"``.
             Default is empty.
-        attn_bias_is_causal (Optional[bool]): Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal mask, which is faster and more accurate. True: a bias proven causal, one that depends on no graph input and holds 0 on and below the diagonal and -inf (or the dtype's lowest value) above, and also a bias that cannot be proven, such as one built from an input, with a dynamic sequence length, or from a module buffer under torch.compile; you assert that it is causal. None: only a bias proven causal, for models whose input-built masks may not be causal, such as masks with padding. A bias that is computed and found not causal is always kept. A mask longer than 4096, or one whose check fails, is not proven: True replaces it and None keeps it. False: never replace. A replaced bias is not read again, so refitting the weights it came from does not change the engine. Default is True.
+        attn_bias_is_causal (Union[bool, str]): Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal mask, which is faster and more accurate. True: a bias proven causal, one that depends on no graph input and holds 0 on and below the diagonal and -inf (or the dtype's lowest value) above, and also a bias that cannot be proven, such as one built from an input, with a dynamic sequence length, or from a module buffer under torch.compile; you assert that it is causal. "proven": only a bias proven causal, for models whose input-built masks may not be causal, such as masks with padding. A bias that is computed and found not causal is always kept. A mask longer than 4096, or one whose check fails, is not proven: True replaces it and "proven" keeps it. False: never replace. A replaced bias is not read again, so refitting the weights it came from does not change the engine. Default is True.
         fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.
         deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Under torch.compile the weights are engine inputs, not constants, so they are not shared. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
@@ -247,7 +247,7 @@ class CompilationSettings:
     disabled_constant_fold_exclusions: Collection[str] = (
         DISABLED_CONSTANT_FOLD_EXCLUSIONS
     )
-    attn_bias_is_causal: Optional[bool] = ATTN_BIAS_IS_CAUSAL
+    attn_bias_is_causal: Union[bool, str] = ATTN_BIAS_IS_CAUSAL
     fold_shared_kv_attention: bool = FOLD_SHARED_KV_ATTENTION
     deduplicate_weights: bool = DEDUPLICATE_WEIGHTS
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
@@ -271,6 +271,11 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        if self.attn_bias_is_causal not in (True, False, "proven"):
+            raise ValueError(
+                'attn_bias_is_causal must be True, False or "proven", got '
+                f"{self.attn_bias_is_causal!r}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
