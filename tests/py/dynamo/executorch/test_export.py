@@ -874,13 +874,47 @@ def test_python_only_build_can_export_a_pte(tmp_path):
 
 
 @pytest.mark.unit
-def test_save_leaves_no_lowered_program_alive(tmp_path):
+@pytest.mark.parametrize("dynamic", [False, True])
+def test_save_leaves_no_lowered_program_alive(tmp_path, dynamic):
     """A saved program's delegates, and so its engines, must not outlive save()."""
     from executorch.exir.lowered_backend_module import LoweredBackendModule
 
     # No gc.collect() of its own: save() has to hand the memory back before it returns.
     def live_lowered_modules():
-        return sum(isinstance(o, LoweredBackendModule) for o in gc.get_objects())
+        return [o for o in gc.get_objects() if isinstance(o, LoweredBackendModule)]
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    dynamic_shapes = (
+        ({0: torch.export.Dim("batch", min=1, max=8)},) if dynamic else None
+    )
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(
+            AddOne().eval().cuda(), example, dynamic_shapes=dynamic_shapes
+        ),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    # Modules an earlier test left behind may be collected during this save too.
+    before = weakref.WeakSet(live_lowered_modules())
+
+    torch_tensorrt.save(
+        compiled,
+        str(tmp_path / "add_one.pte"),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+
+    assert [m for m in live_lowered_modules() if m not in before] == []
+
+
+def test_a_failed_save_leaves_no_lowered_program_alive(tmp_path, monkeypatch):
+    """The caches are cleared also when writing the program fails."""
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
 
     class AddOne(torch.nn.Module):
         def forward(self, value):
@@ -892,17 +926,31 @@ def test_save_leaves_no_lowered_program_alive(tmp_path):
         arg_inputs=example,
         min_block_size=1,
     )
-    before = live_lowered_modules()
-
-    torch_tensorrt.save(
-        compiled,
-        str(tmp_path / "add_one.pte"),
-        output_format="executorch",
-        arg_inputs=example,
-        retrace=False,
+    before = weakref.WeakSet(
+        o for o in gc.get_objects() if isinstance(o, LoweredBackendModule)
     )
-
-    assert live_lowered_modules() == before
+    cleared = []
+    real = torch_tensorrt._compile._release_lowering_caches
+    monkeypatch.setattr(
+        torch_tensorrt._compile,
+        "_release_lowering_caches",
+        lambda program: (cleared.append(True), real(program)),
+    )
+    with pytest.raises(OSError):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "missing_dir" / "add_one.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+    assert cleared
+    gc.collect()  # the exception's traceback held the failed program's frames
+    assert [
+        o
+        for o in gc.get_objects()
+        if isinstance(o, LoweredBackendModule) and o not in before
+    ] == []
 
 
 @pytest.mark.unit
