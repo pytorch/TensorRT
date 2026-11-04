@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Any, Set
+from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -42,6 +42,20 @@ _SAFE_ALIASED_FOLD_SKIP_OPS: Set[torch._ops.OpOverload] = {
     torch.ops.aten.permute.default,
 }
 
+# Compared by value in fold keys; any other argument is compared by identity.
+_VALUE_TYPES = (
+    bool,
+    int,
+    float,
+    str,
+    type(None),
+    slice,
+    torch.dtype,
+    torch.device,
+    torch.layout,
+    torch.memory_format,
+)
+
 
 def _tensor_reuses_module_storage(
     gm: torch.fx.GraphModule, constant: torch.Tensor
@@ -77,6 +91,8 @@ def constant_fold(
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
     skipped_alias = 0
+    # Repeats of an op share the tensor folded first, so install it only once.
+    installed: Dict[int, torch.fx.Node] = {}
     for node, constant in cf.node_replacements.items():
         if (
             isinstance(constant, torch.Tensor)
@@ -96,14 +112,18 @@ def constant_fold(
                 )
                 continue
 
-        if settings.offload_module_to_cpu:
-            replace_node_with_constant(
+        shared = installed.get(id(constant))
+        if shared is not None:
+            node.replace_all_uses_with(shared)
+            gm.graph.erase_node(node)
+        elif settings.offload_module_to_cpu:
+            installed[id(constant)] = replace_node_with_constant(
                 gm,
                 node,
                 torch.nn.Parameter(constant.cpu().contiguous(), requires_grad=False),
             )
         else:
-            replace_node_with_constant(
+            installed[id(constant)] = replace_node_with_constant(
                 gm, node, torch.nn.Parameter(constant, requires_grad=False)
             )
 
@@ -136,7 +156,7 @@ def constant_fold(
 
 def replace_node_with_constant(
     gm: torch.fx.GraphModule, node: torch.fx.Node, constant: torch.Tensor
-) -> None:
+) -> torch.fx.Node:
     """Adapted from:
     https://github.com/pytorch/pytorch/blob/bcf35c6ae62bb6560befa3550e37a8283944e5f4/torch/_inductor/constant_folding.py#L17-L43
 
@@ -169,6 +189,23 @@ def replace_node_with_constant(
     # Needed to suppress `does not reference an nn.Module, nn.Parameter, or buffer` warning
     gm.register_parameter(qualname, constant)
     setattr(gm, qualname, constant)
+    return new_input_node
+
+
+def _describe_args(arg: Any, repeat_of: Dict[torch.fx.Node, torch.fx.Node]) -> Any:
+    """A hashable description of node arguments, naming each input by the first node
+    that computes its value."""
+    if isinstance(arg, torch.fx.Node):
+        return repeat_of.get(arg, arg)
+    if isinstance(arg, (list, tuple)):
+        return type(arg), tuple(_describe_args(a, repeat_of) for a in arg)
+    if isinstance(arg, dict):
+        return dict, tuple((k, _describe_args(v, repeat_of)) for k, v in arg.items())
+    if isinstance(arg, _VALUE_TYPES):
+        # The type and repr keep apart values that compare equal, such as 1, 1.0
+        # and True, or 0.0 and -0.0.
+        return type(arg), repr(arg)
+    return type(arg), id(arg)
 
 
 # TODO: Delete this class when the following code is fixed in nightly:
@@ -176,6 +213,8 @@ def replace_node_with_constant(
 class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._first_with_key: Dict[Tuple[Any, ...], torch.fx.Node] = {}
+        self._repeat_of: Dict[torch.fx.Node, torch.fx.Node] = {}
         # Quantization ops excluded from constant folding so TRT sees QDQ
         # (ModelOpt tensorrt.quantize_op, TorchAO dequantize_affine, TorchAO
         # NVFP4 dequantize_nvfp4, and TorchAO MXFP4 dequantize_mxfp4 when
@@ -232,6 +271,26 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             self.quantization_ops.add(torch.ops.torchao_trt.dequantize_mxfp4.default)
         except Exception:
             pass
+
+    def _deduce_value(self, node: torch.fx.Node) -> Any:
+        # Readers of a constant often repeat the same op on it, such as one cast per
+        # step of an unrolled loop under autocast. Keeping a folded result per repeat
+        # would hold one copy per reader, so a repeat reuses the first result while
+        # it is still held.
+        key = self._fold_key(node)
+        if key is not None:
+            first = self._first_with_key.setdefault(key, node)
+            if first is not node:
+                self._repeat_of[node] = first
+                if first in self.node_replacements:
+                    return self.node_replacements[first]
+        return super()._deduce_value(node)
+
+    def _fold_key(self, node: torch.fx.Node) -> Optional[Tuple[Any, ...]]:
+        # A value that escapes or is mutated must stay a tensor of its own.
+        if node.op != "call_function" or node.is_impure() or _storage_escapes(node):
+            return None
+        return node.target, _describe_args((node.args, node.kwargs), self._repeat_of)
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:

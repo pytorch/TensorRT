@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=d9553575"></script>
+    <script src="../../_static/documentation_options.js?v=28a5836a"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -915,6 +915,17 @@ pressure during the build phase. Weights are loaded back to GPU at runtime.</p><
 <td><p>Let TRT dynamically allocate memory for intermediate tensors at runtime rather
 than pre-allocating. Can reduce peak memory footprint at a small runtime cost.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Add a weight that several layers read to the TRT network once instead of once
+per layer, and give the linear layers that share a weight one transposed copy
+of it. This cuts engine-build host memory for models that reuse weights, such
+as a denoising loop unrolled into one graph, most of all in FP32 builds with
+<code class="docutils literal notranslate"><span class="pre">disable_tf32=True</span></code> and in refittable engines. TRT may pick other kernels, so
+results can round differently, and some models need more memory instead, so
+measure it. Under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> the weights are engine inputs, not
+constants, so they are not shared.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1110,7 +1121,7 @@ rebuilt from scratch:</p>
 <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
-<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code>.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>
 </section>

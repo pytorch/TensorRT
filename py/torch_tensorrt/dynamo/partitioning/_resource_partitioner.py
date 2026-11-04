@@ -17,24 +17,27 @@ Given an original `torch.fx.GraphModule` and a capability-partitioned
      nodes belong to which subgraph (accelerated or not).
    - Preserve fusion groups discovered in each subgraph so that all nodes in a fusion
      group remain in the same subgraph and not be split across subgraphs.
-   - Verify subgraphs respect topological order. This is to ensure the validity of the subgraphs.
    - Reconstruting subgraphs from partitioned module is easier than building nasted partitioned graph modules and flattening them later.
 
 2) Estimate memory cost of each possible subgraphs
    - Compute a per-subgraph "size" by traversing the graph to find weights
      (get_attr) reachable from its nodes and summing tensor bytes.
-   - Use a set to record the visited nodes and avoid double counting shared parameters across subgraphs.
+   - A weight read by several subgraphs counts in each of them, because every TensorRT engine
+     embeds its own copy.
 
 
 4) Split large accelerated subgraphs
    - While a subgraph exceeds the per-engine budget, split it into two or more subgraphs.
    - Move nodes incrementally from the front of the original subgraph into a
-     new left subgraph, repeatedly validating/correcting topological, partitioning, and
-     dependency constraints.
+     new left subgraph. The nodes are in topological order, so the left subgraph
+     never depends on the right one.
    - Ensure we never split across a fusion group; when a split would break a
      fusion, we backtrack dependencies and move the entire fusion and related nodes into the left
      side.
-   - Continue until the left subgraph fits the budget
+   - Stop before a step that adds weights the left subgraph has no room for, or once
+     both sides fit and the left one is larger. A node larger than the budget is kept
+     while the left subgraph has no weights, together with the nodes after it that add
+     no weights.
    - Repeat the process for the right subgraph until all subgraphs fit the budget.
 
 5) Finalize
@@ -49,6 +52,7 @@ Notes
 """
 
 import logging
+import operator
 from typing import Dict, List, Optional, Set, Tuple
 
 import psutil
@@ -100,7 +104,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         self.not_set_limit = cpu_memory_budget is None
         self.resource_split_count = 0
         self.submodule_name = submodule_name
-        self.deps = self.find_deps()
 
         self._node_submodule_map: Dict[str, str] = {}
         self._return_tuple = False
@@ -168,22 +171,16 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 nodes.append(node)
         subgraphs = [Subgraph(is_acc=True, nodes=nodes)]
         self.fusion_patterns = get_node_in_fusion_pattern(self.module.graph)
+        # A TensorRT engine cannot output a tuple, so a node that returns several values
+        # stays in one subgraph with the getitems that unpack them, like a fusion group.
+        # Storing the group on the node alone is enough: a getitem left on the other side of a split
+        # makes the node a leaf, and the split checks the groups of leaves.
+        for node in nodes:
+            getitems = {u for u in node.users if u.target == operator.getitem}
+            if getitems:
+                self.fusion_patterns.setdefault(node, set()).update(getitems | {node})
 
         return subgraphs
-
-    def check_topological_order(self, subgraphs: List[Subgraph]) -> bool:
-        """Return True if subgraphs are in a valid topological order.
-
-        Each node's dependencies must appear in earlier subgraphs or earlier
-        positions within the same subgraph. Subgraphs should be topologically ordered to ensure the validity of the subgraphs.
-        """
-        visited_nodes: set[torch.fx.Node] = set()
-        for subgraph in subgraphs:
-            for node in subgraph.nodes:
-                if self.deps[node] > visited_nodes:
-                    return False
-                visited_nodes.add(node)
-        return True
 
     def calculate_size_budget(
         self,
@@ -231,6 +228,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         new_subgraphs = []
         # We throw an error if the remaining memory is almost empty compared to the model size.
         # i.e. if the remaining memory is 4G (budget is 1G) the model size is greater than 40G, we stop the compilation.
+        # This bounds the model size, not the engine count. There can be more engines, because a split
+        # engine can stop well below the budget and a weight counts in every engine that reads it.
         sizes = self.size_of_subgraphs(subgraphs)
         if sum(sizes) > subgraph_size_budget * MAX_NUM_OF_ENGINES:
             if self.not_set_limit:
@@ -284,12 +283,13 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     ) -> Tuple[List[Subgraph], int, int]:
         """Split a single oversized subgraph into two valid subgraphs.
 
-        Moves nodes from the head of `subgraph` into a new left segment until
-        the left segment's estimated size exceeds `size_to_break`. During the
-        process we:
-        - Repeatedly validate/correct topological placement
-        - Detect and avoid splitting fusion groups by moving all fused nodes
-          (and their producer chain) into the left segment
+        Moves nodes from the head of `subgraph` into a new left segment. It stops
+        before a step that adds weights the left segment has no room for in
+        `size_to_break`, or once both segments fit and the left one is larger.
+        A node larger than `size_to_break` is kept while the left segment has
+        no weights, together with the nodes after it that add no weights.
+        During the process we detect and avoid splitting fusion groups by
+        moving all fused nodes (and their producer chain) into the left segment.
 
         Returns:
             (segments, size_left, size_right):
@@ -311,31 +311,41 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             ),
         ]
 
-        # We break the subgraph until the left subgraph fits the budget.
-        while True:
-            # Set a step size proportional to the size of the subgraph to make the algorithm more efficient.
-            # This reduce the time complexity from O(N**2) to O(N). The max number of steps is 50.
-            # Note: we want the first step size to be 1.
-            step_size = (
-                1 if not new_subgraphs[0].nodes else max(1, len(all_nodes) // 50)
-            )
+        step_size = 1
+        size_0 = 0
+        while new_subgraphs[1].nodes:
+            nodes_before_step = [s.nodes.copy() for s in new_subgraphs]
+            size_before_step = size_0
             new_subgraphs = self.step_and_validate(new_subgraphs, step_size)
             size_0, size_1 = self.size_of_subgraphs(new_subgraphs)
-            if size_0 > size_to_break or size_0 > size_1:
+            # Comparing with size_before_step too keeps the steps after an oversized node while
+            # they add no weights.
+            if size_0 > max(size_to_break, size_before_step):
+                # The step added weights the left subgraph has no room for: undo it and retry with half
+                # as many nodes, or stop if it was a single node. A single node is kept instead while
+                # the left subgraph has no weights, because a subgraph without weights saves no memory.
+                if step_size > 1 or size_before_step > 0:
+                    for s, nodes in zip(new_subgraphs, nodes_before_step):
+                        s.nodes[:] = nodes
+                    size_0 = size_before_step
+                    if step_size == 1:
+                        break
+                    step_size //= 2
+                    continue
+            elif size_1 < size_0 <= size_to_break:
+                # Both sides fit, and stopping here keeps the two engines about the same size.
                 break
+            # Steps of 2% of the remaining nodes keep the number of size estimates low.
+            step_size = max(1, len(new_subgraphs[1].nodes) // 50)
 
+        size_0, size_1 = self.size_of_subgraphs(new_subgraphs)
         return new_subgraphs, size_0, size_1
 
     def step_and_validate(
         self, new_subgraphs: List[Subgraph], step_size: int = 1
     ) -> List[Subgraph]:
-        """Advance the split by `step_size` nodes, then add more nodes to the left subgraph if rules are broken.
-           There are two rules to check:
-            1. The subgraphs should be ordered in a way that is safely to partition.
-               This is checked by validate_and_correct_subgraphs. Check that function for more details.
-            2. The subgraphs should not break any fusion groups.
+        """Advance the split by `step_size` nodes, then add more nodes to the left subgraph if a fusion group is broken.
         - Move `step_size` nodes from the right to the left subgraph.
-        - Run validation/correction to ensure a legal partitioning placement.
         - Get all leaf nodes in the left subgraph and check whether any of them are in a fusion group.
         - If the move splits a fusion group, migrate the entire fusion into the left subgraph.
 
@@ -347,7 +357,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             new_subgraphs[0].nodes.append(new_subgraphs[1].nodes.pop(0))
 
         while True:
-            new_subgraphs = self.validate_and_correct_subgraphs(new_subgraphs)
             nodes_in_first_subgraph = set(new_subgraphs[0].nodes)
             nodes_in_second_subgraph = set(new_subgraphs[1].nodes)
             leaf_node = self.get_leaf_node(nodes_in_first_subgraph)
@@ -383,20 +392,25 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         def add_nodes(node: torch.fx.Node) -> None:
             """
-            This function adds a node and all its previous nodes to the first subgraph and removes it from the second subgraph in post order.
+            This function moves a node and all its previous nodes in the second subgraph to the first subgraph, keeping their order.
             """
-            if (
-                node.op in CALLABLE_NODE_OPS
-                and node not in nodes_in_first_subgraph
-                and node in nodes_in_second_subgraph
-            ):
-                # Exclude all nodes already in the first subgraph
-                nodes_in_first_subgraph.add(node)
-                nodes_in_second_subgraph.remove(node)
-                for input_node in node._input_nodes:
-                    add_nodes(input_node)
-                subgraphs[0].nodes.append(node)
-                subgraphs[1].nodes.remove(node)
+            # An explicit stack, not recursion: a chain of producers can be longer than Python's recursion limit.
+            nodes_to_move, stack = set(), [node]
+            while stack:
+                n = stack.pop()
+                if (
+                    n.op in CALLABLE_NODE_OPS
+                    and n not in nodes_to_move
+                    and n in nodes_in_second_subgraph
+                ):
+                    nodes_to_move.add(n)
+                    stack.extend(n._input_nodes)
+            nodes_in_first_subgraph.update(nodes_to_move)
+            nodes_in_second_subgraph.difference_update(nodes_to_move)
+            # The second subgraph is in graph order, so producers move before their users.
+            for n in [n for n in subgraphs[1].nodes if n in nodes_to_move]:
+                subgraphs[0].nodes.append(n)
+                subgraphs[1].nodes.remove(n)
 
         fusion_broken = False
         for leaf in leaf_nodes:
@@ -431,16 +445,17 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         """Estimate parameter footprint (bytes) for each subgraph.
 
         Traverses each subgraph's nodes and their producer chains to find
-        parameters referenced via `get_attr`, summing tensor bytes. Shared
-        parameters are counted only once globally.
+        parameters referenced via `get_attr`, summing tensor bytes. A parameter
+        read by several subgraphs counts in each of them, because every TensorRT
+        engine embeds its own copy.
 
         Returns:
             List[int]: Size per subgraph in bytes.
         """
         state_dict = self.module.state_dict(keep_vars=True)
         sizes = []
-        weight_visited_nodes = set()
         for subgraph in subgraphs:
+            weight_visited_nodes = set()
             nodes_in_subgraph = set(subgraph.nodes)
             stack = subgraph.nodes.copy()
             size = 0
@@ -464,59 +479,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                         stack.append(input_node)
             sizes.append(size)
         return sizes
-
-    def validate_and_correct_subgraphs(
-        self, subgraphs: List[Subgraph]
-    ) -> List[Subgraph]:
-        """This is very important for the correctness of the partitioning. Torch gives undefined behavior if the subgraphs are not ordered correctly.
-
-        The principle is: nodes that have all dependencies resolved in previous subgraphs should also be moved to the previous subgraph.
-        For example, given a breakpoint node n resulting in two subgraphs S1 [..., n] and S2 [n+1, ...], all nodes in S2 that is not directly or indirectly depend on n should be moved to S1.
-
-        We use a map to record the index of the subgraph that a node's users should belong to. If the node N is in subgraph S1 and is not the breakpoint node (subgraph.nodes[-1]),
-        then the users that only depend on N should also be moved to S1. However, N is a breakpoint node, then the users that only depend on N should also be moved to S2.
-
-        With the map, we can determine with subgraph a later node should be moved to according to all its inputs. We take max indices of all inputs nodes to determine the subgraph index.
-
-        Returns:
-            List[Subgraph]: Corrected subgraphs.
-        """
-        # a map from a node to the index of the subgraph it's user should belong to
-        visited_nodes = {}
-
-        for i, subgraph in enumerate(subgraphs):
-            if i == 0:
-                for node in subgraph.nodes:
-                    visited_nodes[node] = i
-                # breakpoint node's users should belong to the next subgraph
-                visited_nodes[subgraph.nodes[-1]] = i + 1
-                continue
-
-            else:
-                to_remove_nodes = []
-                for j, node in enumerate(subgraph.nodes):
-                    if j == len(subgraph.nodes) - 1:
-                        # breakpoint node's users should belong to the next subgraph
-                        visited_nodes[node] = i + 1
-                        continue
-                    subgraph_idx = 0
-                    for dep in self.deps[node]:
-                        if dep in visited_nodes:
-                            # We take max indices of all inputs nodes to determine the subgraph index.
-                            subgraph_idx = max(subgraph_idx, visited_nodes[dep])
-
-                    if subgraph_idx != i:
-                        # If the node should be moved to a different subgraph, we move it and remove it from the current subgraph.
-                        subgraphs[subgraph_idx].nodes.append(node)
-                        to_remove_nodes.append(node)
-                    # Record the the subgraph that the users of this node should belong to
-                    visited_nodes[node] = subgraph_idx
-
-                # Remove the nodes that are moved to other subgraphs
-                for node in to_remove_nodes:
-                    subgraph.nodes.remove(node)
-
-        return subgraphs
 
 
 def resource_partition(
