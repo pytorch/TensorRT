@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcast,
-    cast_int_int_div_trt_tensor,
     cast_int_or_float_to_bool,
     cast_trt_tensor,
     get_trt_tensor,
@@ -535,9 +534,6 @@ def div(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
-        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
-
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
     )
