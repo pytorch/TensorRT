@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
+
 import pytest
 import torch
 import torch_tensorrt
@@ -139,6 +141,20 @@ def test_compile_releases_weights(release, use_fast_partitioner):
     assert (
         state["w_torch"].untyped_storage().nbytes() > 0
     )  # read by the PyTorch partition
+    # The compiled module keeps none of the released tensors, so copying or saving it reads no freed memory.
+    for tensor in [*trt_gm.parameters(), *trt_gm.buffers()]:
+        assert tensor.untyped_storage().nbytes() > 0
+    copy.deepcopy(trt_gm)
+
+
+def test_sparse_tensors_are_not_weights():
+    root = torch.nn.Module()
+    root.register_buffer("s", torch.eye(4).to_sparse())
+    graph = torch.fx.Graph()
+    x, s = graph.placeholder("x"), graph.get_attr("s")
+    graph.output(graph.call_function(torch.add, (x, s)))
+    # A sparse tensor has no storage to release; asking for it raises.
+    assert weight_storages(torch.fx.GraphModule(root, graph)) == {}
 
 
 def test_single_engine_fast_path_releases_weights():
@@ -173,15 +189,22 @@ def test_mutated_buffer_survives_release():
             self.state.copy_(y)
             return y * 2  # returning y itself trips an unrelated lowering error on main
 
+    torch.manual_seed(0)
+    model = _State().eval().cuda()
+    reference = copy.deepcopy(model)
     x = torch.randn(4, 16, device="cuda")
-    ep = torch.export.export(_State().eval().cuda(), (x,))
+    ep = torch.export.export(model, (x,))
     trt_gm = torch_tensorrt.dynamo.compile(
         ep, arg_inputs=[x], min_block_size=1, release_weights_after_build=True
     )
     assert ep.state_dict["w"].untyped_storage().nbytes() == 0
     # Lifted into an engine input, not read through get_attr: never released.
-    buffers = list(trt_gm.buffers())
-    assert buffers and all(b.untyped_storage().nbytes() > 0 for b in buffers)
+    assert ep.state_dict["state"].untyped_storage().nbytes() > 0
+    with torch.no_grad():
+        out = trt_gm(x)
+        # The compiled module returns a 1-tuple for this model, with or without the release.
+        out = out[0] if isinstance(out, (tuple, list)) else out
+        torch.testing.assert_close(out, reference(x), rtol=1e-2, atol=1e-2)
 
 
 def test_mutable_module_rejects_release():

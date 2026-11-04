@@ -281,6 +281,9 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        # None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".
+        if self.release_weights_after_build is not None:
+            self.release_weights_after_build = bool(self.release_weights_after_build)
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 

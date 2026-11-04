@@ -11,6 +11,7 @@ from types import MappingProxyType, TracebackType
 from typing import Any, Callable, Mapping, Optional, Type, TypeVar, Union, cast
 
 import torch
+from torch_tensorrt.dynamo._weight_release import parameter_storages
 from torch_tensorrt.dynamo.tools.weight_mapping import (
     MappedWeights,
     map_weights,
@@ -42,7 +43,8 @@ class low_memory:
     no weights, maps its weights from the safetensors file ``weights`` with ``map_weights``, and returns
     it, on the CPU. Every tensor must be in the file. Export it with CPU inputs and compile it with
     ``torch_tensorrt.dynamo.compile``; each weight's pages are read while its engine is built and dropped
-    once its last engine is built::
+    once its last engine is built. (``torch_tensorrt.compile(model, inputs=...)`` traces with the inputs on
+    the GPU, which a CPU model can't take.)::
 
         with torch_tensorrt.dynamo.low_memory(lambda: MyModel(config), "weights.safetensors") as model:
             exported = torch.export.export(model, (example,))
@@ -58,14 +60,13 @@ class low_memory:
     defaults are a ``contextvars`` context: leaving the block restores the previous ones, and a thread
     sees them only if it copies the context::
 
-        with torch_tensorrt.dynamo.low_memory(
-            enable_resource_partitioning=True, cpu_memory_budget=8 << 30
-        ):
+        with torch_tensorrt.dynamo.low_memory(cpu_memory_budget=8 << 30):
             run_export_script()
 
-    On leaving, the pages of the model's mapped weights are dropped, also on an exception, unless the
-    block sets ``release_weights_after_build=False``. The file stays mapped: the model still reads it, so
-    keep it in place, unchanged, while the model is in use. A write to a mapped weight is lost when its
+    On leaving, the pages of the model's mapped parameters are dropped, also on an exception, unless the
+    block sets ``release_weights_after_build=False``; buffers, which the model may update, keep theirs.
+    The file stays mapped: the model still reads it, so keep it in place, unchanged, while the model is in
+    use. A write to a mapped weight survives on Linux 5.4 and later; older kernels discard it when its
     pages are dropped.
 
     Args:
@@ -73,10 +74,13 @@ class low_memory:
         weights: the safetensors file to map, in the model's names, dtypes and shapes
             (``save_weights_for_mapping`` writes one, non-persistent buffers included).
         offload_module_to_cpu: move the model's weights to the CPU before the engines are built, so
-            peak GPU memory drops to about the engines' size while the CPU holds the weights. Mapped
-            weights are on the CPU already.
+            peak GPU memory drops to about the engines' size while the CPU holds the weights, and move
+            the weights of the parts that run in PyTorch to the GPU afterwards. On by default with a
+            model: its mapped weights are on the CPU already, and a PyTorch part that reads one needs it
+            on the GPU.
         enable_resource_partitioning: split TensorRT subgraphs into engines small enough to build
-            within ``cpu_memory_budget``.
+            within ``cpu_memory_budget``. On by default with a model or a budget; without a budget,
+            engines are sized to the system's available memory, so a model that fits isn't split.
         cpu_memory_budget: the host memory, in bytes, the compiling process may use, counting what it
             already uses. Read only with ``enable_resource_partitioning=True``; without a budget, the
             partitioner sizes engines to the system's available memory.
@@ -101,11 +105,21 @@ class low_memory:
     ) -> None:
         if (model_fn is None) != (weights is None):
             raise ValueError("Pass model_fn and weights together, or neither")
+        if enable_resource_partitioning is None and (
+            model_fn is not None or cpu_memory_budget is not None
+        ):
+            enable_resource_partitioning = True
+        if offload_module_to_cpu is None and model_fn is not None:
+            offload_module_to_cpu = True
         settings = {
             "offload_module_to_cpu": offload_module_to_cpu,
             "enable_resource_partitioning": enable_resource_partitioning,
             "cpu_memory_budget": cpu_memory_budget,
-            "release_weights_after_build": release_weights_after_build,
+            "release_weights_after_build": (
+                None
+                if release_weights_after_build is None
+                else bool(release_weights_after_build)
+            ),
         }
         self._model_fn = model_fn
         self._weights = weights
@@ -151,5 +165,6 @@ class low_memory:
         )
         _compile_defaults.reset(self._token)
         if self._model is not None and release:
-            for t in itertools.chain(self._model.parameters(), self._model.buffers()):
-                release_mapped_storage(t.untyped_storage())
+            for storage in parameter_storages(self._model).values():
+                release_mapped_storage(storage)
+        self._model = self._token = None

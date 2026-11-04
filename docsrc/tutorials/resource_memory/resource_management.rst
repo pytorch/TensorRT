@@ -205,9 +205,10 @@ zero-copy views of a safetensors file:
 
 ``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
 building it allocates no weights, maps them, and drops their pages when the block ends, unless the block
-sets ``release_weights_after_build=False``. With the resource partitioner on, the model is built as
-several engines, each small enough to build within ``cpu_memory_budget``, so only about one engine's
-weights are resident at a time:
+sets ``release_weights_after_build=False``. It turns the resource partitioner on, so the model is built
+as several engines, each small enough to build within ``cpu_memory_budget`` (or the available memory
+without one), so only about one engine's weights are resident at a time. A part of the model that runs in
+PyTorch gets its weights on the GPU after compilation (``offload_module_to_cpu``, on in the block):
 
 .. code-block:: python
 
@@ -216,10 +217,7 @@ weights are resident at a time:
 
     # Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.
     ctx = torch_tensorrt.dynamo.low_memory(
-        lambda: MyModel().eval(),
-        "model.safetensors",
-        enable_resource_partitioning=True,
-        cpu_memory_budget=8 << 30,
+        lambda: MyModel().eval(), "model.safetensors", cpu_memory_budget=8 << 30
     )
     with ctx as model:
         print(f"{ctx.report.mapped_bytes / 2**30:.2f} GiB mapped")
@@ -242,9 +240,7 @@ A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins
 
 .. code-block:: python
 
-    with torch_tensorrt.dynamo.low_memory(
-        enable_resource_partitioning=True, cpu_memory_budget=8 << 30
-    ):
+    with torch_tensorrt.dynamo.low_memory(cpu_memory_budget=8 << 30):
         run_export_script()
 
 ``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
