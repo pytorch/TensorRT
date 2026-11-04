@@ -1348,6 +1348,16 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
+    for node in gm.graph.nodes:
+        if node.op == "placeholder" and "val" in node.meta:
+            if not isinstance(
+                node.meta["val"], (torch.Tensor, torch.SymInt, torch.SymFloat)
+            ):
+                return False
+    return True
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1490,11 +1500,14 @@ def compile_module(
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
     # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
+    # Graphs with non-tensor inputs (Flux `return_dict`) also partition, since those inputs
+    # cannot be engine bindings.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
         and not defer_engine_setup_to_load()
+        and _placeholders_are_engine_bindings(gm)
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1506,8 +1519,8 @@ def compile_module(
         # Do not delete `_frozen_param*` here. Stock compile_module only drops
         # them on the parent after split; convert still needs them on the
         # graph being interpreted. Use placeholder meta for engine I/O — a
-        # flattened copy of compile() sample args can wrap kwargs dicts and
-        # non-tensor flags (Flux `return_dict`) that are not TRT bindings.
+        # flattened copy of compile() sample args can wrap kwargs dicts that
+        # are not TRT bindings.
         convert_inputs = partitioning.construct_submodule_inputs(
             gm,
             user_symbol_bounds=user_symbol_bounds,
