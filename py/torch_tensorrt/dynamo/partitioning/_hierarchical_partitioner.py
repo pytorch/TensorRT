@@ -30,11 +30,13 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 
 logger = logging.getLogger(__name__)
 
 NON_COMPUTE_NODES = {"torch.ops.aten.view", "_operator.getitem"}
 NON_ACC_BACKEND_NAME = "None"
+TRT_BACKEND_NAME = "tensorrt"
 
 
 @compatibility(is_backward_compatible=False)
@@ -83,6 +85,14 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
             if (
                 (node_name in supported_ops or node.op == "get_attr")
+                # The converters build a TensorRT block, so a node whose converter
+                # validator refuses it, or that would make a uint8 tensor inside it,
+                # has to go to another backend.
+                and (
+                    backend_name != TRT_BACKEND_NAME
+                    or node.op == "get_attr"
+                    or (node in CONVERTERS and not makes_uint8_tensor(node))
+                )
                 and node_name not in self.torch_executed_ops
                 and node.target not in self.torch_executed_ops
             ):
@@ -559,7 +569,10 @@ def hierarchical_adjacency_partition(
     Args:
         gm: FX GraphModule to partition
         min_block_size: Minimum number of operators per TRT-Engine Block
-        backend_support_map: Dictionary mapping backend names to sets of supported operators
+        backend_support_map: Dictionary mapping backend names to sets of supported operators.
+            A node goes to the "tensorrt" backend only if a converter also accepts it, under
+            the settings last given to DYNAMO_CONVERTERS.set_compilation_settings, so set the
+            settings you will convert with before partitioning.
         backend_priority: Ordered list of backend names, from highest to lowest priority
         require_full_compilation: Require that all computational operators be run in TRT
         skip_fusion: Skip fusions found by FxNetAccFusionsFinder
@@ -574,13 +587,13 @@ def hierarchical_adjacency_partition(
     # Default backend support map if none provided
     if backend_support_map is None:
         backend_support_map = {
-            "tensorrt": CONVERTERS.keys(),
+            TRT_BACKEND_NAME: CONVERTERS.keys(),
             "inductor": set(),
         }
 
     # Default backend priority if none provided
     if backend_priority is None:
-        backend_priority = ["tensorrt", "inductor"]
+        backend_priority = [TRT_BACKEND_NAME, "inductor"]
 
     # Construct BackendOpSupportTester
     supported_ops = BackendOpSupportTester(

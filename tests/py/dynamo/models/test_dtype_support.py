@@ -322,6 +322,44 @@ class TestUInt8Support(TestCase):
         )
         self.assertTrue(engine)
 
+    def test_uint8_arithmetic_after_a_shape_op_in_the_hierarchical_partitioner(self):
+        # The permute runs on a widened int32 copy, where 255 * 2 does not wrap, so the
+        # multiply has to stay in PyTorch.
+        from torch_tensorrt.dynamo import partitioning
+        from torch_tensorrt.dynamo._compiler import convert_module
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_CONVERTERS,
+        )
+        from torch_tensorrt.dynamo.lowering import (
+            get_decompositions,
+            post_lowering,
+            pre_export_lowering,
+        )
+
+        class Scale(nn.Module):
+            def forward(self, image):
+                return (image.permute(2, 0, 1) * 2) // 3
+
+        image = torch.full((2, 2, 3), 255, dtype=torch.uint8, device="cuda")
+        settings = CompilationSettings()
+        lowered = pre_export_lowering(torch.export.export(Scale(), (image,)), settings)
+        gm = post_lowering(
+            lowered.run_decompositions(get_decompositions()).module(), settings
+        )
+        DYNAMO_CONVERTERS.set_compilation_settings(settings)
+        partitioned, _ = partitioning.hierarchical_adjacency_partition(
+            gm,
+            min_block_size=1,
+            backend_priority=["tensorrt"],
+            backend_support_map={"tensorrt": DYNAMO_CONVERTERS.keys()},
+        )
+        for name, block in list(partitioned.named_children()):
+            if "_run_on_acc_tensorrt" in name:
+                inputs = partitioning.construct_submodule_inputs(block)
+                setattr(partitioned, name, convert_module(block, inputs, name=name))
+        self.assertEqual(partitioned(image), Scale()(image))
+
     def test_uint8_shape_op_before_cast(self):
         # TensorRT has no uint8 layer for these, so the interpreter widens their uint8
         # input. A partial slice_scatter still writes in PyTorch.
