@@ -4,6 +4,7 @@
 import logging
 
 import torch
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -20,10 +21,11 @@ def force_causal_efficient_attention(
     For square attention (seq_q == seq_k): replaces attn_bias with is_causal=True
     so IAttentionLayer can use its native causal path.
 
-    For decode-phase attention (seq_q != seq_k): skip the transformation.
-    Applying is_causal=True is semantically wrong because it creates a lower-triangular
-    mask aligned to position 0, so the query attends only to k[0] instead of all past keys.
-    The node is left unchanged and passed to IAttentionLayer, which supports non-square Q/K natively.
+    When the lengths are not known to be equal (decode-phase attention, or dynamic lengths that are
+    separate symbols): skip the transformation. With unequal lengths, is_causal=True creates a
+    lower-triangular mask aligned to position 0, so the query attends only to k[0] instead of all past
+    keys, and the pass cannot see how the bias is aligned. The node is left unchanged and passed to
+    IAttentionLayer, which supports non-square Q/K natively.
     """
     if not settings.attn_bias_is_causal:
         return gm
@@ -43,13 +45,14 @@ def force_causal_efficient_attention(
         query_node, key_node = node.args[0], node.args[1]
         query_meta = query_node.meta.get("val") if hasattr(query_node, "meta") else None
         key_meta = key_node.meta.get("val") if hasattr(key_node, "meta") else None
+        # A plain != on symbolic lengths decides by the example sizes and records that as a guard.
         if (
             query_meta is not None
             and key_meta is not None
-            and query_meta.size(-2) != key_meta.size(-2)
+            and not statically_known_true(query_meta.size(-2) == key_meta.size(-2))
         ):
             logger.debug(
-                f"Skipping forcing causal pass for node {node} because seq_q={query_meta.size(-2)} != seq_k={key_meta.size(-2)} (decode-phase, IAttentionLayer handles it)"
+                f"Skipping forcing causal pass for node {node} because seq_q={query_meta.size(-2)} and seq_k={key_meta.size(-2)} are not known to be equal (IAttentionLayer handles it)"
             )
             continue
 

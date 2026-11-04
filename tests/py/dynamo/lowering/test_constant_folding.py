@@ -94,6 +94,36 @@ class TestConstantFolding(TestCase):
 
                 copy.deepcopy(gm)
 
+    def test_repeats_of_an_op_on_a_constant_fold_once(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                x = x + self.weight.sin()
+                for _ in range(3):
+                    x = x @ self.weight.sin().t()
+                # Returned, so it must stay a tensor of its own.
+                return x, self.weight.sin()
+
+        model = Model()
+        example_input = torch.randn(4, 4)
+        for offload_module_to_cpu in (False, True):
+            with self.subTest(offload_module_to_cpu=offload_module_to_cpu):
+                gm = constant_fold(
+                    torch.export.export(model, (example_input,)).module(),
+                    CompilationSettings(offload_module_to_cpu=offload_module_to_cpu),
+                )
+                frozen = [
+                    name
+                    for name, _ in gm.named_parameters()
+                    if name.startswith("_frozen_param")
+                ]
+                # The sine, its transpose, and the returned sine.
+                self.assertEqual(len(frozen), 3)
+                torch.testing.assert_close(gm(example_input), model(example_input))
+
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
         self.assertIn(
