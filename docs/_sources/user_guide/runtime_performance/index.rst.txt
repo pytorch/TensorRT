@@ -14,6 +14,7 @@ correctly, handle unsupported operators, and deploy on specialized hardware (DLA
    saving_models
    serialized_engine
    aot_inductor
+   executorch
    mutable_module
    Example: Saving and Loading Models with Dynamic Shapes <../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example>
    Example: Saving Models with Dynamic Shapes - Both Methods <../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods>

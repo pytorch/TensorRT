@@ -5,7 +5,9 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     to_copy_dtype_validator,
 )
@@ -94,6 +96,115 @@ class TestToCopyConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_to_copy_float64_with_truncate_double(self):
+        class ToCopyDouble(nn.Module):
+            def forward(self, x):
+                y = x * 2
+                return y, torch.ops.aten._to_copy.default(y, dtype=torch.float64)
+
+        # aten.copy reaches the same cast without the _to_copy validator, and
+        # broadcasts its source to the buffer shape.
+        class CopyIntoDouble(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("dest", torch.zeros(2, 3, 10, dtype=torch.double))
+
+            def forward(self, x):
+                return torch.ops.aten.copy.default(self.dest, x * 2)
+
+        inputs = [torch.rand((1, 3, 10), dtype=torch.float)]
+        for model in (ToCopyDouble(), CopyIntoDouble()):
+            with self.subTest(type(model).__name__):
+                self.run_test(
+                    model,
+                    inputs,
+                    check_dtype=False,
+                    use_dynamo_tracer=True,
+                    require_full_compilation=True,
+                )
+
+    def test_to_copy_float64_dynamic_with_memory_format_after_pytorch_op(self):
+        # lgamma stays in PyTorch, so the cast ends up alone on an engine input.
+        class LgammaDouble(nn.Module):
+            def __init__(self, memory_format):
+                super().__init__()
+                self.memory_format = memory_format
+
+            def forward(self, x):
+                return torch.lgamma(x).to(
+                    torch.float64, memory_format=self.memory_format
+                )
+
+        for memory_format in (None, torch.contiguous_format, torch.preserve_format):
+            with self.subTest(memory_format=memory_format):
+                model = LgammaDouble(memory_format).eval().cuda()
+                x = torch.rand(3, 5, device="cuda") + 0.5
+                batch = torch.export.Dim("batch", min=1, max=8)
+                exported = torch.export.export(
+                    model, (x,), dynamic_shapes=({0: batch},)
+                )
+                compiled = torch_tensorrt.dynamo.compile(
+                    exported,
+                    arg_inputs=[
+                        torch_tensorrt.Input(
+                            min_shape=(1, 5),
+                            opt_shape=(3, 5),
+                            max_shape=(8, 5),
+                            dtype=torch.float32,
+                        )
+                    ],
+                    min_block_size=1,
+                    truncate_double=True,
+                )
+                # Only the cast without a memory_format goes to TensorRT.
+                self.assertEqual(
+                    sum("_run_on_acc" in name for name, _ in compiled.named_children()),
+                    int(memory_format is None),
+                )
+                for n in (1, 3, 8):
+                    x = torch.rand(n, 5, device="cuda") + 0.5
+                    torch.testing.assert_close(compiled(x), model(x))
+
+    def test_float64_copies_share_one_truncation_rule(self):
+        # The float64 rule for _to_copy applies to aten.copy too: a source float32
+        # cannot hold exactly, or a result layout TensorRT cannot produce, stays in
+        # PyTorch, and the other cases convert.
+        class CopyIntoDouble(nn.Module):
+            def __init__(self, memory_format):
+                super().__init__()
+                dest = torch.zeros(2, 3, 4, 5, dtype=torch.double)
+                self.register_buffer("dest", dest.to(memory_format=memory_format))
+
+            def forward(self, x):
+                return torch.ops.aten.copy.default(self.dest, x * 2)
+
+        class BoolToDouble(nn.Module):
+            def forward(self, x):
+                return (x > 0.5).to(torch.float64) * 3
+
+        cases = (
+            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5)),
+            (CopyIntoDouble(torch.contiguous_format), torch.randint(9, (2, 3, 4, 5))),
+            (BoolToDouble(), torch.rand(2, 3, 4, 5)),
+        )
+        for model, x in cases:
+            with self.subTest(type(model).__name__, dtype=x.dtype):
+                model = model.eval().cuda()
+                x = x.cuda()
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, (x,)),
+                    arg_inputs=[x],
+                    min_block_size=1,
+                    truncate_double=True,
+                )
+                self.assertEqual(
+                    sum("_run_on_acc" in name for name, _ in compiled.named_children()),
+                    1,
+                )
+                out, expected = compiled(x), model(x)
+                torch.testing.assert_close(out, expected)
+                self.assertEqual(out.stride(), expected.stride())
+
     def test_to_copy_multiple_returns(self):
         class ToCopyReturns(nn.Module):
             def forward(self, x):
@@ -132,6 +243,58 @@ class TestToCopyConverter(DispatchTestCase):
         validator = to_copy_dtype_validator(placeholder_only=False)
         self.assertFalse(validator(to_copy_node("cpu")))
         self.assertTrue(validator(to_copy_node("cuda")))
+
+    def test_to_copy_validator_float64_keeps_layout_in_pytorch(self):
+        class DoubleCopy(nn.Module):
+            def __init__(self, memory_format, view):
+                super().__init__()
+                self.memory_format = memory_format
+                self.view = view
+
+            def forward(self, x):
+                y = self.view(x + 1)
+                return torch.ops.aten._to_copy.default(
+                    y, dtype=torch.float64, memory_format=self.memory_format
+                )
+
+        def to_copy_node(memory_format, dtype=torch.float32, view=lambda y: y):
+            x = torch.ones(2, 3, 4, 5, dtype=dtype)
+            exported = torch.export.export(DoubleCopy(memory_format, view), (x,))
+            return next(
+                node
+                for node in exported.graph.nodes
+                if node.target is torch.ops.aten._to_copy.default
+            )
+
+        validator = to_copy_dtype_validator(placeholder_only=False)
+        settings = CompilationSettings(truncate_double=True)
+        self.assertTrue(validator(to_copy_node(torch.contiguous_format), settings))
+        self.assertFalse(validator(to_copy_node(torch.channels_last), settings))
+        # Copying a strided input gives a contiguous result, which TensorRT matches.
+        self.assertTrue(
+            validator(
+                to_copy_node(torch.preserve_format, view=lambda y: y[..., ::2]),
+                settings,
+            )
+        )
+        self.assertFalse(
+            validator(
+                to_copy_node(torch.preserve_format, view=lambda y: y.transpose(1, 2)),
+                settings,
+            )
+        )
+        # TensorRT cannot cast float8 to float32.
+        self.assertFalse(
+            validator(
+                to_copy_node(torch.contiguous_format, torch.float8_e4m3fn), settings
+            )
+        )
+        self.assertFalse(
+            validator(
+                to_copy_node(torch.contiguous_format),
+                CompilationSettings(truncate_double=False),
+            )
+        )
 
 
 if __name__ == "__main__":

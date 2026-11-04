@@ -92,7 +92,7 @@ summary *args:
 # test-ext↔quantization `uv sync` lockfile conflict). Run before `just lane full`.
 # Install optional test deps for Linux with the project's CUDA 13.2 (cu132) default.
 install-test-ext:
-    uv pip install --group test-ext --group kernels --group quantization
+    uv pip install --group test-ext --group kernels-cutedsl --group quantization
     # ExecuTorch's CUDA wheels are only on the PyTorch nightly index, so the channel is needed.
     # No --pre: a specifier naming a prerelease admits prereleases by itself, and --pre would
     # apply to pyyaml here too. cu132 matches the torch index this project resolves against by
@@ -102,7 +102,7 @@ install-test-ext:
     # compiled from the commit this version pairs with.
     uv pip install pyyaml patchelf \
       --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-      "executorch==1.6.0.dev20261009"
+      "executorch==1.6.0.dev20261021"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 

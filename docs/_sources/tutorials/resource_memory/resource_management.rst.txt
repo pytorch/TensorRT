@@ -15,11 +15,30 @@ to reduce both CPU and GPU memory consumption.
 Memory Usage Control
 --------------------
 
+Peak memory during compilation, as multiples of the model's weight size, measured on a
+3 GiB fp16 model. The GPU column includes the model's own copy. TensorRT's builder also
+needs about 2 GB of host working memory that does not grow with the model.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Setting
+     - Peak CPU memory
+     - Peak GPU memory
+   * - Default
+     - ~1x
+     - ~2x
+   * - ``offload_module_to_cpu=True``
+     - ~2x
+     - ~1x
+
+Once compilation finishes, the compiled module holds only the TensorRT engine, about 1x
+the weight size on the GPU. Delete the original PyTorch model if you no longer need it.
+Models whose lowering creates new weight tensors (for example by folding transposes or
+casts of weights) need more.
+
 CPU Memory
 ^^^^^^^^^^
-
-By default, Torch-TensorRT may consume up to **5x** the model size in CPU memory.  
-This can exceed system limits when compiling large models.
 
 **Common symptoms of high CPU memory usage:**
 
@@ -28,16 +47,16 @@ This can exceed system limits when compiling large models.
 
 **Ways to lower CPU memory usage:**
 
-1. **Enable memory trimming**
+1. **Keep memory trimming enabled**
 
-   Set the following environment variable:
+   On Linux, Torch-TensorRT returns the memory the TensorRT builder frees to the
+   operating system after each engine build (glibc ``malloc_trim``). Without it the
+   process keeps on the order of gigabytes of freed builder memory for the rest of its
+   life. Trimming is on by default; to turn it off, set:
 
    .. code-block:: bash
 
-      export TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1
-
-   This reduces approximately **2x** of redundant model copies, limiting 
-   total CPU memory usage to up to **3x** the model size.
+      export TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=0
 
 2. **Disable CPU offloading**
 
@@ -47,13 +66,11 @@ This can exceed system limits when compiling large models.
 
       offload_module_to_cpu = False
 
-   This removes another **1x** model copy, reducing peak CPU memory
-   usage to about **2x** the model size.
+   The weights then stay on the GPU instead of moving to the CPU. TensorRT still builds
+   from a host copy of them, but that copy is freed as soon as the engine is built.
 
 GPU Memory
 ^^^^^^^^^^
-
-By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory.
 
 **Common symptoms of high GPU memory usage:**
 
@@ -70,9 +87,20 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
 
       offload_module_to_cpu = True
 
-   This shifts one model copy from GPU to CPU memory.
-   As a result, peak GPU memory usage decreases to about **1x**
-   the model size, while one more copy of the model will occupy the CPU memory so CPU memory usage increases by roughly **1x**.
+   This moves the model's weights to CPU memory before the engine builds, a block at a
+   time, and TensorRT reads them there in place. Peak GPU memory drops to about the size
+   of the engine (**1x**), while CPU memory holds the weights for the rest of
+   compilation (about **2x** at peak, while the engine is handed to the runtime).
+
+Unified Memory Systems
+^^^^^^^^^^^^^^^^^^^^^^
+
+On systems where the CPU and GPU share physical memory, such as Jetson or DGX Spark,
+CPU and GPU allocations come out of the same pool, so budget for their sum. Counting
+the model itself, compilation peaks at about **3.8x** the weight size with default
+settings and about **3.2x** with ``offload_module_to_cpu=True``. Moving the weights to
+the CPU frees no memory on these systems, but TensorRT then builds from them directly
+instead of from a second copy.
 
 ----
 
@@ -151,6 +179,12 @@ the cost of slightly higher per-call latency:
     with ResourceAllocationStrategy(trt_model, dynamically_allocate_resources=True):
         output = trt_model(*inputs)
     # Submodules revert to static allocation on exit
+
+Some memory stays allocated between calls. With CUDA graphs on, the C++ runtime keeps
+each engine's memory for as long as its captured graph, because a replay writes to the
+memory the graph was recorded with. The Python runtime keeps each engine's memory from
+its last call, with or without CUDA graphs, until a later call replaces it or a settings
+change drops it.
 
 Use ``dynamically_allocate_resources=False`` to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).

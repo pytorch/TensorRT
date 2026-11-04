@@ -15,8 +15,10 @@ memory-constrained machines or when compiling very large models.
 Key notes:
 - The toy model below has roughly 430 MB of parameters. We set the CPU
   memory budget to 2 GiB. At compile time, only about 900 MB of host RAM
-  may remain available. We expect at most 403 * 4 = 1612 MB of memory to be used by the model.
-  So the model is partitioned into two subgraphs to fit the memory budget.
+  may remain available. Building an engine can take up to four times its
+  weights, so each engine may hold about 900 / 4 = 225 MB. The model is
+  partitioned into three subgraphs: one for each convolution (about 150 MB
+  each) and one for the linear layer (about 130 MB).
 
 - Performance impact varies by model. When the number of TensorRT engines
   created is small, the impact is typically minimal.
@@ -79,12 +81,12 @@ with torchtrt.dynamo.Debugger(
         **compilation_options,
     )
 
-    # Expect two back-to-back TensorRT engines due to partitioning under the memory budget.
+    # Expect three back-to-back TensorRT engines due to partitioning under the memory budget.
     print(trt_gm)
 
 
 """
-You should be able to see two back-to-back TensorRT engines in the graph
+You should be able to see three back-to-back TensorRT engines in the graph
 
 Graph Structure:
 
@@ -92,10 +94,15 @@ Graph Structure:
     ...
     TRT Engine #1 - Submodule name: _run_on_acc_0_resource_split_0
      Engine Inputs: List[Tensor: (1, 1024, 224, 224)@float32]
-     Number of Operators in Engine: 9
-     Engine Outputs: List[Tensor: (1, 1024, 112, 112)@float32]
+     Number of Operators in Engine: 5
+     Engine Outputs: List[Tensor: (1, 4096, 112, 112)@float32]
     ...
     TRT Engine #2 - Submodule name: _run_on_acc_0_resource_split_1
+     Engine Inputs: List[Tensor: (1, 4096, 112, 112)@float32]
+     Number of Operators in Engine: 4
+     Engine Outputs: List[Tensor: (1, 1024, 112, 112)@float32]
+    ...
+    TRT Engine #3 - Submodule name: _run_on_acc_0_resource_split_2
      Engine Inputs: List[Tensor: (1, 1024, 112, 112)@float32]
      Number of Operators in Engine: 3
      Engine Outputs: List[Tensor: (1, 10)@float32]
@@ -104,17 +111,18 @@ Graph Structure:
 
   ------------------------- Aggregate Stats -------------------------
 
-   Average Number of Operators per TRT Engine: 6.0
-   Most Operators in a TRT Engine: 9
+   Average Number of Operators per TRT Engine: 4.0
+   Most Operators in a TRT Engine: 5
 
   ********** Recommendations **********
 
-   - For minimal graph segmentation, select min_block_size=9 which would generate 1 TRT engine(s)
-   - For moderate graph segmentation, select min_block_size=6 which would generate 1 TRT engine(s)
-   - The current level of graph segmentation is equivalent to selecting min_block_size=3 which generates 2 TRT engine(s)
+   - For minimal graph segmentation, select min_block_size=5 which would generate 1 TRT engine(s)
+   - For moderate graph segmentation, select min_block_size=4 which would generate 2 TRT engine(s)
+   - The current level of graph segmentation is equivalent to selecting min_block_size=3 which generates 3 TRT engine(s)
 GraphModule(
   (_run_on_acc_0_resource_split_0): TorchTensorRTModule()
   (_run_on_acc_0_resource_split_1): TorchTensorRTModule()
+  (_run_on_acc_0_resource_split_2): TorchTensorRTModule()
 )
 
 
@@ -123,6 +131,7 @@ def forward(self, x):
     x, = fx_pytree.tree_flatten_spec(([x], {}), self._in_spec)
     _run_on_acc_0_resource_split_0 = self._run_on_acc_0_resource_split_0(x);  x = None
     _run_on_acc_0_resource_split_1 = self._run_on_acc_0_resource_split_1(_run_on_acc_0_resource_split_0);  _run_on_acc_0_resource_split_0 = None
-    return pytree.tree_unflatten((_run_on_acc_0_resource_split_1,), self._out_spec)
+    _run_on_acc_0_resource_split_2 = self._run_on_acc_0_resource_split_2(_run_on_acc_0_resource_split_1);  _run_on_acc_0_resource_split_1 = None
+    return pytree.tree_unflatten((_run_on_acc_0_resource_split_2,), self._out_spec)
 )
 """

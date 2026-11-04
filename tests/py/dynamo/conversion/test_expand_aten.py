@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -83,6 +84,23 @@ class TestExpandConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             ExpandTargetDynamic(), input_specs, use_dynamo_tracer=True
         )
+
+    def test_expand_static_dim_to_data_dependent_size(self):
+        # The True count is a runtime target that must equal the static dim of 4.
+        class ExpandToCount(nn.Module):
+            def forward(self, x, mask):
+                return x.expand(mask.nonzero().shape[0], 8)
+
+        mask = torch.zeros(10, dtype=torch.bool, device="cuda")
+        mask[3:7] = True
+        inputs = (torch.randn(4, 8, device="cuda"), mask)
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(ExpandToCount(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*inputs), ExpandToCount()(*inputs))
 
 
 if __name__ == "__main__":

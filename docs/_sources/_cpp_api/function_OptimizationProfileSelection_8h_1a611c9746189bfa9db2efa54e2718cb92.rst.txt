@@ -1,0 +1,14 @@
+.. _exhale_function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92:
+
+Function torch_tensorrt::executorch_backend::select_profile
+===========================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::executorch_backend::select_profile(const ProfileTable&, ProfileRequest, int32_t, const std::vector<nvinfer1::Dims>&, int32_t&)
+   :project: Torch-TensorRT

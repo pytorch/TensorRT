@@ -18,6 +18,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -110,7 +111,7 @@ def pick_target(versions: list[str], track: str) -> str:
         parsed.append(version)
     if not parsed:
         raise SystemExit(f"no executorch version on the index matches track {track!r}")
-    return max(parsed).public
+    return cast(str, max(parsed).public)
 
 
 def wheel_git_version(version: str, index_args: list[str]) -> str:
@@ -351,7 +352,7 @@ def delegate_channels() -> list[str]:
 def _public_or_none(raw: str) -> str | None:
     """The public part of a version string, or None when it does not parse."""
     try:
-        return Version(raw).public
+        return cast(str, Version(raw).public)
     except InvalidVersion:
         return None
 
@@ -375,6 +376,25 @@ def _index_args(track: str, channel: str) -> list[str]:
             f"https://download.pytorch.org/whl/nightly/{channel}",
         ]
     return []
+
+
+def delegate_platforms() -> tuple[str, ...]:
+    """Wheel platforms built by the standard CUDA delegate jobs."""
+    return ("manylinux_2_28_x86_64", "manylinux_2_28_aarch64", "win_amd64")
+
+
+def _target_index_args(channel: str, platform: str, python: str) -> list[str]:
+    return [
+        "--platform",
+        platform,
+        "--python-version",
+        python,
+        "--implementation",
+        "cp",
+        "--abi",
+        f"cp{python.replace('.', '')}",
+        *_index_args("nightly", channel),
+    ]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -425,10 +445,22 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             published = _public_versions(_index_args(args.track, channel))
             candidates = [v for v in candidates if _public_or_none(v) in published]
+        # pip otherwise sees only the updater host's wheels. A dated x86-64
+        # nightly can publish before SBSA or Windows and strand their builds.
+        for channel in delegate_channels():
+            for platform in delegate_platforms():
+                for python in ("3.11", "3.12", "3.13"):
+                    published = _public_versions(
+                        _target_index_args(channel, platform, python)
+                    )
+                    candidates = [
+                        v for v in candidates if _public_or_none(v) in published
+                    ]
         if not candidates:
             raise SystemExit(
                 "no executorch version is published in every channel the delegate build "
-                f"accepts ({', '.join(delegate_channels())})"
+                f"accepts ({', '.join(delegate_channels())}), across Linux x86-64, SBSA, "
+                "and Windows x64 on Python 3.11–3.13"
             )
     target = pick_target(candidates, args.track)
     current = read_pin("__executorch_version__")

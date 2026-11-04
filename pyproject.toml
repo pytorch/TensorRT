@@ -144,6 +144,9 @@ quantization = [
 # CUDA Toolkit used to build/test this project; users without it can install
 # cuda-tile's ``tileiras`` extra as documented for ``cutile_op``.
 kernels = ["cuda-python", "cuda-core", "cuda-tile>=1.3.0,<2"]
+# CuTe DSL is large and only needed to register ``cutedsl_op`` kernels, so it is
+# opt-in; serialized engines embed PTX and never import it.
+kernels-cutedsl = [{ include-group = "kernels" }, "nvidia-cutlass-dsl>=4.8.1,<5"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -219,12 +222,21 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
+torchao = [
+    # Match the Windows companion build's Python-only torchao nightly.
+    { index = "pytorch-nightly-cpu", marker = "sys_platform == 'win32'" },
+]
 torch = [
     { index = "pytorch-nightly-cu132" },
 ]
 torchvision = [
     { index = "pytorch-nightly-cu132" },
 ]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cpu"
+url = "https://download.pytorch.org/whl/nightly/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu132"

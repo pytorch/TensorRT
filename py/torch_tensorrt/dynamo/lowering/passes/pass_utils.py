@@ -13,6 +13,22 @@ _defer_graph_cleanup: bool = False
 _graph_cleanup_pending: bool = False
 
 
+def _has_side_effect(node: torch.fx.Node) -> bool:
+    """Whether dead-code elimination must keep this node even though nothing uses it.
+
+    Until run_decompositions, an exported graph still calls functorch's vmap
+    bookkeeping (_vmap_increment_nesting, _vmap_decrement_nesting,
+    lazy_load_decompositions) only for its side effects. FX does not count those
+    calls as impure, so plain dead-code elimination deletes them, and the vmap they
+    bracket then fails to decompose ("tensor may have escaped from inside a
+    function being vmapped").
+    """
+    return node.is_impure() or (
+        node.op == "call_function"
+        and getattr(node.target, "__module__", None) == "torch._functorch.predispatch"
+    )
+
+
 def set_defer_graph_cleanup(enabled: bool) -> None:
     """Enable/disable deferred FX cleanup for the current post_lowering run."""
     global _defer_graph_cleanup, _graph_cleanup_pending
@@ -34,7 +50,7 @@ def flush_deferred_graph_cleanup(
 
 def _run_graph_cleanup(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Runs dead-code elimination, linting, and recompilation for graph, in-place"""
-    gm.graph.eliminate_dead_code()
+    gm.graph.eliminate_dead_code(is_impure_node=_has_side_effect)
     gm.graph.lint()
     gm.recompile()
     return gm

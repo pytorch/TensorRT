@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=28a5836a"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -509,6 +509,7 @@ document.write(`
 <li><p><span class="xref std std-ref">debugger_example</span>: Debugging Torch-TensorRT Compilation</p></li>
 <li><p><span class="xref std std-ref">torch_export_3d_rope</span>: Compiling a 3D RoPE video-transformer block with complex numerics support</p></li>
 <li><p><span class="xref std std-ref">engine_converter_binding_names</span>: Naming input / output bindings when emitting a raw serialized TRT engine</p></li>
+<li><p><span class="xref std std-ref">cutedsl_op</span>: Registering a CuTe DSL kernel as an AOT TensorRT plugin with dynamic shapes</p></li>
 </ul>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_stable_diffusion.py</span></p>
@@ -540,18 +541,27 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_compile_advanced_usage.py</span></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="torch_tensorrt.kernels.cutedsl_op compiles a raw @cute.kernel to PTX, registers a PyTorch custo..."><img alt="" src="../../../_images/sphx_glr_cutedsl_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_cutedsl_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Register a CuTe DSL kernel as an AOT TensorRT plugin</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT."><img alt="" src="../../../_images/sphx_glr_engine_caching_bert_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This is the PyTorch-canonical pattern for streaming inference: the cache lives inside the model..."><img alt="" src="../../../_images/sphx_glr_aliased_io_buffers_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aliased_io_buffers.py</span></p>
   <div class="sphx-glr-thumbnail-title">In-place aliased I/O: module-owned buffers</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="cutile_op is the cuTile counterpart of cuda_kernel_op, and the declarative form of the hand-wri..."><img alt="" src="../../../_images/sphx_glr_cutile_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_cutile_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Register a cuTile kernel as an AOT QDP plugin via torch_tensorrt.kernels.cutile_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci..."><img alt="" src="../../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py</span></p>
   <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee..."><img alt="" src="../../../_images/sphx_glr_pre_allocated_output_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This is the productized form of aot_plugin. That example shows the raw mechanism — a @triton.ji..."><img alt="" src="../../../_images/sphx_glr_triton_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_triton_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Register a Triton kernel as an AOT QDP plugin via torch_tensorrt.kernels.triton_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to register a custom Triton kernel as a TensorRT plugin using the..."><img alt="" src="../../../_images/sphx_glr_auto_generate_plugins_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py</span></p>
   <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
@@ -570,9 +580,6 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a converter for a custom kernel using..."><img alt="" src="../../../_images/sphx_glr_auto_generate_converters_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_converters.py</span></p>
   <div class="sphx-glr-thumbnail-title">Automatically Generate a Converter for a Custom Kernel</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch..."><img alt="" src="../../../_images/sphx_glr_low_cpu_memory_compilation_thumb.png" />
-<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py</span></p>
-  <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i..."><img alt="" src="../../../_images/sphx_glr_save_dynamic_shapes_both_methods_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_both_methods.py</span></p>
   <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
@@ -582,18 +589,24 @@ document.write(`
 </div><div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t..."><img alt="" src="../../../_images/sphx_glr_converter_overloading_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py</span></p>
   <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch..."><img alt="" src="../../../_images/sphx_glr_low_cpu_memory_compilation_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to save and load Torch-TensorRT compiled models with dynamic inpu..."><img alt="" src="../../../_images/sphx_glr_save_dynamic_shapes_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Saving and Loading Models with Dynamic Shapes</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="JIT vs AOT — the key difference:"><img alt="" src="../../../_images/sphx_glr_aot_plugin_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py</span></p>
   <div class="sphx-glr-thumbnail-title">This example builds on auto_generate_plugins by showing the AOT (Ahead-of-Time)</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i..."><img alt="" src="../../../_images/sphx_glr_ptx_op_thumb.png" />
-<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py</span></p>
-  <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example shows how to use TensorRT&#x27;s Global Performance Tuning (GPT) from Torch-TensorRT: d..."><img alt="" src="../../../_images/sphx_glr_global_perf_tuning_attention_example_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_global_perf_tuning_attention_example.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Global Performance Tuning (Attention)</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Autoregressive LLMs run in two very different shape regimes that share one set of weights (and ..."><img alt="" src="../../../_images/sphx_glr_multi_optimization_profiles_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_multi_optimization_profiles.py</span></p>
   <div class="sphx-glr-thumbnail-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i..."><img alt="" src="../../../_images/sphx_glr_ptx_op_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil..."><img alt="" src="../../../_images/sphx_glr_hierarchical_partitioner_example_thumb.png" />
 <p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_hierarchical_partitioner_example.py</span></p>
   <div class="sphx-glr-thumbnail-title">Hierarchical Partitioner Example</div>
