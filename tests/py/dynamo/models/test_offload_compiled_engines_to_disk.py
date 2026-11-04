@@ -105,3 +105,26 @@ def test_without_the_setting_no_engine_goes_to_disk(temp_dir):
     _, _, _, engines = _compile()
     assert all(m.engine is not None for m in engines)
     assert not glob.glob(str(temp_dir / "*.engine"))
+
+
+@pytest.mark.parametrize(
+    "setting", ["lazy_engine_init", "offload_compiled_engines_to_disk"]
+)
+def test_require_full_compilation_sets_the_deferred_engine_up(setting, temp_dir):
+    """require_full_compilation converts a fully supported graph into one engine, without partitioning,
+    and returns that engine's module."""
+    torch.manual_seed(0)
+    model = torch.nn.Sequential(torch.nn.Linear(64, 64), torch.nn.ReLU()).eval().cuda()
+    x = torch.randn(4, 64, device="cuda")
+    trt = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        require_full_compilation=True,
+        **{setting: True},
+    )
+    assert isinstance(trt, TorchTensorRTModule)
+    assert trt.engine is not None
+    assert not glob.glob(str(temp_dir / "*.engine"))
+    with torch.no_grad():
+        torch.testing.assert_close(trt(x), model(x), rtol=1e-2, atol=1e-2)

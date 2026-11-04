@@ -1453,6 +1453,15 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    # Engines whose setup is deferred, by lazy_engine_init or offload_compiled_engines_to_disk, are set up
+    # once every engine is built, unless compile_and_save keeps them in their files for the save.
+    keep_offloaded = keeping_offloaded_engines()
+    set_up_deferred_engines = (
+        (settings.lazy_engine_init or settings.offload_compiled_engines_to_disk)
+        and not settings.enable_cross_compile_for_windows
+        and not keep_offloaded
+    )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition.
     if (
@@ -1476,13 +1485,16 @@ def compile_module(
             gm,
             user_symbol_bounds=user_symbol_bounds,
         )
-        return convert_module(
+        trt_module = convert_module(
             gm,
             convert_inputs,
             settings=settings,
             name="_run_on_acc_0",
             engine_cache=engine_cache,
         )
+        if set_up_deferred_engines:
+            trt_module.setup_engine()
+        return trt_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1757,17 +1769,10 @@ def compile_module(
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
 
-    # Replace all FX Modules with TRT Modules. Engines whose setup was deferred, by lazy_engine_init or
-    # offload_compiled_engines_to_disk, are set up now that every engine is built, unless compile_and_save
-    # keeps them in their files for the save.
-    keep_offloaded = keeping_offloaded_engines()
+    # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if (
-            (settings.lazy_engine_init or settings.offload_compiled_engines_to_disk)
-            and not settings.enable_cross_compile_for_windows
-            and not keep_offloaded
-        ):
+        if set_up_deferred_engines:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
