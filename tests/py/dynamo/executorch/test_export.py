@@ -874,6 +874,45 @@ def test_python_only_build_can_export_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
+    """The boolean mask selection has a data-dependent shape, the engine output does not."""
+
+    class MaskedSum(torch.nn.Module):
+        def forward(self, value, mask):
+            return value + value[mask].sum()
+
+    class MaskedRows(torch.nn.Module):
+        def forward(self, value, mask):
+            return value[mask] * 2
+
+    value = torch.randn(10, 4, device="cuda")
+    mask = torch.arange(10, device="cuda") % 3 == 0
+
+    def save(model):
+        exported = torch.export.export(model.eval().cuda(), (value, mask))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[value, mask],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        output = tmp_path / f"{type(model).__name__}.pte"
+        torch_tensorrt.save(
+            compiled,
+            str(output),
+            output_format="executorch",
+            arg_inputs=(value, mask),
+            retrace=False,
+        )
+        return output
+
+    assert save(MaskedSum()).stat().st_size > 0
+    # An output shape that depends on the data still needs an output allocator.
+    with pytest.raises(RuntimeError, match="output allocator"):
+        save(MaskedRows())
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("dynamic", [False, True])
 def test_save_leaves_no_lowered_program_alive(tmp_path, dynamic):
     """A saved program's delegates, and so its engines, must not outlive save()."""
@@ -951,45 +990,6 @@ def test_a_failed_save_leaves_no_lowered_program_alive(tmp_path, monkeypatch):
         for o in gc.get_objects()
         if isinstance(o, LoweredBackendModule) and o not in before
     ] == []
-
-
-@pytest.mark.unit
-def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
-    """The boolean mask selection has a data-dependent shape, the engine output does not."""
-
-    class MaskedSum(torch.nn.Module):
-        def forward(self, value, mask):
-            return value + value[mask].sum()
-
-    class MaskedRows(torch.nn.Module):
-        def forward(self, value, mask):
-            return value[mask] * 2
-
-    value = torch.randn(10, 4, device="cuda")
-    mask = torch.arange(10, device="cuda") % 3 == 0
-
-    def save(model):
-        exported = torch.export.export(model.eval().cuda(), (value, mask))
-        compiled = torch_tensorrt.dynamo.compile(
-            exported,
-            arg_inputs=[value, mask],
-            min_block_size=1,
-            pass_through_build_failures=True,
-        )
-        output = tmp_path / f"{type(model).__name__}.pte"
-        torch_tensorrt.save(
-            compiled,
-            str(output),
-            output_format="executorch",
-            arg_inputs=(value, mask),
-            retrace=False,
-        )
-        return output
-
-    assert save(MaskedSum()).stat().st_size > 0
-    # An output shape that depends on the data still needs an output allocator.
-    with pytest.raises(RuntimeError, match="output allocator"):
-        save(MaskedRows())
 
 
 @pytest.mark.unit
