@@ -609,6 +609,61 @@ def test_refit_preserves_torch_executed_modules_partitioning(use_fast_partitione
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+@pytest.mark.parametrize("offload_module_to_cpu", [False, True])
+def test_refit_global_partitioner_updates_top_module_state(offload_module_to_cpu):
+    class net(nn.Module):
+        def __init__(self, rows=2):
+            super().__init__()
+            self.register_buffer("w", torch.randn(2, 8))
+            self.p = nn.Parameter(torch.randn(rows, 8))
+            self.b = nn.Parameter(torch.randn(2, 8))
+
+        def forward(self, x):
+            # The PyTorch muls read w + 1, folded into a constant, and p from the top
+            # module. The add runs in TensorRT and reads b.
+            return torch.ops.aten.mul.Tensor(x, self.w + 1) * self.p + self.b
+
+    model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
+    inputs = [torch.randn((2, 8)).to("cuda")]
+    expected = model2(*inputs)
+
+    trt_gm = torchtrt.dynamo.compile(
+        torch.export.export(model, tuple(inputs)),
+        tuple(inputs),
+        min_block_size=1,
+        immutable_weights=False,
+        torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        use_fast_partitioner=False,
+        reuse_cached_engines=False,
+        offload_module_to_cpu=offload_module_to_cpu,
+    )
+    assertions.assertTrue(
+        any("_run_on_acc" in name for name, _ in trt_gm.named_children())
+    )
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=torch.export.export(model2, tuple(inputs)),
+        arg_inputs=inputs,
+    )
+    torch.testing.assert_close(new_trt_gm(*inputs), expected)
+
+    # p broadcasts, so a (1, 8) p exports the same graph, but it cannot replace a (2, 8) one.
+    model3 = net(rows=1).eval().to("cuda")
+    with pytest.raises(AssertionError, match="not compatible"):
+        refit_module_weights(
+            compiled_module=trt_gm,
+            new_weight_module=torch.export.export(model3, tuple(inputs)),
+        )
+
+    torch._dynamo.reset()
+
+
 @pytest.mark.unit
 def test_refit_multiple_engine_with_weightmap_cpu_offload():
     class net(nn.Module):
@@ -983,6 +1038,46 @@ def test_refit_cumsum():
         )
         # Clean up model env
 
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_refit_weight_read_by_several_layers():
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = nn.Linear(4, 6)
+
+        def forward(self, x):
+            return self.fc1(x) + self.fc1(2 * x) * self.fc1(3 * x)
+
+    model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
+    inputs = [torch.randn((2, 3, 4)).to("cuda")]
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        min_block_size=1,
+        immutable_weights=False,
+        deduplicate_weights=True,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+    )
+
+    assertions.assertTrue(
+        torch.allclose(model2(*inputs), new_trt_gm(*inputs), 1e-2, 1e-2),
+        "Refit Result is not correct. Refit failed",
+    )
     torch._dynamo.reset()
 
 

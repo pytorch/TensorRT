@@ -338,7 +338,8 @@ def test_extra_arg_value_must_fit_signed_i32(
     indirect=["launch_int"],
 )
 def test_constant_extra_args_preserve_valid_values(launch_int, value):
-    from torch_tensorrt.kernels._triton import SignatureParam, make_symint32_args
+    from torch_tensorrt.kernels._common import SignatureParam
+    from torch_tensorrt.kernels._triton import make_symint32_args
 
     args = make_symint32_args(
         "ttk_test::scalar_bounds",
@@ -600,8 +601,8 @@ def test_constant_grid_bounds(launch_int, values):
 def test_dynamic_launch_expressions_are_preserved(wrapper, fake):
     import tensorrt.plugin as trtp
 
+    from torch_tensorrt.kernels._common import SignatureParam
     from torch_tensorrt.kernels._triton import (
-        SignatureParam,
         make_symint32_args,
         validate_launch_grid,
     )
