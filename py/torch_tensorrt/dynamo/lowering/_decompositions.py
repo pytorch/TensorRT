@@ -615,7 +615,19 @@ def scaled_dot_product_attention_decomposition(
         # We only add attn_bias when we have to, otherwise this will have a negative impact on the performance even it's 0.
         attn_weight = attn_weight + attn_bias
 
-    attn_weight = torch.softmax(attn_weight, dim=-1)
+    # amax needs at least one key. With none, the softmax below is empty and the output is zeros, as in PyTorch.
+    if (
+        attn_mask is not None
+        and attn_weight.dtype in (torch.float32, torch.float64)
+        and not statically_known_true(S == 0)
+    ):
+        # As PyTorch's _safe_softmax: zeros, not NaN, for a query that the mask hides all keys from. A 16-bit
+        # softmax is left alone, as this would stop TensorRT's fused 16-bit attention, which gives zeros. A 16-bit
+        # attention that is not fused, such as one with different key and value head sizes, still gives NaN.
+        hidden = attn_weight.amax(-1, keepdim=True) == float("-inf")
+        attn_weight = torch.where(hidden, 0.0, torch.softmax(attn_weight, dim=-1))
+    else:
+        attn_weight = torch.softmax(attn_weight, dim=-1)
     output = torch.matmul(attn_weight, value)
     return output.to(output_dtype) if promote_intermediates else output
 
