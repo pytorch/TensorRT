@@ -1582,16 +1582,7 @@ def _with_tensorrt_alignment(backend_config: Any) -> Any:
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
     try:
-        _lower_and_write_executorch(exp_program, file_path, **kwargs)
-    finally:
-        _release_lowering_caches(exp_program)
-
-
-def _lower_and_write_executorch(
-    exp_program: Any, file_path: str, **kwargs: Any
-) -> None:
-    try:
-        from torch_tensorrt.executorch import (
+        from torch_tensorrt.executorch import (  # noqa: F401
             check_zero_copy_kv,
             export,
             zero_copy_backend_config,
@@ -1603,6 +1594,21 @@ def _lower_and_write_executorch(
             "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
+    try:
+        _lower_and_write_executorch(exp_program, file_path, **kwargs)
+    finally:
+        _release_lowering_caches(exp_program)
+
+
+def _lower_and_write_executorch(
+    exp_program: Any, file_path: str, **kwargs: Any
+) -> None:
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
     for option in ("partitioners", "compile_specs"):
