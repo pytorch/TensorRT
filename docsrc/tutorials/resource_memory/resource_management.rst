@@ -37,6 +37,40 @@ the weight size on the GPU. Delete the original PyTorch model if you no longer n
 Models whose lowering creates new weight tensors (for example by folding transposes or
 casts of weights) need more.
 
+The ways to lower that memory, each described below:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Technique
+     - Lowers
+     - How
+   * - Memory trimming
+     - Host memory kept after each build
+     - On by default (``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM``)
+   * - Offloading to the CPU
+     - GPU memory, for more host memory
+     - ``offload_module_to_cpu=True``
+   * - Compiling on the CPU
+     - GPU memory, with about the same host memory
+     - Export with CPU inputs, compile with GPU inputs
+   * - Several smaller engines
+     - Host memory of each build
+     - ``enable_resource_partitioning=True``, ``cpu_memory_budget``
+   * - Releasing weights as engines are built
+     - Weights held during compilation
+     - ``release_weights_after_build``
+   * - Mapping the weights from their file
+     - Host memory before and during compilation
+     - ``torch_tensorrt.dynamo.tools.map_weights``
+   * - Weight streaming
+     - GPU memory at run time
+     - ``enable_weight_streaming=True``
+
+They combine. ``torch_tensorrt.dynamo.low_memory`` maps the weights, which leaves the model
+on the CPU, and sets the partitioner and the weight release for every compile in a block;
+see `Compiling from Memory-Mapped Weights`_.
+
 CPU Memory
 ^^^^^^^^^^
 
@@ -69,6 +103,58 @@ CPU Memory
    The weights then stay on the GPU instead of moving to the CPU. TensorRT still builds
    from a host copy of them, but that copy is freed as soon as the engine is built.
 
+3. **Build several smaller engines**
+
+   Resource partitioning splits each TensorRT subgraph into pieces whose weights fit a
+   per-engine budget, and builds them one after another, so the builder's working memory
+   scales with the largest piece instead of the whole model:
+
+   .. code-block:: python
+
+      trt_model = torch_tensorrt.compile(
+          model,
+          arg_inputs=inputs,
+          enable_resource_partitioning=True,
+          cpu_memory_budget=16 * 1024**3,  # bytes
+      )
+
+   The per-engine budget is ``(cpu_memory_budget - resident memory) / 4``. Resident memory
+   is the process's RSS when partitioning runs, so it includes weights held on the host
+   (on a CPU compile, every weight already read into memory, see below): set
+   ``cpu_memory_budget`` above that. Without ``cpu_memory_budget``, the budget is the
+   available system memory divided by 4. See :ref:`low_cpu_memory_compilation` for a
+   runnable example.
+
+   Each engine boundary adds a little latency. A split that cuts through a region reusing
+   the same weights, such as an unrolled loop, also costs memory: every engine that uses
+   those weights carries its own copy. For a 3.6-billion-parameter model with a 10-step unrolled
+   denoising loop compiled into 16 engines, the engines totaled 10.9 GB against 5.3 GB as
+   one engine (GPU memory at inference: 11.5 GB against 5.5 GB), and inference was 2%
+   slower.
+
+4. **Release weights as their engines are built**
+
+   Each TensorRT engine carries its own copy of its weights, so the model's copy of a
+   weight isn't needed for the rest of compilation once the last engine that reads it is
+   built. ``release_weights_after_build`` frees it then, and frees the weights no engine
+   reads before the first build. Weights read by layers left in PyTorch are kept.
+
+   * ``None`` (default): only weights mapped from a file (option 5) are released. Their
+     pages are dropped and re-read from the file if used again, so the model keeps working.
+   * ``True``: the model's other weights are freed too. The model shares that memory, so
+     it can't be used after compiling, even if compiling fails.
+   * ``False``: nothing is released.
+
+   With several engines (option 3), compilation then holds only the weights still to be
+   built. For the same model compiled on the CPU as 9 engines, the peak of host and GPU
+   memory together went from 25.7 to 18.9 GiB with ``True``.
+
+5. **Map the weights from their file**
+
+   Instead of loading the weights before compiling, point the model at its safetensors
+   file: a weight's pages are then read only while TensorRT builds the engine that uses
+   it. See `Compiling from Memory-Mapped Weights`_.
+
 GPU Memory
 ^^^^^^^^^^
 
@@ -91,6 +177,56 @@ GPU Memory
    time, and TensorRT reads them there in place. Peak GPU memory drops to about the size
    of the engine (**1x**), while CPU memory holds the weights for the rest of
    compilation (about **2x** at peak, while the engine is handed to the runtime).
+
+2. **Compile on the CPU**
+
+   Keep the model on the CPU: export it with CPU example inputs and compile the
+   ``ExportedProgram`` with inputs on the GPU. TensorRT takes weights from host memory, and
+   the converters pass a CPU weight's own memory to it instead of copying it, so the model
+   never has a copy on the GPU. Unlike option 1, no model copy is added on the host: host
+   memory stays about where a compile on the GPU puts it.
+
+   .. code-block:: python
+
+      model = model.eval()  # on the CPU
+      exported = torch.export.export(model, (example_input,))  # example_input on the CPU
+      trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example_input.cuda()])
+      trt_model = trt_model.cuda()  # layers left to PyTorch still hold CPU weights
+      output = trt_model(example_input.cuda())
+
+   Peak GPU memory drops by about **1x** the model size: the GPU holds only the engine
+   being built and the engines already built. This also matters where CPU and GPU share
+   memory (Jetson), since the sum of both is what has to fit.
+
+   The engine is the same as a GPU compile's, so latency doesn't change. For ResNet-50, ViT,
+   BERT, GPT-2 and a 4-layer Llama, the engines were byte-identical with a shared timing
+   cache. Constant folding runs where the constants are, here on the CPU, so a float32 folded
+   constant can differ from a GPU compile's in the last bit. bfloat16, float16 and float64
+   constants match exactly.
+
+   Use ``torch.export`` and ``torch_tensorrt.dynamo.compile`` as above:
+   ``torch_tensorrt.compile(model, ir="dynamo", ...)`` doesn't accept a model on the CPU
+   (``FakeTensorDeviceMismatchError``).
+
+   TensorRT engines carry their own copy of their weights; layers that run in PyTorch
+   (operators without a converter, listed in ``torch_executed_ops``, or in blocks smaller
+   than ``min_block_size``) use the model's tensors, so move the compiled module to the GPU
+   before running it. Only those layers' weights move, and since they are the model's own
+   tensors, they move in the original model too; moving the original model back to the
+   CPU moves them out of the compiled module.
+
+   With a model on the CPU, ``offload_module_to_cpu=True`` has nothing to offload, but it
+   makes the compiler move the layers that run in PyTorch to ``device`` for you, which
+   replaces the ``.cuda()`` call.
+
+   .. note::
+
+      Code that enables autocast only for CUDA tensors (``torch.autocast("cuda", ...)``, or
+      autocast gated on ``tensor.is_cuda``) does not apply while the model runs on the CPU
+      during export, which can leave low-precision weights next to FP32 activations and fail
+      with a dtype mismatch during export or conversion (for example
+      ``IMatrixMultiplyLayer must have same input types``). Wrap those regions in
+      ``torch.autocast("cpu", dtype=...)`` for the export.
 
 Unified Memory Systems
 ^^^^^^^^^^^^^^^^^^^^^^
