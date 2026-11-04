@@ -9,7 +9,7 @@ import operator
 import os
 import platform
 import warnings
-from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import sympy
 import torch
@@ -33,7 +33,7 @@ from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.dynamo._weight_release import (
     WeightReleaser,
-    parameter_storages,
+    report_released_weights_on_failure,
     weight_storages,
 )
 from torch_tensorrt.dynamo.conversion import (
@@ -648,9 +648,9 @@ def compile(
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
             and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
-            module shares that memory and must not be used afterwards, even if compilation fails. Weights read by subgraphs that run in
-            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile``, and not supported by
-            ``MutableTorchTensorRTModule``.
+            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
+            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
+            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -1471,6 +1471,11 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    weight_releaser = None
+    if settings.release_weights_after_build and not settings.dryrun:
+        _warn_if_refit_source_released(settings)
+        weight_releaser = WeightReleaser(gm)
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition.
     if (
@@ -1494,22 +1499,23 @@ def compile_module(
             gm,
             user_symbol_bounds=user_symbol_bounds,
         )
-        single_releaser = None
-        single_weights: Dict[int, torch.UntypedStorage] = {}
-        if settings.release_weights_after_build:
-            _warn_if_refit_source_released(settings)
-            single_releaser = WeightReleaser([gm])
-            single_releaser.release_unread(parameter_storages(gm))
-            single_weights = weight_storages(gm)
-        single_module = convert_module(
-            gm,
-            convert_inputs,
-            settings=settings,
-            name="_run_on_acc_0",
-            engine_cache=engine_cache,
-        )
-        if single_releaser is not None and single_releaser.built(
-            single_weights, "_run_on_acc_0"
+        read: Set[int] = set()
+        if weight_releaser is not None:
+            weight_releaser.count_readers([gm])
+            if weight_releaser.release_unread_storages():
+                release_host_and_device_memory()
+            read = set(weight_storages(gm))
+        with report_released_weights_on_failure(weight_releaser, "_run_on_acc_0"):
+            single_module = convert_module(
+                gm,
+                convert_inputs,
+                settings=settings,
+                name="_run_on_acc_0",
+                engine_cache=engine_cache,
+            )
+        if (
+            weight_releaser is not None
+            and weight_releaser.release_storages_after_build(read, "_run_on_acc_0")
         ):
             release_host_and_device_memory()
         return single_module
@@ -1631,11 +1637,9 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
-    weight_releaser = None
-    if settings.release_weights_after_build and not settings.dryrun:
-        _warn_if_refit_source_released(settings)
+    if weight_releaser is not None:
         # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
-        weight_releaser = WeightReleaser(
+        weight_releaser.count_readers(
             [partitioned_module]
             + [
                 sub
@@ -1645,7 +1649,7 @@ def compile_module(
         )
         # The lowered module still holds weights no partition reads (for example a model head the
         # traced function never calls); nothing needs them once partitioning is done.
-        weight_releaser.release_unread(parameter_storages(gm))
+        weight_releaser.release_unread_storages()
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
@@ -1748,21 +1752,26 @@ def compile_module(
         torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
-            # Collected before conversion, which deletes the submodule's frozen parameters.
-            submodule_weights = (
-                weight_storages(submodule) if weight_releaser is not None else {}
+            # Collected before conversion, which deletes the submodule's frozen parameters. Only the keys:
+            # holding the storages would keep those frozen parameters alive after conversion frees them.
+            read = (
+                set(weight_storages(submodule))
+                if weight_releaser is not None
+                else set()
             )
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
-            )
+            with report_released_weights_on_failure(weight_releaser, name):
+                trt_module = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
 
             trt_modules[name] = trt_module
-            if weight_releaser is not None and weight_releaser.built(
-                submodule_weights, name
+            if (
+                weight_releaser is not None
+                and weight_releaser.release_storages_after_build(read, name)
             ):
                 release_host_and_device_memory()
 

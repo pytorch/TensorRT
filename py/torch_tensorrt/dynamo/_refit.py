@@ -354,8 +354,16 @@ def refit_module_weights(
         for name, submodule in list(new_partitioned_module.named_children()):
             if isinstance(submodule, torch.export._unlift.GuardsFn):
                 new_partitioned_module.delete_submodule(name)
+        # The global partitioner leaves the model's own submodules in place after the engines take over their
+        # weights, and release_weights_after_build empties them: compare and refit the ones the graphs use.
+        new_partitioned_module.delete_all_unused_submodules()
+        used = {
+            str(node.target).split(".")[0]
+            for node in compiled_module.graph.nodes
+            if node.op in ("call_module", "get_attr")
+        }
         assert {sm[0] for sm in new_partitioned_module.named_children()} == {
-            sm[0] for sm in compiled_module.named_children()
+            sm[0] for sm in compiled_module.named_children() if sm[0] in used
         }, "New weights module is not compatible with previously compiled Torch-TensorRT module"
     # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
