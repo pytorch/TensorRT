@@ -122,7 +122,6 @@ def _prepare_graph_module(
         kwarg_inputs=torch_keyword_arguments,
         dynamic_shapes=dynamic_shapes,
         use_legacy_exporter=not retrace,
-        engines_from_files=True,
     )
 
 

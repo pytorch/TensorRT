@@ -879,7 +879,7 @@ def test_python_only_build_can_export_a_pte(tmp_path):
     reason="specifically validates a Python-only wheel",
 )
 def test_python_only_build_saves_engines_from_their_files(tmp_path):
-    """With engine_output_dir the exporter emits the placeholder op itself, which a
+    """With compile_and_save the exporter emits the placeholder op itself, which a
     Python-only build registers only through meta_ops."""
 
     class AddOne(torch.nn.Module):
@@ -887,20 +887,12 @@ def test_python_only_build_saves_engines_from_their_files(tmp_path):
             return value + 1
 
     example = (torch.randn(2, 3, 4, 4, device="cuda"),)
-    compiled = torch_tensorrt.dynamo.compile(
+    output = tmp_path / "python-only-engine-files.pte"
+    torch_tensorrt.executorch.compile_and_save(
         torch.export.export(AddOne().eval().cuda(), example),
+        output,
         arg_inputs=example,
         min_block_size=1,
-        engine_output_dir=str(tmp_path / "engines"),
-    )
-    output = tmp_path / "python-only-engine-files.pte"
-
-    torch_tensorrt.save(
-        compiled,
-        str(output),
-        output_format="executorch",
-        arg_inputs=example,
-        retrace=False,
     )
 
     assert output.stat().st_size > 0

@@ -39,7 +39,6 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_RESOURCE_PARTITIONING,
     ENABLE_WEIGHT_STREAMING,
     ENGINE_CAPABILITY,
-    ENGINE_OUTPUT_DIR,
     FALLBACK_DATA_DEPENDENT_OPS,
     FOLD_SHARED_KV_ATTENTION,
     HARDWARE_COMPATIBLE,
@@ -49,6 +48,7 @@ from torch_tensorrt.dynamo._defaults import (
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
+    OFFLOAD_COMPILED_ENGINES_TO_DISK,
     OFFLOAD_MODULE_TO_CPU,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
@@ -129,11 +129,10 @@ class CompilationSettings:
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
-        engine_output_dir (Optional[str]): Write each TensorRT engine to a file in this directory as soon as
-            it is built, and keep it there instead of in memory: no engine is loaded on the GPU or held on the
-            host during compilation. A module loads its engine from the file when first used, and
-            ``torch_tensorrt.save(..., output_format="executorch")`` copies it into the ``.pte`` from the
-            file. The files must outlive the compiled module. Default is None (engines in memory).
+        offload_compiled_engines_to_disk (bool): Write each TensorRT engine to a temporary file as soon as
+            it is built, so the engines built so far are not held on the GPU or the host while the next ones
+            build. When the last one is built, each engine is loaded from its file and the file is deleted, so
+            the compiled module is the same as without this setting. Default is False.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
@@ -214,7 +213,7 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
-    engine_output_dir: Optional[str] = ENGINE_OUTPUT_DIR
+    offload_compiled_engines_to_disk: bool = OFFLOAD_COMPILED_ENGINES_TO_DISK
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_fp32_acc: bool = USE_FP32_ACC
@@ -314,7 +313,9 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
-        state.setdefault("engine_output_dir", ENGINE_OUTPUT_DIR)
+        state.setdefault(
+            "offload_compiled_engines_to_disk", OFFLOAD_COMPILED_ENGINES_TO_DISK
+        )
         self.__dict__.update(state)
 
 

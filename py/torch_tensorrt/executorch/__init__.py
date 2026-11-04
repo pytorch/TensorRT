@@ -37,10 +37,12 @@ if not _has_executorch_exir():
         "TensorRTPartitioner",
         "TensorRTBackend",
         "export",
+        "compile_and_save",
         "zero_copy_backend_config",
         "check_zero_copy_kv",
     ]
 else:
+    from torch_tensorrt.executorch._compile_and_save import compile_and_save
     from torch_tensorrt.executorch._export import export
     from torch_tensorrt.executorch._zero_copy import (
         check_zero_copy_kv,
@@ -60,6 +62,7 @@ else:
         "TensorRTPartitioner",
         "TensorRTBackend",
         "export",
+        "compile_and_save",
         "zero_copy_backend_config",
         "check_zero_copy_kv",
     ]

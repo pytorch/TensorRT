@@ -1298,7 +1298,6 @@ def save(
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
-                    engines_from_files=output_format == "executorch",
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1407,7 +1406,6 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
-                        engines_from_files=output_format == "executorch",
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally

@@ -65,6 +65,10 @@ from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    OffloadedTorchTensorRTModule,
+    keeping_offloaded_engines,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -526,7 +530,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
-    engine_output_dir: Optional[str] = _defaults.ENGINE_OUTPUT_DIR,
+    offload_compiled_engines_to_disk: bool = _defaults.OFFLOAD_COMPILED_ENGINES_TO_DISK,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -636,10 +640,10 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        engine_output_dir (Optional[str]): Write each TensorRT engine to a file in this directory as soon as it is built, and keep it there
-            instead of in memory, so engines don't accumulate on the GPU or the host during compilation. A module loads its engine from the file
-            when first used; ``torch_tensorrt.save(..., output_format="executorch", retrace=False)`` copies it into the ``.pte`` from the file.
-            The files must outlive the compiled module.
+        offload_compiled_engines_to_disk (bool): Write each TensorRT engine to a temporary file as soon as it is built, so the engines
+            built so far are not held on the GPU or the host while the next ones build. When the last one is built, each engine is loaded
+            from its file and the file is deleted, so the compiled module is the same as without this setting. This lowers the memory
+            peak of compiling a model built as several engines. The files go to the system temporary directory (``TMPDIR``).
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -855,7 +859,7 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
-        "engine_output_dir": engine_output_dir,
+        "offload_compiled_engines_to_disk": offload_compiled_engines_to_disk,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1703,6 +1707,16 @@ def compile_module(
                 engine_cache=engine_cache,
             )
 
+            if (
+                _debugger_config
+                and (
+                    _debugger_config.save_engine_profile
+                    or _debugger_config.save_layer_info
+                )
+                and isinstance(trt_module, OffloadedTorchTensorRTModule)
+            ):
+                # Profiling and layer info need the engine.
+                trt_module = trt_module.load()
             trt_modules[name] = trt_module
 
             if _debugger_config:
@@ -1744,13 +1758,17 @@ def compile_module(
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
 
-    # Replace all FX Modules with TRT Modules
+    # Replace all FX Modules with TRT Modules. Engines offloaded to disk are loaded now that every engine
+    # is built, unless compile_and_save keeps them in their files for the save.
+    keep_offloaded = keeping_offloaded_engines()
     for name, trt_module in trt_modules.items():
+        if isinstance(trt_module, OffloadedTorchTensorRTModule) and not keep_offloaded:
+            trt_module = trt_module.load()
         setattr(partitioned_module, name, trt_module)
         if (
             settings.lazy_engine_init
             and not settings.enable_cross_compile_for_windows
-            and not settings.engine_output_dir
+            and not isinstance(trt_module, OffloadedTorchTensorRTModule)
         ):
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
