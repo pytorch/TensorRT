@@ -398,6 +398,7 @@ class DispatchTestCase(TRTTestCase):
         attn_bias_is_causal=True,
         require_full_compilation=False,
         disable_tf32=False,
+        convert_antialiased_resize=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -411,6 +412,7 @@ class DispatchTestCase(TRTTestCase):
             attn_bias_is_causal=attn_bias_is_causal,
             require_full_compilation=require_full_compilation,
             disable_tf32=disable_tf32,
+            convert_antialiased_resize=convert_antialiased_resize,
         )
 
         mod = self.generate_graph(
@@ -547,6 +549,7 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         immutable_weights=True,
         torch_export_dynamic_shapes=None,
+        convert_antialiased_resize=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -557,6 +560,7 @@ class DispatchTestCase(TRTTestCase):
         compilation_settings = CompilationSettings(
             truncate_double=True,
             immutable_weights=immutable_weights,
+            convert_antialiased_resize=convert_antialiased_resize,
         )
         mod = self.generate_graph(
             mod,

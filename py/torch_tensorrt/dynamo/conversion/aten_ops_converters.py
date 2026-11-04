@@ -4758,6 +4758,81 @@ def aten_ops_upsample_bicubic2d(
     )
 
 
+def antialiased_upsample_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Opt-in: PyTorch's kernel is correct too, and faster for some sizes.
+    if settings is None or not settings.convert_antialiased_resize:
+        _LOGGER.debug(
+            "antialiased resize runs in PyTorch unless convert_antialiased_resize=True"
+        )
+        return False
+    meta = node.args[0].meta
+    input_val = meta.get("val", meta.get("tensor_meta"))
+    if input_val is None:
+        _LOGGER.debug("antialiased resize needs the input metadata, falling back")
+        return False
+    # Integer inputs would need ATen's rounding, which the float32 sums do not do.
+    if not input_val.dtype.is_floating_point:
+        _LOGGER.debug(
+            "antialiased resize of an integer input is not supported, falling back"
+        )
+        return False
+    if input_val.dtype == torch.float64 and not settings.truncate_double:
+        _LOGGER.debug(
+            "antialiased resize of a float64 input needs truncate_double=True, "
+            "falling back"
+        )
+        return False
+    # The weights come from the spatial sizes, so they must be static.
+    if not all(isinstance(s, int) for s in (*input_val.shape[-2:], *node.args[1])):
+        _LOGGER.debug(
+            "antialiased resize needs a static height, width and output size, "
+            "falling back"
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._upsample_bilinear2d_aa.default,
+    capability_validator=antialiased_upsample_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._upsample_bicubic2d_aa.default,
+    capability_validator=antialiased_upsample_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_antialias(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample_antialias(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args[1],
+        align_corners=args[2],
+        scales=(args_bounds_check(args, 3), args_bounds_check(args, 4)),
+        mode=(
+            "bilinear"
+            if target == torch.ops.aten._upsample_bilinear2d_aa.default
+            else "bicubic"
+        ),
+    )
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.topk.default,
     capability_validator=topk_validator,
