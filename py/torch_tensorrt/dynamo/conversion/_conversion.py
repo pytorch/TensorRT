@@ -20,7 +20,10 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
-from torch_tensorrt.dynamo.runtime._offloaded_engines import offload_engine
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    keeping_offloaded_engines,
+    offload_engine,
+)
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
     get_output_dtypes,
@@ -437,7 +440,7 @@ def convert_module(
                 "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
             )
 
-    offload = settings.offload_compiled_engines_to_disk
+    offload = keeping_offloaded_engines()
     module = TorchTensorRTModule(
         serialized_engine=(
             None if offload else serialized_interpreter_result.serialized_engine
@@ -453,7 +456,7 @@ def convert_module(
         num_user_outputs=serialized_interpreter_result.num_user_outputs,
     )
     if offload:
-        # Set up with the other engines once the last one is built, as with lazy_engine_init.
+        # Inside compile_and_save: the engine stays in its file, which the save streams into the program.
         module.serialized_engine = offload_engine(
             serialized_interpreter_result.serialized_engine, name
         )

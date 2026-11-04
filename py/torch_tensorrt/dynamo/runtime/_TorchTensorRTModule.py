@@ -229,7 +229,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # engines — creating a new execution context during copy can crash at
         # destruction time.  Since the exporter only reads the engine (never
         # executes it), sharing the same C++ object is safe. A plan is never modified either,
-        # and copying a memory-mapped one (offload_compiled_engines_to_disk) would read it in.
+        # and copying a memory-mapped one (compile_and_save) would read it in.
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result

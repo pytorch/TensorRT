@@ -1,16 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Compiled engines kept in files while compilation runs (``offload_compiled_engines_to_disk``).
+"""Compiled engines kept in files while ``torch_tensorrt.executorch.compile_and_save`` runs.
 
-``convert_module`` writes each engine to a temporary file as soon as it is built, and gives its
-``TorchTensorRTModule`` the file memory-mapped as the plan. The engines built so far are then held
-neither on the GPU nor in host memory while the next ones build. As with ``lazy_engine_init``,
-``compile_module`` sets every engine up once the last one is built, which releases the mapping. The
-file is deleted as soon as it is mapped, so its space is freed with the mapping.
-
-``torch_tensorrt.executorch.compile_and_save`` keeps the files instead, and the save streams each one
-into the program.
+Inside ``keep_offloaded_engines()``, ``convert_module`` writes each engine to a temporary file as soon as it is
+built, and gives its ``TorchTensorRTModule`` the file memory-mapped as the plan. The engines built so far are
+then held neither on the GPU nor in host memory while the next ones build. ``compile_module`` leaves them in their
+files, the save streams each file into the program, and the files are deleted when the block ends.
 """
 
 import contextlib
@@ -24,7 +20,7 @@ import torch
 
 logger = logging.getLogger(__name__)
 
-# The engine files of the enclosing compile_and_save, when compilation must leave them in place.
+# The engine files of the enclosing keep_offloaded_engines() block.
 _kept_files: ContextVar[Optional[List[str]]] = ContextVar(
     "kept_engine_files", default=None
 )
@@ -41,13 +37,15 @@ def _remove(path: str) -> None:
 
 @contextlib.contextmanager
 def keep_offloaded_engines() -> Iterator[None]:
-    """Keep the engine files of the compilations inside the block until it ends, then delete them."""
+    """Keep the engines of the compilations inside the block in files until it ends, then delete them."""
     files: List[str] = []
     token = _kept_files.set(files)
     try:
         yield
     finally:
         _kept_files.reset(token)
+        for address in [a for a, path in _mapped_files.items() if path in files]:
+            del _mapped_files[address]
         for path in files:
             _remove(path)
 
@@ -57,19 +55,19 @@ def keeping_offloaded_engines() -> bool:
 
 
 def offload_engine(serialized_engine: bytes, name: str) -> torch.Tensor:
-    """Write an engine to a temporary file and return the file memory-mapped as a uint8 tensor."""
+    """Write an engine to a kept temporary file and return the file memory-mapped as a uint8 tensor."""
+    kept = _kept_files.get()
+    assert (
+        kept is not None
+    ), "engines are offloaded only inside keep_offloaded_engines()"
     fd, path = tempfile.mkstemp(suffix=".engine", prefix=f"{name or 'engine'}_")
+    kept.append(path)  # before the write, so a partly written file is deleted too
     with os.fdopen(fd, "wb") as f:
         f.write(serialized_engine)
     plan = torch.from_file(
         path, shared=False, size=os.path.getsize(path), dtype=torch.uint8
     )
-    kept = _kept_files.get()
-    if kept is None:
-        os.remove(path)  # the mapping keeps the data until it is released
-    else:
-        kept.append(path)
-        _mapped_files[plan.data_ptr()] = path
+    _mapped_files[plan.data_ptr()] = path
     logger.debug(f"Offloaded the engine of {name} to {path}")
     return plan
 

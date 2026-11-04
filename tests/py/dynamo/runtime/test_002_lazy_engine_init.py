@@ -405,3 +405,22 @@ class TestLazyEngineInit(TestCase):
 
         # Clean up model env
         torch._dynamo.reset()
+
+    def test_lazy_engine_init_require_full_compilation(self):
+        """require_full_compilation converts a fully supported graph into one engine, without partitioning,
+        and returns that engine's module."""
+        model = (
+            torch.nn.Sequential(torch.nn.Linear(64, 64), torch.nn.ReLU()).eval().cuda()
+        )
+        x = torch.randn(4, 64, device="cuda")
+        trt_mod = torchtrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            require_full_compilation=True,
+            lazy_engine_init=True,
+        )
+        assertions.assertIsInstance(trt_mod, TorchTensorRTModule)
+        assertions.assertIsNotNone(trt_mod.engine)
+        with torch.no_grad():
+            assert_close(trt_mod(x), model(x))

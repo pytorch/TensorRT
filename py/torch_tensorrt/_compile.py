@@ -22,6 +22,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import torch
@@ -574,11 +575,14 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
-            exp_program,
-            arg_inputs=tuple(normalized_arg_inputs),
-            kwarg_inputs=torchtrt_kwarg_inputs,
-            **kwargs,
+        return cast(
+            bytes,
+            dynamo_convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=tuple(normalized_arg_inputs),
+                kwarg_inputs=torchtrt_kwarg_inputs,
+                **kwargs,
+            ),
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(

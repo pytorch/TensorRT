@@ -12,6 +12,7 @@ pytest.importorskip("executorch.exir")
 import torch_tensorrt  # noqa: E402
 from executorch.exir._serialize._cord import FileBackedData  # noqa: E402
 from executorch.exir._serialize._named_data_store import NamedDataStore  # noqa: E402
+from torch_tensorrt.dynamo import _compiler  # noqa: E402
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule  # noqa: E402
 from torch_tensorrt.executorch import _compile_and_save  # noqa: E402
 
@@ -89,11 +90,7 @@ def test_keywords_go_to_compile_or_save_by_name(monkeypatch):
         min_block_size=1,
         external_engine_data="model",
     )
-    assert calls["compile"] == {
-        "offload_compiled_engines_to_disk": True,
-        "arg_inputs": ["x"],
-        "min_block_size": 1,
-    }
+    assert calls["compile"] == {"arg_inputs": ["x"], "min_block_size": 1}
     assert calls["save"] == {
         "output_format": "executorch",
         "arg_inputs": ["x"],
@@ -102,7 +99,28 @@ def test_keywords_go_to_compile_or_save_by_name(monkeypatch):
 
     with pytest.raises(TypeError, match="min_blok_size"):
         _compile_and_save.compile_and_save("program", "model.pte", min_blok_size=1)
-    with pytest.raises(ValueError, match="always offloads"):
-        _compile_and_save.compile_and_save(
-            "program", "model.pte", offload_compiled_engines_to_disk=False
+
+
+def test_engine_files_are_deleted_when_compilation_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    real_convert = _compiler.convert_module
+    calls = []
+
+    def failing_second(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("build failed")
+        return real_convert(*args, **kwargs)
+
+    monkeypatch.setattr(_compiler, "convert_module", failing_second)
+    x = torch.randn(4, 64, device="cuda")
+    with pytest.raises(RuntimeError, match="build failed"):
+        torch_tensorrt.executorch.compile_and_save(
+            torch.export.export(_TwoEngines().eval().cuda(), (x,)),
+            tmp_path / "model.pte",
+            arg_inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={torch.ops.aten.sin.default},
         )
+    assert len(calls) == 2
+    assert not glob.glob(str(tmp_path / "*.engine"))

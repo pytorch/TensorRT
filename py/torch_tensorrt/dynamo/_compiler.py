@@ -529,7 +529,6 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
-    offload_compiled_engines_to_disk: bool = _defaults.OFFLOAD_COMPILED_ENGINES_TO_DISK,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -639,10 +638,6 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        offload_compiled_engines_to_disk (bool): Like ``lazy_engine_init``, set every TensorRT engine up only once the last one is built,
-            but keep each engine in a temporary file until then instead of in host memory, so the engines built so far are held neither on
-            the GPU nor on the host while the next ones build. The compiled module is the same as without this setting. This lowers the
-            memory peak of compiling a model built as several engines. The files go to the system temporary directory (``TMPDIR``).
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -858,7 +853,6 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
-        "offload_compiled_engines_to_disk": offload_compiled_engines_to_disk,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1453,11 +1447,11 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
-    # Engines whose setup is deferred, by lazy_engine_init or offload_compiled_engines_to_disk, are set up
-    # once every engine is built, unless compile_and_save keeps them in their files for the save.
+    # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
+    # compile_and_save keeps them in their files for the save.
     keep_offloaded = keeping_offloaded_engines()
     set_up_deferred_engines = (
-        (settings.lazy_engine_init or settings.offload_compiled_engines_to_disk)
+        settings.lazy_engine_init
         and not settings.enable_cross_compile_for_windows
         and not keep_offloaded
     )
@@ -1719,7 +1713,7 @@ def compile_module(
             )
 
             if (
-                settings.offload_compiled_engines_to_disk
+                keep_offloaded
                 and _debugger_config
                 and (
                     _debugger_config.save_engine_profile

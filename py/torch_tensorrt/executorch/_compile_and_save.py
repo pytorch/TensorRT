@@ -40,16 +40,15 @@ def compile_and_save(
     """Compile ``exported_program`` with TensorRT and save it as an ExecuTorch ``.pte``, without holding a
     compiled engine in memory.
 
-    The same as::
+    The same program as::
 
-        trt_gm = torch_tensorrt.dynamo.compile(
-            exported_program, offload_compiled_engines_to_disk=True, ...
-        )
+        trt_gm = torch_tensorrt.dynamo.compile(exported_program, ...)
         torch_tensorrt.save(trt_gm, file_path, output_format="executorch", ...)
 
-    except that the engines are not loaded when compilation ends. Each one stays in its temporary file until
-    the save streams the file into the program (or the ``.ptd`` with ``external_engine_data``), so neither
-    compilation nor the save holds an engine in memory. The files are deleted when the call returns.
+    but each engine goes to a temporary file as soon as it is built, and is never loaded: the save streams
+    the file into the program (or the ``.ptd`` with ``external_engine_data``). Neither compilation nor the
+    save holds an engine on the GPU or in host memory. The files go to the system temporary directory
+    (``TMPDIR``) and are deleted when the call returns, which returns nothing.
 
     Each keyword argument goes to ``torch_tensorrt.dynamo.compile`` or ``torch_tensorrt.save``, whichever
     takes it; ``inputs``, ``arg_inputs`` and ``kwarg_inputs`` go to both.
@@ -59,15 +58,10 @@ def compile_and_save(
         raise TypeError(
             f"compile_and_save() got unexpected keyword arguments: {unknown}"
         )
-    if kwargs.pop("offload_compiled_engines_to_disk", True) is not True:
-        raise ValueError(
-            "compile_and_save always offloads the compiled engines to disk"
-        )
 
     with keep_offloaded_engines():
         trt_gm = dynamo_compile(
             exported_program,
-            offload_compiled_engines_to_disk=True,
             **{k: v for k, v in kwargs.items() if k in _COMPILE_KEYWORDS},
         )
         save(
