@@ -40,6 +40,8 @@ Model Zoo
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
+* :ref:`cutedsl_op`: Registering a CuTe DSL kernel as an AOT TensorRT plugin with dynamic shapes
+
 
 
 .. raw:: html
@@ -214,6 +216,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="torch_tensorrt.kernels.cutedsl_op compiles a raw @cute.kernel to PTX, registers a PyTorch custo...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_cutedsl_op_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_cutedsl_op.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Register a CuTe DSL kernel as an AOT TensorRT plugin</div>
     </div>
 
 
@@ -813,6 +832,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   /tutorials/_rendered_examples/dynamo/cutedsl_op
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/aliased_io_buffers
    /tutorials/_rendered_examples/dynamo/cutile_op

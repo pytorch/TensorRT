@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=62de6c45"></script>
+    <script src="../_static/documentation_options.js?v=28a5836a"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -574,11 +574,11 @@ document.write(`
 <span id="torch-tensorrt-kernels-py"></span><h1>torch_tensorrt.kernels<a class="headerlink" href="#torch-tensorrt-kernels" title="Link to this heading">#</a></h1>
 <section id="torch-tensorrt-kernels-experimental">
 <span id="module-torch_tensorrt.kernels"></span><h2>torch_tensorrt.kernels  (experimental)<a class="headerlink" href="#torch-tensorrt-kernels-experimental" title="Link to this heading">#</a></h2>
-<p>Register custom CUDA C++, precompiled PTX, Triton, and cuTile kernels as TensorRT
+<p>Register CUDA C++, precompiled PTX, Triton, cuTile, and CuTe DSL kernels as TensorRT
 Quick Deployable Plugins (QDP). Tensor-only kernels use AOT plugin launches;
 declarative CUDA kernels with <code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> use TensorRT’s QDP JIT path so
 runtime scalar attributes can be forwarded by value.</p>
-<p>The module exposes four registration entry points:</p>
+<p>The module exposes five registration entry points:</p>
 <dl class="simple">
 <dt><code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code> — fully declarative for the common cases, with optional</dt><dd><p>overrides for everything else. Describe the kernel via <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code>
 (inputs, outputs, extras, launch geometry) and the meta / eager / aot
@@ -600,6 +600,10 @@ tensor-only; shape-derived kernel extras may use the validated <code class="docu
 <code class="docutils literal notranslate"><span class="pre">(ptr,</span> <span class="pre">extents...,</span> <span class="pre">strides...)</span></code> layout into TensorRT’s launch order, and
 derives the AOT launch — so you only supply the array <code class="docutils literal notranslate"><span class="pre">signature</span></code>, the
 <code class="docutils literal notranslate"><span class="pre">ct.Constant</span></code> values, a <code class="docutils literal notranslate"><span class="pre">grid</span></code>, and a <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">cutedsl_op</span></code> — register a pointer-based <code class="docutils literal notranslate"><span class="pre">&#64;cute.kernel</span></code> CuTe DSL program.</dt><dd><p>Supply a pointer/<code class="docutils literal notranslate"><span class="pre">i32</span></code> signature, <code class="docutils literal notranslate"><span class="pre">cutlass.Constexpr</span></code> constants, launch grid
+and block size, and a <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code>. The frontend compiles and embeds PTX
+through the same AOT plugin backend.</p>
 </dd>
 </dl>
 <p>Minimal example — declarative <code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</span></code>:</p>
@@ -637,21 +641,23 @@ to <code class="docutils literal notranslate"><span class="pre">cuda_kernel_op</
 <code class="docutils literal notranslate"><span class="pre">&gt;=10.7.0</span></code> (and not <code class="docutils literal notranslate"><span class="pre">10.14.x</span></code>) with Quick Deployable Plugin (QDP)
 support. CUDA C++ kernels require <code class="docutils literal notranslate"><span class="pre">cuda-python</span></code> and <code class="docutils literal notranslate"><span class="pre">cuda-core</span></code>;
 <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">triton_op()</span></code> requires <code class="docutils literal notranslate"><span class="pre">triton&gt;=3.5.0</span></code> while registering and compiling
-the kernel. cuTile kernels additionally require <code class="docutils literal notranslate"><span class="pre">cuda-tile</span></code> and
-<code class="docutils literal notranslate"><span class="pre">tileiras</span></code> as described below. From a source checkout, install all
-frontend packages with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--group</span> <span class="pre">kernels</span></code>. A serialized AOT
-engine embeds the resulting PTX and does not need Triton, cuTile, or the
-Python registration callback to execute.</p>
+the kernel. CuTe DSL kernels require <code class="docutils literal notranslate"><span class="pre">nvidia-cutlass-dsl&gt;=4.8.1,&lt;5</span></code>.
+cuTile kernels additionally require <code class="docutils literal notranslate"><span class="pre">cuda-tile</span></code> and
+<code class="docutils literal notranslate"><span class="pre">tileiras</span></code> as described below. From a source checkout, install the
+frontend packages with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--group</span> <span class="pre">kernels</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--group</span> <span class="pre">kernels-cutedsl</span></code> to add CuTe DSL. A serialized AOT
+engine embeds the resulting PTX and does not need Triton, CuTe DSL, cuTile,
+or the Python registration callback to execute.</p>
 </div>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">kernels</span></code> module registers custom kernels — CUDA C++ compiled with
-NVRTC, Triton, or cuTile — as TensorRT Quick Deployable Plugins. Tensor-only
+NVRTC, Triton, CuTe DSL, or cuTile — as TensorRT Quick Deployable Plugins. Tensor-only
 declarative kernels use Ahead-of-Time (AOT) plugin launches when
 available; kernels with <code class="docutils literal notranslate"><span class="pre">ScalarInput</span></code> compile through TensorRT’s QDP JIT
 path because QDP AOT extra arguments currently support symbolic integer
 expressions, not arbitrary runtime floats.</p>
-<p>Four entry points share one registration funnel:</p>
+<p>Five entry points share one registration funnel:</p>
 <ul class="simple">
 <li><p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cuda_kernel_op()</span></code> handles both the declarative case (drive
 everything from a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">KernelSpec</span></code> dataclass) and the override case
@@ -660,6 +666,8 @@ arguments when the declarative DSL doesn’t cover your kernel).</p></li>
 <li><p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">ptx_op()</span></code> registers kernels that are already compiled to PTX bytes.</p></li>
 <li><p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">triton_op()</span></code> registers a <code class="docutils literal notranslate"><span class="pre">&#64;triton.jit</span></code> kernel, compiling it to
 PTX and deriving the AOT launch for you.</p></li>
+<li><p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cutedsl_op()</span></code> registers a raw <code class="docutils literal notranslate"><span class="pre">&#64;cute.kernel</span></code> CuTe DSL kernel,
+compiling it to PTX and deriving the AOT launch for you.</p></li>
 <li><p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cutile_op()</span></code> registers a <code class="docutils literal notranslate"><span class="pre">&#64;ct.kernel</span></code> cuTile program, compiling it
 to PTX and deriving the AOT launch for you.</p></li>
 </ul>
@@ -931,8 +939,10 @@ it, and repeated compilations reuse Triton’s own cache.</p>
 <p>This initial implementation compiles a single PTX for the given
 <code class="docutils literal notranslate"><span class="pre">signature</span></code> (fixed input dtypes) and <code class="docutils literal notranslate"><span class="pre">constexprs</span></code> (single config).
 Inputs whose dtypes don’t match the compiled ones are declined at
-conversion time. Such inputs can fall back to PyTorch only when the
-surrounding partition and <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> permit it. Multi-config
+conversion time, as are <code class="docutils literal notranslate"><span class="pre">hardware_compatible=True</span></code> engines, which
+could run on architectures the PTX does not target. Such inputs can
+fall back to PyTorch only when the surrounding partition and
+<code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> permit it. Multi-config
 autotuning and dtype specialization are follow-up work.</p>
 </div>
 </dd></dl>
@@ -1071,6 +1081,68 @@ To reproduce that compatibility run without replacing the installed Triton:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">python</span><span class="w"> </span><span class="o">-</span><span class="n">m</span><span class="w"> </span><span class="n">tests</span><span class="p">.</span><span class="n">ci</span><span class="p">.</span><span class="n">triton_compat</span><span class="w"> </span><span class="mf">3.5.0</span>
 </pre></div>
 </div>
+</section>
+<section id="cute-dsl-entry-point">
+<h2>CuTe DSL entry point<a class="headerlink" href="#cute-dsl-entry-point" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.kernels.cutedsl_op">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.kernels.</span></span><span class="sig-name descname"><span class="pre">cutedsl_op</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">op_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">signature</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constants</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_args_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eager_fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shared_mem</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pointer_alignment</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">supports_dynamic_shapes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ConverterPriority</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">ConverterPriority.STANDARD</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">capability_validator</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">schema</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/kernels/_ops.html#cutedsl_op"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.kernels.cutedsl_op" title="Link to this definition">#</a></dt>
+<dd><p>Register a pointer-based NVIDIA CuTe DSL kernel as a TensorRT AOT plugin.</p>
+<p><code class="docutils literal notranslate"><span class="pre">kernel</span></code> is a <code class="docutils literal notranslate"><span class="pre">&#64;cute.kernel</span></code> function. <code class="docutils literal notranslate"><span class="pre">signature</span></code> lists its runtime
+parameters in declaration order: input pointers, optional <code class="docutils literal notranslate"><span class="pre">i32</span></code> extras,
+then output pointers. For example, <code class="docutils literal notranslate"><span class="pre">{&quot;x&quot;:</span> <span class="pre">&quot;*fp32&quot;,</span> <span class="pre">&quot;n&quot;:</span> <span class="pre">&quot;i32&quot;,</span> <span class="pre">&quot;y&quot;:</span> <span class="pre">&quot;*fp32&quot;}</span></code>.
+<code class="docutils literal notranslate"><span class="pre">constants</span></code> supplies all <code class="docutils literal notranslate"><span class="pre">cutlass.Constexpr</span></code> parameters.</p>
+<p><code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> describes a functional, Tensor-only Torch op. <code class="docutils literal notranslate"><span class="pre">grid(inputs,</span>
+<span class="pre">outputs)</span></code> computes up to three launch dimensions from TensorRT descriptors;
+<code class="docutils literal notranslate"><span class="pre">extra_args_fn(inputs,</span> <span class="pre">outputs)</span></code> returns one int or <code class="docutils literal notranslate"><span class="pre">trtp.SymInt32</span></code> per
+scalar parameter. Use symbolic shapes in both callbacks for dynamic inputs.
+<code class="docutils literal notranslate"><span class="pre">block_size</span></code> is a static CUDA thread count or tuple. <code class="docutils literal notranslate"><span class="pre">shared_mem</span></code> is the
+required dynamic shared-memory size in bytes. <code class="docutils literal notranslate"><span class="pre">eager_fn</span></code> optionally defines
+the op’s CUDA implementation outside TensorRT.</p>
+<p><code class="docutils literal notranslate"><span class="pre">pointer_alignment</span></code> is the byte alignment CuTe may assume for every tensor
+pointer, or a mapping from pointer names to alignments (unlisted pointers
+use 1). The default of 1 is always safe; declaring 16 lets CuTe emit 128-bit
+vectorized loads and stores, but the caller must guarantee every bound
+buffer meets it, since a misaligned pointer faults at runtime.</p>
+<p>Compilation targets the current CUDA device with fixed pointer dtypes.
+Kernels may construct CuTe tensors from their pointers, but descriptor
+arguments, clusters, and compiler-added workspaces are unsupported. The op
+is not lowered when <code class="docutils literal notranslate"><span class="pre">hardware_compatible=True</span></code>, because its PTX is tied to
+the registering GPU’s architecture. The resulting engine embeds PTX and does
+not need CuTe DSL at runtime. Set <code class="docutils literal notranslate"><span class="pre">TORCH_TENSORRT_CUTEDSL_CACHE_DIR</span></code> to
+reuse compiled PTX across processes. Requires <code class="docutils literal notranslate"><span class="pre">nvidia-cutlass-dsl&gt;=4.8.1,&lt;5</span></code>.</p>
+</dd></dl>
+
+<p>See the <span class="xref std std-ref">cutedsl_op</span> example for a complete kernel and dynamic-shape
+engine. Registration uses a generated <code class="docutils literal notranslate"><span class="pre">&#64;cute.jit</span></code> host wrapper and the
+shared <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">ptx_op()</span></code> registration path. Inference launches embedded PTX
+without importing CuTe DSL.</p>
+<p>The current CUDA device determines the target, including architecture-specific
+instructions such as <code class="docutils literal notranslate"><span class="pre">sm_90a</span></code>. Use <code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">torch.cuda.device(device):</span></code> to
+select another target. If CuTe emits a PTX ISA newer than the loaded driver
+supports, the frontend recompiles for that driver and verifies the result
+with a driver load. Kernels that require a newer ISA still need a compatible
+driver; serialized engines retain these compatibility requirements.</p>
+<p>Kernels index contiguous TensorRT buffers and must guard their loads and
+stores. <code class="docutils literal notranslate"><span class="pre">meta_fn</span></code> must describe contiguous outputs with the compiled dtypes.
+The caller must provide enough <code class="docutils literal notranslate"><span class="pre">shared_mem</span></code> for the kernel; launch limits
+and scalar ranges must hold throughout the input profile. Empty tensors
+require a positive grid. Native tensor arguments, TMA descriptors, clusters,
+and compiler-added workspaces are unsupported; kernels may construct CuTe
+tensors internally from pointers.</p>
+<p>By default pointers assume only byte alignment, which is always safe but
+prevents vectorized memory access. Pass <code class="docutils literal notranslate"><span class="pre">pointer_alignment=16</span></code> (or a mapping
+from pointer names to byte alignments) to let CuTe emit 128-bit loads and
+stores; every buffer TensorRT binds must then meet that alignment, or the
+kernel faults. Like <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">triton_op()</span></code>, the op is not lowered into
+<code class="docutils literal notranslate"><span class="pre">hardware_compatible=True</span></code> engines, because its PTX targets the registering
+GPU’s exact architecture.</p>
+<p>Registration compiles the kernel. Set <code class="docutils literal notranslate"><span class="pre">TORCH_TENSORRT_CUTEDSL_CACHE_DIR</span></code> to a
+directory to reuse compiled PTX across processes. The cache key covers the
+kernel’s defining module, its constants, signature, launch configuration,
+target, driver PTX ISA, and the CuTe DSL version; clear the directory after
+editing helpers that the kernel imports from other modules. Cached PTX is
+still validated and loaded by the driver before use.</p>
 </section>
 <section id="cutile-entry-point">
 <h2>cuTile entry point<a class="headerlink" href="#cutile-entry-point" title="Link to this heading">#</a></h2>
@@ -1279,12 +1351,12 @@ deployment.</p>
 </section>
 <section id="kernel-signature-convention">
 <h2>Kernel signature convention<a class="headerlink" href="#kernel-signature-convention" title="Link to this heading">#</a></h2>
-<p>The Triton and tensor-only precompiled AOT paths use this fixed order:</p>
+<p>The Triton, CuTe DSL, and tensor-only precompiled AOT paths use this fixed order:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">input_ptrs</span><span class="p">...,</span><span class="w"> </span><span class="n">extras</span><span class="p">...,</span><span class="w"> </span><span class="n">output_ptrs</span><span class="p">...)</span>
 </pre></div>
 </div>
 <p>This matches the order TensorRT passes tensor pointers and AOT extra
-arguments. In a Triton kernel, pointers are the <code class="docutils literal notranslate"><span class="pre">*&lt;dtype&gt;</span></code> parameters
+arguments. In a Triton or CuTe DSL kernel, pointers are the <code class="docutils literal notranslate"><span class="pre">*&lt;dtype&gt;</span></code> parameters
 specified in <code class="docutils literal notranslate"><span class="pre">signature</span></code> and extras follow the order returned by
 <code class="docutils literal notranslate"><span class="pre">extra_args_fn</span></code>; no PTX rewriting is needed. A cuTile kernel declares its
 arrays in <code class="docutils literal notranslate"><span class="pre">(inputs...,</span> <span class="pre">outputs...)</span></code> order, and <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">cutile_op()</span></code> rewrites
@@ -1403,6 +1475,10 @@ the offending ranks are only known when concrete tensors arrive.</p>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#triton-entry-point">Triton entry point</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.triton_op"><code class="docutils literal notranslate"><span class="pre">triton_op()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cute-dsl-entry-point">CuTe DSL entry point</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.kernels.cutedsl_op"><code class="docutils literal notranslate"><span class="pre">cutedsl_op()</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cutile-entry-point">cuTile entry point</a><ul class="visible nav section-nav flex-column">

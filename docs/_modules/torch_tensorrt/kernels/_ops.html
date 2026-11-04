@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=62de6c45"></script>
+    <script src="../../../_static/documentation_options.js?v=28a5836a"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -479,7 +479,7 @@ document.write(`
 
 <span class="sd">"""Public entry points for ``torch_tensorrt.kernels``.</span>
 
-<span class="sd">Four functions, four paths into the same registration funnel:</span>
+<span class="sd">Kernel frontends share one registration funnel:</span>
 
 <span class="sd">* :func:`cuda_kernel_op` — declarative entry for CUDA C++ source. Reads</span>
 <span class="sd">  a :class:`KernelSpec` and derives meta / eager / aot / schema, with</span>
@@ -492,6 +492,8 @@ document.write(`
 <span class="sd">* :func:`cutile_op` — declarative entry for a ``@ct.kernel`` cuTile program.</span>
 <span class="sd">  Compiles the kernel to PTX for you, reorders its parameters into TensorRT's</span>
 <span class="sd">  launch order, and derives the AOT launch.</span>
+<span class="sd">* :func:`cutedsl_op` — compile a pointer-based ``@cute.kernel`` CuTe DSL program</span>
+<span class="sd">  to PTX and derive its AOT launch.</span>
 <span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
@@ -753,13 +755,13 @@ document.write(`
 <span class="sd">        This initial implementation compiles a single PTX for the given</span>
 <span class="sd">        ``signature`` (fixed input dtypes) and ``constexprs`` (single config).</span>
 <span class="sd">        Inputs whose dtypes don't match the compiled ones are declined at</span>
-<span class="sd">        conversion time. Such inputs can fall back to PyTorch only when the</span>
-<span class="sd">        surrounding partition and ``eager_fn`` permit it. Multi-config</span>
+<span class="sd">        conversion time, as are ``hardware_compatible=True`` engines, which</span>
+<span class="sd">        could run on architectures the PTX does not target. Such inputs can</span>
+<span class="sd">        fall back to PyTorch only when the surrounding partition and</span>
+<span class="sd">        ``eager_fn`` permit it. Multi-config</span>
 <span class="sd">        autotuning and dtype specialization are follow-up work.</span>
 <span class="sd">    """</span>
     <span class="n">_require_qdp_plugin</span><span class="p">()</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_triton</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -804,31 +806,20 @@ document.write(`
         <span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">capability_validator</span><span class="p">,</span> <span class="n">artifact</span><span class="o">=</span><span class="n">artifact</span>
     <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">final_aot</span><span class="p">(</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">outputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_tactic</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-        <span class="n">_triton</span><span class="o">.</span><span class="n">validate_target</span><span class="p">(</span><span class="n">artifact</span><span class="p">)</span>
-        <span class="n">dims</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">validate_launch_grid</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">grid</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">))</span>
-        <span class="n">launch_params</span> <span class="o">=</span> <span class="n">trtp</span><span class="o">.</span><span class="n">KernelLaunchParams</span><span class="p">(</span>
-            <span class="n">grid_x</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-            <span class="n">grid_y</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="n">grid_z</span><span class="o">=</span><span class="n">dims</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="mi">1</span><span class="p">,</span>
-            <span class="c1"># Triton reports occupancy in warps; TRT wants threads per block.</span>
-            <span class="n">block_x</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">num_warps</span> <span class="o">*</span> <span class="mi">32</span><span class="p">,</span>
-            <span class="n">shared_mem</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">shared_mem</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="n">values</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">extra_args_fn</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">extra_args_fn</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
-        <span class="n">extra_args</span> <span class="o">=</span> <span class="n">_triton</span><span class="o">.</span><span class="n">make_symint32_args</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="o">.</span><span class="n">scalars</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">launch_params</span><span class="p">,</span> <span class="n">extra_args</span>
-
     <span class="n">register_precompiled_qdp_plugin</span><span class="p">(</span>
         <span class="n">op_name</span><span class="o">=</span><span class="n">op_name</span><span class="p">,</span>
         <span class="n">ptx</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">ptx</span><span class="p">,</span>
         <span class="n">kernel_name</span><span class="o">=</span><span class="n">artifact</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
-        <span class="n">aot_fn</span><span class="o">=</span><span class="n">_common</span><span class="o">.</span><span class="n">check_aot_dtypes</span><span class="p">(</span>
+        <span class="n">aot_fn</span><span class="o">=</span><span class="n">_common</span><span class="o">.</span><span class="n">make_pointer_aot_fn</span><span class="p">(</span>
             <span class="n">op_name</span><span class="p">,</span>
-            <span class="n">final_aot</span><span class="p">,</span>
-            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">inputs</span><span class="p">],</span>
-            <span class="p">[</span><span class="n">param</span><span class="o">.</span><span class="n">dtype</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">outputs</span><span class="p">],</span>
+            <span class="n">layout</span><span class="p">,</span>
+            <span class="n">grid</span><span class="p">,</span>
+            <span class="c1"># Triton reports occupancy in warps; TRT wants threads per block.</span>
+            <span class="p">(</span><span class="n">artifact</span><span class="o">.</span><span class="n">num_warps</span> <span class="o">*</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">shared_mem</span><span class="p">,</span>
+            <span class="n">extra_args_fn</span><span class="p">,</span>
+            <span class="k">lambda</span><span class="p">:</span> <span class="n">_triton</span><span class="o">.</span><span class="n">validate_target</span><span class="p">(</span><span class="n">artifact</span><span class="p">),</span>
+            <span class="n">frontend</span><span class="o">=</span><span class="s2">"triton_op"</span><span class="p">,</span>
         <span class="p">),</span>
         <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
         <span class="n">meta_fn</span><span class="o">=</span><span class="n">meta_fn</span><span class="p">,</span>
@@ -1040,6 +1031,129 @@ document.write(`
         <span class="n">schema</span><span class="o">=</span><span class="n">schema_info</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"cutile_op '</span><span class="si">%s</span><span class="s2">' registered (kernel: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">kernel_name</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="cutedsl_op">
+<a class="viewcode-back" href="../../../py_api/kernels.html#torch_tensorrt.kernels.cutedsl_op">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">cutedsl_op</span><span class="p">(</span>
+    <span class="n">op_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">kernel</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">signature</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+    <span class="n">meta_fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">block_size</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span>
+    <span class="n">constants</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">extra_args_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">eager_fn</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">shared_mem</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">pointer_alignment</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">priority</span><span class="p">:</span> <span class="n">ConverterPriority</span> <span class="o">=</span> <span class="n">ConverterPriority</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">capability_validator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">schema</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register a pointer-based NVIDIA CuTe DSL kernel as a TensorRT AOT plugin.</span>
+
+<span class="sd">    ``kernel`` is a ``@cute.kernel`` function. ``signature`` lists its runtime</span>
+<span class="sd">    parameters in declaration order: input pointers, optional ``i32`` extras,</span>
+<span class="sd">    then output pointers. For example, ``{"x": "*fp32", "n": "i32", "y": "*fp32"}``.</span>
+<span class="sd">    ``constants`` supplies all ``cutlass.Constexpr`` parameters.</span>
+
+<span class="sd">    ``meta_fn`` describes a functional, Tensor-only Torch op. ``grid(inputs,</span>
+<span class="sd">    outputs)`` computes up to three launch dimensions from TensorRT descriptors;</span>
+<span class="sd">    ``extra_args_fn(inputs, outputs)`` returns one int or ``trtp.SymInt32`` per</span>
+<span class="sd">    scalar parameter. Use symbolic shapes in both callbacks for dynamic inputs.</span>
+<span class="sd">    ``block_size`` is a static CUDA thread count or tuple. ``shared_mem`` is the</span>
+<span class="sd">    required dynamic shared-memory size in bytes. ``eager_fn`` optionally defines</span>
+<span class="sd">    the op's CUDA implementation outside TensorRT.</span>
+
+<span class="sd">    ``pointer_alignment`` is the byte alignment CuTe may assume for every tensor</span>
+<span class="sd">    pointer, or a mapping from pointer names to alignments (unlisted pointers</span>
+<span class="sd">    use 1). The default of 1 is always safe; declaring 16 lets CuTe emit 128-bit</span>
+<span class="sd">    vectorized loads and stores, but the caller must guarantee every bound</span>
+<span class="sd">    buffer meets it, since a misaligned pointer faults at runtime.</span>
+
+<span class="sd">    Compilation targets the current CUDA device with fixed pointer dtypes.</span>
+<span class="sd">    Kernels may construct CuTe tensors from their pointers, but descriptor</span>
+<span class="sd">    arguments, clusters, and compiler-added workspaces are unsupported. The op</span>
+<span class="sd">    is not lowered when ``hardware_compatible=True``, because its PTX is tied to</span>
+<span class="sd">    the registering GPU's architecture. The resulting engine embeds PTX and does</span>
+<span class="sd">    not need CuTe DSL at runtime. Set ``TORCH_TENSORRT_CUTEDSL_CACHE_DIR`` to</span>
+<span class="sd">    reuse compiled PTX across processes. Requires ``nvidia-cutlass-dsl&gt;=4.8.1,&lt;5``.</span>
+<span class="sd">    """</span>
+    <span class="n">_require_qdp_plugin</span><span class="p">()</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">_cutedsl</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.kernels._register</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">analyze_op_schema</span><span class="p">,</span>
+        <span class="n">validate_registration</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">validate_registration</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">check_available</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="o">=</span><span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">capability_validator</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">grid</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cutedsl_op '</span><span class="si">{</span><span class="n">op_name</span><span class="si">}</span><span class="s2">' grid must be callable."</span><span class="p">)</span>
+    <span class="n">block</span> <span class="o">=</span> <span class="n">_common</span><span class="o">.</span><span class="n">normalize_block_dims</span><span class="p">(</span><span class="n">op_name</span><span class="p">,</span> <span class="n">block_size</span><span class="p">,</span> <span class="n">frontend</span><span class="o">=</span><span class="s2">"cutedsl_op"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_mem</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_mem</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">shared_mem</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="o">**</span><span class="mi">31</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"cutedsl_op shared_mem must be a non-negative i32 byte count."</span><span class="p">)</span>
+    <span class="n">schema_info</span> <span class="o">=</span> <span class="n">analyze_op_schema</span><span class="p">(</span>
+        <span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">schema</span><span class="p">,</span>
+        <span class="n">require_complete_hints</span><span class="o">=</span><span class="n">schema</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">tensor_inputs_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">constants</span> <span class="o">=</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">constants</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">constants</span>
+    <span class="n">layout</span> <span class="o">=</span> <span class="n">_cutedsl</span><span class="o">.</span><span class="n">validate_config</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">kernel</span><span class="p">,</span>
+        <span class="n">signature</span><span class="p">,</span>
+        <span class="n">constants</span><span class="p">,</span>
+        <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">schema_info</span><span class="o">.</span><span class="n">tensor_arg_names</span><span class="p">),</span> <span class="n">schema_info</span><span class="o">.</span><span class="n">num_outputs</span><span class="p">),</span>
+        <span class="n">extra_args_fn</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">alignments</span> <span class="o">=</span> <span class="n">_cutedsl</span><span class="o">.</span><span class="n">normalize_pointer_alignment</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">pointer_alignment</span>
+    <span class="p">)</span>
+    <span class="n">artifact</span> <span class="o">=</span> <span class="n">_cutedsl</span><span class="o">.</span><span class="n">compile_to_ptx</span><span class="p">(</span>
+        <span class="n">kernel</span><span class="p">,</span> <span class="n">constants</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">block</span><span class="p">,</span> <span class="n">shared_mem</span><span class="p">,</span> <span class="n">alignments</span>
+    <span class="p">)</span>
+
+    <span class="n">ptx_op</span><span class="p">(</span>
+        <span class="n">op_name</span><span class="p">,</span>
+        <span class="n">artifact</span><span class="o">.</span><span class="n">ptx</span><span class="p">,</span>
+        <span class="n">artifact</span><span class="o">.</span><span class="n">kernel_name</span><span class="p">,</span>
+        <span class="n">meta_fn</span><span class="p">,</span>
+        <span class="n">eager_fn</span><span class="p">,</span>
+        <span class="n">_common</span><span class="o">.</span><span class="n">make_pointer_aot_fn</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span>
+            <span class="n">layout</span><span class="p">,</span>
+            <span class="n">grid</span><span class="p">,</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">block</span><span class="p">,</span>
+            <span class="n">artifact</span><span class="o">.</span><span class="n">shared_mem</span><span class="p">,</span>
+            <span class="n">extra_args_fn</span><span class="p">,</span>
+            <span class="k">lambda</span><span class="p">:</span> <span class="n">_cutedsl</span><span class="o">.</span><span class="n">validate_target</span><span class="p">(</span><span class="n">artifact</span><span class="p">),</span>
+            <span class="n">frontend</span><span class="o">=</span><span class="s2">"cutedsl_op"</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="n">supports_dynamic_shapes</span><span class="p">,</span>
+        <span class="n">priority</span><span class="o">=</span><span class="n">priority</span><span class="p">,</span>
+        <span class="n">capability_validator</span><span class="o">=</span><span class="n">_cutedsl</span><span class="o">.</span><span class="n">make_capability_validator</span><span class="p">(</span>
+            <span class="n">op_name</span><span class="p">,</span> <span class="n">layout</span><span class="p">,</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">capability_validator</span>
+        <span class="p">),</span>
+        <span class="n">schema</span><span class="o">=</span><span class="n">schema_info</span><span class="o">.</span><span class="n">schema</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"cutedsl_op '</span><span class="si">%s</span><span class="s2">' registered (kernel: </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span> <span class="n">op_name</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">kernel_name</span>
+    <span class="p">)</span></div>
 
 </pre></div>
 
