@@ -302,8 +302,9 @@ Memory and Resource Management
    * - ``resource_partition_engine_cap``
      - ``None``
      - Weight bytes per engine for resource partitioning: a finer control than
-       ``cpu_memory_budget``, which it replaces when set. The split then depends only on
-       the model and this size, so it is the same on every run.
+       ``cpu_memory_budget``, which it replaces, so the two can't both be set. The split
+       then depends only on the model and this size, so it is the same on every run.
+       Setting it turns resource partitioning on.
    * - ``offload_module_to_cpu``
      - ``False``
      - Move the model weights to CPU RAM before compilation to reduce GPU memory

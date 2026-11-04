@@ -140,6 +140,16 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         subgraphs = self.break_subgraphs(
             subgraphs, subgraph_size_budget=self.calculate_size_budget()
         )
+        engine_sizes = [
+            size
+            for subgraph, size in zip(subgraphs, self.size_of_subgraphs(subgraphs))
+            if subgraph.is_acc
+        ]
+        logger.info(
+            f"Resource partitioning split {self.submodule_name} into {len(engine_sizes)} TensorRT engines "
+            + "with these weights, in MiB: "
+            + ", ".join(f"{size / 2**20:.1f}" for size in engine_sizes)
+        )
 
         if len(subgraphs) == 1:
             return self.module
@@ -246,9 +256,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 )
             elif self.engine_cap is not None:
                 raise ValueError(
-                    f"resource_partition_engine_cap ({self.engine_cap / 2**20:.2f} MiB) would split the model "
-                    + f"({sum(sizes) / 2**20:.2f} MiB) into more than {MAX_NUM_OF_ENGINES} engines. "
-                    + "Consider setting resource_partition_engine_cap to a larger value."
+                    f"resource_partition_engine_cap is {self.engine_cap} bytes, but {self.submodule_name} "
+                    + f"has {sum(sizes) / 2**20:.2f} MiB of weights, more than {MAX_NUM_OF_ENGINES} times "
+                    + "the cap. The cap is in bytes; set a larger value."
                 )
             else:
                 raise ValueError(

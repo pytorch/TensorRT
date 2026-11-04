@@ -239,7 +239,6 @@ other step stays the same:
     trt_gm = torch_tensorrt.compile(
         model,
         arg_inputs=inputs,
-        enable_resource_partitioning=True,
         resource_partition_engine_cap=512 * 1024**2,  # 512 MiB of weights per engine
     )
 
@@ -259,10 +258,10 @@ Use it when:
 
 How it combines with the budget:
 
-* It needs ``enable_resource_partitioning=True``. Without it, it has no effect, and a
-  warning says so.
-* When both are set, the fixed size is used, ``cpu_memory_budget`` is ignored for the
-  split, and a warning says so. The resident memory is not read.
+* Setting it turns resource partitioning on, so ``enable_resource_partitioning`` need not
+  be set.
+* It replaces ``cpu_memory_budget``, so setting both raises a ``ValueError``. The resident
+  memory is not read.
 * Internally, the partitioner treats the size as a budget of
   ``4 × resource_partition_engine_cap``, so the checks of step 4 follow from it: a model
   within the size stays one engine, and a size so small that the model is more than 50
@@ -273,7 +272,8 @@ What it does not bound:
 * **The memory of a build.** The size counts an engine's weights. The memory TensorRT
   takes to build that engine is a multiple of it, which the factor of 4 only estimates;
   builds have been measured at 3 to 10 times their weights. Check the peak of a first
-  compile, and lower the size if it is too high.
+  compile, and lower the size if it is too high. Each split logs its engines' weights at
+  ``INFO`` level.
 * **Layers larger than the size.** A single layer larger than the size still gets an
   engine of its own, larger than the size. Lowering the size below the largest layer
   doesn't make that layer's engine any smaller.

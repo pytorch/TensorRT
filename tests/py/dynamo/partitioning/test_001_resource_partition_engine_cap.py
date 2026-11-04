@@ -87,8 +87,20 @@ class TestResourcePartitionEngineCap(TestCase):
             with self.assertRaisesRegex(ValueError, "positive"):
                 CompilationSettings(resource_partition_engine_cap=cap)
 
-    def test_cap_too_small_names_the_setting(self) -> None:
-        with self.assertRaisesRegex(ValueError, "resource_partition_engine_cap"):
+    def test_cap_turns_resource_partitioning_on(self) -> None:
+        settings = CompilationSettings(resource_partition_engine_cap=_MiB)
+        self.assertTrue(settings.enable_resource_partitioning)
+
+    def test_cap_and_budget_together_are_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not both"):
+            CompilationSettings(
+                resource_partition_engine_cap=_MiB, cpu_memory_budget=8 * 1024 * _MiB
+            )
+
+    def test_cap_too_small_names_the_setting_and_its_unit(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, r"resource_partition_engine_cap is 16384 bytes"
+        ):
             _engines(rss=0, cpu_memory_budget=None, engine_cap=_MiB // 64)
 
     def test_compile_with_cap(self) -> None:
@@ -99,12 +111,16 @@ class TestResourcePartitionEngineCap(TestCase):
             torch.export.export(model, (x,)),
             inputs=[x],
             min_block_size=1,
-            enable_resource_partitioning=True,
             resource_partition_engine_cap=2 * _MiB,
         )
         engines = [n for n, _ in trt.named_children() if "_run_on_acc" in n]
         self.assertEqual(len(engines), 4)
-        torch.testing.assert_close(trt(x), model(x), rtol=1e-3, atol=1e-3)
+        with torch.no_grad():
+            expected = model(x)
+            # Eight layers shrink the activations to about 1e-3, so the tolerance follows their scale.
+            torch.testing.assert_close(
+                trt(x), expected, rtol=1e-2, atol=1e-2 * expected.abs().max().item()
+            )
         torch._dynamo.reset()
 
 
