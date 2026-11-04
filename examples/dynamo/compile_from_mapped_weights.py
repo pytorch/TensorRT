@@ -122,7 +122,6 @@ x = torch.randn(4, 2048)
 ctx = torch_tensorrt.dynamo.low_memory(
     lambda: MLP().eval(),
     path,
-    enable_resource_partitioning=True,
     cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),
 )
 with ctx as model, torch.no_grad():
