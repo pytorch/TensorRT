@@ -152,7 +152,8 @@ def test_extract_ptx_from_cubin_rejects_invalid_or_ambiguous_elf(blob):
 
 
 def test_parse_and_reorder_single_entry():
-    from torch_tensorrt.kernels._cutile import parse_entry, reorder_entry_params
+    from torch_tensorrt.kernels._common import parse_entry
+    from torch_tensorrt.kernels._cutile import reorder_entry_params
 
     match, name, params = parse_entry(FAKE_PTX)
     assert match is not None and name == "relu_kernel" and len(params) == 6
@@ -171,7 +172,7 @@ def test_parse_and_reorder_single_entry():
 
 
 def test_entry_parser_ignores_comments_and_accepts_unqualified_entry():
-    from torch_tensorrt.kernels._cutile import parse_entry
+    from torch_tensorrt.kernels._common import parse_entry
 
     ptx = "/* .visible .entry fake(.param .u64 x) */\n" + FAKE_PTX.replace(
         ".visible .entry", ".entry"
@@ -186,7 +187,8 @@ def test_entry_parser_ignores_comments_and_accepts_unqualified_entry():
 
 
 def test_entry_rewrite_rejects_missing_ambiguous_or_wrong_arity():
-    from torch_tensorrt.kernels._cutile import parse_entry, reorder_entry_params
+    from torch_tensorrt.kernels._common import parse_entry
+    from torch_tensorrt.kernels._cutile import reorder_entry_params
 
     assert parse_entry(FAKE_PTX + FAKE_PTX) == (None, "", [])
     with pytest.raises(RuntimeError, match="reorder expects"):
@@ -196,10 +198,10 @@ def test_entry_rewrite_rejects_missing_ambiguous_or_wrong_arity():
 
 
 def test_ptx_metadata_helpers():
+    from torch_tensorrt.kernels._common import parse_reqntid
     from torch_tensorrt.kernels._cutile import (
         cap_ptx_version,
         parse_ptx_version,
-        parse_reqntid,
         set_ptx_version,
     )
 
@@ -319,19 +321,19 @@ def test_cutile_selected_compiler_version(monkeypatch):
 def test_driver_verification_fails_closed(monkeypatch):
     from cuda.bindings import driver as cuda
 
-    from torch_tensorrt.kernels import _cutile
+    from torch_tensorrt.kernels import _common, _cutile
 
     monkeypatch.setattr(
-        _cutile,
-        "_load_ptx",
+        _common,
+        "load_ptx",
         lambda ptx, kernel_name: cuda.CUresult.CUDA_ERROR_INVALID_PTX,
     )
     with pytest.raises(RuntimeError, match="could not load PTX ISA 9.3"):
         _cutile.verify_driver_accepts_ptx("ns::op", "k", FAKE_PTX)
 
     monkeypatch.setattr(
-        _cutile,
-        "_load_ptx",
+        _common,
+        "load_ptx",
         lambda ptx, kernel_name: cuda.CUresult.CUDA_SUCCESS,
     )
     assert _cutile.verify_driver_accepts_ptx("ns::op", "k", FAKE_PTX) is None
@@ -339,7 +341,7 @@ def test_driver_verification_fails_closed(monkeypatch):
     def _broken(_ptx, _kernel_name):
         raise RuntimeError("driver unavailable")
 
-    monkeypatch.setattr(_cutile, "_load_ptx", _broken)
+    monkeypatch.setattr(_common, "load_ptx", _broken)
     with pytest.raises(RuntimeError, match="refusing to embed unchecked code"):
         _cutile.verify_driver_accepts_ptx("ns::op", "k", FAKE_PTX)
 
