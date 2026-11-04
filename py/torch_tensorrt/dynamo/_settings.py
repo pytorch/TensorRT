@@ -54,6 +54,7 @@ from torch_tensorrt.dynamo._defaults import (
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
+    RESOURCE_PARTITION_ENGINE_CAP,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
@@ -151,6 +152,10 @@ class CompilationSettings:
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        resource_partition_engine_cap (Optional[int]): The weight bytes per TensorRT engine the resource partitioner
+            splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The
+            size is then not derived from the budget and the process's resident memory, so the same model and cap always
+            give the same split. Setting it turns resource partitioning on. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
@@ -240,6 +245,7 @@ class CompilationSettings:
     )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
+    resource_partition_engine_cap: Optional[int] = RESOURCE_PARTITION_ENGINE_CAP
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
     disabled_constant_fold_exclusions: Collection[str] = (
@@ -268,6 +274,18 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        if self.resource_partition_engine_cap is not None:
+            if self.resource_partition_engine_cap <= 0:
+                raise ValueError(
+                    "resource_partition_engine_cap must be a positive number of bytes, "
+                    f"got {self.resource_partition_engine_cap}"
+                )
+            if self.cpu_memory_budget is not None:
+                raise ValueError(
+                    "Set resource_partition_engine_cap or cpu_memory_budget, not both: the cap replaces "
+                    "the budget as the size the resource partitioner splits to."
+                )
+            self.enable_resource_partitioning = True
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -311,6 +329,7 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("resource_partition_engine_cap", RESOURCE_PARTITION_ENGINE_CAP)
         self.__dict__.update(state)
 
 
