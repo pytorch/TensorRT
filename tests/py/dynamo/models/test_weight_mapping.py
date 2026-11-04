@@ -4,7 +4,9 @@
 import gc
 import json
 import mmap
+import platform
 import struct
+import sys
 
 import pytest
 import torch
@@ -13,10 +15,10 @@ from torch_tensorrt.dynamo import _weight_release
 from torch_tensorrt.dynamo._weight_release import release_storage
 from torch_tensorrt.dynamo.tools import (
     map_weights,
-    release_mapped_storage,
     save_weights_for_mapping,
     weight_mapping,
 )
+from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
 
 class _Tied(torch.nn.Module):
@@ -148,9 +150,9 @@ def test_missing_names_are_listed_or_raise_with_strict(tmp_path):
             {"proj": torch.nn.Linear(8, 8), "extra": torch.nn.Linear(2, 2)}
         )
     with pytest.raises(ValueError, match="not in"):
-        map_weights(model, tmp_path / "w.safetensors", strict=True)
+        map_weights(model, tmp_path / "w.safetensors")  # strict by default
     assert model["proj"].weight.is_meta  # nothing changed
-    mapping = map_weights(model, tmp_path / "w.safetensors")
+    mapping = map_weights(model, tmp_path / "w.safetensors", strict=False)
     assert sorted(mapping.missing) == ["extra.bias", "extra.weight"]
     assert _mapped(model["proj"].weight) and model["extra"].weight.is_meta
 
@@ -203,6 +205,87 @@ def test_malformed_headers_raise(tmp_path):
     assert model.w.is_meta
 
 
+def test_a_tie_stored_under_its_later_name_maps(tmp_path):
+    torch.manual_seed(0)
+    ref = _Tied().eval()
+    weights = {k: v for k, v in ref.state_dict().items() if k != "embed.weight"}
+    _write_raw_tensors(tmp_path / "w.safetensors", weights)  # head.weight only
+    with torch.device("meta"):
+        model = _Tied().eval()
+    mapping = map_weights(model, tmp_path / "w.safetensors")
+    assert mapping.missing == []
+    assert model.head.weight is model.embed.weight
+    torch.testing.assert_close(model.embed.weight, ref.embed.weight)
+
+
+def _write_raw_tensors(path, tensors):
+    header, data, offset = {}, b"", 0
+    for name, t in tensors.items():
+        raw = t.contiguous().view(torch.uint8).numpy().tobytes()
+        dtype = weight_mapping._DTYPE_NAMES[t.dtype]
+        header[name] = {
+            "dtype": dtype,
+            "shape": list(t.shape),
+            "data_offsets": [offset, offset + len(raw)],
+        }
+        data, offset = data + raw, offset + len(raw)
+    _write_raw(path, header, data)
+
+
+def test_unsupported_dtypes_and_sharded_indexes_raise_clearly(tmp_path):
+    with torch.device("meta"):
+        model = torch.nn.Module()
+        model.register_buffer("w", torch.empty(4))
+    _write_raw(
+        tmp_path / "q.safetensors",
+        {"w": {"dtype": "Q4", "shape": [4], "data_offsets": [0, 2]}},
+        b"\0\0",
+    )
+    with pytest.raises(ValueError, match="dtype Q4 is not supported"):
+        map_weights(model, tmp_path / "q.safetensors")
+    (tmp_path / "model.safetensors.index.json").write_text('{"weight_map": {}}')
+    with pytest.raises(ValueError, match="index of a sharded checkpoint"):
+        map_weights(model, tmp_path / "model.safetensors.index.json")
+
+
+def test_a_sharded_checkpoint_converts_through_its_index(tmp_path):
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    torch.manual_seed(0)
+    ref = _Tied().eval()
+    state = {k: v for k, v in ref.state_dict().items() if k != "head.weight"}
+    names = sorted(state)
+    shards = {"a.safetensors": names[:2], "b.safetensors": names[2:]}
+    for file, keys in shards.items():
+        safetensors_torch.save_file({k: state[k] for k in keys}, str(tmp_path / file))
+    index = tmp_path / "model.safetensors.index.json"
+    index.write_text(
+        json.dumps({"weight_map": {k: f for f, ks in shards.items() for k in ks}})
+    )
+    with torch.device("meta"):
+        model = _Tied(torch.bfloat16).eval()
+    path = tmp_path / "w.safetensors"
+    save_weights_for_mapping(
+        model, path, source=weight_mapping.checkpoint_source(index)
+    )
+    mapped = _Tied(torch.bfloat16)
+    map_weights(mapped, path)
+    for name, value in ref.state_dict().items():
+        torch.testing.assert_close(mapped.state_dict()[name], value.to(torch.bfloat16))
+
+
+def test_a_buffer_the_checkpoint_does_not_store_must_be_real(tmp_path):
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    ref = torch.nn.Linear(8, 8)
+    ref.register_buffer("inv_freq", torch.rand(4), persistent=False)
+    safetensors_torch.save_file(ref.state_dict(), str(tmp_path / "sd.safetensors"))
+    with torch.device("meta"):
+        model = torch.nn.Linear(8, 8)
+        model.register_buffer("inv_freq", torch.empty(4), persistent=False)
+    source = weight_mapping.checkpoint_source(tmp_path / "sd.safetensors")
+    with pytest.raises(ValueError, match="inv_freq is not in .*init_empty_weights"):
+        save_weights_for_mapping(model, tmp_path / "w.safetensors", source=source)
+
+
 class _TwoBuffers(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -211,7 +294,7 @@ class _TwoBuffers(torch.nn.Module):
         self.register_buffer("b", -torch.arange(n, dtype=torch.float32))
 
 
-def test_release_drops_only_its_own_pages(tmp_path):
+def _mapped_two_buffers(tmp_path):
     ref = _TwoBuffers()
     save_weights_for_mapping(ref, tmp_path / "w.safetensors")
     with torch.device("meta"):
@@ -219,11 +302,31 @@ def test_release_drops_only_its_own_pages(tmp_path):
     map_weights(model, tmp_path / "w.safetensors")
     model.a.add_(5.0)
     model.b.add_(5.0)
+    return ref, model
+
+
+def _has_pageout():
+    release = tuple(int(p) for p in platform.release().split("-")[0].split(".")[:2])
+    return sys.platform == "linux" and release >= (5, 4)
+
+
+@pytest.mark.skipif(not _has_pageout(), reason="needs MADV_PAGEOUT (Linux 5.4+)")
+def test_release_keeps_writes(tmp_path):
+    ref, model = _mapped_two_buffers(tmp_path)
+    assert release_mapped_storage(model.b.untyped_storage())
+    torch.testing.assert_close(model.a, ref.a + 5.0)
+    torch.testing.assert_close(model.b, ref.b + 5.0)  # swapped out, not discarded
+    assert not release_mapped_storage(torch.ones(4).untyped_storage())
+
+
+@pytest.mark.skipif(not hasattr(mmap, "MADV_DONTNEED"), reason="needs MADV_DONTNEED")
+def test_release_without_pageout_drops_only_its_own_pages(tmp_path, monkeypatch):
+    monkeypatch.setattr(weight_mapping, "_PAGE_DROP_ADVICE", (mmap.MADV_DONTNEED,))
+    ref, model = _mapped_two_buffers(tmp_path)
     assert release_mapped_storage(model.b.untyped_storage())
     torch.testing.assert_close(model.a, ref.a + 5.0)  # a neighbour's writes survive
     # b's whole pages were re-read from the file; its edge page, shared with a neighbour, was kept.
     assert not torch.equal(model.b, ref.b + 5.0)
-    assert not release_mapped_storage(torch.ones(4).untyped_storage())
 
 
 def test_mappings_are_freed_with_their_views(tmp_path):

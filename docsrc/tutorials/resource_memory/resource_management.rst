@@ -201,21 +201,19 @@ zero-copy views of a safetensors file:
 - ``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them,
   while it builds the engine that uses the weight.
 - With ``release_weights_after_build=True``, the pages are dropped again once the last engine that reads
-  the weight is built. The tensor stays valid; its pages are re-read from the file if it is used again.
+  the weight is built. A mapped weight stays valid; its pages are read back if it is used again. A weight
+  that isn't mapped is freed instead, so the source model can't run after that compilation.
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
-    from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
+    from torch_tensorrt.dynamo.tools import map_weights
 
-    # Once, wherever the model loads: write its weights in the dtypes it runs in.
-    save_weights_for_mapping(model, "weights.safetensors")
-
-    # To compile: build the model without allocating weights, and map them.
+    # Build the model without allocating weights, and map them from the checkpoint.
     with torch.device("meta"):
         model = MyModel().eval()
-    mapping = map_weights(model, "weights.safetensors", strict=True)
+    mapping = map_weights(model, "model.safetensors")
     print(f"{mapping.mapped_bytes / 2**30:.2f} GiB mapped")
 
     example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
@@ -230,16 +228,20 @@ zero-copy views of a safetensors file:
   the CPU for ``torch.export``. TensorRT takes weights as host pointers and reads each one in place:
   there's no GPU copy and no host copy of the weights.
 - **Checkpoints.** Any safetensors file maps if its tensors have the names, dtypes and shapes the model
-  uses; a mismatch raises. ``save_weights_for_mapping`` is for checkpoints whose loader casts, for
-  example stored in float32 and run in bfloat16. It writes the weights as loaded, a tied weight once.
+  uses; a mismatch raises. A checkpoint stored in other dtypes than the model runs in, for example
+  float32 for a bfloat16 model, is converted once, as below.
 - **Converting without loading.** ``save_weights_for_mapping(model, path, source=...)`` writes a model
   built on ``meta`` straight from a checkpoint. It writes one tensor at a time. For each meta tensor it
   calls ``source(name, tensor)``, which returns the data whole or in chunks along dimension 0, and it
   casts each chunk to the model's dtype. ``checkpoint_source(checkpoint, key=...)`` is a ready source that
-  reads a safetensors file in 64 MiB chunks, so even a float32 checkpoint is never loaded. Change the meta
-  model the way the compiled model will be changed first, such as casting it to bfloat16, so the file
-  holds the dtypes and shapes the export maps. For pi0.5, converting the 14.5 GB float32 checkpoint held
-  0.9 GiB of process memory, against 9.3 GiB for loading it on the CPU and writing the loaded model.
+  reads a safetensors file, or a sharded checkpoint's ``model.safetensors.index.json``, in 64 MiB chunks,
+  so even a float32 checkpoint is never loaded. Change the meta model the way the compiled model will be
+  changed first, such as casting it to bfloat16, so the file holds the dtypes and shapes the export maps.
+  For pi0.5, converting the 14.5 GB float32 checkpoint held 0.9 GiB of process memory, against 9.3 GiB
+  for loading it on the CPU and writing the loaded model. Buffers a checkpoint doesn't store, such as
+  non-persistent rotary frequencies, must be real tensors, not on ``meta``: accelerate's
+  ``init_empty_weights()`` builds a model that way. ``save_weights_for_mapping(model, path)`` without a
+  source writes a model that is already loaded.
 
   .. code-block:: python
 
@@ -251,14 +253,16 @@ zero-copy views of a safetensors file:
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** are listed in ``mapping.missing`` and left as they were (still on ``meta`` if the
-  model was built there). ``strict=True`` raises instead for any name in the model's ``state_dict``;
-  non-persistent buffers, such as rotary frequencies, aren't required, so recompute those or write them
-  with ``save_weights_for_mapping``. On any error the model is left unchanged.
-- **The file must stay in place** while the model or its weights are in use. ``map_weights`` maps it
-  copy-on-write and never writes to it. A write to a released weight is lost when its pages are dropped.
-- **Releasing pages uses** ``madvise(MADV_DONTNEED)`` **(POSIX).** Elsewhere the mapping works, but the
-  pages stay resident until the file is unmapped.
+- **Missing names** raise for any name in the model's ``state_dict``; non-persistent buffers, such as
+  rotary frequencies, aren't required, so recompute those or write them with
+  ``save_weights_for_mapping``. With ``strict=False``, missing names are listed in ``mapping.missing``
+  and left as they were (still on ``meta`` if the model was built there). On any error the model is left
+  unchanged.
+- **The file must stay in place and unchanged** while the model or its weights are in use: rewriting it
+  changes or invalidates the weights. ``map_weights`` maps it copy-on-write and never writes to it.
+- **Releasing pages uses** ``madvise``: ``MADV_PAGEOUT`` on Linux 5.4 and later, which keeps writes made
+  to a weight, else ``MADV_DONTNEED``, which discards them, so the weight reverts to the file's data. On
+  Windows the mapping works, but pages stay resident until the file is unmapped, and a warning says so.
 
 Combined with CPU compilation and the resource partitioner, the host's peak stays near the largest
 single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host RSS before

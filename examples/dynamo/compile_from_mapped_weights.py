@@ -78,14 +78,14 @@ print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 # Build the model without its weights and map them
 # ------------------------------------------------
 #
-# On ``meta`` the model allocates nothing. ``strict=True`` raises if a tensor in the model's
-# ``state_dict`` is missing from the file. Mapping doesn't read the weights, so none of the file is
-# resident yet.
+# On ``meta`` the model allocates nothing. ``map_weights`` raises if a tensor in the model's
+# ``state_dict`` is missing from the file (``strict=False`` lists it instead). Mapping doesn't read the
+# weights, so none of the file is resident yet.
 
 with torch.device("meta"):
     model = MLP().eval()
 
-mapping = map_weights(model, path, strict=True)
+mapping = map_weights(model, path)
 print(
     f"mapped {mapping.mapped_bytes / 2**20:.0f} MiB, {len(mapping.missing)} missing; "
     f"resident: {resident_mib(path):.0f} MiB"
