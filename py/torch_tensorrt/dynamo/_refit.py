@@ -458,6 +458,23 @@ def refit_module_weights(
         gc.collect()
         torch.cuda.empty_cache()
 
+    # The global partitioner leaves the PyTorch nodes in the top graph, and they can read
+    # state set on the top module itself, such as a folded constant. The loop above only
+    # refits the children, so copy that state over too.
+    if not settings.use_fast_partitioner and not inline_module:
+        with torch.no_grad():
+            for node in new_partitioned_module.graph.nodes:
+                if node.op != "get_attr" or "." in node.target:
+                    continue
+                new_value = getattr(new_partitioned_module, node.target)
+                if not isinstance(new_value, torch.Tensor):
+                    continue
+                value = getattr(compiled_module, node.target)
+                assert (
+                    value.shape == new_value.shape
+                ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
+                value.copy_(new_value)
+
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))  # move to device for inference
         _restore_complex_io(new_gm)
