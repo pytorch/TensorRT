@@ -200,27 +200,50 @@ zero-copy views of a safetensors file:
 
 - ``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them,
   while it builds the engine that uses the weight.
-- With ``release_weights_after_build=True``, the pages are dropped again once the last engine that reads
-  the weight is built. A mapped weight stays valid; its pages are read back if it is used again. A weight
-  that isn't mapped is freed instead, so the source model can't run after that compilation.
+- The pages are dropped again once the last engine that reads the weight is built. A mapped weight stays
+  valid; its pages are read back if it is used again.
+
+``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
+building it allocates no weights, maps them, and drops their pages when the block ends, unless the block
+sets ``release_weights_after_build=False``. It turns the resource partitioner on, so the model is built
+as several engines, each small enough to build within ``cpu_memory_budget`` (or the available memory
+without one), so only about one engine's weights are resident at a time. A part of the model that runs in
+PyTorch gets its weights on the GPU after compilation (``offload_module_to_cpu``, on in the block):
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
-    from torch_tensorrt.dynamo.tools import map_weights
 
-    # Build the model without allocating weights, and map them from the checkpoint.
-    with torch.device("meta"):
-        model = MyModel().eval()
-    mapping = map_weights(model, "model.safetensors")
-    print(f"{mapping.mapped_bytes / 2**30:.2f} GiB mapped")
-
-    example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
-    exported = torch.export.export(model, (example,))
-    trt_model = torch_tensorrt.dynamo.compile(
-        exported, inputs=[example.cuda()], release_weights_after_build=True
+    # Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.
+    ctx = torch_tensorrt.dynamo.low_memory(
+        lambda: MyModel().eval(), "model.safetensors", cpu_memory_budget=8 << 30
     )
+    with ctx as model:
+        print(f"{ctx.report.mapped_bytes / 2**30:.2f} GiB mapped")
+        example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
+        exported = torch.export.export(model, (example,))
+        trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example.cuda()])
+
+``cpu_memory_budget`` is the host memory the compiling process may use, counting what it already uses,
+and each engine gets up to a quarter of what's left. In :ref:`compile_from_mapped_weights`, a model with
+192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
+compiling, against all 192 MiB when built as one engine.
+
+``low_memory`` also takes the compile settings that lower memory during compilation:
+``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget`` and
+``release_weights_after_build``. They're the defaults for every call to
+``torch_tensorrt.dynamo.compile`` inside the block, including in a script you don't own, and so for
+``torch_tensorrt.compile(..., ir="dynamo")``. ``torch.compile(backend="tensorrt")``,
+``cross_compile_for_windows`` and ``convert_exported_program_to_serialized_trt_engine`` don't use them.
+A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins over the block's:
+
+.. code-block:: python
+
+    with torch_tensorrt.dynamo.low_memory(cpu_memory_budget=8 << 30):
+        run_export_script()
+
+``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
 
 **What to know:**
 
@@ -253,19 +276,23 @@ zero-copy views of a safetensors file:
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** raise for any name in the model's ``state_dict``; non-persistent buffers, such as
-  rotary frequencies, aren't required, so recompute those or write them with
-  ``save_weights_for_mapping``. With ``strict=False``, missing names are listed in ``mapping.missing``
-  and left as they were (still on ``meta`` if the model was built there). On any error the model is left
-  unchanged.
+- **Missing names** raise in ``low_memory``: every tensor must be in the file, non-persistent buffers
+  such as rotary frequencies included, and ``save_weights_for_mapping`` writes those too.
+  ``map_weights`` alone raises for any name in the model's ``state_dict``, but doesn't require
+  non-persistent buffers. With ``strict=False``, it lists missing names in its result's ``missing`` and
+  leaves them as they were (still on ``meta`` if the model was built there). On any error the model is
+  left unchanged.
 - **The file must stay in place and unchanged** while the model or its weights are in use: rewriting it
   changes or invalidates the weights. ``map_weights`` maps it copy-on-write and never writes to it.
+  ``release_weights_after_build=True`` also frees weights that aren't mapped, which the source model
+  then can't use.
 - **Releasing pages uses** ``madvise``: ``MADV_PAGEOUT`` on Linux 5.4 and later, which keeps writes made
   to a weight, else ``MADV_DONTNEED``, which discards them, so the weight reverts to the file's data. On
   Windows the mapping works, but pages stay resident until the file is unmapped, and a warning says so.
 
-Combined with CPU compilation and the resource partitioner, the host's peak stays near the largest
-single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host RSS before
-compilation went from 8.7 to 2.9 GiB. See :ref:`compile_from_mapped_weights` for a runnable example.
+With mapped weights, CPU compilation and the resource partitioner, the host's peak stays near the
+largest single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host
+RSS before compilation went from 8.7 to 2.9 GiB. See :ref:`compile_from_mapped_weights` for a runnable
+example.
 
 

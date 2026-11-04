@@ -32,6 +32,8 @@ Functions
 Classes
 --------
 
+.. autoclass:: low_memory
+
 .. autoclass:: CompilationSettings
 
 Tools

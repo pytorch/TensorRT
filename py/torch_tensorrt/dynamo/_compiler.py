@@ -31,6 +31,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._low_memory import with_low_memory_defaults
 from torch_tensorrt.dynamo._weight_release import (
     WeightReleaser,
     building,
@@ -471,6 +472,7 @@ def cross_compile_for_windows(
     return trt_gm
 
 
+@with_low_memory_defaults
 def compile(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -537,7 +539,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
-    release_weights_after_build: bool = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
+    release_weights_after_build: Optional[bool] = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -648,11 +650,13 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
-            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
-            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
-            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
-            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
+        release_weights_after_build (Optional[bool]): Release the memory of each model weight once the last TensorRT engine that reads it is built,
+            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. ``None`` (default)
+            releases only weights mapped by ``map_weights``: their pages are dropped and read back if used again, so the source module keeps
+            working. ``True`` also frees ordinary weights; the source module, and any tensor sharing storage with its weights, must not be used
+            afterwards, even if compilation fails. ``False`` releases nothing. Weights read by subgraphs that run in PyTorch are kept. Applies to
+            ``torch_tensorrt.dynamo.compile``; ``True`` is turned off, with a warning, under ``torch.compile``. ``MutableTorchTensorRTModule``
+            uses ``False``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -1336,7 +1340,11 @@ def _build_user_symbol_bounds(
 
 
 def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
-    if settings.strip_engine_weights and not settings.immutable_weights:
+    if (
+        settings.release_weights_after_build
+        and settings.strip_engine_weights
+        and not settings.immutable_weights
+    ):
         logger.warning(
             "release_weights_after_build releases the source weights; engines built with "
             "strip_engine_weights must be refit from a freshly loaded checkpoint."
@@ -1498,9 +1506,11 @@ def compile_module(
         )
         single_releaser = None
         single_weights: Dict[int, torch.UntypedStorage] = {}
-        if settings.release_weights_after_build:
+        if settings.release_weights_after_build is not False:
             _warn_if_refit_source_released(settings)
-            single_releaser = WeightReleaser([gm])
+            single_releaser = WeightReleaser(
+                [gm], mapped_only=settings.release_weights_after_build is None
+            )
             if single_releaser.release_unread(parameter_storages(gm)):
                 release_host_and_device_memory()
             single_weights = weight_storages(gm)
@@ -1636,7 +1646,7 @@ def compile_module(
     # Generate the corresponding TRT Module for those
 
     weight_releaser = None
-    if settings.release_weights_after_build and not settings.dryrun:
+    if settings.release_weights_after_build is not False and not settings.dryrun:
         _warn_if_refit_source_released(settings)
         # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
         weight_releaser = WeightReleaser(
@@ -1645,7 +1655,8 @@ def compile_module(
                 sub
                 for _, sub in partitioned_module.named_children()
                 if isinstance(sub, torch.fx.GraphModule)
-            ]
+            ],
+            mapped_only=settings.release_weights_after_build is None,
         )
         # The lowered module still holds weights no partition reads (for example a model head the
         # traced function never calls); nothing needs them once partitioning is done.
@@ -1816,7 +1827,7 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
-    if weight_releaser is not None:
+    if weight_releaser is not None and not weight_releaser.mapped_only:
         drop_released_weights(partitioned_module)
 
     # compile() offloaded gm before this call. The global partitioner leaves the PyTorch

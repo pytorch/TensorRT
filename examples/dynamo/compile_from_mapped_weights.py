@@ -12,25 +12,30 @@ To compile a model, its weights normally have to be loaded into host memory firs
 the first TensorRT engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's
 weights at zero-copy views of a safetensors file. ``torch.export`` reads only shapes, so a weight's
 pages become resident only when TensorRT reads them, while it builds the engine that uses the weight.
-With ``release_weights_after_build=True`` the pages are dropped again once the last engine that reads
-the weight is built.
+The pages are dropped again once the last engine that reads the weight is built. With the resource
+partitioner, the model is built as several engines, each small enough to build within a host memory
+budget, so only about one engine's weights are resident at a time.
 
 This example:
 
 1. writes a model's weights once with ``save_weights_for_mapping``, standing in for a checkpoint;
-2. builds the model on the ``meta`` device, so constructing it allocates no weights, and maps its weights;
-3. exports and compiles it on the CPU, releasing each weight after its last engine;
-4. checks the compiled model against the original.
+2. with ``torch_tensorrt.dynamo.low_memory``, builds the model on the ``meta`` device, so constructing it
+   allocates no weights, maps its weights, and exports and compiles it on the CPU as several engines
+   within a CPU memory budget, watching how much of the weights file is resident;
+3. checks the compiled model against the original.
 
 How much of the weights file is resident is read from ``/proc/self/smaps``, so it prints on Linux only.
 """
 
 import os
 import tempfile
+import threading
+from typing import Any, Callable, Tuple
 
+import psutil
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
+from torch_tensorrt.dynamo.tools import save_weights_for_mapping
 
 
 def resident_mib(path: str) -> float:
@@ -45,6 +50,26 @@ def resident_mib(path: str) -> float:
         elif in_file and fields[0] == "Rss:":
             total += int(fields[1])
     return total / 1024
+
+
+def peak_resident_mib(path: str, fn: Callable[[], Any]) -> Tuple[Any, float]:
+    """Run ``fn()`` while sampling ``resident_mib(path)``; return its result and the peak. TensorRT
+    releases the GIL while it builds an engine, so the samples cover the builds."""
+    peak, done = [resident_mib(path)], threading.Event()
+
+    def sample() -> None:
+        while not done.is_set():
+            peak[0] = max(peak[0], resident_mib(path))
+            done.wait(0.005)
+
+    sampler = threading.Thread(target=sample)
+    sampler.start()
+    try:
+        result = fn()
+    finally:
+        done.set()
+        sampler.join()
+    return result, peak[0]
 
 
 class MLP(torch.nn.Module):
@@ -75,42 +100,46 @@ save_weights_for_mapping(reference, path)
 print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 
 # %%
-# Build the model without its weights and map them
-# ------------------------------------------------
+# Build, map, export and compile within a memory budget
+# -----------------------------------------------------
 #
-# On ``meta`` the model allocates nothing. ``map_weights`` raises if a tensor in the model's
-# ``state_dict`` is missing from the file (``strict=False`` lists it instead). Mapping doesn't read the
-# weights, so none of the file is resident yet.
-
-with torch.device("meta"):
-    model = MLP().eval()
-
-mapping = map_weights(model, path)
-print(
-    f"mapped {mapping.mapped_bytes / 2**20:.0f} MiB, {len(mapping.missing)} missing; "
-    f"resident: {resident_mib(path):.0f} MiB"
-)
-
-# %%
-# Export and compile on the CPU
-# -----------------------------
+# ``low_memory`` builds the model on ``meta``, where it allocates nothing, and maps its weights; every
+# tensor must be in the file. Mapping doesn't read the weights, so none of the file is resident yet.
 #
 # The mapped weights are CPU tensors, so the model and its example input stay on the CPU through
 # ``torch.export``. TensorRT takes weights as host pointers and reads each one in place from the mapping:
-# there's no GPU copy and no host copy. ``release_weights_after_build=True`` drops a weight's pages once
-# the last engine that reads it is built; the tensor stays valid and is re-read from the file if used.
+# there's no GPU copy and no host copy. A weight's pages are dropped once the last engine that reads it
+# is built; the tensor stays valid and is re-read from the file if used.
+#
+# ``enable_resource_partitioning`` splits the model into engines small enough to build within
+# ``cpu_memory_budget``, the host memory the process may use. Each engine gets up to a quarter of the
+# budget left over after the memory already in use, since building an engine takes a few times its
+# weights' size. So a budget of the memory in use now plus the weights' size makes engines of at most
+# about a quarter of the weights, and building them one after another keeps only about one engine's
+# weights resident.
 
 x = torch.randn(4, 2048)
-with torch.no_grad():
-    exported = torch.export.export(model, (x,))
-    trt_model = torch_tensorrt.dynamo.compile(
-        exported,
-        inputs=[x.cuda()],
-        min_block_size=1,
-        release_weights_after_build=True,
+ctx = torch_tensorrt.dynamo.low_memory(
+    lambda: MLP().eval(),
+    path,
+    cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),
+)
+with ctx as model, torch.no_grad():
+    print(
+        f"mapped {ctx.report.mapped_bytes / 2**20:.0f} MiB; "
+        f"resident: {resident_mib(path):.0f} MiB"
     )
-# With release_weights_after_build=False the whole file (192 MiB here) would still be resident.
-print(f"compiled; resident: {resident_mib(path):.0f} MiB of the weights file")
+    exported = torch.export.export(model, (x,))
+    trt_model, peak = peak_resident_mib(
+        path, lambda: torch_tensorrt.dynamo.compile(exported, inputs=[x.cuda()])
+    )
+    engines = [name for name, _ in trt_model.named_children() if "_run_on_acc" in name]
+    # As one engine, without the partitioner, the whole file (192 MiB here) is resident while it builds.
+    # With release_weights_after_build=False, all of it would stay resident after compiling.
+    print(
+        f"compiled into {len(engines)} engines; at most {peak:.0f} MiB of the weights file was "
+        f"resident, {resident_mib(path):.0f} MiB is now"
+    )
 
 # %%
 # Check the result
