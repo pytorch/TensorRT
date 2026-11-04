@@ -11,9 +11,10 @@ modules keep it referenced until compilation ends. ``compile_module`` uses these
 dropping references cannot free what the caller's model still points to.
 """
 
+import contextlib
 import logging
 from collections import Counter
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Iterator, Optional
 
 import torch
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
@@ -30,8 +31,12 @@ def _get_attr(module: torch.nn.Module, target: str) -> object:
 
 
 def _add_storage(found: Dict[int, torch.UntypedStorage], tensor: torch.Tensor) -> None:
-    if tensor.is_meta or is_traceable_wrapper_subclass(tensor):
-        return  # a wrapper subclass's storage is a placeholder; its inner tensors are not reachable here
+    if (
+        tensor.is_meta
+        or tensor.layout != torch.strided
+        or is_traceable_wrapper_subclass(tensor)
+    ):
+        return  # sparse tensors have no storage, and a wrapper subclass's is a placeholder
     storage = tensor.untyped_storage()
     if storage.nbytes():
         found[storage.data_ptr()] = storage
@@ -89,6 +94,7 @@ class WeightReleaser:
 
     def __init__(self, readers: Iterable[torch.fx.GraphModule]):
         self.uses: Counter[int] = Counter()
+        self.released = 0
         for reader in readers:
             self.uses.update(weight_storages(reader).keys())
 
@@ -101,6 +107,7 @@ class WeightReleaser:
             logger.info(
                 f"Released {released / 2**20:.0f} MiB of weights that no partition reads"
             )
+        self.released += released
         return released
 
     def built(self, storages: Dict[int, torch.UntypedStorage], name: str = "") -> int:
@@ -118,4 +125,41 @@ class WeightReleaser:
             logger.info(
                 f"Released {released / 2**20:.0f} MiB of weights after building {name}"
             )
+        self.released += released
         return released
+
+
+@contextlib.contextmanager
+def building(releaser: Optional[WeightReleaser], name: str) -> Iterator[None]:
+    """Build an engine; if that fails after weights were released, say what the source model lost."""
+    try:
+        yield
+    except Exception:
+        if releaser is not None and releaser.released:
+            logger.error(
+                f"Building {name} failed after release_weights_after_build released "
+                f"{releaser.released / 2**20:.0f} MiB of the source model's weights; reload the model "
+                "before running it in PyTorch."
+            )
+        raise
+
+
+def drop_released_weights(module: torch.fx.GraphModule) -> None:
+    """Remove from ``module`` the parameters and buffers whose memory was released and that its graph doesn't
+    read, then the submodules nothing uses. The global partitioner splits the lowered module in place, so the
+    compiled module still holds the weights its engines took over, and deep-copying, saving or moving a
+    released one would read freed memory."""
+    read = {node.target for node in module.graph.nodes if node.op == "get_attr"}
+    for name, tensor in [
+        *module.named_parameters(remove_duplicate=False),
+        *module.named_buffers(remove_duplicate=False),
+    ]:
+        if (
+            name not in read
+            and tensor.layout == torch.strided
+            and tensor.numel()
+            and not tensor.untyped_storage().nbytes()
+        ):
+            owner, _, attr = name.rpartition(".")
+            delattr(module.get_submodule(owner), attr)
+    module.delete_all_unused_submodules()

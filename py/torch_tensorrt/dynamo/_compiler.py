@@ -33,6 +33,8 @@ from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.dynamo._weight_release import (
     WeightReleaser,
+    building,
+    drop_released_weights,
     parameter_storages,
     weight_storages,
 )
@@ -648,9 +650,9 @@ def compile(
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
             and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
-            module shares that memory and must not be used afterwards, even if compilation fails. Weights read by subgraphs that run in
-            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile``, and not supported by
-            ``MutableTorchTensorRTModule``.
+            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
+            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
+            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -1499,15 +1501,17 @@ def compile_module(
         if settings.release_weights_after_build:
             _warn_if_refit_source_released(settings)
             single_releaser = WeightReleaser([gm])
-            single_releaser.release_unread(parameter_storages(gm))
+            if single_releaser.release_unread(parameter_storages(gm)):
+                release_host_and_device_memory()
             single_weights = weight_storages(gm)
-        single_module = convert_module(
-            gm,
-            convert_inputs,
-            settings=settings,
-            name="_run_on_acc_0",
-            engine_cache=engine_cache,
-        )
+        with building(single_releaser, "_run_on_acc_0"):
+            single_module = convert_module(
+                gm,
+                convert_inputs,
+                settings=settings,
+                name="_run_on_acc_0",
+                engine_cache=engine_cache,
+            )
         if single_releaser is not None and single_releaser.built(
             single_weights, "_run_on_acc_0"
         ):
@@ -1752,13 +1756,14 @@ def compile_module(
             submodule_weights = (
                 weight_storages(submodule) if weight_releaser is not None else {}
             )
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
-            )
+            with building(weight_releaser, name):
+                trt_module = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
 
             trt_modules[name] = trt_module
             if weight_releaser is not None and weight_releaser.built(
@@ -1811,6 +1816,8 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+    if weight_releaser is not None:
+        drop_released_weights(partitioned_module)
 
     # compile() offloaded gm before this call. The global partitioner leaves the PyTorch
     # nodes in this graph, so the state they read must go back to the device.
