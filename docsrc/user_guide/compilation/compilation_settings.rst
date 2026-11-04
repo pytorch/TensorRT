@@ -384,6 +384,15 @@ Graph Partitioning
        With it, an accumulating ``index_put`` with one 1-D index can stay in TensorRT
        through TensorRT's ScatterElements plugin, which needs no PyTorch. The data
        type and size limits are in the ExecuTorch guide.
+   * - ``collapse_high_rank_permutes``
+     - ``False``
+     - Rewrite a reshape, permute, reshape chain over more than 8 dimensions
+       (TensorRT's limit) as reshapes and permutes of at most 8 dimensions that give
+       the same values. Window and patch layouts, such as neighborhood attention and
+       the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits
+       the graph, and the partitioner can then hand many large tensors across one
+       engine boundary. Only static shapes are rewritten. Fewer, larger engines can
+       need much more time and memory to build and to run, so measure it.
 
 ----
 
@@ -488,7 +497,7 @@ rebuilt from scratch:
 ``autocast_calibration_dataloader``, ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
-``fallback_pytorch_plugin_ops``.
+``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)

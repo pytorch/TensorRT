@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import math
 import operator
+import random
 import sys
 import tempfile
 from unittest import mock
@@ -923,6 +925,202 @@ class TestRewriteEfficientAttention(TestCase):
                     == torch.ops.aten._scaled_dot_product_efficient_attention.default
                 )
                 self.assertEqual(node.args[3] is None, forced)
+
+
+class TestCollapseHighRankPermutes(TestCase):
+    class Window(torch.nn.Module):
+        """Neighborhood attention's 9-D layout."""
+
+        def forward(self, x):
+            y = (x + 1).view(*x.shape[:5], 2, 2, *x.shape[6:])
+            return y.permute(0, 1, 3, 5, -2, 2, 4, 6, -1).flatten(5, 7) * 2
+
+    class Patches(torch.nn.Module):
+        """Qwen2-VL's 10-D image patch layout for 2 images."""
+
+        def forward(self, x):
+            p = x.view(2, 1, 2, 3, 2, 2, 2, 2, 2, 2)
+            return p.permute(0, 1, 4, 7, 5, 8, 3, 2, 6, 9).reshape(2, 16, 24)
+
+    class WithPatches(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.patches = TestCollapseHighRankPermutes.Patches()
+
+        def forward(self, x):
+            return self.patches(x + 1) * 2
+
+    def _compile(self, mod, inputs, dynamic_shapes=None, collapse=True, **settings):
+        if collapse:
+            settings["collapse_high_rank_permutes"] = True
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes),
+            list(inputs),
+            min_block_size=1,
+            **settings,
+        )
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+        return {n: m for n, m in trt_mod.named_children() if "_run_on" in n}
+
+    def test_off_by_default(self):
+        x = torch.randn(2, 2, 3, 8, 8, device="cuda")
+        self.assertEqual(
+            list(self._compile(self.WithPatches(), (x,), collapse=False)),
+            ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+        )
+
+    def test_steps(self):
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            _steps,
+        )
+
+        patches = [0, 1, 4, 7, 5, 8, 3, 2, 6, 9]
+        # Dims 0 and 1 stay together.
+        self.assertEqual(
+            _steps([2, 2, 5, 3, 5, 4, 5, 6, 7], [0, 1, 3, 5, 7, 2, 4, 6, 8]),
+            [([4, 5, 3, 5, 4, 5, 6, 7], [0, 2, 4, 6, 1, 3, 5, 7])],
+        )
+        # Without the dims of size 1, 8 are left.
+        self.assertEqual(
+            _steps([1, 1, 2, 3, 8, 2, 14, 8, 2, 14], patches),
+            [([2, 3, 8, 2, 14, 8, 2, 14], [2, 5, 3, 6, 1, 0, 4, 7])],
+        )
+        # 9 are left, so dims 0 and 1 move together first.
+        self.assertEqual(
+            _steps([2, 1, 2, 3, 8, 2, 14, 8, 2, 14], patches),
+            [
+                ([4, 3, 8, 2, 14, 8, 2, 14], [0, 2, 5, 3, 6, 1, 4, 7]),
+                ([2, 2, 768, 196], [0, 2, 1, 3]),
+            ],
+        )
+
+    def test_steps_match_one_permute(self):
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            _steps,
+        )
+
+        rng = random.Random(0)
+        for _ in range(500):
+            sizes = [rng.choice([1, 2, 2, 3]) for _ in range(rng.randint(9, 13))]
+            dims = rng.sample(range(len(sizes)), len(sizes))
+            x = torch.arange(math.prod(sizes))
+            y = x
+            for shape, step_dims in _steps(sizes, dims):
+                self.assertLessEqual(len(shape), 8)
+                y = y.reshape(shape).permute(step_dims)
+            self.assertTrue(
+                torch.equal(y.flatten(), x.reshape(sizes).permute(dims).flatten())
+            )
+
+    def test_window_layout(self):
+        x = torch.randn(2, 2, 3, 3, 3, 4, 2, 8, device="cuda")
+        self.assertEqual(list(self._compile(self.Window(), (x,))), ["_run_on_acc_0"])
+
+    def test_patch_layout(self):
+        x = torch.randn(2, 2, 3, 8, 8, device="cuda")
+        self.assertEqual(
+            list(self._compile(self.WithPatches(), (x,))), ["_run_on_acc_0"]
+        )
+
+    def test_patch_layout_left_to_pytorch(self):
+        x = torch.randn(2, 2, 3, 8, 8, device="cuda")
+        patches = f"{self.Patches.__module__}.{self.Patches.__qualname__}"
+        for settings in (
+            {"torch_executed_modules": {patches}},
+            {"torch_executed_ops": {"torch.ops.aten.permute.default"}},
+            {"torch_executed_ops": {"torch.ops.aten._reshape_copy.default"}},
+            {"torch_executed_ops": {"torch.ops.aten.clone.default"}},
+        ):
+            with self.subTest(settings=settings):
+                parts = self._compile(self.WithPatches(), (x,), **settings)
+                self.assertEqual(
+                    list(parts), ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"]
+                )
+                permutes = [
+                    n
+                    for n in parts["_run_on_gpu_1"].graph.nodes
+                    if n.target == torch.ops.aten.permute.default
+                ]
+                self.assertEqual(len(permutes), 1)
+
+    def test_torch_compile_and_serialized_engine(self):
+        logger = "torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes"
+        mod, x = self.WithPatches(), torch.randn(2, 2, 3, 8, 8, device="cuda")
+        torch._dynamo.reset()
+        compiled = torch.compile(
+            mod,
+            backend="torch_tensorrt",
+            options={"collapse_high_rank_permutes": True, "min_block_size": 1},
+        )
+        with self.assertLogs(logger, level="DEBUG") as logs, torch.no_grad():
+            torch.testing.assert_close(compiled(x), mod(x))
+        torch._dynamo.reset()
+        self.assertIn("Rewrote 1 permute(s)", "\n".join(logs.output))
+        # Without the rewrite this path fails to build the engine.
+        with self.assertLogs(logger, level="DEBUG") as logs:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(mod, (x,)),
+                [x],
+                min_block_size=1,
+                collapse_high_rank_permutes=True,
+            )
+        self.assertIn("Rewrote 1 permute(s)", "\n".join(logs.output))
+
+    def test_chains_left_alone(self):
+        class ReadsReshape(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 2, 3, 3, 3, 2, 2, 2, 8)
+                z = y.permute(0, 1, 3, 5, 7, 2, 4, 6, 8).flatten(5, 7)
+                return z * 2, (y * 3).sum(6)
+
+        class ReadsPermute(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 2, 3, 3, 3, 2, 2, 2, 8)
+                z = y.permute(0, 1, 3, 5, 7, 2, 4, 6, 8)
+                return z.flatten(5, 7) * 2, (z * 3).sum(6)
+
+        class ReadsClone(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 2, 3, 3, 3, 2, 2, 2, 8)
+                z = y.permute(0, 1, 3, 5, 7, 2, 4, 6, 8).contiguous()
+                return z.flatten(5, 7) * 2, (z * 3).sum(6)
+
+        class PermutesProduct(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 2, 3, 3, 3, 2, 2, 2, 8) * 3
+                return y.permute(0, 1, 3, 5, 7, 2, 4, 6, 8).flatten(5, 7) * 2
+
+        x = torch.randn(2, 2, 3, 3, 3, 4, 2, 8, device="cuda")
+        for mod in (ReadsReshape(), ReadsPermute(), ReadsClone(), PermutesProduct()):
+            with self.subTest(mod=type(mod).__name__):
+                self._compile(mod, (x,))
+
+    def test_dynamic_shape(self):
+        x = torch.randn(2, 2, 3, 3, 3, 4, 2, 8, device="cuda")
+        batch = torch.export.Dim("batch", min=2, max=8)
+        self.assertEqual(
+            list(self._compile(self.Window(), (x,), dynamic_shapes=({0: batch},))),
+            ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+        )
+
+    def test_reshape_of_a_node_added_by_lowering(self):
+        """The dynamic slice_scatter lowering adds nodes without values."""
+
+        class CacheWindow(torch.nn.Module):
+            def forward(self, cache, new):
+                n = cache.shape[1]
+                out = cache.slice_scatter(new, dim=1, start=n - new.shape[1], end=n)
+                y = out.view(2, 2, 3, 3, 3, 2, 2, 2, 8)
+                return y.permute(0, 1, 3, 5, 7, 2, 4, 6, 8).flatten(5, 7) * 2
+
+        inputs = (torch.randn(2, 432, 8, device="cuda"), torch.randn(2, 5, 8).cuda())
+        length = torch.export.Dim("length", min=2, max=431)
+        self.assertEqual(
+            list(
+                self._compile(CacheWindow(), inputs, dynamic_shapes=({}, {1: length}))
+            ),
+            ["_run_on_acc_0"],
+        )
 
 
 if __name__ == "__main__":
