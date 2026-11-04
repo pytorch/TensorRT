@@ -103,16 +103,13 @@ def process_fused_rms_norm_node(
                 {"dtype": input_dtype},
             )
 
-        for i, user in enumerate(list(node.users)):
+        for user in list(node.users):
             if user.op == "call_function" and user.target == operator.getitem:
-                if i == 0:
-                    # If the getitem is extracting the first element (the output tensor)
-                    user.replace_all_uses_with(x_normalized)
-                else:
-                    user.replace_all_uses_with(x_squared_sum_eps_rsqrt)
+                output = x_normalized if user.args[1] == 0 else x_squared_sum_eps_rsqrt
+                user.replace_all_uses_with(output)
 
                 logger.debug(
-                    f"Replaced {i}-th user of fused_rms_norm node [{user}] with lowered rms_norm output [{x_normalized if i == 0 else x_squared_sum_eps_rsqrt}]"
+                    f"Replaced user [{user}] of fused_rms_norm node with lowered rms_norm output [{output}]"
                 )
                 gm.graph.erase_node(user)
 

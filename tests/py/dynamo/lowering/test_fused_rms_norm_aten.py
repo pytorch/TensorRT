@@ -308,6 +308,21 @@ class TestFusedRMSNormLoweringPass(DispatchTestCase):
         torch.testing.assert_close(rstd, expected_rstd)
         torch._dynamo.reset()
 
+    def test_rms_norm_only_rstd_used(self):
+        class RMSNormRstd(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten._fused_rms_norm.default(x, [64], weight, 1e-6)[1]
+
+        inputs = (torch.randn(4, 64).cuda(), torch.randn(64).cuda())
+        trt_gm = torch_tensorrt.dynamo.compile(
+            torch.export.export(RMSNormRstd(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+        )
+
+        torch.testing.assert_close(trt_gm(*inputs), RMSNormRstd()(*inputs))
+        torch._dynamo.reset()
+
     def test_rms_norm_with_dynamic_shape_and_graph_break(self):
         """
         Test RMS norm with dynamic batch dimension and graph break.
