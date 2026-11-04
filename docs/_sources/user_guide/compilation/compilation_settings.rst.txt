@@ -304,6 +304,16 @@ Memory and Resource Management
      - ``False``
      - Let TRT dynamically allocate memory for intermediate tensors at runtime rather
        than pre-allocating. Can reduce peak memory footprint at a small runtime cost.
+   * - ``deduplicate_weights``
+     - ``False``
+     - Add a weight that several layers read to the TRT network once instead of once
+       per layer, and give the linear layers that share a weight one transposed copy
+       of it. This cuts engine-build host memory for models that reuse weights, such
+       as a denoising loop unrolled into one graph, most of all in FP32 builds with
+       ``disable_tf32=True`` and in refittable engines. TRT may pick other kernels, so
+       results can round differently, and some models need more memory instead, so
+       measure it. Under ``torch.compile`` the weights are engine inputs, not
+       constants, so they are not shared.
 
 ----
 
@@ -456,7 +466,7 @@ rebuilt from scratch:
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
 ``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``,
-``fold_shared_kv_attention``.
+``fold_shared_kv_attention``, ``deduplicate_weights``.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

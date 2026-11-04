@@ -212,8 +212,7 @@ def pin_torch_executed_state(module: torch.nn.Module, device: torch.device) -> N
 def _move_attr(module: torch.nn.Module, target: str, device: torch.device) -> None:
     prefix, _, name = target.rpartition(".")
     owner = module.get_submodule(prefix)
-    # A target can be missing: compile_module deletes the root _frozen_param attributes.
-    value = getattr(owner, name, None)
+    value = getattr(owner, name)
     if isinstance(value, torch.nn.Parameter):
         # nn.Module.to() sets .data in the same way. The source model holds this same
         # Parameter, so the source model sees the move too.

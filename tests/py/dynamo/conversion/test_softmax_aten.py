@@ -6,7 +6,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestSoftmaxConverter(DispatchTestCase):
@@ -46,6 +46,18 @@ class TestSoftmaxConverter(DispatchTestCase):
             )
         ]
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
+
+    def test_softmax_over_size_one_dim_followed_by_matmul(self):
+        skip_if_trt_rtx_turing(self, "aten.mm (an FP32 GEMM)")
+
+        class TestModule(torch.nn.Module):
+            def forward(self, x, other):
+                softmax = torch.ops.aten._softmax.default(x, 1, False)
+                return torch.ops.aten.mm.default(softmax, other)
+
+        x = torch.randn(24, 1)
+        x[0, 0] = float("inf")  # PyTorch gives NaN here, not 1
+        self.run_test(TestModule(), [x, torch.randn(1, 2)])
 
 
 if __name__ == "__main__":
