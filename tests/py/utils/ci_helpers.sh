@@ -99,6 +99,7 @@ trt_tier_l0_core() {
         trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_core_partitioning_tests_results)" partitioning/test_000_* "$@"
       fi
       trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_core_lowering_tests_results)" lowering/ "$@"
+      trt_pytest -ra $(_trt_nproc 4) --junitxml="$(_trt_xml l0_dynamo_core_regions_tests_results)" regions/ "$@"
       [ "${USE_TRT_RTX:-false}" = "true" ] || trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_hlo_tests_results)" hlo/ "$@" )
 }
 
@@ -166,8 +167,10 @@ trt_tier_executorch() {
     # runner; this tier needs a GPU and a built wheel, which they do not. The one exception is
     # kept by name: it compares the pinned commit against the installed wheel's own recorded
     # source, so it needs an ExecuTorch the lint runner does not have and skips everywhere else.
+    # Run the region export case here too: this lane has ExecuTorch installed.
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" -k "(not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source) and not test_update_executorch_pin" executorch/ "$@" )
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" -k "(not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source) and not test_update_executorch_pin" executorch/ \
+        'regions/test_fused_op.py::test_export_retains_custom_op[executorch]' "$@" )
 }
 
 trt_tier_l2_plugin() {
