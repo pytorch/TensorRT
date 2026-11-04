@@ -7,8 +7,8 @@
 Nothing is read until something touches a weight. During compilation that is TensorRT, while it builds
 the engine that uses the weight (it takes weights as host pointers, so a CPU view is read in place).
 
-``release_mapped_storage`` drops a mapped weight's pages; they are re-read from the file if the weight is
-used again. ``release_weights_after_build`` calls it once a weight's last engine is built.
+``release_mapped_storage`` drops a mapped weight's resident pages; they are read back if the weight is used
+again. ``release_weights_after_build`` calls it once a weight's last engine is built.
 
 ``save_weights_for_mapping`` writes a module's weights as they are after loading, for checkpoints whose
 loader casts (a view must already have the model's dtype). With ``source=`` it converts a checkpoint
@@ -18,28 +18,59 @@ without loading it: the module is built on ``meta``, and each weight is read, ca
 import ctypes
 import io
 import json
+import logging
 import mmap
 import os
 import struct
+import sys
 import threading
+import warnings
 import weakref
 from dataclasses import dataclass, field
-from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch
+
+logger = logging.getLogger(__name__)
 
 _DTYPES: Dict[str, torch.dtype] = {
     "BOOL": torch.bool,
     "U8": torch.uint8,
+    "U16": torch.uint16,
+    "U32": torch.uint32,
+    "U64": torch.uint64,
     "I8": torch.int8,
     "I16": torch.int16,
     "I32": torch.int32,
     "I64": torch.int64,
+    "F8_E4M3": torch.float8_e4m3fn,
+    "F8_E5M2": torch.float8_e5m2,
     "F16": torch.float16,
     "BF16": torch.bfloat16,
     "F32": torch.float32,
     "F64": torch.float64,
 }
+# Ways to drop a copy-on-write mapping's resident pages, best first. MADV_PAGEOUT (Linux 5.4+; Python names it
+# only when built with headers that have it) keeps writes made to them; MADV_DONTNEED discards them.
+_PAGE_DROP_ADVICE = tuple(
+    advice
+    for advice in (
+        getattr(mmap, "MADV_PAGEOUT", 21 if sys.platform == "linux" else None),
+        getattr(mmap, "MADV_DONTNEED", None),
+    )
+    if advice is not None
+)
 _DTYPE_NAMES = {dtype: name for name, dtype in _DTYPES.items()}
 _MAX_HEADER_BYTES = 100 * 1024 * 1024  # the safetensors format's limit
 # For a tensor on ``meta``: (its name, the tensor) -> its data, whole or as chunks along dimension 0.
@@ -76,6 +107,12 @@ def _registrations(
 
 def _read_header(path: str) -> Tuple[Dict[str, Dict[str, object]], int]:
     """The safetensors header (8-byte little-endian length, then JSON) and where the data starts."""
+    if path.endswith(".json"):
+        raise ValueError(
+            f"{path} is the index of a sharded checkpoint, and map_weights maps one file. Write the "
+            "weights to one file with save_weights_for_mapping(..., source=checkpoint_source(index)), "
+            "which reads the shards one tensor at a time."
+        )
     size = os.path.getsize(path)
     with open(path, "rb") as f:
         prefix = f.read(8)
@@ -98,6 +135,8 @@ def _view(
     if not isinstance(entry, dict):
         raise ValueError(f"{name}: invalid safetensors header entry {entry!r}")
     dtype = _DTYPES.get(str(entry.get("dtype")))
+    if dtype is None:
+        raise ValueError(f"{name}: dtype {entry.get('dtype')} is not supported")
     if dtype != like.dtype:
         raise ValueError(
             f"{name}: file dtype {entry.get('dtype')} != model dtype {like.dtype} "
@@ -131,7 +170,7 @@ def map_weights(
     module: torch.nn.Module,
     path: Union[str, "os.PathLike[str]"],
     *,
-    strict: bool = False,
+    strict: bool = True,
     prefix: str = "",
 ) -> MappedWeights:
     """Point ``module``'s parameters and buffers at zero-copy views of the safetensors file ``path``.
@@ -139,12 +178,14 @@ def map_weights(
     Build the module on the ``meta`` device to never allocate its weights; its tensors are replaced, and
     a tied weight stays tied. A real tensor, on any device, keeps its object and gets ``.data = view``, so
     the module ends up on the CPU, ready for CPU compilation. The file is mapped copy-on-write and never
-    written, and must stay in place while the weights are used.
+    written. It must stay in place and unchanged while the weights are used: rewriting it changes or
+    invalidates them.
 
     Each tensor in the file must have the model's dtype and shape (``save_weights_for_mapping`` writes
-    such a file). Names missing from the file are listed in ``missing``. With ``strict=True``, any missing
-    name in ``module.state_dict()`` raises, as ``load_state_dict(strict=True)`` would; non-persistent
-    buffers, such as rotary frequencies, are not required. If anything raises, the module is unchanged.
+    such a file). Names missing from the file are listed in ``missing``. With ``strict=True``, the default,
+    a parameter or persistent buffer missing from the file raises; non-persistent buffers, such as rotary
+    frequencies, are not required, and tensors in the file that the module doesn't have are ignored. If
+    anything raises, the module is unchanged.
 
     ``prefix`` is prepended to each name to find it in the file, as for ``load_state_dict``, so a submodule
     maps straight from a checkpoint of the whole model.
@@ -158,23 +199,37 @@ def map_weights(
     # Make every view first, so an error leaves the module as it was. Keyed by the original tensor's id,
     # which the stored original keeps from being reused.
     views: Dict[int, Tuple[torch.Tensor, torch.Tensor]] = {}
+    absent: List[Tuple[str, int]] = []
     for name, table, key in _registrations(module):
         tensor = table[key]
         if id(tensor) in views:
             continue  # a tied weight, seen under another name
         if prefix + name not in header:
-            result.missing.append(name)
+            absent.append((name, id(tensor)))
             continue
         view = _view(mm, data_start, header[prefix + name], tensor, prefix + name)
         views[id(tensor)] = (tensor, view)
         result.mapped_bytes += view.nbytes
-    if strict:
-        persistent = set(module.state_dict())
-        required = [name for name in result.missing if name in persistent]
-        if required:
-            raise ValueError(
-                f"{len(required)} tensors are not in {path}: {required[:8]}"
-            )
+    # A tied weight the file stores under a later name is not missing.
+    result.missing = [name for name, tensor_id in absent if tensor_id not in views]
+    persistent = set(module.state_dict())
+    required = [name for name in result.missing if name in persistent]
+    if required and strict:
+        hint = (
+            f" The module's names look like {required[0]!r} and the file's like "
+            f"{next(iter(header))!r}; pass prefix= if the file's have a prefix the module's don't."
+            if header and not views
+            else ""
+        )
+        raise ValueError(
+            f"{len(required)} tensors are not in {path}: {required[:8]}.{hint}"
+        )
+    logger.info(f"Mapped {result.mapped_bytes / 2**20:.1f} MiB of weights from {path}")
+    if required:
+        logger.warning(
+            f"{len(required)} parameters and persistent buffers are not in {path}, so they keep "
+            f"their values: {required[:8]}"
+        )
 
     with torch.no_grad():
         replacements: Dict[int, torch.Tensor] = {}
@@ -208,7 +263,9 @@ def _address(mm: mmap.mmap) -> int:
 
 def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
     """Drop the resident pages of a storage that views a file mapped by ``map_weights``; True if it does.
-    The tensor stays valid and is re-read from the file if used again, so writes made to it are lost.
+    The tensor stays valid: its pages are read back when it is used again, from the file, or from swap for
+    pages it has written. Kernels before Linux 5.4 can only discard written pages, which then revert to the
+    file's data. Where pages can't be dropped (Windows), this returns False.
     """
     ptr, nbytes = storage.data_ptr(), storage.nbytes()
     if not nbytes:
@@ -220,15 +277,26 @@ def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
         mm = ref()
         if mm is None or not (base <= ptr and ptr + nbytes <= base + size):
             continue
-        if hasattr(mmap, "MADV_DONTNEED"):  # POSIX; elsewhere pages stay until unmapped
-            # Only pages entirely inside the storage: a page at either end may hold a neighbour's data,
-            # and MADV_DONTNEED would discard writes made to it.
-            page = mmap.PAGESIZE
-            lo = -(-(ptr - base) // page) * page
-            hi = (ptr - base + nbytes) // page * page
-            if hi > lo:
-                mm.madvise(mmap.MADV_DONTNEED, lo, hi - lo)
-        return True
+        # Only pages entirely inside the storage: a page at either end may hold a neighbour's data.
+        page = mmap.PAGESIZE
+        lo = -(-(ptr - base) // page) * page
+        hi = (ptr - base + nbytes) // page * page
+        return hi <= lo or _drop_pages(mm, lo, hi - lo)
+    return False
+
+
+def _drop_pages(mm: mmap.mmap, start: int, length: int) -> bool:
+    for advice in _PAGE_DROP_ADVICE:
+        try:
+            mm.madvise(advice, start, length)
+            return True
+        except OSError:  # MADV_PAGEOUT on a kernel before 5.4
+            continue
+    warnings.warn(
+        "Pages of memory-mapped weights can't be dropped on this platform, so released weights stay "
+        "resident until their file is unmapped.",
+        RuntimeWarning,
+    )
     return False
 
 
@@ -321,27 +389,62 @@ def _write_tensor(
 
 def checkpoint_source(
     path: Union[str, "os.PathLike[str]"],
-    key: Callable[[str], str] = lambda name: name,
+    key: Optional[Callable[[str], str]] = None,
     *,
     chunk_bytes: int = 64 << 20,
 ) -> WeightSource:
-    """A ``source=`` for ``save_weights_for_mapping`` that reads each tensor from the safetensors file
-    ``path``, under ``key(name)``, in chunks of at most ``chunk_bytes`` along dimension 0, so no whole
-    checkpoint tensor is ever in memory. The file's dtype may differ; the writer casts each chunk.
+    """A ``source=`` for ``save_weights_for_mapping`` that reads each tensor from the safetensors checkpoint
+    ``path``, under ``key(name)`` (the name itself by default), in chunks of at most ``chunk_bytes`` along
+    dimension 0, so no whole checkpoint tensor is ever in memory. The file's dtype may differ; the writer
+    casts each chunk. ``path`` may also be a sharded checkpoint's ``model.safetensors.index.json``.
     """
-    from safetensors import safe_open
+    try:
+        from safetensors import safe_open
+    except ImportError as e:
+        raise ImportError(
+            "checkpoint_source reads checkpoints with the safetensors package: pip install safetensors"
+        ) from e
 
-    checkpoint = safe_open(os.fspath(path), framework="pt", device="cpu")
+    path = os.fspath(path)
+    shard_of: Dict[str, str] = {}  # for an index, the shard file of each name
+    if path.endswith(".json"):
+        with open(path) as f:
+            shard_of = json.load(f)["weight_map"]
+    directory = os.path.dirname(path)
+    files: Dict[str, Tuple[Any, Set[str]]] = {}  # each file open once, with its names
+
+    def not_stored(stored_name: str) -> ValueError:
+        return ValueError(
+            f"{stored_name} is not in {path}. A buffer a checkpoint doesn't store, such as non-persistent "
+            "rotary frequencies, must be a real tensor, not on meta: build the model with accelerate's "
+            "init_empty_weights(), which keeps buffers real, or set the buffer before writing."
+        )
+
+    def checkpoint_of(stored_name: str) -> Any:
+        if shard_of and stored_name not in shard_of:
+            raise not_stored(stored_name)
+        file = os.path.join(directory, shard_of[stored_name]) if shard_of else path
+        if file not in files:
+            handle = safe_open(file, framework="pt", device="cpu")
+            files[file] = (handle, set(handle.keys()))
+        handle, names = files[file]
+        if stored_name not in names:
+            raise not_stored(stored_name)
+        return handle
 
     def read(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:
-        stored = checkpoint.get_slice(key(name))
+        stored_name = key(name) if key is not None else name
+        checkpoint = checkpoint_of(stored_name)
+        stored = checkpoint.get_slice(stored_name)
         shape = list(stored.get_shape())
         if shape != list(like.shape):
             raise ValueError(
-                f"{name}: {key(name)} in {path} has shape {shape}, the model {list(like.shape)}"
+                f"{name}: {stored_name} in {path} has shape {shape}, the model {list(like.shape)}"
             )
         if not shape:
-            return [checkpoint.get_tensor(key(name))]
+            return [checkpoint.get_tensor(stored_name)]
+        if stored.get_dtype() not in _DTYPES:
+            raise ValueError(f"{name}: dtype {stored.get_dtype()} is not supported")
         row_bytes = _DTYPES[stored.get_dtype()].itemsize
         for size in shape[1:]:
             row_bytes *= size

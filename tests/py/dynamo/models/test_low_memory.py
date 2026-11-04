@@ -9,7 +9,8 @@ import torch_tensorrt
 from safetensors.torch import save_file
 from torch_tensorrt.dynamo import _low_memory, low_memory
 from torch_tensorrt.dynamo._low_memory import with_low_memory_defaults
-from torch_tensorrt.dynamo.tools import release_mapped_storage, save_weights_for_mapping
+from torch_tensorrt.dynamo.tools import save_weights_for_mapping
+from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
 
 class _Model(torch.nn.Module):
