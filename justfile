@@ -93,8 +93,8 @@ summary *args:
 # Install optional test deps for Linux with the project's CUDA 13.2 (cu132) default.
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
-    # ExecuTorch's CUDA wheels are only on the PyTorch indexes: a development build on the
-    # nightly one, a release on the test one, so both channels are needed.
+    # A development build of ExecuTorch is only on the PyTorch nightly index and a release is on
+    # the test index, so naming both covers either kind of pin. On Linux, PyPI has the release too.
     # No --pre: a specifier naming a prerelease admits prereleases by itself, and --pre would
     # apply to pyyaml here too. cu132 matches the torch index this project resolves against by
     # default.
