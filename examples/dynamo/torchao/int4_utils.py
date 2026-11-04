@@ -5,9 +5,8 @@ never emits dequantize_affine. Int4TensorNonDecomposed unpacks nibbles
 and dequantizes explicitly so Torch-TensorRT can map DQ to IDequantizeLayer
 and keep an INT4 weight constant.
 
-TensorRT's IDequantizeLayer rejects nonzero zero-points, so weights must be
-quantized with the symmetric Int4Tensor.from_hp path (float8-activation
-branch, then restore BF16 as the activation dtype).
+TensorRT's IDequantizeLayer rejects nonzero zero-points, so weights are
+quantized symmetrically here in plain PyTorch (no mslk required).
 """
 
 from __future__ import annotations
@@ -26,6 +25,23 @@ def unpack_int4(packed: torch.Tensor) -> torch.Tensor:
     low = torch.bitwise_right_shift(torch.bitwise_left_shift(packed, 4), 4)
     high = torch.bitwise_right_shift(packed, 4)
     return torch.stack([low, high], dim=-1).flatten(-2).contiguous()
+
+
+def _int4_symmetric_quantize(
+    w: torch.Tensor, group_size: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Match mslk's int4_row_quantize + pack_int4 (scale = max|w| / 8).
+
+    Returns packed qdata [N, K // 2] int8 and scale [K // group_size, N] fp32.
+    """
+    n, k = w.shape
+    groups = w.float().reshape(n, k // group_size, group_size)
+    scale = groups.abs().amax(dim=-1, keepdim=True).clamp(min=1e-6) / 8
+    q = groups.div(scale).round().clamp(-8, 7).to(torch.int8).reshape(n, k)
+    packed = torch.bitwise_or(
+        torch.bitwise_and(q[:, ::2], 0xF), torch.bitwise_left_shift(q[:, 1::2], 4)
+    )
+    return packed.contiguous(), scale.reshape(n, -1).t().contiguous()
 
 
 class Int4TensorNonDecomposed(Int4Tensor):
@@ -161,9 +177,9 @@ def quantize_linear_int4_symmetric(
     """Replace Linear weights with symmetric group-wise INT4 (TRT-compatible).
 
     TorchAO's default Int4WeightOnlyConfig path for BF16 activations is
-    asymmetric (nonzero zero_point). TRT rejects that, so this uses TorchAO's
-    symmetric quantizer (float8-activation branch of Int4Tensor.from_hp) and
-    restores BF16 as the activation dtype for the DQ → Linear path.
+    asymmetric (nonzero zero_point). TRT rejects that, so this quantizes
+    symmetrically with the same math as TorchAO's float8-activation branch
+    of Int4Tensor.from_hp, without its mslk dependency.
 
     Accepts dense BF16 weights **or** already-quantized Hub TorchAO weights
     (dequantized first). Each layer is handled on compute_device then moved
@@ -198,14 +214,15 @@ def quantize_linear_int4_symmetric(
             continue
 
         block_size = [1] * (hp_weight.ndim - 1) + [group_size]
-        qw = Int4Tensor.from_hp(
-            hp_weight,
-            block_size,
-            activation_dtype=torch.float8_e4m3fn,
+        qdata, scale = _int4_symmetric_quantize(hp_weight, group_size)
+        qw = Int4Tensor(
+            qdata=qdata,
+            scale=scale.to(hp_weight.dtype),
+            zero_point=torch.zeros_like(scale, dtype=hp_weight.dtype),
+            block_size=block_size,
+            shape=hp_weight.shape,
+            activation_dtype=torch.bfloat16,
         )
-        qw.activation_dtype = torch.bfloat16
-        if not torch.all(qw.zero_point == 0).item():
-            raise AssertionError(f"{name}: expected symmetric INT4 (zero zero_point)")
         if qw.device != original_device:
             qw = qw.to(original_device)
         module.weight = torch.nn.Parameter(qw, requires_grad=False)
