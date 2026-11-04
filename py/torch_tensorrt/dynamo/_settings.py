@@ -129,10 +129,10 @@ class CompilationSettings:
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
-        offload_compiled_engines_to_disk (bool): Write each TensorRT engine to a temporary file as soon as
-            it is built, so the engines built so far are not held on the GPU or the host while the next ones
-            build. When the last one is built, each engine is loaded from its file and the file is deleted, so
-            the compiled module is the same as without this setting. Default is False.
+        offload_compiled_engines_to_disk (bool): Like ``lazy_engine_init``, set every TensorRT engine up
+            only once the last one is built, but keep each engine in a temporary file until then instead of in
+            host memory, so the engines built so far are held neither on the GPU nor on the host while the next
+            ones build. The compiled module is the same as without this setting. Default is False.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16

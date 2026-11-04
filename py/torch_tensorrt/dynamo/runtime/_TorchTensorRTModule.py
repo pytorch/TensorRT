@@ -228,12 +228,13 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)
         # engines — creating a new execution context during copy can crash at
         # destruction time.  Since the exporter only reads the engine (never
-        # executes it), sharing the same C++ object is safe.
+        # executes it), sharing the same C++ object is safe. A plan is never modified either,
+        # and copying a memory-mapped one (offload_compiled_engines_to_disk) would read it in.
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k == "engine":
+            if k in ("engine", "_serialized_engine"):
                 object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
             else:
                 object.__setattr__(result, k, copy.deepcopy(v, memo))
