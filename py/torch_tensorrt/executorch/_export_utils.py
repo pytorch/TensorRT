@@ -16,6 +16,7 @@ from torch.fx.experimental.symbolic_shapes import (
     guarding_hint_or_throw,
     has_guarding_hint,
 )
+from torch_tensorrt.dynamo._exporter import shared_payload_memo
 
 logger = logging.getLogger(__name__)
 
@@ -334,22 +335,13 @@ def validate_engine_program(
 
 
 def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
-    memo: dict[int, Any] = {}
+    memo = shared_payload_memo(exported_program.graph_module, _SHARED_PAYLOAD_TYPES)
     for value in (
         *exported_program.state_dict.values(),
         *exported_program.constants.values(),
     ):
         if isinstance(value, _SHARED_PAYLOAD_TYPES):
             memo[id(value)] = value
-    for module in exported_program.graph_module.modules():
-        for value in (
-            *module.parameters(recurse=False),
-            *module.buffers(recurse=False),
-        ):
-            memo[id(value)] = value
-        for value in module.__dict__.values():
-            if isinstance(value, _SHARED_PAYLOAD_TYPES):
-                memo[id(value)] = value
     for module in exported_program.graph_module.modules():
         if not isinstance(module, torch.fx.GraphModule):
             continue
