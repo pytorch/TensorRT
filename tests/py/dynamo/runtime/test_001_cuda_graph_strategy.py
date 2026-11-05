@@ -1,7 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import gc
+import tempfile
 import unittest
+from pathlib import Path
 
 import torch
 import torch_tensorrt as torchtrt
@@ -20,8 +23,8 @@ class CudaGraphConvModel(torch.nn.Module):
         return torch.relu(self.conv(x))
 
 
-def _compile_conv(strategy):
-    """Compile CudaGraphConvModel + apply cuda_graph_strategy post-compile."""
+def _compile_conv(strategy, cache_path):
+    """Compile a convolution model and apply the strategy and cache path."""
     model = CudaGraphConvModel().eval().cuda()
     inputs = [torch.randn(2, 3, 16, 16).cuda()]
     compiled = torchtrt.compile(
@@ -32,8 +35,11 @@ def _compile_conv(strategy):
         min_block_size=1,
     )
     torch._dynamo.reset()
-    apply_runtime_settings(compiled, RuntimeSettings(cuda_graph_strategy=strategy))
-    return compiled, inputs
+    apply_runtime_settings(
+        compiled,
+        RuntimeSettings(cuda_graph_strategy=strategy, runtime_cache=cache_path),
+    )
+    return compiled, model, inputs
 
 
 class SimpleModel(torch.nn.Module):
@@ -227,10 +233,22 @@ class TestCudaGraphStrategyInference(TestCase):
 
     @parameterized.expand([("disabled",), ("whole_graph_capture",)])
     def test_strategy_inference(self, strategy):
-        compiled, inputs = _compile_conv(strategy)
-        y = compiled(*inputs)
-        self.assertEqual(tuple(y.shape), (2, 8, 16, 16))
-        self.assertTrue(torch.isfinite(y).all().item())
+        self.addCleanup(torch._dynamo.reset)
+        torch.manual_seed(0)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "cache.bin")
+            compiled, model, inputs = _compile_conv(strategy, path)
+            with torch.no_grad():
+                for _ in range(3):
+                    x = torch.randn_like(inputs[0])
+                    output = compiled(x).clone()
+                    self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
+                    self.assertTrue(torch.isfinite(output).all().item())
+                    torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
+            del compiled
+            gc.collect()
+            self.assertTrue(Path(path).is_file())
+            self.assertGreater(Path(path).stat().st_size, 0)
 
 
 @unittest.skipIf(
@@ -244,37 +262,6 @@ class TestCudaGraphStrategyUsage(TestCase):
         self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
         torchtrt.runtime.set_cudagraphs_mode(False)
         torch.manual_seed(0)
-
-    def test_runtime_cm_strategy_applies(self):
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-            TorchTensorRTModule,
-        )
-
-        model = CudaGraphConvModel().eval().cuda()
-        x = torch.randn(2, 3, 16, 16, device="cuda")
-        compiled = torchtrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
-        apply_runtime_settings(
-            compiled,
-            RuntimeSettings(cuda_graph_strategy="disabled", runtime_cache=None),
-        )
-        modules = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
-        self.assertTrue(modules)
-        with torch.no_grad():
-            with torchtrt.runtime.enable_cudagraphs(
-                compiled, cuda_graph_strategy="whole_graph_capture"
-            ) as captured:
-                for module in modules:
-                    self.assertEqual(
-                        module.runtime_settings.cuda_graph_strategy,
-                        "whole_graph_capture",
-                    )
-                for _ in range(3):
-                    x = torch.randn_like(x)
-                    torch.testing.assert_close(
-                        captured(x).clone(), model(x), rtol=1e-3, atol=1e-3
-                    )
-        for module in modules:
-            self.assertEqual(module.runtime_settings.cuda_graph_strategy, "disabled")
 
     def test_whole_graph_capture_with_graph_break(self):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (

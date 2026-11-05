@@ -366,24 +366,45 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
         "cuda_graph_strategy is TRT-RTX-only",
     )
     def test_collapsed_cudagraphs_with_strategy_is_one_create(self):
-        """``with enable_cudagraphs(mod, cuda_graph_strategy=...) as w:`` --
-        the collapsed form folds the prior ``set_cuda_graph_strategy`` CM
-        into ``enable_cudagraphs``. Should yield the same single
-        ``createExecutionContext`` call as the explicit nested form."""
         from torch_tensorrt.runtime import enable_cudagraphs
 
-        compiled = _compile_simple()
-        inputs = [torch.randn(2, 3).cuda()]
-        with enable_cudagraphs(
-            compiled, cuda_graph_strategy="whole_graph_capture"
-        ) as w:
-            _ = w(*inputs)
-        for mod in self._walk_engines(compiled):
-            n = mod.engine.num_execution_contexts_created()
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
+        torch.manual_seed(0)
+        model = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 8, 3, padding=1), torch.nn.ReLU())
+            .eval()
+            .cuda()
+        )
+        x = torch.randn(2, 3, 16, 16, device="cuda")
+        compiled = torchtrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(cuda_graph_strategy="disabled", runtime_cache=None),
+        )
+        modules = list(self._walk_engines(compiled))
+        self.assertTrue(modules)
+        prior = [module.runtime_settings for module in modules]
+        with torch.no_grad():
+            with enable_cudagraphs(
+                compiled, cuda_graph_strategy="whole_graph_capture"
+            ) as captured:
+                for module in modules:
+                    self.assertEqual(
+                        module.runtime_settings.cuda_graph_strategy,
+                        "whole_graph_capture",
+                    )
+                for _ in range(3):
+                    x = torch.randn_like(x)
+                    torch.testing.assert_close(
+                        captured(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                    )
+        for module, settings in zip(modules, prior):
+            self.assertEqual(module.runtime_settings, settings)
+            count = module.engine.num_execution_contexts_created()
             self.assertEqual(
-                n,
-                1,
-                f"Collapsed form should create exactly 1 context, got {n}",
+                count, 1, f"Collapsed form should create exactly 1 context, got {count}"
             )
 
     @unittest.skipIf(

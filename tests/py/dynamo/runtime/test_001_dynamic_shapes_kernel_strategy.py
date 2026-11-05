@@ -29,7 +29,7 @@ class DynamicConvModel(torch.nn.Module):
 
 
 def _compile_dynamic_conv(strategy):
-    """Compile DynamicConvModel with the given strategy as a compile-time hint."""
+    """Compile a dynamic convolution model and apply the selected strategy."""
     model = DynamicConvModel().eval().cuda()
     inp = torchtrt.Input(
         min_shape=(1, 3, 16, 16),
@@ -49,7 +49,7 @@ def _compile_dynamic_conv(strategy):
         compiled,
         RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
     )
-    return compiled
+    return compiled, model
 
 
 def _compile_simple(*, runtime_settings=None):
@@ -188,50 +188,18 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
 
     @parameterized.expand(_STRATEGIES)
     def test_strategy_inference(self, strategy):
-        compiled = _compile_dynamic_conv(strategy)
-        x = torch.randn(2, 3, 16, 16, device="cuda")
-        y = compiled(x)
-        self.assertEqual(tuple(y.shape), (2, 8, 16, 16))
-        self.assertTrue(torch.isfinite(y).all().item())
-
-    @parameterized.expand(_STRATEGIES)
-    def test_strategy_matches_eager(self, strategy):
+        self.addCleanup(torch._dynamo.reset)
         torch.manual_seed(0)
-        model = DynamicConvModel().eval().cuda()
-        compiled = torchtrt.compile(
-            model,
-            ir="dynamo",
-            inputs=[
-                torchtrt.Input(
-                    min_shape=(1, 3, 16, 16),
-                    opt_shape=(2, 3, 16, 16),
-                    max_shape=(4, 3, 16, 16),
-                    dtype=torch.float32,
-                )
-            ],
-            enabled_precisions={torch.float32},
-            min_block_size=1,
-        )
-        apply_runtime_settings(
-            compiled,
-            RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
-        )
+        compiled, model = _compile_dynamic_conv(strategy)
+        batches = (1, 2, 3, 4) if strategy == "eager" else (1, 2, 4)
         with torch.no_grad():
-            for batch in (1, 2, 4):
+            for batch in batches:
                 with self.subTest(batch=batch):
                     x = torch.randn(batch, 3, 16, 16, device="cuda")
-                    torch.testing.assert_close(
-                        compiled(x), model(x), rtol=1e-3, atol=1e-3
-                    )
-        torch._dynamo.reset()
-
-    def test_dynamic_shape_with_eager(self):
-        """Exercise shape changes under eager kernel specialization."""
-        compiled = _compile_dynamic_conv("eager")
-        for batch in (1, 2, 3, 4):
-            x = torch.randn(batch, 3, 16, 16, device="cuda")
-            y = compiled(x)
-            self.assertEqual(tuple(y.shape), (batch, 8, 16, 16))
+                    output = compiled(x)
+                    self.assertEqual(tuple(output.shape), (batch, 8, 16, 16))
+                    self.assertTrue(torch.isfinite(output).all().item())
+                    torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
 
 
 class TestDynamicShapesKernelStrategyInvalidValue(TestCase):
