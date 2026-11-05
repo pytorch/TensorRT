@@ -1065,21 +1065,29 @@ def _definition_body(source: str, signature: str) -> str:
 
 def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     code = _code_only(source)
-    helper = "int cuda_foreign_device_of_ptr("
+    helper = "BufferPlacement placement_of("
     assert helper in code, "the helper that answers the question is gone"
     # Read the body that binds the buffers, not the whole file: a check that still exists but sits
     # somewhere execute() never reaches refuses nothing.
     execute = _definition_body(code, "Error TensorRTBackend::execute(")
+    # Both the query and the read of its answer: dropping either one refuses nothing.
     assert (
-        "const int input_device = cuda_foreign_device_of_ptr(" in execute
+        "input_placements[i] = placement_of(" in execute
+    ), "an input's device is no longer queried where it is bound"
+    assert (
+        "const int input_device = input_placements[i].foreign_device;" in execute
     ), "an input is no longer checked against the engine's device where it is bound"
     assert (
-        "const int output_device = cuda_foreign_device_of_ptr(" in execute
+        "const BufferPlacement output_placement = placement_of(" in execute
+    ), "a caller-supplied output's device is no longer queried where it is bound"
+    assert (
+        "const int output_device = output_placement.foreign_device;" in execute
     ), "a caller-supplied output is no longer checked where it is bound"
     # The aliased branch returns before reaching the ordinary output check, so it needs its own. It
     # went without one, and a buffer on a card the engine cannot reach was copied into.
     assert (
-        "const int foreign_alias_device = cuda_foreign_device_of_ptr(" in execute
+        "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;"
+        in execute
     ), "an aliased output is no longer checked, and its branch skips the ordinary check"
     # Capability asserted absent and usability asserted present: whether two cards CAN reach each
     # other answered yes on every pair measured and still faulted, while a non-null devicePointer is
@@ -1088,19 +1096,17 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
         "cudaDeviceCanAccessPeer" not in code
     ), "the capability check is back, and capability is not access"
     assert (
-        "attrs.devicePointer != nullptr" in code
+        "attrs.devicePointer == nullptr" in code
     ), "the usability check is gone, so a buffer reachable from here is refused"
-    # Read the accessibility helper's own body. cudaMemoryTypeDevice is also the foreign-device
-    # check's own token, so asserting it against the whole file says nothing about the exemption:
-    # the managed arm could go and the file would still mention the type.
-    accessible = _definition_body(code, "bool is_cuda_accessible_ptr(")
+    # Read the helper's own body, so a mention elsewhere in the file cannot stand in for it.
+    placement = _definition_body(code, helper)
     assert (
-        "attrs.type == cudaMemoryTypeManaged" in accessible
+        "attrs.type == cudaMemoryTypeManaged" in placement
     ), "the managed-memory exemption is gone"
-    foreign = _definition_body(code, "int cuda_foreign_device_of_ptr(")
     assert (
-        "attrs.type != cudaMemoryTypeDevice" in foreign
-    ), "the foreign-device helper no longer gates on the buffer being device memory"
+        "attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device"
+        in placement
+    ), "the foreign-device check no longer gates on the buffer being device memory"
 
 
 def _assert_one_shared_runtime(source: str, header: str) -> None:
@@ -1132,7 +1138,9 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
     [
         None,
         "drop-input-check",
+        "drop-input-query",
         "drop-output-check",
+        "drop-output-query",
         "drop-alias-check",
         "drop-helper",
         "drop-managed-exemption",
@@ -1159,7 +1167,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    input_check = "const int input_device = cuda_foreign_device_of_ptr("
+    input_check = "const int input_device = input_placements[i].foreign_device;"
 
     if mutation is None:
         _assert_wrong_device_buffers_are_refused(source)
@@ -1173,7 +1181,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         ), "mutation input-check-outside-execute has nothing to move"
         assert availability in source
         source = source.replace(input_check, "", 1).replace(
-            availability, availability + f"\n  {input_check}nullptr, 0);", 1
+            availability, availability + f"\n  {input_check}", 1
         )
     elif mutation == "peer-capability-back":
         # The one reading that asserts absence, so the only mutation that can pin it is one that
@@ -1189,9 +1197,11 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         # commented line already reads as absent.
         removed = {
             "drop-input-check": input_check,
-            "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
-            "drop-alias-check": "const int foreign_alias_device = cuda_foreign_device_of_ptr(",
-            "drop-helper": "int cuda_foreign_device_of_ptr(",
+            "drop-input-query": "input_placements[i] = placement_of(",
+            "drop-output-query": "const BufferPlacement output_placement = placement_of(",
+            "drop-output-check": "const int output_device = output_placement.foreign_device;",
+            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;",
+            "drop-helper": "BufferPlacement placement_of(",
             "drop-managed-exemption": " || attrs.type == cudaMemoryTypeManaged",
         }[mutation]
         assert removed in source, f"mutation {mutation} has nothing to remove"

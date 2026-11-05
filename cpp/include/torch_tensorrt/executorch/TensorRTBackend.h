@@ -91,8 +91,7 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * compile spec value, or the key twice, fails the load. Engines with aliased
  * outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5
  * keep ordinary enqueueV3. An engine on the shared activation scratch pool drops
- * its recorded graph whenever the pool hands it a different buffer, and pays the
- * same stable I/O buffers and copies as any other replaying engine. Caller
+ * its recorded graph whenever the pool hands it a different buffer. Caller
  * streams in the current ordinary context can replay, as can a call with no
  * caller stream. Green context and other context streams take the plain path,
  * and the graph is kept unless the scratch buffer, the shapes, or the
