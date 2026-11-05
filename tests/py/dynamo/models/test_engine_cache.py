@@ -663,6 +663,14 @@ class TestEngineCache(TestCase):
             def forward(self, x):
                 return x.permute(self.dims)
 
+        class Scale(torch.nn.Module):
+            def __init__(self, dtype):
+                super().__init__()
+                self.register_buffer("w", torch.ones(3, dtype=dtype, device="cuda"))
+
+            def forward(self, x):
+                return x * self.w
+
         class Cond(torch.nn.Module):
             def __init__(self, branch):
                 super().__init__()
@@ -679,6 +687,8 @@ class TestEngineCache(TestCase):
                 torch.nn.Linear(3, 4).cuda(),
                 torch.nn.Linear(3, 5).cuda(),
             ),
+            # A converter can build other layers for another weight dtype.
+            "weight dtype": (Scale(torch.float32), Scale(torch.float16)),
         }
         for name, models in pairs.items():
             with self.subTest(name):
