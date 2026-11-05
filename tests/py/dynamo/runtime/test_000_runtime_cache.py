@@ -69,6 +69,24 @@ def _compile(model, inputs, *, runtime_cache_path=None):
     return compiled
 
 
+def _check_cache_in_child(path, payload):
+    state = torch.load(payload, weights_only=True)
+    model = ConvModel().eval().cuda()
+    model.load_state_dict(state["state"])
+    inputs = [state["input"].cuda()]
+    compiled = _compile(model, inputs)
+    expected_bytes = Path(path).read_bytes()
+    with torch.no_grad():
+        with runtime_cache(compiled, path) as cache:
+            before = io.BytesIO()
+            cache.save_to_stream(before)
+            assert before.getvalue() == expected_bytes, "The cache did not load."
+            torch.testing.assert_close(
+                compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+            )
+            assert cache.has_cache(), "The engine did not attach the cache."
+
+
 def _compile_simple(runtime_cache_path=None):
     """Compile SimpleModel through the build-selected runtime."""
     model = SimpleModel().eval().cuda()
@@ -208,13 +226,14 @@ class TestRuntimeCachePersistence(TestCase):
             )
             cold_size = os.path.getsize(path)
             self.assertGreater(cold_size, 0)
+            child = (
+                "import sys\n"
+                "from test_000_runtime_cache import _check_cache_in_child\n"
+                "_check_cache_in_child(*sys.argv[1:])\n"
+            )
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(Path(__file__).with_name("_runtime_cache_process_helper.py")),
-                    path,
-                    payload,
-                ],
+                [sys.executable, "-c", child, path, payload],
+                cwd=Path(__file__).resolve().parent,
                 capture_output=True,
                 text=True,
                 timeout=120,
