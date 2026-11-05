@@ -617,6 +617,7 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
     )
     (modules / "FindTensorRT.cmake").write_text(
         "add_library(TensorRT::nvinfer INTERFACE IMPORTED)\n"
+        "add_library(TensorRT::nvinfer_plugin INTERFACE IMPORTED)\n"
     )
     (modules / "FindCUDAToolkit.cmake").write_text(
         "add_library(CUDA::cudart SHARED IMPORTED)\n"
@@ -1251,3 +1252,41 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
         source = source.replace(original, "//" + original)
     with pytest.raises(AssertionError):
         _assert_one_shared_runtime(source, header)
+
+
+@pytest.mark.parametrize("plugin", [False, True])
+@pytest.mark.parametrize(
+    "project",
+    [
+        "py/torch-tensorrt-executorch-runtime/native",
+        "cpp/src/torch_tensorrt/executorch",
+    ],
+)
+def test_a_tensorrt_without_its_plugin_library_stops_at_configure(
+    tmp_path, native_tools, project, plugin
+):
+    trt = tmp_path / "tensorrt"
+    (trt / "include").mkdir(parents=True)
+    (trt / "lib").mkdir()
+    (trt / "include/NvInfer.h").write_text(
+        "#define NV_TENSORRT_MAJOR 11\n#define NV_TENSORRT_MINOR 4\n#define NV_TENSORRT_PATCH 0\n"
+    )
+    (trt / "lib/libnvinfer.so").write_bytes(b"")
+    if plugin:
+        (trt / "lib/libnvinfer_plugin.so").write_bytes(b"")
+    result = subprocess.run(
+        [
+            native_tools["cmake"],
+            "-S",
+            str(_ROOT / project),
+            "-B",
+            str(tmp_path / "build"),
+            f"-DTORCH_TENSORRT_SOURCE_DIR={_ROOT}",
+            f"-DTensorRT_ROOT={trt}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    # Past this check the configure still fails for want of ExecuTorch and CUDA, which is fine here.
+    refused = "nvinfer_plugin),whichwas" in "".join(result.stderr.split())
+    assert refused is not plugin, result.stderr

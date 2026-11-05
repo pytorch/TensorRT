@@ -48,6 +48,7 @@ class SerializedInterpreterResult(NamedTuple):
     # and bind the same device pointer).
     aliased_io: Dict[str, Tuple[str, str]] = {}
     num_user_outputs: Optional[int] = None
+    pytorch_plugin_ops: List[str] = []
 
 
 def infer_module_output_dtypes(
@@ -106,6 +107,7 @@ def insert_engine_to_cache(
             interpreter_result.requires_output_allocator,
             interpreter_result.requires_native_multidevice,
             interpreter_result.aliased_io,
+            interpreter_result.pytorch_plugin_ops,
         ),
     )
     logger.info(f"Engine with hash: {hash_val} was successfully inserted into cache")
@@ -144,6 +146,7 @@ def pull_cached_engine(
             requires_output_allocator,
             requires_native_multidevice,
             aliased_io,
+            pytorch_plugin_ops,
         ) = cached_data
 
         setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -200,6 +203,7 @@ def pull_cached_engine(
             requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
             aliased_io=aliased_io,
+            pytorch_plugin_ops=pytorch_plugin_ops,
             # The cached graph is identical; recover its user-output boundary
             # without changing the cache's on-disk tuple format. The interpreter
             # marks one engine output per output position.
@@ -389,6 +393,7 @@ def _interpret_module_to_result_impl(
         symbolic_shape_expressions=symbolic_shape_expressions,
         aliased_io=interpreter_result.aliased_io,
         num_user_outputs=interpreter_result.num_user_outputs,
+        pytorch_plugin_ops=interpreter_result.pytorch_plugin_ops,
     )
 
     return serialized_interpreter_result
@@ -447,4 +452,5 @@ def convert_module(
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
         aliased_io=serialized_interpreter_result.aliased_io,
         num_user_outputs=serialized_interpreter_result.num_user_outputs,
+        pytorch_plugin_ops=serialized_interpreter_result.pytorch_plugin_ops,
     )

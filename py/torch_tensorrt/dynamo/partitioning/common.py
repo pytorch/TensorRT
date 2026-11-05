@@ -124,6 +124,13 @@ def node_in_torch_executed_module(
     return False
 
 
+def _example_kwargs(example_tensors: bool, is_shape_tensor: bool) -> Dict[str, Any]:
+    """Input kwargs that skip the random example tensor Input makes by default,
+    unless it is wanted. A shape tensor keeps its example: it is the shape
+    value itself, not random data, and readers such as the tuning sweeper use it."""
+    return {} if example_tensors or is_shape_tensor else {"torch_tensor": None}
+
+
 def construct_dynamic_input(
     input_shape: torch.Size,
     input_dtype: torch.dtype,
@@ -132,6 +139,7 @@ def construct_dynamic_input(
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    example_tensors: bool = True,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
@@ -143,9 +151,12 @@ def construct_dynamic_input(
             is provided.
         user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
             :func:`extract_var_range_info` to fill unbounded exporter uppers.
+        example_tensors: Whether the Input carries a random example tensor (see
+            :func:`construct_submodule_inputs`).
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
+    example = _example_kwargs(example_tensors, is_shape_tensor)
     min_shape = []
     opt_shape = []
     max_shape = []
@@ -224,6 +235,7 @@ def construct_dynamic_input(
                     dtype=input_dtype,
                     name=name,
                     is_shape_tensor=is_shape_tensor,
+                    **example,
                 )
             except (ValueError, TypeError) as e:
                 # Non-affine / non-monotonic expressions can yield invalid
@@ -241,6 +253,7 @@ def construct_dynamic_input(
         dtype=input_dtype,
         name=name,
         is_shape_tensor=is_shape_tensor,
+        **example,
     )
 
 
@@ -252,11 +265,13 @@ def get_input(
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    example_tensors: bool = True,
 ) -> Input:
     """
     Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs.
 
-    ``user_symbol_bounds`` is forwarded to :func:`construct_dynamic_input`.
+    ``user_symbol_bounds`` and ``example_tensors`` are forwarded to
+    :func:`construct_dynamic_input`.
     """
     if dtype in COMPLEX_TO_REAL_DTYPE:
         real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
@@ -278,10 +293,15 @@ def get_input(
             profile_source_bounds=profile_source_bounds,
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
+            example_tensors=example_tensors,
         )
     else:
         return Input(
-            shape=input_shape, dtype=dtype, name=name, is_shape_tensor=is_shape_tensor
+            shape=input_shape,
+            dtype=dtype,
+            name=name,
+            is_shape_tensor=is_shape_tensor,
+            **_example_kwargs(example_tensors, is_shape_tensor),
         )
 
 
@@ -290,6 +310,7 @@ def construct_submodule_inputs(
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    example_tensors: bool = True,
 ) -> Sequence[Input]:
     """
     Construct torch_tensorrt Inputs based on the module inputs.
@@ -304,6 +325,13 @@ def construct_submodule_inputs(
             ``profile_source_bounds``.
         user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
             :func:`get_input` to fill unbounded exporter uppers.
+        example_tensors: Whether each Input carries a random example tensor in
+            ``torch_tensor``, as Input does by default. Building an engine reads
+            only shapes and dtypes (with tuning on, the sweeper makes its own
+            samples from the specs), and on a large model the examples of all the
+            inputs of a part can take hundreds of GiB of host memory, so compile
+            and refit pass False. Shape tensors keep their example either way
+            (see :func:`_example_kwargs`).
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
@@ -326,6 +354,7 @@ def construct_submodule_inputs(
                                 profile_source_bounds=profile_source_bounds,
                                 num_profiles=num_profiles,
                                 user_symbol_bounds=user_symbol_bounds,
+                                example_tensors=example_tensors,
                             )
                         )
                     elif isinstance(input_meta, torch.SymInt):
@@ -339,6 +368,7 @@ def construct_submodule_inputs(
                                 profile_source_bounds=profile_source_bounds,
                                 num_profiles=num_profiles,
                                 user_symbol_bounds=user_symbol_bounds,
+                                example_tensors=example_tensors,
                             )
                         )
                     elif isinstance(input_meta, torch.SymFloat):
@@ -351,6 +381,7 @@ def construct_submodule_inputs(
                                 name=input.name,
                                 is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
                                 user_symbol_bounds=user_symbol_bounds,
+                                example_tensors=example_tensors,
                             )
                         )
                     else:
@@ -367,6 +398,7 @@ def construct_submodule_inputs(
                             input_meta.dtype,
                             name=input.name,
                             user_symbol_bounds=user_symbol_bounds,
+                            example_tensors=example_tensors,
                         )
                     )
                 else:

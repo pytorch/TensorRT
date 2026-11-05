@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
@@ -351,6 +352,14 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
             self._record_fallback(node, node_name, "complex tensor dtype")
+            return False
+
+        if makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
             return False
 
         if self._has_bf16_on_turing(node, settings):

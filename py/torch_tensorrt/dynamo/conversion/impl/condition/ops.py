@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     prepend_ones,
     promote_trt_tensors_to_same_dtype,
     set_layer_name,
+    widen_uint8,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import ne
 from torch_tensorrt.dynamo.conversion.impl.shuffle import reshape as reshape_tensor
@@ -33,6 +34,11 @@ def where(
 ) -> TRTTensor:
     if not (broadcastable(input, other)):
         assert "The two torch tensors should be broadcastable"
+
+    # TensorRT has no uint8 shuffle or constant, so widen uint8 values before the
+    # broadcast and constant steps below. The select would promote them anyway.
+    input = widen_uint8(ctx, input, f"{name}_x_int32")
+    other = widen_uint8(ctx, other, f"{name}_y_int32")
 
     x_shape = list(input.shape)
     y_shape = list(other.shape)

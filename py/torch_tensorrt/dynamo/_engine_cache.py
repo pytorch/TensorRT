@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+import functools
 import io
 import logging
 import os
@@ -30,6 +31,7 @@ UnpackedCacheHit = Tuple[
     bool,
     bool,
     Dict[str, Tuple[str, str]],
+    List[str],
 ]
 
 
@@ -83,13 +85,34 @@ class BaseEngineCache(ABC):
             """
             canonical_nodes = []
             input_counter = 0
+            positions: Dict[torch.fx.Node, int] = {}
 
             for node in graph.nodes:
                 if node.op == "placeholder":
                     canonical_nodes.append(f"placeholder_input_{input_counter}")
                     input_counter += 1
                 else:
-                    canonical_nodes.append(f"{node.op}_{node.target}")
+                    # A refit replaces weights, not arguments. Nodes go in by
+                    # position, so node names do not change the key.
+                    arguments = torch.fx.node.map_arg(
+                        (node.args, node.kwargs), lambda n: f"%{positions[n]}"
+                    )
+                    canonical = f"{node.op}_{node.target}{arguments}"
+                    if node.op == "get_attr":
+                        attr = functools.reduce(
+                            lambda obj, name: getattr(obj, name, None),
+                            node.target.split("."),
+                            graph.owning_module,
+                        )
+                        # A torch.cond branch is a submodule, and its body is part
+                        # of the engine.
+                        if isinstance(attr, torch.fx.GraphModule):
+                            canonical += f"{{{canonicalize_graph(attr.graph)}}}"
+                        # A refit replaces a weight's values, not its shape or dtype.
+                        elif isinstance(attr, torch.Tensor):
+                            canonical += f"{tuple(attr.shape)}{attr.dtype}"
+                    canonical_nodes.append(canonical)
+                positions[node] = len(positions)
 
             return " ".join(canonical_nodes)
 
@@ -127,6 +150,7 @@ class BaseEngineCache(ABC):
         requires_output_allocator: bool,
         requires_native_multidevice: bool,
         aliased_io: Dict[str, Tuple[str, str]],
+        pytorch_plugin_ops: List[str],
     ) -> bytes:
         """Pack serialized engine, input names, and output names into a single blob
 
@@ -139,6 +163,7 @@ class BaseEngineCache(ABC):
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             aliased_io (Dict[str, Tuple[str, str]]): Map of engine output binding name -> (input binding name, kind_str) for outputs the engine writes through in place
+            pytorch_plugin_ops (List[str]): Operators the engine runs with TensorRT plugins whose kernels run PyTorch (e.g. aten.index_put.default)
         Returns:
             bytes: packed blob
         """
@@ -154,6 +179,7 @@ class BaseEngineCache(ABC):
                 "requires_output_allocator": requires_output_allocator,
                 "requires_native_multidevice": requires_native_multidevice,
                 "aliased_io": aliased_io,
+                "pytorch_plugin_ops": pytorch_plugin_ops,
             }
         )
 
@@ -165,7 +191,7 @@ class BaseEngineCache(ABC):
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool, Dict[str, Tuple[str, str]]]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice, aliased_io
+            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, bool, bool, Dict[str, Tuple[str, str]], List[str]]: serialized engine, input names, output names, input specs, CompilationSettings, requires_output_allocator, requires_native_multidevice, aliased_io, pytorch_plugin_ops
         """
         return BaseEngineCache._fields_from(pickle.loads(packed_obj))
 
@@ -186,6 +212,7 @@ class BaseEngineCache(ABC):
             unpacked["requires_output_allocator"],
             unpacked.get("requires_native_multidevice", False),
             unpacked.get("aliased_io", {}),
+            unpacked.get("pytorch_plugin_ops", []),
         )
 
     def insert(
@@ -235,6 +262,15 @@ class BaseEngineCache(ABC):
             _LOGGER.info(
                 "Ignoring engine cache entry %s: written before aliased_io was "
                 "cached, so it cannot be reused safely. It will be rebuilt.",
+                hash,
+            )
+            return None
+        # Likewise, reading an older blob as "no PyTorch plugins" would let such an
+        # engine through the ExecuTorch export check.
+        if "pytorch_plugin_ops" not in unpacked:
+            _LOGGER.info(
+                "Ignoring engine cache entry %s: written before "
+                "pytorch_plugin_ops was cached. It will be rebuilt.",
                 hash,
             )
             return None

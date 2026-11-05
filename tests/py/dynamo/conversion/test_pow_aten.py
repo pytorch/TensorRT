@@ -62,6 +62,15 @@ class TestPowConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_pow_of_integers(self):
+        # A float exponent makes the power float; an integer one keeps it integer.
+        class IntPow(nn.Module):
+            def forward(self, lhs_val):
+                return lhs_val**0.5, lhs_val**2
+
+        inputs = [torch.randint(0, 256, (2, 3), dtype=torch.int32)]
+        self.run_test(IntPow(), inputs)
+
     @parameterized.expand(
         [
             (

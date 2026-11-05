@@ -74,6 +74,24 @@ def _tensor_reuses_module_storage(
     return False
 
 
+def _has_offloaded_constants(gm: torch.fx.GraphModule) -> bool:
+    """Whether a constant sits on the CPU while its metadata names a device."""
+    for node in gm.graph.nodes:
+        meta = node.meta.get("val")
+        if node.op != "get_attr" or not isinstance(meta, torch.Tensor):
+            continue
+        value: Any = gm
+        for atom in str(node.target).split("."):
+            value = getattr(value, atom, None)
+        if (
+            isinstance(value, torch.Tensor)
+            and value.device.type == "cpu"
+            and meta.device.type != "cpu"
+        ):
+            return True
+    return False
+
+
 @torch.utils._python_dispatch._disable_current_modes()  # type: ignore
 def constant_fold(
     gm: torch.fx.GraphModule, settings: CompilationSettings
@@ -85,7 +103,12 @@ def constant_fold(
 
     Modifies the graph in-place and replaces node with constants
     """
-    cf = _TorchTensorRTConstantFolder(gm, skip_constructors=False)
+    folder = (
+        _OffloadedConstantFolder
+        if _has_offloaded_constants(gm)
+        else _TorchTensorRTConstantFolder
+    )
+    cf = folder(gm, skip_constructors=False)
     cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
@@ -306,3 +329,40 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         # The meta value holds the IDs of the rules that marked this node; it is
         # empty once every rule that claimed it has been disabled.
         return bool(node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY))
+
+
+class _OffloadedConstantFolder(_TorchTensorRTConstantFolder):
+    """Folds a graph holding constants that offload_module_to_cpu left on the CPU."""
+
+    def run_node(self, node: torch.fx.Node) -> Any:
+        try:
+            return super().run_node(node)
+        except RuntimeError as error:
+            # offload_module_to_cpu leaves folded constants on the CPU while their
+            # metadata keeps the device that computed them. An op that also reads a
+            # tensor on that device, such as a scalar the complex lowering's retrace
+            # created there, can fail on the mix. Only then does it run again with
+            # those constants on their device, so every op that ran before still
+            # computes where it did, and an op that fails either way keeps its error.
+            inputs = {inp: self.env.get(inp) for inp in node.all_input_nodes}
+            devices = {v.device for v in inputs.values() if isinstance(v, torch.Tensor)}
+            offloaded = {
+                inp: meta.device
+                for inp, value in inputs.items()
+                if isinstance(value, torch.Tensor)
+                and value.device.type == "cpu"
+                and isinstance(meta := inp.meta.get("val"), torch.Tensor)
+                and meta.device.type != "cpu"
+                and meta.device in devices
+            }
+            if not offloaded:
+                raise
+            try:
+                self.env.update(
+                    {inp: inputs[inp].to(device) for inp, device in offloaded.items()}
+                )
+                return super().run_node(node)
+            except RuntimeError:
+                raise error from None
+            finally:
+                self.env.update({inp: inputs[inp] for inp in offloaded})

@@ -77,6 +77,7 @@
 #include <executorch/runtime/core/freeable_buffer.h>
 #include <executorch/runtime/core/memory_allocator.h>
 #include <executorch/runtime/core/span.h>
+#include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
 
 #include "gtest/gtest.h"
@@ -113,6 +114,8 @@ using ::executorch::runtime::Error;
 using ::executorch::runtime::EValue;
 using ::executorch::runtime::FreeableBuffer;
 using ::executorch::runtime::MemoryAllocator;
+using ::executorch::runtime::PalImpl;
+using ::executorch::runtime::register_pal;
 using ::executorch::runtime::Span;
 
 // Spelled out rather than taken from TensorRTBackend.h: a test that reads the
@@ -1377,6 +1380,73 @@ TEST_F(SharedScratchBackendTest, ALargerEngineGrowsThePoolAndFreesTheBufferItRep
 // on, since the disposal returns the bytes itself and runs before it.
 TEST_F(SharedScratchBackendTest, AGrowthOnASynchronizedCallFreesTheBufferItReplaces) {
   run_a_growth_and_bound_what_it_cost(/*synchronized_path=*/true);
+}
+
+// The device whose pool lock count_growth_lines checks, or -1 while no case is watching.
+std::atomic<int> growth_log_device{-1};
+std::atomic<int> growth_lines{0};
+std::atomic<int> growth_lines_under_the_pool_lock{0};
+
+void count_growth_lines(
+    et_timestamp_t,
+    et_pal_log_level_t level,
+    const char*,
+    const char*,
+    std::size_t,
+    const char* message,
+    std::size_t length) {
+  // Registering a sink replaces the default one, so keep the log readable for every later case.
+  std::fprintf(stderr, "%c %.*s\n", static_cast<char>(level), static_cast<int>(length), message);
+  const int device = growth_log_device.load();
+  if (device < 0 || std::string(message, length).find("shared scratch pool (device") == std::string::npos) {
+    return;
+  }
+  growth_lines.fetch_add(1);
+  SharedScratchDevice& dev = scratch_pool().get(device);
+  bool held = false;
+  // From another thread, because try_lock on a mutex the calling thread may own is undefined.
+  std::thread probe([&dev, &held] {
+    const std::unique_lock<std::mutex> attempt(dev.mu, std::try_to_lock);
+    held = !attempt.owns_lock();
+  });
+  probe.join();
+  if (held) {
+    growth_lines_under_the_pool_lock.fetch_add(1);
+  }
+}
+
+// A log sink can block, as one waiting for the interpreter lock does under the Python bindings, and
+// every pooled engine on the device waits for the pool lock meanwhile. So the pool's own log lines
+// must be written after it drops that lock. Only this thread runs pooled work here, so a held lock
+// seen from the sink is this call's own.
+TEST_F(SharedScratchBackendTest, APoolGrowthIsLoggedAfterThePoolLockIsReleased) {
+  static const bool tapped = register_pal(PalImpl::create(count_growth_lines, __FILE__));
+  ASSERT_TRUE(tapped);
+  ASSERT_GT(big_scratch_bytes_, scratch_bytes_) << "the larger fixture engine would not grow the pool";
+
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&stream), cudaSuccess);
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine small;
+  LoadedEngine big;
+  ASSERT_EQ(small.load(blob(), 17), Error::Ok);
+  ASSERT_EQ(big.load(big_blob(), 18, kBigRows, kBigCols), Error::Ok);
+  ASSERT_TRUE(small.handle()->claims_pooled_scratch);
+  ASSERT_TRUE(big.handle()->claims_pooled_scratch);
+
+  growth_lines.store(0);
+  growth_lines_under_the_pool_lock.store(0);
+  growth_log_device.store(small.handle()->device_id);
+  // The first run allocates the pool's buffer and the second grows it: the two lines it logs.
+  EXPECT_EQ(small.run(stream), Error::Ok);
+  EXPECT_EQ(big.run(stream), Error::Ok);
+  growth_log_device.store(-1);
+  EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+
+  EXPECT_EQ(growth_lines.load(), 2) << "expected one line for the first allocation and one for the growth";
+  EXPECT_EQ(growth_lines_under_the_pool_lock.load(), 0)
+      << "the pool logged a growth while its device lock was still held";
 }
 
 // ---------------------------------------------------------------------------

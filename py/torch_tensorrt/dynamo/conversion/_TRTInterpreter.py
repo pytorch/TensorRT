@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import itertools
 import logging
 import os
 import warnings
@@ -39,10 +40,15 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_COMPARISONS,
+    UINT8_DATA_MOVEMENT_OPS,
     get_node_io,
     get_node_name,
     get_trt_tensor,
+    makes_uint8_tensor,
     to_torch,
+    widen_uint8,
+    wrap_to_uint8,
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
@@ -58,6 +64,12 @@ from torch_tensorrt.logging import TRT_LOGGER
 import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_UINT8_VALUE_PICKING_OPS = {
+    torch.ops.aten.select.int,
+    torch.ops.aten.index.Tensor,
+    torch.ops.aten.gather.default,
+}
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
     Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
@@ -85,6 +97,7 @@ class TRTInterpreterResult(NamedTuple):
     aliased_io: dict[str, tuple[str, str]] = {}
     # Explicit count: a user return may itself be an aliased output.
     num_user_outputs: Optional[int] = None
+    pytorch_plugin_ops: List[str] = []
 
 
 def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
@@ -642,6 +655,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice,
             engine_aliased_io,
             self._num_user_outputs,
+            sorted(self.ctx.pytorch_plugin_ops),
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -664,6 +678,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if isinstance(trt_node, trt.ITensor):
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
+            if isinstance(n.meta.get("val"), (float, torch.SymFloat)):
+                self.ctx.python_floats.add(trt_node)
 
         return trt_node
 
@@ -810,6 +826,23 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise UnsupportedOperatorException(
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
+        # The partitioners keep such a node in PyTorch. A single-engine build has no
+        # fallback, and the widened int32 values would not wrap as uint8 does. An op that
+        # only picks input values gives the same values from a widened input.
+        if (
+            makes_uint8_tensor(self._cur_node)
+            and self._cur_node.target not in _UINT8_VALUE_PICKING_OPS
+            and any(
+                getattr(arg.meta.get("val"), "dtype", None) == torch.uint8
+                and isinstance(self.env.get(arg), trt.ITensor)
+                and self.env[arg].dtype != trt.uint8
+                for arg in self._cur_node.all_input_nodes
+            )
+        ):
+            raise UnsupportedOperatorException(
+                f"Conversion of {self._cur_node_name} not supported: it computes a uint8 "
+                "result, which TensorRT cannot do inside an engine. Run it in PyTorch."
+            )
 
         converter, calling_convention, converter_info = converter_packet
         if converter_info.get("requires_output_allocator", False):
@@ -823,6 +856,54 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_aliased_plugin_io", False):
             self.ctx.requires_aliased_plugin_io = True
             _LOGGER.debug(f"{target} requires aliased plugin I/O")
+
+        if converter_info.get("requires_pytorch_plugin", False):
+            self.ctx.pytorch_plugin_ops.add(CONVERTERS.qualified_name_or_str(target))
+            _LOGGER.debug(f"{target} adds a plugin that runs PyTorch")
+
+        if target in UINT8_DATA_MOVEMENT_OPS:
+            names = (f"{self._cur_node_name}_uint8_{i}" for i in itertools.count())
+            args = torch.fx.node.map_aggregate(
+                args, lambda arg: widen_uint8(self.ctx, arg, next(names))
+            )
+
+        if target in UINT8_COMPARISONS or target == torch.ops.aten.where.self:
+            assert self._cur_node is not None
+            # The condition of where is not a value, so only the two values set the result type.
+            first = 1 if target == torch.ops.aten.where.self else 0
+            # The graph still shows a widened uint8 tensor as uint8, and a 0-d tensor as 0-d.
+            operands = [
+                arg.meta.get("val", value) if isinstance(arg, torch.fx.Node) else arg
+                for arg, value in zip(self._cur_node.args[first:], args[first:])
+            ]
+            # A symbolic number, such as a dynamic size, promotes as a Python number does.
+            operands = [
+                {torch.SymInt: 0, torch.SymFloat: 0.0, torch.SymBool: False}.get(
+                    type(operand), operand
+                )
+                for operand in operands
+            ]
+            if any(
+                getattr(operand, "dtype", None) == torch.uint8 for operand in operands
+            ) and all(
+                isinstance(operand, (torch.Tensor, int, float, bool))
+                for operand in operands
+            ):
+                to_uint8 = torch.result_type(*operands) == torch.uint8
+                names = (f"{self._cur_node_name}_uint8_{i}" for i in itertools.count())
+                args = args[:first] + tuple(
+                    (
+                        wrap_to_uint8(self.ctx, target, value, next(names))
+                        if to_uint8
+                        and (
+                            type(operand) is int
+                            or getattr(operand, "dtype", None)
+                            not in (None, torch.uint8, torch.bool)
+                        )
+                        else widen_uint8(self.ctx, value, next(names))
+                    )
+                    for operand, value in zip(operands, args[first:])
+                )
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
@@ -1034,8 +1115,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 output = self._reshape_output_to_scalar(output, name)
 
             # TensorRT rejects a network input that is also an output, and a tensor
-            # can be marked as an output only once, so mark a copy.
-            if output.is_network_input or repeated:
+            # can be marked as an output only once, so mark a copy, unless the cast or
+            # reshape above already made a new tensor.
+            if output.is_network_input or (repeated and id(output) == original_id):
                 layer = self.ctx.net.add_identity(output)
                 layer.name = f"Copy {output.name} to output {name}"
                 output = layer.get_output(0)
