@@ -79,6 +79,27 @@ class TestAddConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_add_int8_buffer(self):
+        # TensorRT reads an INT8 constant as quantized data, so a plain int8 weight
+        # must not become one.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.arange(-128, 128, dtype=torch.int8).reshape(16, 16)
+                )
+
+            def forward(self, x):
+                return torch.ops.aten.add.Tensor(self.offsets, x)
+
+        inputs = [torch.randn(16, 16)]
+        self.run_test(
+            add(),
+            inputs,
+            rtol=0,
+            atol=0,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

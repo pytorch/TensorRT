@@ -63,6 +63,24 @@ class TestWhereConverter(DispatchTestCase):
             (condition,),
         )
 
+    def test_int8_buffer_gives_int8(self):
+        # int8 constants are stored as int32, but the result stays int8.
+        class Where(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "values", torch.arange(-128, 128, dtype=torch.int8).reshape(16, 16)
+                )
+                self.register_buffer("zeros", torch.zeros(16, 16, dtype=torch.int8))
+
+            def forward(self, condition):
+                return torch.ops.aten.where.self(condition, self.values, self.zeros)
+
+        self.run_test(
+            Where(),
+            (torch.randn(16, 16) > 0,),
+        )
+
     def test_const_input_with_broadcast(self):
         class Where(nn.Module):
             def __init__(self, *args, **kwargs) -> None:

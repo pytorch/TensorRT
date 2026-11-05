@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt._features import needs_qdp_plugin
@@ -23,8 +24,6 @@ from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
     mutated_tensor_indices,
     plugin_output_count,
 )
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -136,7 +135,16 @@ def _generate_plugin_converter(
 
         unique_id = uuid.uuid4()
         itensor_args = [
-            get_trt_tensor(ctx, t, f"{t_name}_{unique_id}")
+            get_trt_tensor(
+                ctx,
+                t,
+                f"{t_name}_{unique_id}",
+                target_quantized_type=(
+                    trt.DataType.INT8
+                    if getattr(t, "dtype", None) == torch.int8
+                    else None
+                ),
+            )
             for (t, t_name) in zip(tensor_args, tensor_inputs)
         ]
 

@@ -77,6 +77,23 @@ if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     )
 
 
+@torch.library.custom_op("torchtrt_ex::int8_weight_mm", mutates_args=())  # type: ignore[misc]
+def int8_weight_mm(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    # torch._int_mm takes int8 operands only.
+    return torch._int_mm(x.to(torch.int8), w).to(torch.float32)
+
+
+@torch.library.register_fake("torchtrt_ex::int8_weight_mm")
+def int8_weight_mm(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    return x.new_empty((x.shape[0], w.shape[1]))
+
+
+if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "torchtrt_ex::int8_weight_mm", supports_dynamic_shapes=False
+    )
+
+
 @unittest.skipIf(
     platform.system() == "Windows",
     "Triton is not supported on Windows",
@@ -104,6 +121,24 @@ class TestAutomaticPlugin(DispatchTestCase):
         ]
 
         self.run_test(elementwise_mul(), inputs)
+
+    def test_int8_weight_plugin(self):
+        # TensorRT takes an INT8 constant in front of a plugin, so the weight
+        # must reach the plugin as int8.
+        class Int8WeightMM(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "w",
+                    torch.randint(-128, 128, (64, 32), dtype=torch.int8, device="cuda"),
+                )
+
+            def forward(self, x):
+                return torch.ops.torchtrt_ex.int8_weight_mm.default(x, self.w)
+
+        inputs = [torch.randint(-8, 8, (32, 64), device="cuda", dtype=torch.float)]
+
+        self.run_test(Int8WeightMM(), inputs)
 
 
 if __name__ == "__main__":
