@@ -530,6 +530,59 @@ def test_base_fp8(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("quant", ["fp8", "int8", "fp8_dynamic_amax"])
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+def test_zero_amax(ir, quant):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    if quant != "int8" and torch.cuda.get_device_capability() < (8, 9):
+        pytest.skip("FP8 quantization requires compute capability 8.9 or later")
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
+            self.linear2 = torch.nn.Linear(in_features=10, out_features=5)
+
+        def forward(self, x, zeros):
+            return self.linear1(x) + self.linear2(zeros)
+
+    x = torch.randn(2, 10).cuda()
+    zeros = torch.zeros(2, 10).cuda()
+    model = SimpleNetwork().eval().cuda()
+    quant_cfg = mtq.INT8_DEFAULT_CFG if quant == "int8" else mtq.FP8_DEFAULT_CFG
+    # The input quantizer of linear2 sees only zeros, so its amax is 0.
+    mtq.quantize(model, quant_cfg, forward_loop=lambda model: model(x, zeros))
+    y = torch.randn(2, 10).cuda()
+    if quant == "fp8_dynamic_amax":
+        # Without a calibrated amax, the engine computes it from the input.
+        del model.linear2.input_quantizer._amax
+        y = zeros
+    output_pyt = model(x, y)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (x, zeros), strict=False)
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[x, zeros],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+            )
+            outputs_trt = trt_model(x, y)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),

@@ -83,6 +83,7 @@ def quantize(
             max_bound = 448
 
         axis = None
+        zero_amax_bound = max_bound / torch.finfo(torch.float32).max
         # Dynamic amax (TRT ITensor) is always treated as per-tensor; numel()/shape
         # checks only apply to constant torch/numpy amax values.
         if not isinstance(amax, trt.ITensor):
@@ -105,9 +106,32 @@ def quantize(
                 ), f"{name=} is per-tensor quantization, expected amax is a singular value, but got {amax.shape=}"
 
             amax = to_torch(amax, None)
+            if dtype == trt.DataType.FP8:
+                # An amax of 0 makes an FP8 scale of 0, which zeroes the input or gives
+                # NaN. ModelOpt's FP8 fake quantization uses an amax of 1 then.
+                amax = torch.where(amax <= zero_amax_bound, torch.ones_like(amax), amax)
             scale = torch.divide(amax, max_bound)
             scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
         else:
+            if dtype == trt.DataType.FP8:
+                amax = impl.condition.where(
+                    ctx,
+                    target,
+                    get_ir(target),
+                    f"{name}_amax_or_one",
+                    torch.tensor(
+                        1.0, dtype=_enums.dtype._from(amax.dtype).to(torch.dtype)
+                    ),
+                    amax,
+                    impl.elementwise.le(
+                        ctx,
+                        target,
+                        get_ir(target),
+                        f"{name}_zero_amax",
+                        amax,
+                        zero_amax_bound,
+                    ),
+                )
             scale = impl.elementwise.div(
                 ctx,
                 target,
