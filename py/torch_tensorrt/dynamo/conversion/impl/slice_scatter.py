@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
     set_layer_name,
+    wrap_to_uint8,
 )
 from torch_tensorrt.dynamo.conversion.impl import select
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
@@ -416,16 +417,16 @@ def slice_scatter(
 
     # As torch does, src is written in the input's dtype. IKVCacheUpdateLayer also
     # requires the cache and the update to have the same dtype. A full overwrite of a
-    # uint8 input keeps a source the interpreter widened to int32, because TensorRT
-    # allows uint8 only at engine inputs and outputs; an output cast restores uint8.
-    source = ctx.current_node.args[1] if ctx.current_node is not None else None
-    source_val = source.meta.get("val") if isinstance(source, Node) else None
-    if not (
-        full_overwrite
-        and input.dtype == trt.uint8
-        and src.dtype == trt.int32
-        and getattr(source_val, "dtype", None) == torch.uint8
-    ):
+    # uint8 input keeps an int32 source as int32, because TensorRT allows uint8 only at
+    # engine inputs and outputs; an output cast restores uint8. A source the interpreter
+    # widened from uint8 holds uint8 values already, and any other one wraps modulo 256
+    # as PyTorch's cast does.
+    if full_overwrite and input.dtype == trt.uint8 and src.dtype == trt.int32:
+        source = ctx.current_node.args[1] if ctx.current_node is not None else None
+        source_val = source.meta.get("val") if isinstance(source, Node) else None
+        if getattr(source_val, "dtype", None) != torch.uint8:
+            src = wrap_to_uint8(ctx, target, src, name + "_src_wrap")
+    else:
         src = cast_trt_tensor(
             ctx, src, input.dtype, name + "_src_cast", target, source_ir
         )

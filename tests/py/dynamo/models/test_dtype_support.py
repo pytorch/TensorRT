@@ -322,6 +322,26 @@ class TestUInt8Support(TestCase):
         )
         self.assertTrue(engine)
 
+    def test_uint8_full_overwrite_from_int32_in_a_single_engine(self):
+        # The int32 source stays int32 inside the engine, so it has to wrap as uint8 does.
+        class Overwrite(nn.Module):
+            def forward(self, image, updates):
+                return torch.slice_scatter(image, updates, 0, 0, 2).float()
+
+        inputs = (
+            torch.tensor([[1, 2], [3, 4]], dtype=torch.uint8, device="cuda"),
+            torch.tensor([[-1, 256], [300, 512]], dtype=torch.int32, device="cuda"),
+        )
+        engine = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Overwrite(), inputs),
+                arg_inputs=list(inputs),
+                min_block_size=1,
+            )
+        )
+        trt_mod = TorchTensorRTModule(bytes(engine), ["image", "updates"], ["output0"])
+        torch.testing.assert_close(trt_mod(*inputs), Overwrite()(*inputs))
+
     def test_uint8_arithmetic_after_a_shape_op_in_the_hierarchical_partitioner(self):
         # The permute runs on a widened int32 copy, where 255 * 2 does not wrap, so the
         # multiply has to stay in PyTorch.
