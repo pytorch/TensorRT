@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
+import os
+import tempfile
 import unittest
 from unittest.mock import Mock
 
@@ -104,6 +106,29 @@ class TestTruncateDoubleMetadata(TestCase):
         self.assertEqual(engine_node.meta["val"].dtype, torch.float32)
         self.assertEqual(output_cast.meta["val"].dtype, torch.float64)
         self.assertEqual(repaired_input.dtype, dtype.float32)
+
+    def test_input_cast_takes_partition_metadata_when_producer_has_none(self):
+        # The call to a partition left to PyTorch carries no metadata. The cast in
+        # front of the engine takes the engine partition's own input metadata
+        # instead; a cast without a value fails ExportedProgram verification on save.
+        parent, submodule, engine_node = self._make_graphs(with_scalar_output=False)
+        parent_input = engine_node.args[0]
+        with parent.graph.inserting_before(engine_node):
+            producer = parent.graph.call_function(
+                torch.ops.aten.clone.default, args=(parent_input,)
+            )
+        engine_node.replace_input_with(parent_input, producer)
+
+        self._repair(parent, submodule)
+
+        input_cast = next(
+            node
+            for node in parent.graph.nodes
+            if node.target == torch.ops.aten._to_copy.default
+            and node.kwargs["dtype"] == torch.float32
+        )
+        self.assertIs(input_cast.args[0], producer)
+        self.assertEqual(input_cast.meta["val"].dtype, torch.float32)
 
     def test_scalar_tuple_output_is_not_executed_or_retyped(self):
         parent, submodule, engine_node = self._make_graphs(with_scalar_output=True)
@@ -238,6 +263,37 @@ class TestTruncateDoubleMetadata(TestCase):
             and node.kwargs.get("dtype") == torch.float64
         ]
         self.assertEqual(len(restoring_casts), 1)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "requires CUDA")
+    def test_saves_a_float64_input_produced_outside_the_engine(self):
+        class CholeskyOutside(nn.Module):
+            # linalg.cholesky has no converter, so its float64 result reaches the
+            # engine as an input produced by a partition left to PyTorch.
+            def forward(self, spd: torch.Tensor) -> torch.Tensor:
+                return torch.linalg.cholesky(spd) * 2.0
+
+        model = CholeskyOutside().eval().cuda()
+        a = torch.randn((4, 4), dtype=torch.float64, device="cuda")
+        spd = a @ a.mT + 4 * torch.eye(4, dtype=torch.float64, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (spd,)),
+            arg_inputs=[spd],
+            min_block_size=1,
+            truncate_double=True,
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "trt.ep")
+            torch_tensorrt.save(
+                compiled,
+                path,
+                output_format="exported_program",
+                arg_inputs=[spd],
+                retrace=False,
+            )
+            reloaded = torch_tensorrt.load(path).module()
+
+        torch.testing.assert_close(reloaded(spd), model(spd), rtol=1e-5, atol=1e-5)
 
 
 if __name__ == "__main__":
