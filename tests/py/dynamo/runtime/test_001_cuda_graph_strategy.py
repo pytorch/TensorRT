@@ -1,10 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-import gc
-import tempfile
 import unittest
-from pathlib import Path
 
 import torch
 import torch_tensorrt as torchtrt
@@ -23,8 +20,8 @@ class CudaGraphConvModel(torch.nn.Module):
         return torch.relu(self.conv(x))
 
 
-def _compile_conv(strategy, cache_path):
-    """Compile a convolution model and apply the strategy and cache path."""
+def _compile_conv(strategy):
+    """Compile a convolution model and apply the CUDA graph strategy."""
     model = CudaGraphConvModel().eval().cuda()
     inputs = [torch.randn(2, 3, 16, 16).cuda()]
     compiled = torchtrt.compile(
@@ -37,7 +34,7 @@ def _compile_conv(strategy, cache_path):
     torch._dynamo.reset()
     apply_runtime_settings(
         compiled,
-        RuntimeSettings(cuda_graph_strategy=strategy, runtime_cache=cache_path),
+        RuntimeSettings(cuda_graph_strategy=strategy, runtime_cache=None),
     )
     return compiled, model, inputs
 
@@ -231,31 +228,6 @@ class TestMonolithicCapturability(TestCase):
 class TestCudaGraphStrategyInference(TestCase):
     """End-to-end: compile + infer with each strategy on the build-selected runtime."""
 
-    @parameterized.expand([("disabled",), ("whole_graph_capture",)])
-    def test_strategy_inference(self, strategy):
-        self.addCleanup(torch._dynamo.reset)
-        torch.manual_seed(0)
-        with tempfile.TemporaryDirectory() as tmp:
-            path = str(Path(tmp) / "cache.bin")
-            compiled, model, inputs = _compile_conv(strategy, path)
-            with torch.no_grad():
-                for _ in range(3):
-                    x = torch.randn_like(inputs[0])
-                    output = compiled(x).clone()
-                    self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
-                    self.assertTrue(torch.isfinite(output).all().item())
-                    torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
-            del compiled
-            gc.collect()
-            self.assertTrue(Path(path).is_file())
-            self.assertGreater(Path(path).stat().st_size, 0)
-
-
-@unittest.skipIf(
-    not ENABLED_FEATURES.tensorrt_rtx,
-    "CUDA graph strategy requires TensorRT-RTX",
-)
-class TestCudaGraphStrategyUsage(TestCase):
     def setUp(self):
         super().setUp()
         self.addCleanup(torch._dynamo.reset)
@@ -263,16 +235,22 @@ class TestCudaGraphStrategyUsage(TestCase):
         torchtrt.runtime.set_cudagraphs_mode(False)
         torch.manual_seed(0)
 
+    @parameterized.expand([("disabled",), ("whole_graph_capture",)])
+    def test_strategy_matches_eager(self, strategy):
+        compiled, model, inputs = _compile_conv(strategy)
+        with torch.no_grad():
+            for _ in range(3):
+                x = torch.randn_like(inputs[0])
+                output = compiled(x).clone()
+                self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
+                torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
+
     def test_whole_graph_capture_with_graph_break(self):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
         )
 
-        class Model(CudaGraphConvModel):
-            def forward(self, x):
-                return torch.relu(self.conv(x))
-
-        model = Model().eval().cuda()
+        model = CudaGraphConvModel().eval().cuda()
         x = torch.randn(2, 3, 16, 16, device="cuda")
         compiled = torchtrt.compile(
             model,

@@ -187,7 +187,7 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
     """End-to-end: compile + infer with each strategy on the build-selected runtime."""
 
     @parameterized.expand(_STRATEGIES)
-    def test_strategy_inference(self, strategy):
+    def test_strategy_matches_eager_across_batch_sizes(self, strategy):
         self.addCleanup(torch._dynamo.reset)
         torch.manual_seed(0)
         compiled, model = _compile_dynamic_conv(strategy)
@@ -198,7 +198,6 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
                     x = torch.randn(batch, 3, 16, 16, device="cuda")
                     output = compiled(x)
                     self.assertEqual(tuple(output.shape), (batch, 8, 16, 16))
-                    self.assertTrue(torch.isfinite(output).all().item())
                     torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
 
 

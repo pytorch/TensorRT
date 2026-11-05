@@ -168,6 +168,20 @@ class TestRuntimeCachePersistence(TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "rc.bin")
             model, inputs = _fresh_conv_model_and_inputs(seed=42)
+            compiled = _compile(model, inputs, runtime_cache_path=path)
+            with torch.no_grad():
+                compiled(*inputs)
+            self.assertFalse(os.path.exists(path))
+            del compiled
+            gc.collect()
+            self.assertTrue(os.path.isfile(path))
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_cache_loaded_in_fresh_process(self):
+        self.addCleanup(torch._dynamo.reset)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            model, inputs = _fresh_conv_model_and_inputs(seed=42)
             payload = os.path.join(tmp, "model.pt")
             torch.save(
                 {
@@ -1041,7 +1055,7 @@ class TestPostLoadOwnsNoCache(TestCase):
     not ENABLED_FEATURES.tensorrt_rtx,
     "Runtime cache requires TensorRT-RTX",
 )
-class TestRuntimeCacheUsage(TestCase):
+class TestRuntimeCacheBadFile(TestCase):
     def setUp(self):
         super().setUp()
         self.addCleanup(torch._dynamo.reset)
@@ -1061,7 +1075,7 @@ class TestRuntimeCacheUsage(TestCase):
         self.assertGreater(Path(path).stat().st_size, 0)
 
     @parameterized.expand([("empty",), ("random",), ("truncated",)])
-    def test_corrupt_and_empty_file(self, kind):
+    def test_invalid_cache_file_recovers_and_matches_eager(self, kind):
         model, inputs = _fresh_conv_model_and_inputs()
         if kind == "truncated":
             self._run_and_save(model, inputs, self.path)

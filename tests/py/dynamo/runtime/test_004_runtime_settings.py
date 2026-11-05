@@ -365,7 +365,27 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
         not ENABLED_FEATURES.tensorrt_rtx,
         "cuda_graph_strategy is TRT-RTX-only",
     )
-    def test_collapsed_cudagraphs_with_strategy_is_one_create(self):
+    def test_enable_cudagraphs_creates_one_context(self):
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
+        compiled = _compile_simple()
+        modules = list(self._walk_engines(compiled))
+        self.assertTrue(modules)
+        with enable_cudagraphs(
+            compiled, cuda_graph_strategy="whole_graph_capture"
+        ) as captured:
+            captured(torch.randn(2, 3, device="cuda"))
+        for module in modules:
+            self.assertEqual(module.engine.num_execution_contexts_created(), 1)
+
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx,
+        "cuda_graph_strategy is TRT-RTX-only",
+    )
+    def test_enable_cudagraphs_applies_and_restores_strategy(self):
         from torch_tensorrt.runtime import enable_cudagraphs
 
         self.addCleanup(torch._dynamo.reset)
@@ -402,10 +422,6 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
                     )
         for module, settings in zip(modules, prior):
             self.assertEqual(module.runtime_settings, settings)
-            count = module.engine.num_execution_contexts_created()
-            self.assertEqual(
-                count, 1, f"Collapsed form should create exactly 1 context, got {count}"
-            )
 
     @unittest.skipIf(
         ENABLED_FEATURES.tensorrt_rtx,
