@@ -286,10 +286,15 @@ Some calls do not replay:
   loop that changes shape or profile on every call never replays.
 - An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
   12.5 never replays. The delegate logs the reason.
-- A call on a green context stream, or on a stream from another CUDA context, takes the ordinary
-  path. The recorded graph is kept for the next call that can replay it.
+- A graph runs its kernels in the CUDA context it was recorded in, so calls from green contexts keep
+  a graph of their own, recorded in the green context, and a green context's replays stay on its own
+  SMs. An engine called in turn from a green and a plain stream replays on both. A call from another
+  green context than the last green one, or another plain context than the last plain one, records
+  again in that context. A stream from a context that is neither green nor current on the calling
+  thread, or from another device, takes the ordinary path, and the recorded graphs are kept. So does
+  a green context stream while a regular context other than its device's primary one is current.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
-  ordinary path until its shapes or its profile change.
+  ordinary path until its shapes or its profile change. Green and plain contexts count theirs apart.
 
 Engines on the shared activation scratch replay too.
 

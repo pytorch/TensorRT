@@ -1135,7 +1135,7 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
   EXPECT_EQ(cudaStreamDestroy(blocking), cudaSuccess);
 }
 
-// A non-blocking stream on a green context, which the graph path does not replay on.
+// A non-blocking stream on a green context.
 struct GreenStream {
   ~GreenStream() {
     if (stream) {
@@ -1146,7 +1146,7 @@ struct GreenStream {
     }
   }
 
-  void create() {
+  void create(int device = 0) {
     const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
     const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
     const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
@@ -1161,9 +1161,9 @@ struct GreenStream {
     ASSERT_NE(get_context, nullptr);
     CUdevResource resource{};
     CUdevResourceDesc descriptor{};
-    ASSERT_EQ(get_resource(0, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
+    ASSERT_EQ(get_resource(device, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
     ASSERT_EQ(generate_desc(&descriptor, &resource, 1), CUDA_SUCCESS);
-    ASSERT_EQ(create_green(&context, descriptor, 0, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
+    ASSERT_EQ(create_green(&context, descriptor, device, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
     ASSERT_EQ(create_stream(&stream, context, CU_STREAM_NON_BLOCKING, 0), CUDA_SUCCESS);
     CUcontext owner = nullptr;
     CUgreenCtx observed_green = nullptr;
@@ -1180,29 +1180,186 @@ struct GreenStream {
   PFN_cuGreenCtxDestroy_v12040 destroy = nullptr;
 };
 
-TEST_F(ExecutionGraphReplayTest, GreenContextStreamRunsPlainAndKeepsTheGraph) {
+// Graph nodes run in the context they were recorded in, so a green context stream records its own
+// graph there, and its replays stay on the green context's SMs. The plain stream's graph is kept.
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamRecordsInItsOwnContext) {
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
+  const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  ASSERT_NE(get_context, nullptr);
 
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   for (int i = 0; i < 2; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
   }
   ASSERT_TRUE(graph.is_captured());
-  CudaCalls calls;
-  for (int i = 0; i < 5; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, green.stream));
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
+  CUcontext owner = nullptr;
+  CUgreenCtx capture_green = nullptr;
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, green.stream));
+      EXPECT_EQ(graph.is_captured(), i >= 1);
+    }
+    ASSERT_EQ(calls.captures.size(), 1u);
+    ASSERT_EQ(get_context(calls.captures.front(), &owner, &capture_green), CUDA_SUCCESS);
+    EXPECT_EQ(capture_green, green.context) << "the graph for the green stream was recorded outside its context";
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, green.stream));
+    EXPECT_EQ(calls.malloc_calls, 0u);
+  }
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
     EXPECT_TRUE(graph.is_captured());
   }
-  EXPECT_EQ(calls.malloc_calls, 0u);
-  EXPECT_TRUE(calls.retirements.empty());
-  EXPECT_TRUE(calls.captures.empty());
-  EXPECT_TRUE(calls.launches.empty());
-  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 9, streams_[0]));
-  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 3, green.stream));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>({streams_[0], streams_[0], streams_[0], green.stream}));
+}
+
+// A green context stream on another device than the engine's takes the ordinary path, which refuses it
+// as it refuses any stream there, and the engine keeps replaying on its own device.
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph) {
+  int device_count = 0;
+  if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count < 2) {
+    GTEST_SKIP() << "Requires two CUDA devices for a green context on another device";
+  }
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  GreenStream other;
+  ASSERT_NO_FATAL_FAILURE(other.create(1));
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_NE(graph.run(inputs_[0], outputs_[0], 2, 8, other.stream), Error::Ok);
+    }
+    EXPECT_TRUE(calls.captures.empty());
+  }
+  EXPECT_TRUE(graph.is_captured());
+  CudaCalls back;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// A caller may destroy a green context while an engine that recorded there is still loaded, then run
+// the engine on a new one or destroy it. The old graph and capture stream belong to the destroyed
+// context, and cleaning them up must not leave an error behind for the caller.
+TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedBeforeTheEngineRecordsAgainCleanly) {
+  const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  ASSERT_NE(get_context, nullptr);
+  LoadedGraphEngine plain;
+  auto graph = std::make_unique<LoadedGraphEngine>();
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, *graph));
+  {
+    GreenStream first;
+    ASSERT_NO_FATAL_FAILURE(first.create());
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, i, first.stream));
+    }
+    ASSERT_TRUE(graph->is_captured());
+  }
+  auto second = std::make_unique<GreenStream>();
+  ASSERT_NO_FATAL_FAILURE(second->create());
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, i + 3, second->stream));
+      EXPECT_EQ(graph->is_captured(), i >= 1);
+    }
+    ASSERT_EQ(calls.captures.size(), 1u);
+    CUcontext owner = nullptr;
+    CUgreenCtx capture_green = nullptr;
+    ASSERT_EQ(get_context(calls.captures.front(), &owner, &capture_green), CUDA_SUCCESS);
+    EXPECT_EQ(capture_green, second->context);
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, second->stream));
+  }
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  second.reset();
+  graph.reset();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+}
+
+// Green and plain calls keep a graph each, so bursts that switch between them record once in each
+// rather than at every switch.
+TEST_F(ExecutionGraphReplayTest, BurstsFromAGreenAndAPlainStreamReplayOnBoth) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  int seed = 0;
+  for (int round = 0; round < 4; ++round) {
+    for (cudaStream_t stream : {streams_[0], green.stream}) {
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, stream));
+      }
+    }
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  std::vector<cudaStream_t> expected = {streams_[0], green.stream};
+  for (int round = 1; round < 4; ++round) {
+    expected.insert(expected.end(), {streams_[0], streams_[0], green.stream, green.stream});
+  }
+  EXPECT_EQ(calls.launches, expected);
+}
+
+// Failed recordings in a green context say nothing about the caller's other context.
+TEST_F(ExecutionGraphReplayTest, FailedGreenRecordingsLeaveThePlainStreamReplaying) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  {
+    CudaCalls calls;
+    calls.fail_captures = 3;
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, green.stream));
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 6, streams_[0]));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
+}
+
+// A green context stream whose caller keeps moving its buffers records on buffers the graph owns,
+// still in the green context, and copies through them.
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamCopiesThroughOwnBuffersAfterTwoMoves) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  ASSERT_NE(get_context, nullptr);
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  const int slots[] = {0, 0, 1, 0, 1, 0};
+  CudaCalls calls;
+  for (int i = 0; i < 6; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slots[i], 2, 8, i, green.stream));
+  }
+  EXPECT_EQ(calls.malloc_calls, 2u);
+  ASSERT_EQ(calls.captures.size(), 3u);
+  for (cudaStream_t capture : calls.captures) {
+    CUcontext owner = nullptr;
+    CUgreenCtx capture_green = nullptr;
+    ASSERT_EQ(get_context(capture, &owner, &capture_green), CUDA_SUCCESS);
+    EXPECT_EQ(capture_green, green.context);
+  }
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, green.stream));
 }
 
 // The pool frees its old buffer when a larger request grows it, so a graph recorded on that buffer
@@ -1253,8 +1410,7 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
-// A pool growth has to drop the graph whatever stream the next call uses. A green context stream
-// takes the plain path, which returns before the graph path, so it needs its own case.
+// A pool growth has to drop the graph, including one recorded in a green context.
 TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamShapes) {
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
@@ -1272,7 +1428,7 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamSh
     }
   };
   const std::pair<std::optional<cudaStream_t>, std::optional<cudaStream_t>> cases[] = {
-      {std::nullopt, std::nullopt}, {streams_[0], green.stream}};
+      {std::nullopt, std::nullopt}, {green.stream, green.stream}};
   for (const auto& [record_on, after_growth_on] : cases) {
     SCOPED_TRACE(after_growth_on.has_value() ? "green context stream" : "no caller stream");
     ASSERT_TRUE(reset_shared_scratch_pool_for_testing());

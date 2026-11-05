@@ -552,8 +552,11 @@ Some calls never replay:
 * An engine whose input shapes change on every call never replays.
 * An engine with aliased outputs, a GPU without stream-ordered memory, and a driver older than
   CUDA 12.5 never replay. They take the ordinary path.
-* A call on a green context stream, or on a stream of another CUDA context, takes the ordinary
-  path for that call.
+* A graph runs its kernels in the CUDA context it was recorded in, so calls from green contexts
+  keep a graph of their own, recorded there, and a green context's replays stay on its own SMs. An
+  engine called in turn from a green and a plain stream replays on both. A call from another green
+  context than the last records again there. A stream of a context that is neither green nor
+  current on the calling thread, or of another device, takes the ordinary path.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.

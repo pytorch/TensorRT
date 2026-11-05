@@ -94,9 +94,9 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * its recorded graph whenever the pool hands it a different buffer, and pays the
  * same stable I/O buffers and copies as any other replaying engine. Caller
  * streams in the current ordinary context can replay, as can a call with no
- * caller stream. Green context and other context streams take the plain path,
- * and the graph is kept unless the scratch buffer, the shapes, or the
- * optimization profile changed.
+ * caller stream. A green context stream records and replays in its own
+ * context. Other context streams take the plain path, and the graph is kept
+ * unless the scratch buffer, the shapes, or the optimization profile changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 
