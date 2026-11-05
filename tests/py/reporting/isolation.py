@@ -29,3 +29,7 @@ def _load(child):
 
 def load_reporting():
     return _load("reporting")
+
+
+def load_artifacts():
+    return _load("artifacts")

@@ -1,0 +1,31 @@
+{
+    "workspace_root": "YOUR_PATH/TensorRT/mcp_example",
+    "output_root": "YOUR_PATH/TensorRT/mcp_example/jobs",
+    "models": {
+        "add": {
+            "path": "factories_add.py",
+            "function": "model",
+            "parameters": []
+        },
+        "qwen3_5": {
+            "path": "factories_qwen3.5-0.8b.py",
+            "function": "qwen35_model",
+            "parameters": []
+        }
+    },
+    "inputs": {
+        "add": {
+            "path": "factories_add.py",
+            "function": "inputs",
+            "parameters": ["batch_size"]
+        },
+        "qwen3_5": {
+            "path": "factories_qwen3.5-0.8b.py",
+            "function": "qwen35_inputs",
+            "parameters": ["batch_size", "sequence_length"]
+        }
+    },
+    "max_pending_jobs": 32,
+    "max_timeout_seconds": 3600,
+    "max_response_bytes": 262144
+}
