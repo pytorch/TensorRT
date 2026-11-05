@@ -110,3 +110,28 @@ def test_pr_base_is_validated_against_merge_parent(repository):
     assert checker.check_contracts(root, base, require_merge_parent=True)[2] == []
     with pytest.raises(ValueError, match="merge parent"):
         checker.check_contracts(root, feature, require_merge_parent=True)
+
+
+def test_stacked_pr_accepts_equivalent_synthetic_merge_parent(repository):
+    root, path, base = repository
+    git(root, "checkout", "-qb", "parent")
+    (root / "parent.txt").write_text("parent")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "Parent PR")
+    parent = git(root, "rev-parse", "HEAD")
+
+    git(root, "checkout", "-qb", "child")
+    (root / "child.txt").write_text("child")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "Child PR")
+    child = git(root, "rev-parse", "HEAD")
+
+    git(root, "checkout", "-q", "--detach", base)
+    git(root, "merge", "--no-ff", "-m", "Synthetic parent PR merge", parent)
+    synthetic_parent = git(root, "rev-parse", "HEAD")
+    assert git(root, "rev-parse", f"{synthetic_parent}^{{tree}}") == git(
+        root, "rev-parse", f"{parent}^{{tree}}"
+    )
+
+    git(root, "merge", "--no-ff", "-m", "Synthetic child PR merge", child)
+    assert checker.check_contracts(root, parent, require_merge_parent=True)[2] == []

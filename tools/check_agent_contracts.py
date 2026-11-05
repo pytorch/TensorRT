@@ -85,9 +85,18 @@ def check_contracts(
         _git(root, "rev-parse", "--verify", "HEAD^2")
         parent = _git(root, "rev-parse", "--verify", "HEAD^1").strip()
         if parent != base:
-            raise ValueError(
-                "Explicit base commit does not match the checked-out PR merge parent"
-            )
+            # For a stacked PR, GitHub tests a synthetic merge of the lower
+            # PRs as HEAD^1 instead of the head commit of the immediate base
+            # branch. Its tree must still exactly match that explicit base.
+            parent_tree = _git(
+                root, "rev-parse", "--verify", parent + "^{tree}"
+            ).strip()
+            base_tree = _git(root, "rev-parse", "--verify", base + "^{tree}").strip()
+            if parent_tree != base_tree:
+                raise ValueError(
+                    "Explicit base commit does not match the checked-out PR "
+                    "merge parent"
+                )
     tracked = _git(
         root, "ls-tree", "-r", "-z", "--name-only", base, "--", SCHEMA_DIRECTORY
     )
