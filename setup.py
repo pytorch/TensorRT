@@ -367,11 +367,29 @@ def build_libtorchtrt_cxx11_abi(
             env["TORCH_PATH"] = stable_torch_path
             print(f"Using TORCH_PATH={stable_torch_path}")
 
+    # libtorch_cuda.so needs cuDNN, NCCL, cuSPARSELt, NVSHMEM etc., which a pip-installed torch
+    # keeps under site-packages/nvidia/*/lib, outside the linker's search path. Linking an
+    # executable (torchtrtc) must resolve them, so point -rpath-link at them rather than
+    # needing a per-venv .bazelrc.user.
+    if not IS_WINDOWS and env.get("TORCH_PATH"):
+        for lib_dir in find_torch_nvidia_lib_dirs(env["TORCH_PATH"]):
+            cmd.append(f"--linkopt=-Wl,-rpath-link,{lib_dir}")
+
     print(f"building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd, env=env).returncode
 
     if status_code != 0:
         sys.exit(status_code)
+
+
+def find_torch_nvidia_lib_dirs(torch_path):
+    """The nvidia/*/lib directories that sit beside a pip-installed torch, if any."""
+    site_packages = Path(torch_path).parent
+    return sorted(
+        str(lib_dir)
+        for lib_dir in (site_packages / "nvidia").glob("*/lib")
+        if lib_dir.is_dir()
+    )
 
 
 def resolve_torch_path():
