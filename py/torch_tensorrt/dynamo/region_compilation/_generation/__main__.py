@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Inspect instructions and replay saved region-generation tasks."""
+"""Inspect instructions and replay saved region-generation tasks.
+
+Generation itself runs inside torch_tensorrt.compile for each
+fused_kernel(generator=...) region; this command is a debugging aid.
+"""
 
 from __future__ import annotations
 

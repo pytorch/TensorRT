@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import re
 import secrets
 import sys
 import tempfile
@@ -116,6 +117,10 @@ def _task_digest(task: dict[str, Any]) -> str:
         for key, value in task.items()
         if key not in ("search", "budget", "diagnostics", "samples")
     }
+    # Tensor factories in the reference name the region's logical device.
+    identity["reference"] = re.sub(
+        r"device\(type='cuda', index=\d+\)", "device(type='cuda')", task["reference"]
+    )
     identity["tuning"] = task["search"]["tuning"]
     for side in ("inputs", "outputs"):
         identity[side] = [
@@ -982,7 +987,11 @@ class _Search:
             _LOGGER.warning("Agent region cache revalidation failed: %s", report)
             self.cache_miss = self.revalidation_failure(report)
             self.inconclusive = report.get("stage") in _INCONCLUSIVE_STAGES
-            self.slow = report.get("status") == "passed"
+            # Speed advice needs the remeasured speedup that cache_miss reports.
+            self.slow = report.get("status") == "passed" and all(
+                _positive(report.get(name))
+                for name in ("baseline_latency_ms", "latency_ms")
+            )
             return None
         _LOGGER.info("Agent region %s: cache hit (%s)", self.region_id, self.cache)
         # Runs that reuse a kernel accumulate with every compilation, so they
@@ -1055,7 +1064,7 @@ class _Search:
                 other = read_json_object(run / "task.json")
             except (OSError, KeyError, TypeError, ValueError):
                 continue
-            if other.get("reference") != self.task["reference"]:
+            if self.changes_key("reference", other):
                 continue
             fields = [
                 name

@@ -22,7 +22,11 @@ from torch_tensorrt.dynamo.region_compilation import (
     materialize_regions,
     normalize_region_scopes,
 )
-from torch_tensorrt.dynamo.region_compilation._generation import _factory, _samples
+from torch_tensorrt.dynamo.region_compilation._generation import (
+    _factory,
+    _samples,
+    _worker,
+)
 from torch_tensorrt.region import KernelGenerator, RegionError, fused_kernel
 from torch_tensorrt.region._session import RegionCompilationSession
 
@@ -658,11 +662,22 @@ def test_identical_regions_recheck_only_the_shared_kernels_correctness(factory, 
     assert accepted["candidate"] == _candidate("a")
 
 
-def test_an_inconclusive_identical_region_check_is_retried_before_a_search(factory):
+@pytest.mark.parametrize("cause", ["timeout", "out_of_memory"])
+def test_an_inconclusive_identical_region_check_is_retried_before_a_search(
+    factory, cause
+):
     factory.author.side_effect = [_candidate("a"), _candidate("b")]
     factory.evaluate.return_value = _passed(0.2)
-    timeout = {"status": "error", "stage": "timeout", "error": "Evaluator exceeded"}
-    outcomes = iter([_passed(0.2), timeout, _passed(0.2)])
+    failure = {"status": "error", "stage": "timeout", "error": "Evaluator exceeded"}
+    if cause == "out_of_memory":
+        # The report of a worker whose correctness check found the GPU full.
+        def allocate():
+            raise torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 2 GiB")
+
+        with pytest.raises(_worker._EvaluationError) as error:
+            _worker._run_stage("correctness", allocate)
+        failure = _worker._error_report(error.value, factory.root, "holdout")
+    outcomes = iter([_passed(0.2), failure, _passed(0.2)])
     factory.finalize.side_effect = lambda *args: next(outcomes)
     memo = {}
     _generate_with(factory, _samples_of(1.0), memo)

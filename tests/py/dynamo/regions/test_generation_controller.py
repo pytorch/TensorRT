@@ -383,6 +383,26 @@ def test_cache_only_refusal_reports_a_remeasured_speedup_below_the_objective(
     assert "Retry on a less busy GPU; if the speedup stays below min_speedup" in message
 
 
+def test_cache_only_refusal_without_a_remeasured_speedup_gives_no_speed_advice(
+    factory,
+):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = {**_passed(1.0), "baseline_latency_ms": 1.2}
+    factory.finalize.return_value = {**_passed(1.0), "baseline_latency_ms": 1.2}
+    objective = {"objective": "eager", "min_speedup": 1.1}
+    _generate(factory, **objective)
+    factory.finalize.return_value = _passed(1.0)
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False, **objective)
+    message = str(failure.value)
+    assert (
+        "its cached kernel passed revalidation without a measured eager baseline"
+    ) in message
+    # No speedup was measured, so none can be retried for.
+    assert "less busy GPU" not in message
+    assert "Compile once with generation allowed" in message
+
+
 def test_cache_only_compilation_never_creates_a_missing_cache_directory(factory):
     with pytest.raises(RegionError) as failure:
         _generate(factory, allow_generation=False)

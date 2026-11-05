@@ -8,8 +8,9 @@ engine would embed, but its kernel is launched directly, without building an
 engine. Holdout evaluations always run it as a plugin inside a real TRT engine.
 
 Failures carry the stage that owns them: ``setup`` (the request, device or
-reference; the author cannot fix it), ``source``, ``compile``, ``engine``,
-``correctness``, ``baseline`` (the TensorRT baseline) or ``benchmark``.
+reference, including device memory running out at any stage; the author cannot
+fix it), ``source``, ``compile``, ``engine``, ``correctness``, ``baseline``
+(the TensorRT baseline) or ``benchmark``.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import logging
 import math
 import operator
 import os
+import re
 import statistics
 import sys
 import time
@@ -31,6 +33,8 @@ from pathlib import Path
 from typing import Any, Callable, Iterator, NamedTuple, Sequence, TypeVar
 
 import torch
+
+from torch_tensorrt.logging import TRT_LOGGER
 
 from .._plugins import _TensorBoundary
 from ._reference import load_reference
@@ -79,6 +83,9 @@ _FORCED_COMPILE_OPTIONS = {
     "require_full_compilation": True,
     "offload_module_to_cpu": False,
 }
+# Exhausted device memory as PyTorch, the CUDA driver and runtime, Triton, and
+# TensorRT report it: "out of memory", CUDA_ERROR_OUT_OF_MEMORY, "OutOfMemory".
+_OUT_OF_MEMORY = re.compile(r"out[ _]?of[ _]?memory", re.IGNORECASE)
 
 
 class _EvaluationError(RuntimeError):
@@ -93,12 +100,31 @@ class _EvaluationError(RuntimeError):
 def _run_stage(
     stage: str, function: Callable[..., _Result], *args: Any, **kwargs: Any
 ) -> _Result:
-    try:
-        return function(*args, **kwargs)
-    except _EvaluationError:
-        raise
-    except Exception as error:
-        raise _EvaluationError(stage, str(error)) from error
+    with TRT_LOGGER.capture_errors() as logged:
+        try:
+            return function(*args, **kwargs)
+        except _EvaluationError:
+            raise
+        except Exception as error:
+            message = str(error)
+            # TensorRT logs a failed allocation; the exception that follows,
+            # such as "Failed to create execution context", may not say why.
+            # Compiler errors quote the candidate's source after their first line.
+            memory = next(
+                (
+                    text
+                    for text in (message.partition("\n")[0], *logged)
+                    if _OUT_OF_MEMORY.search(text)
+                ),
+                None,
+            )
+            if memory is None:
+                raise _EvaluationError(stage, message) from error
+            # Memory that other work holds says nothing about the candidate,
+            # so, as a setup failure, it leaves the evaluation inconclusive.
+            if memory not in message:
+                message = f"{message} ({memory})"
+            raise _EvaluationError("setup", message) from error
 
 
 def _outputs(value: Any) -> tuple[torch.Tensor, ...]:
@@ -303,7 +329,11 @@ def _build_reference_engine(
     inputs: tuple[torch.Tensor, ...],
     options: dict[str, Any],
 ) -> torch.nn.Module:
-    """Compile the unannotated region and reject any remaining eager computation."""
+    """Compile the unannotated region and reject any remaining eager computation.
+
+    Only the ``tensorrt`` objective, a speedup over TensorRT, needs this engine,
+    and only to time it; candidates are always checked against eager PyTorch.
+    """
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
     compiled = _compile(copy.deepcopy(reference), inputs, options)

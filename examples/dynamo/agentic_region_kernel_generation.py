@@ -106,11 +106,18 @@ def main():
         # Keep the library defaults for every option that was not passed.
         return {name: value for name, value in options.items() if value is not None}
 
+    torch.manual_seed(0)
+    # Model input batches with the compiled shapes, such as a DataLoader of real
+    # data: every candidate is also checked on the inputs they give the region.
+    dataset = torch.utils.data.TensorDataset(
+        *(torch.randn(4 * 257, 1025) for _ in range(3))
+    )
     global GENERATOR
     GENERATOR = KernelGenerator(
         provider=args.provider,
         backend=args.backend,
         instruction_files=tuple(args.instruction_file),
+        validation_inputs=torch.utils.data.DataLoader(dataset, batch_size=257),
         search=SearchPolicy(
             **given(
                 batch_size=args.batch_size,
@@ -133,7 +140,6 @@ def main():
             diagnostics=args.diagnostics,
         ),
     )
-    torch.manual_seed(0)
     inputs = tuple(torch.randn(257, 1025, device="cuda") for _ in range(3))
     model = Model().eval().cuda()
     compiled = torch_tensorrt.compile(

@@ -293,6 +293,7 @@ def test_extension_shape_check_does_not_reject_valid_overlapping_schema_branches
 def _task_identity_example():
     spec = {"shape": [257], "dtype": "float32", "device": "cuda:0"}
     return {
+        "reference": "full(..., device=device(type='cuda', index=0))",
         "backend": "triton",
         "backend_version": "1",
         "proposal_schema_sha256": "schema",
@@ -331,6 +332,7 @@ def test_task_identity_ignores_scheduling_budget_diagnostics_and_device_index():
         "diagnostics": True,
         "inputs": other_device,
         "outputs": other_device,
+        "reference": task["reference"].replace("index=0", "index=1"),
     }
     assert _factory._task_digest(changed) == _factory._task_digest(task)
     assert _factory._task_digest(json.loads(json.dumps(task))) == _factory._task_digest(

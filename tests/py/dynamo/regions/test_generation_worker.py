@@ -15,6 +15,7 @@ import weakref
 from types import SimpleNamespace
 
 import pytest
+import tensorrt as trt
 import torch
 
 import torch_tensorrt
@@ -25,6 +26,7 @@ from torch_tensorrt.dynamo.region_compilation._generation import (
     _worker,
 )
 from torch_tensorrt.dynamo.region_compilation._generation._util import digest
+from torch_tensorrt.logging import TRT_LOGGER
 
 from ._generation_utils import save_reference
 
@@ -1032,6 +1034,95 @@ def test_error_report_retains_cause_and_stage_without_local_paths(tmp_path):
     assert "wrong value at <evaluation>/candidate.py" in report["error"]
     assert str(tmp_path) not in report["error"]
     assert "\x1b" not in report["error"]
+
+
+@pytest.mark.parametrize(
+    "error, logged, stage",
+    [
+        (
+            torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.00 GiB"),
+            None,
+            "setup",
+        ),
+        (RuntimeError("Triton Error [CUDA]: out of memory"), None, "setup"),
+        (
+            RuntimeError(
+                "The CUDA driver could not load the PTX that NVRTC produced "
+                "(CUDA_ERROR_OUT_OF_MEMORY)"
+            ),
+            None,
+            "setup",
+        ),
+        (
+            RuntimeError(
+                "TensorRT could not build the engine: [globWriter.cpp::HybridGlobWriter"
+                "::482] Error Code 2: OutOfMemory (Requested size was 1024 bytes.)"
+            ),
+            None,
+            "setup",
+        ),
+        # The Python runtime raises this after TensorRT logs the cause.
+        (
+            AssertionError("Failed to create execution context"),
+            "[cachePolicy.cu::init::88] Error Code 2: OutOfMemory (Requested size "
+            "was 2048 bytes.)",
+            "setup",
+        ),
+        # Kernels that need more than the GPU offers, or that fault, are wrong.
+        (
+            RuntimeError(
+                "Triton Error [CUDA]: too many resources requested for launch"
+            ),
+            None,
+            "correctness",
+        ),
+        (
+            RuntimeError(
+                "out of resource: shared memory, Required: 232448, Hardware limit: "
+                "101376. Reducing block sizes or `num_stages` may help."
+            ),
+            None,
+            "correctness",
+        ),
+        (
+            RuntimeError("TensorRT failed to run engine, see the TensorRT error above"),
+            "Error Code 1: Cuda Runtime (an illegal memory access was encountered)",
+            "correctness",
+        ),
+        # A compiler error quotes the candidate's source, comments included.
+        (
+            RuntimeError(
+                "at 2:41:\n    # Tiles never run out of memory.\n"
+                "    offsets = tl.arange(0, N)\narange's range must be a power of 2"
+            ),
+            None,
+            "correctness",
+        ),
+    ],
+    ids=[
+        "pytorch",
+        "triton",
+        "cuda-module-load",
+        "tensorrt-build",
+        "tensorrt-context",
+        "launch-resources",
+        "triton-shared-memory",
+        "illegal-address",
+        "quoted-source",
+    ],
+)
+def test_running_out_of_device_memory_is_a_setup_failure(error, logged, stage):
+    def fail():
+        if logged is not None:
+            TRT_LOGGER.log(trt.ILogger.Severity.ERROR, logged)
+        raise error
+
+    with pytest.raises(_worker._EvaluationError) as failure:
+        _worker._run_stage("correctness", fail)
+    # A setup failure says nothing about the kernel; the other stages reject it.
+    assert failure.value.stage == stage
+    if logged is not None and stage == "setup":
+        assert str(failure.value) == f"{error} ({logged})"
 
 
 def test_worker_processes_cannot_dump_core():
