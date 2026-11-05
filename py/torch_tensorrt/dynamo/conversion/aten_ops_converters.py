@@ -171,7 +171,7 @@ def aten_ops_batch_norm_legit_no_stats(
         input=args[0],
         weight=args[1],
         bias=args[2],
-        training=False,
+        training=args[3],
         momentum=args[4],
         eps=args[5],
         return_mean_rstd=True,

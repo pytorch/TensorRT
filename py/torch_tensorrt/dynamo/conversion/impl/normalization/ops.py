@@ -52,6 +52,40 @@ def batch_norm(
     # Save the original output shape for later use
     output_shape = input.shape
     feature_num = output_shape[1]
+    if training:
+        # In training mode, and whenever no running stats are tracked, PyTorch normalizes
+        # with the mean and biased variance of the current batch, per channel
+        stats_shape = (1, feature_num) + (1,) * (len(output_shape) - 2)
+        with unset_fake_temporarily():
+            weight = get_trt_tensor(
+                ctx,
+                torch.ones((feature_num,)) if weight is None else weight,
+                f"{name}_weight",
+            )
+            bias = get_trt_tensor(
+                ctx,
+                torch.zeros((feature_num,)) if bias is None else bias,
+                f"{name}_bias",
+            )
+        weight = cast_trt_tensor(
+            ctx, weight, input.dtype, f"{name}_cast_weight", target, source_ir
+        )
+        bias = cast_trt_tensor(
+            ctx, bias, input.dtype, f"{name}_cast_bias", target, source_ir
+        )
+        weight = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_weight", weight, stats_shape
+        )
+        bias = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_bias", bias, stats_shape
+        )
+        axes = get_axes_for_reduce_op([0] + list(range(2, len(output_shape))))
+        layer = ctx.net.add_normalization(input, weight, bias, axes)
+        layer.epsilon = eps
+        set_layer_name(layer, target, name, source_ir)
+        output = layer.get_output(0)
+        return (output, None, None) if return_mean_rstd else output
+
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.

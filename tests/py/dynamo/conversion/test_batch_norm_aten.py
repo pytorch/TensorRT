@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import torch
+from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
@@ -274,6 +275,78 @@ class TestNativeBatchNormConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             BatchNorm(),
             input_specs,
+        )
+
+    @parameterized.expand(
+        [
+            ("1d", (4, FEATURE_NUM), torch.float, True),
+            ("2d", (2, FEATURE_NUM, 8, 8), torch.float, True),
+            ("3d", (2, FEATURE_NUM, 4, 8, 8), torch.float, True),
+            ("2d_no_affine", (2, FEATURE_NUM, 8, 8), torch.float, False),
+            ("2d_fp16", (2, FEATURE_NUM, 8, 8), torch.half, True),
+        ]
+    )
+    def test_native_batchnorm_legit_no_stats(self, _, shape, dtype, affine):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._native_batch_norm_legit.no_stats(
+                    x,
+                    torch.tensor([2.0, 1.0, 0.5]) if affine else None,
+                    torch.tensor([0.5, -1.0, 0.0]) if affine else None,
+                    True,
+                    0.1,
+                    1e-05,
+                )[0]
+
+        inputs = [(torch.randn(shape) * 3 + 2).to(dtype)]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
+    def test_native_batchnorm_legit_no_stats_rank3_with_dynamic_shape(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._native_batch_norm_legit.no_stats(
+                    x,
+                    torch.tensor([2.0, 1.0, 0.5]),
+                    torch.tensor([0.5, -1.0, 0.0]),
+                    True,
+                    0.1,
+                    1e-03,
+                )[0]
+
+        input_specs = [
+            Input(
+                shape=(-1, 3, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3, 2), (2, 3, 8), (4, 3, 16))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            BatchNorm(),
+            input_specs,
+        )
+
+    def test_native_batchnorm_training_uses_batch_statistics(self):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.native_batch_norm.default(
+                    x,
+                    torch.tensor([2.0, 1.0, 0.5]),
+                    torch.tensor([0.5, -1.0, 0.0]),
+                    torch.zeros(FEATURE_NUM),
+                    torch.ones(FEATURE_NUM),
+                    True,
+                    0.1,
+                    1e-05,
+                )[0]
+
+        inputs = [torch.randn(2, 3, 8, 8) * 3 + 2]
+        self.run_test(
+            BatchNorm(),
+            inputs,
         )
 
 
