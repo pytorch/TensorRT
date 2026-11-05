@@ -3,6 +3,7 @@
 
 """Exercise automatic region registration through the public compile API."""
 
+import logging
 from dataclasses import replace
 from functools import partial
 from threading import Lock
@@ -10,9 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 import torch
-from kernels.conftest import skip_no_nvrtc
-
 import torch_tensorrt
+from kernels.conftest import skip_no_nvrtc
 from torch_tensorrt import kernels, region
 from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo.region_compilation import (
 )
 from torch_tensorrt.region import RegionCaptureError, RegionError
 
+from ._utils import capture_regions as _capture
 from ._utils import compile_regions as _compile
 
 # Use test-level skips: collection skips omit the JUnit ``type`` attribute and
@@ -141,6 +142,29 @@ class Unary(torch.nn.Module):
         return y
 
 
+class CudaUnary(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        spec = kernels.KernelSpec(
+            kernel_source=r"""
+            extern "C" __global__ void relu_add(const float* x, int n, float* y) {
+                int i = blockIdx.x * blockDim.x + threadIdx.x;
+                if (i < n) y[i] = fmaxf(x[i] + 0.25f, 0.0f);
+            }
+            """,
+            kernel_name="relu_add",
+            extras=[kernels.Numel("arg0")],
+            geometry=kernels.Elementwise(),
+        )
+        # Local kernel descriptors stay outside Dynamo's graph.
+        self.kernel_factory = lambda: spec
+
+    def forward(self, x):
+        with region.fused_kernel(kernel=self.kernel_factory):
+            y = torch.relu(x + 0.25)
+        return y
+
+
 def _assert_plugin_ownership(compiled, count):
     records = [
         record for record in get_region_records(compiled) if record.route == "plugin"
@@ -185,6 +209,88 @@ def test_unowned_context_does_not_resolve_or_register_a_kernel(monkeypatch):
     assert not get_region_records(exported.module())
 
 
+@pytest.mark.parametrize(
+    "misuse, message",
+    [
+        ("kernel", "kernel=lambda: my_kernel; got JITFunction"),
+        ("spec", "kernel=lambda: my_kernel; got KernelSpec"),
+        ("method", "kernel=lambda: my_kernel; got method"),
+        ("grid", "grid must be a function or functools.partial; got method"),
+    ],
+)
+def test_kernel_and_callbacks_must_be_functions(misuse, message):
+    spec = kernels.KernelSpec("unused source", "kernel")
+
+    class Misused(torch.nn.Module):
+        def kernel_factory(self):
+            return _unary_kernel
+
+        def launch_grid(self, inputs, outputs):
+            return _grid(inputs, outputs)
+
+        def forward(self, x):
+            options = {
+                "kernel": dict(kernel=_unary_kernel),
+                "spec": dict(kernel=spec),
+                "method": dict(kernel=self.kernel_factory),
+                "grid": dict(grid=self.launch_grid),
+            }[misuse]
+            with _fused(**options):
+                result = x.sin()
+            return result
+
+    x = torch.ones(2)
+    # Misuse fails eagerly, not only when compilation resolves the kernel.
+    with pytest.raises(TypeError, match=message):
+        Misused()(x)
+    # Capture reports it instead of Dynamo's constant-conversion failure.
+    with pytest.raises(Exception, match=message):
+        _capture(Misused(), x)
+
+
+@pytest.mark.parametrize(
+    "misuse, error, message",
+    [
+        (
+            "self",
+            RegionCaptureError,
+            "fused_kernel 'activation' options must be compile-time constants",
+        ),
+        (
+            "tensor",
+            RegionCaptureError,
+            "fused_kernel options must be compile-time constants: they cannot "
+            "hold tensors or symbolic sizes",
+        ),
+        ("int", TypeError, "must return a @triton.jit function .*; got int"),
+    ],
+)
+def test_capture_errors_explain_the_option_contract(misuse, error, message):
+    class Misused(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.kernel = _unary_kernel
+            self.scale = torch.nn.Parameter(torch.ones(1))
+
+        def forward(self, x):
+            options = {
+                "self": dict(kernel=lambda: self.kernel, name="activation"),
+                "tensor": dict(constexprs={"BLOCK": BLOCK, "SCALE": self.scale}),
+                "int": dict(kernel=lambda: 42),
+            }[misuse]
+            with _fused(**options):
+                result = torch.relu(x + 0.25)
+            return result
+
+    x = torch.randn(2, 8)
+    model = Misused()
+    torch.testing.assert_close(model(x), torch.relu(x + 0.25))
+    # Dynamo cannot pass a lambda over self or a tensor option to the compiler;
+    # errors raised by a factory that did run keep their own message.
+    with pytest.raises(error, match=message):
+        _capture(model, x)
+
+
 @requires_cuda_qdp
 def test_triton_region_is_one_plugin_in_a_real_engine():
     x = torch.randn(3, 129, device="cuda")
@@ -205,12 +311,73 @@ def test_triton_region_is_one_plugin_in_a_real_engine():
             op(x.to(torch.float16))
 
         engine = compiled.get_submodule(records[0].owner)
+        assert str(op) in engine.get_layer_info()
         graph = torch.fx.Graph()
         graph.output(graph.call_module("nested", (graph.placeholder("x"),)))
         wrapper = torch.fx.GraphModule({"nested": compiled}, graph)
         nested_record = replace(records[0], owner=None)
-        audit_region_placement(wrapper, [nested_record], require_plugins_in_trt=True)
+        audit_region_placement(wrapper, [nested_record], plugins_outside_trt="raise")
         assert wrapper.get_submodule(nested_record.owner) is engine
+
+
+@requires_cuda_qdp
+@pytest.mark.parametrize("cast", ["input", "output"])
+def test_plugin_reference_may_change_dtype(cast):
+    class Mixed(torch.nn.Module):
+        def forward(self, x):
+            with _fused(name="mixed"):
+                if cast == "input":
+                    y = torch.relu(x.float() + 0.25)
+                else:
+                    y = torch.relu(x + 0.25).float()
+            return y.half()
+
+    x = torch.randn(3, 129, device="cuda", dtype=torch.float16)
+    model = Mixed().eval()
+    with torch.inference_mode():
+        compiled = _compile(model, [x], require_full_compilation=True)
+        record = _assert_plugin_ownership(compiled, 1)[0]
+        torch.testing.assert_close(compiled(x), model(x))
+        assert record.plugin_op(x).dtype == torch.float32
+
+
+@requires_cuda_qdp
+@pytest.mark.parametrize("training", [False, True], ids=["eval", "train"])
+def test_plugin_region_accepts_only_disabled_dropout(training):
+    class BiasDropout(torch.nn.Module):
+        def forward(self, x):
+            with _fused(name="activation"):
+                y = torch.relu(torch.nn.functional.dropout(x + 0.25, 0.1, training))
+            return y
+
+    x = torch.randn(3, 129, device="cuda")
+    model = BiasDropout().eval()
+    if training:
+        with pytest.raises(RegionCaptureError, match="Random operations"):
+            _compile(model, [x])
+        return
+    with torch.inference_mode():
+        compiled = _compile(model, [x], require_full_compilation=True)
+        _assert_plugin_ownership(compiled, 1)
+        torch.testing.assert_close(compiled(x), model(x))
+
+
+@pytest.mark.parametrize("read_after", ["result", "input"])
+def test_plugin_region_cannot_output_its_input(read_after):
+    class PassThrough(torch.nn.Module):
+        def forward(self, x):
+            with _fused(name="cast"):
+                y = x.float()
+                z = torch.relu(y + 0.25)
+            # For a float32 x, y is x itself: export binds both reads to the cast.
+            return (y if read_after == "result" else x) * 2, z
+
+    # Capture cannot tell whether the kernel writes y, so it rejects the region
+    # rather than drop an output from the kernel's launch.
+    with pytest.raises(
+        RegionCaptureError, match="'cast#0' would output its input 'x' unchanged"
+    ):
+        _capture(PassThrough(), torch.randn(2, 8))
 
 
 @requires_cuda_qdp
@@ -239,21 +406,22 @@ def test_plugin_specializations_keep_shapes_and_storage_offsets_independent():
 
 @requires_cuda_qdp
 @pytest.mark.parametrize("with_parameter", [False, True])
-def test_plugin_inputs_follow_first_use_not_exported_placeholder_order(with_parameter):
+def test_plugin_inputs_follow_listed_order(with_parameter):
     class ReversedInputs(torch.nn.Module):
         def __init__(self):
             super().__init__()
             self.offset = torch.nn.Parameter(
-                torch.full((3, 17), 2.0, device="cuda"), requires_grad=False
+                torch.full((51,), 2.0, device="cuda"), requires_grad=False
             )
 
         def forward(self, x, y):
-            # First use puts y first; subtraction exposes reversed bindings.
-            with _fused(lambda: _subtract_kernel):
-                result = y - (self.offset if with_parameter else x)
+            second = self.offset if with_parameter else x
+            # The view reads second first; subtraction exposes reversed bindings.
+            with _fused(lambda: _subtract_kernel, inputs=(y, second)):
+                result = y - second.view(3, 17)
             return result
 
-    x = torch.full((3, 17), -3.0, device="cuda")
+    x = torch.full((51,), -3.0, device="cuda")
     y = torch.arange(51, device="cuda", dtype=torch.float32).reshape(3, 17) + 10
     model = ReversedInputs().eval()
     with torch.inference_mode():
@@ -263,6 +431,21 @@ def test_plugin_inputs_follow_first_use_not_exported_placeholder_order(with_para
         torch.testing.assert_close(compiled(x, y), expected)
         second = model.offset if with_parameter else x
         torch.testing.assert_close(record.plugin_op(y, second), expected)
+
+
+def test_plugin_inputs_must_be_listed_for_multiple_tensors():
+    class Unlisted(torch.nn.Module):
+        def forward(self, x, y):
+            with _fused(lambda: _subtract_kernel):
+                result = y - x
+            return result
+
+    with pytest.raises(TypeError, match="tuple or list of tensors"):
+        with _fused(inputs=torch.ones(2)):
+            pass
+    # Capture rejects the ambiguous binding before any CUDA or TensorRT work.
+    with pytest.raises(RegionCaptureError, match="fused_kernel .* pass inputs="):
+        _capture(Unlisted(), torch.ones(2, 8), torch.ones(2, 8))
 
 
 @requires_cuda_qdp
@@ -304,31 +487,8 @@ def test_multioutput_plugin_derives_different_output_shapes(use_fast_partitioner
 @requires_cuda_qdp
 @skip_no_nvrtc
 def test_cuda_kernel_spec_infers_inputs_and_outputs():
-    spec = kernels.KernelSpec(
-        kernel_source=r"""
-        extern "C" __global__ void relu_add(const float* x, int n, float* y) {
-            int i = blockIdx.x * blockDim.x + threadIdx.x;
-            if (i < n) y[i] = fmaxf(x[i] + 0.25f, 0.0f);
-        }
-        """,
-        kernel_name="relu_add",
-        extras=[kernels.Numel("arg0")],
-        geometry=kernels.Elementwise(),
-    )
-
-    class CudaRegion(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            # Local kernel descriptors stay outside Dynamo's graph.
-            self.kernel_factory = lambda: spec
-
-        def forward(self, x):
-            with region.fused_kernel(kernel=self.kernel_factory):
-                y = torch.relu(x + 0.25)
-            return y
-
     x = torch.randn(3, 129, device="cuda")
-    model = CudaRegion().eval()
+    model = CudaUnary().eval()
     with torch.inference_mode():
         compiled = _compile(model, [x], require_full_compilation=True)
         _assert_plugin_ownership(compiled, 1)
@@ -339,7 +499,6 @@ def test_cuda_kernel_spec_infers_inputs_and_outputs():
 def test_cuda_region_checks_engine_pointer_dtypes_before_launch(monkeypatch):
     import tensorrt as trt
     from torch.fx.experimental.proxy_tensor import make_fx
-
     from torch_tensorrt.dynamo.region_compilation._plugins import register_region_plugin
     from torch_tensorrt.kernels import _derive, _register
     from torch_tensorrt.region._plugin import prepare_plugin
@@ -406,9 +565,9 @@ def test_repeated_plugin_scopes_with_parameter_and_torch_region_recompile():
         def forward(self, x):
             with region.execute_in_torch(name="torch"):
                 x = torch.sin(x)
-            with _fused(lambda: _bias_kernel, name="repeated"):
+            with _fused(lambda: _bias_kernel, name="repeated", inputs=(x, self.bias)):
                 x = torch.relu(x + self.bias)
-            with _fused(lambda: _bias_kernel, name="repeated"):
+            with _fused(lambda: _bias_kernel, name="repeated", inputs=(x, self.bias)):
                 x = torch.relu(x + self.bias)
             return x
 
@@ -447,6 +606,24 @@ def test_plugin_value_reused_after_torch_region_has_one_owner(use_fast_partition
 
     x = torch.randn(3, 17, device="cuda")
     model = Reused().eval()
+    with torch.inference_mode():
+        compiled = _compile(model, [x], use_fast_partitioner=use_fast_partitioner)
+        _assert_plugin_ownership(compiled, 1)
+        torch.testing.assert_close(compiled(x), model(x))
+
+
+@requires_cuda_qdp
+@pytest.mark.parametrize("use_fast_partitioner", [True, False])
+def test_plugin_result_is_one_of_several_engine_outputs(use_fast_partitioner):
+    class Returned(torch.nn.Module):
+        def forward(self, x):
+            with _fused():
+                y = torch.relu(x + 0.25)
+            # The engine returns the plugin result beside a value computed from it.
+            return y, y - 0.5
+
+    x = torch.randn(3, 17, device="cuda")
+    model = Returned().eval()
     with torch.inference_mode():
         compiled = _compile(model, [x], use_fast_partitioner=use_fast_partitioner)
         _assert_plugin_ownership(compiled, 1)
@@ -500,6 +677,18 @@ def test_plugin_region_rejects_final_pytorch_fallback():
         _compile(Unary().eval(), [x], min_block_size=10)
 
 
+@requires_cuda_qdp
+def test_plugin_region_dryrun_reports_final_pytorch_fallback(caplog, capsys):
+    x = torch.randn(3, 17, device="cuda")
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt"):
+        _compile(Unary().eval(), [x], min_block_size=10, dryrun=True)
+    # The dry run names the region that compiling without dryrun rejects.
+    messages = [record.getMessage() for record in caplog.records]
+    assert sum("'activation#0' must run in" in message for message in messages) == 1
+    report = capsys.readouterr().out
+    assert "Region: activation#0, fused_kernel region outside TensorRT" in report
+
+
 @pytest.mark.parametrize("field,value", [("route", "torch"), ("plugin_key", 123)])
 def test_lowering_cannot_change_plugin_policy(field, value):
     from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -547,6 +736,23 @@ def test_plugin_region_rejects_unsupported_tensor_boundaries(kind):
 
 
 @requires_cuda_qdp
+@pytest.mark.parametrize("model_type", [Unary, CudaUnary])
+def test_plugin_region_rejects_hardware_compatible_engines(monkeypatch, model_type):
+    def unexpected(*args, **kwargs):
+        raise AssertionError("A conflicting region attempted kernel registration")
+
+    monkeypatch.setattr(kernels, "triton_op", unexpected)
+    monkeypatch.setattr(kernels, "cuda_kernel_op", unexpected)
+    # Plugin PTX targets the compiling GPU: stop before compiling any kernel.
+    with pytest.raises(RegionError, match="incompatible with hardware_compatible=True"):
+        _compile(
+            model_type().eval(),
+            [torch.randn(3, 17, device="cuda")],
+            hardware_compatible=True,
+        )
+
+
+@requires_cuda_qdp
 def test_plugin_region_rejects_dynamic_shapes():
     shape = torch_tensorrt.Input(
         min_shape=(2, 17),
@@ -559,19 +765,20 @@ def test_plugin_region_rejects_dynamic_shapes():
 
 
 @requires_cuda_qdp
-@pytest.mark.parametrize("invalid", ["dtype", "extras", "constexpr"])
+@pytest.mark.parametrize("invalid", ["dtype", "extras", "constexpr", "grid"])
 def test_plugin_region_rejects_invalid_launch_contract(invalid):
     class InvalidLaunch(torch.nn.Module):
         def forward(self, x):
             with region.fused_kernel(
                 kernel=lambda: _unary_kernel,
+                name="launch",
                 signature=(
                     {"x": "*fp16", "n": "i32", "y": "*fp32"}
                     if invalid == "dtype"
                     else None
                 ),
                 constexprs={} if invalid == "constexpr" else {"BLOCK": BLOCK},
-                grid=_grid,
+                grid=None if invalid == "grid" else _grid,
                 extra_args_fn=None if invalid == "extras" else _extras,
             ):
                 y = torch.relu(x + 0.25)
@@ -581,6 +788,9 @@ def test_plugin_region_rejects_invalid_launch_contract(invalid):
         "dtype": "signature parameter",
         "extras": "no extra_args_fn",
         "constexpr": "missing constexpr values",
+        "grid": "requires a grid callback",
     }[invalid]
-    with pytest.raises((RegionError, ValueError), match=error):
+    with pytest.raises((RegionError, ValueError), match=error) as caught:
         _compile(InvalidLaunch().eval(), [torch.randn(3, 17, device="cuda")])
+    # Name the user's region, not only the generated plugin operator.
+    caught.match("'launch#0'")

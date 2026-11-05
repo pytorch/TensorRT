@@ -18,7 +18,6 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,

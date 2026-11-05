@@ -3,9 +3,22 @@
 
 """Install region execution backends after all compiler graph rewriting."""
 
+import functools
+
 import torch
 
 from ._types import REGION_META_KEY, audit_region_placement, get_region_records
+
+
+def _compile_lazily(child: torch.fx.GraphModule, backend: str) -> None:
+    # Keep the FX body; compile lazily without nesting CUDA captures.
+    child.compile(
+        backend=backend,
+        fullgraph=True,
+        dynamic=False,
+        options={"triton.cudagraphs": False},
+    )
+    child._torch_tensorrt_compiled_backend = backend
 
 
 def configure_region_backends(gm: torch.fx.GraphModule) -> None:
@@ -28,14 +41,10 @@ def configure_region_backends(gm: torch.fx.GraphModule) -> None:
                     and child._compiled_call_impl is not None
                 ):
                     continue
-                # Keep the FX body; compile lazily without nesting CUDA captures.
-                child.compile(
-                    backend=backend,
-                    fullgraph=True,
-                    dynamic=False,
-                    options={"triton.cudagraphs": False},
-                )
-                child._torch_tensorrt_compiled_backend = backend
+                compile_child = functools.partial(_compile_lazily, backend=backend)
+                compile_child(child)
+                # GraphModule deepcopy drops the compiled callable; compile copies too.
+                child._register_deepcopy_hook(compile_child)
             elif isinstance(child, torch.fx.GraphModule):
                 visit(child)
 

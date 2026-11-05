@@ -496,8 +496,10 @@ def export(
     shared payload value as immutable. Engines are never deep copied, since that
     would serialize and deserialize them, but each one is decoded into a byte
     buffer the returned program owns, so the bytes of a multi-gigabyte engine are
-    resident twice while both programs are alive. Method mappings preserve
-    independent entry points but do not imply shared mutable state between them.
+    resident twice while both programs are alive. A CUDA weight read by an operator
+    outside every delegate is copied too, to host memory, since ExecuTorch runs such
+    operators on its CPU kernels. Method mappings preserve independent entry points
+    but do not imply shared mutable state between them.
 
     When exporting more than one method, give each method its own partitioner
     instances via ``partitioners={"method": [...]}``. A partitioner may carry
@@ -655,6 +657,7 @@ def export(
     from torch_tensorrt.dynamo._exporter import _declare_aliased_kv_mutations_on_ep
     from torch_tensorrt.executorch import TensorRTPartitioner, get_edge_compile_config
     from torch_tensorrt.executorch._export_utils import (
+        move_constants_to_host,
         replace_execute_engine,
         stage_exported_program,
         validate_engine_program,
@@ -853,5 +856,7 @@ def export(
     # opt-in, and would leave a sibling method repaired or not according to
     # whether some other method asked for zero-copy.
     for name in edge_manager.methods:
-        order_copyback_mutations_first(edge_manager.exported_program(name))
+        program = edge_manager.exported_program(name)
+        order_copyback_mutations_first(program)
+        move_constants_to_host(program)
     return edge_manager

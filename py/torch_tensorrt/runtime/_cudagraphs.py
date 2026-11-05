@@ -6,7 +6,6 @@ import sys
 from typing import Any, Optional, Union
 
 import torch
-
 import torch_tensorrt
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,

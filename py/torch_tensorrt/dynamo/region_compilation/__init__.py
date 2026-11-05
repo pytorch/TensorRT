@@ -7,6 +7,7 @@ from torch_tensorrt.region._errors import RegionError
 
 from ._capture import (
     assert_no_unresolved_regions,
+    check_decomposed_regions,
     is_region_hop,
     materialize_regions,
     normalize_region_scopes,
@@ -28,6 +29,7 @@ __all__ = [
     "assert_no_unresolved_regions",
     "attach_region_records",
     "audit_region_placement",
+    "check_decomposed_regions",
     "configure_region_backends",
     "get_region_records",
     "is_region_hop",

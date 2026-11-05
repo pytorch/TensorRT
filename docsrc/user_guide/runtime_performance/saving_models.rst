@@ -371,7 +371,9 @@ methods share no state: two methods do not share a buffer unless you plan it tha
     program too, with no error. Build a new tensor instead.
 
     Engines are not shared. ``export()`` copies each engine into the Edge program once, so a large
-    engine is in host memory twice while both programs exist.
+    engine is in host memory twice while both programs exist. A CUDA weight read by an operator
+    outside every delegate is not shared either: ExecuTorch runs such operators on its CPU kernels,
+    so the Edge program holds a host copy of it.
 
 .. _executorch_zero_copy_kv:
 

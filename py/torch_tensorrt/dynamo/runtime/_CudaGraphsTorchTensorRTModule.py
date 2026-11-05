@@ -3,14 +3,19 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
+from contextlib import nullcontext
 from typing import Any, List, Optional, Sequence, Tuple
 
 import torch
-from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
-
 import torch_tensorrt
+from torch.fx._pytree import tree_flatten_spec
+from torch.fx.experimental.proxy_tensor import (
+    disable_autocast_cache,
+    unset_fake_temporarily,
+)
+from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
 from torch_tensorrt.dynamo import partitioning
 
 logger = logging.getLogger(__name__)
@@ -47,6 +52,48 @@ def _unflatten_inputs(
     return processed_inputs[0], processed_inputs[1]
 
 
+# CUDA allocations start on 256-byte boundaries. Static input copies keep each
+# input's address modulo this, so kernels take the caller's vectorized paths.
+_ALIGNMENT = 256
+
+
+def _byte_span(tensor: torch.Tensor) -> Tuple[int, int]:
+    """Return the storage bytes [start, end) from a tensor's first element to its last."""
+    itemsize = tensor.element_size()
+    start = tensor.storage_offset() * itemsize
+    if not tensor.numel():
+        return start, start
+    last = sum((n - 1) * s for n, s in zip(tensor.shape, tensor.stride()))
+    return start, start + (last + 1) * itemsize
+
+
+def _region_input_layout(
+    inputs: Sequence[torch.Tensor],
+) -> Tuple[List[Tuple[int, int, int]], List[Tuple[int, int]]]:
+    """Group region inputs whose storage bytes overlap, such as chunk results.
+
+    Returns the bytes each group reaches as (an input's index, start, end), in
+    input order, and each input's group and byte offset in it. An input that
+    overlaps no other forms its own group, wherever it sits in its storage.
+    """
+    spans = [_byte_span(tensor) for tensor in inputs]
+    storages = [tensor.untyped_storage()._cdata for tensor in inputs]
+    groups: List[Tuple[List[int], int, int]] = []
+    for i in sorted(range(len(inputs)), key=lambda i: (storages[i], spans[i])):
+        start, end = spans[i]
+        members, low, high = groups[-1] if groups else ([], 0, 0)
+        if members and storages[members[0]] == storages[i] and start < high:
+            groups[-1] = (members + [i], low, max(high, end))
+        else:
+            groups.append(([i], start, end))
+    groups.sort(key=lambda group: min(group[0]))
+    placements = [(0, 0)] * len(inputs)
+    for index, (members, low, _) in enumerate(groups):
+        for i in members:
+            placements[i] = (index, spans[i][0] - low)
+    return [(members[0], low, high) for members, low, high in groups], placements
+
+
 class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """This Wrapper runtime module is to record/replay whole cuda graph in sub modules
 
@@ -62,10 +109,12 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     ):
         super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
+        self._forward_signature = inspect.signature(compiled_module.forward)
         self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []
         self._input_storage_buffers: List[torch.Tensor] = []
+        self._input_layout = _region_input_layout([])
         self._output_buffers: Any = None
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.use_output_allocator_outputs = False
@@ -120,10 +169,25 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         self.compiled_module(*args, **kwargs)
                 torch.cuda.current_stream().wait_stream(s)
 
+    def _flatten_inputs(self, args: Any, kwargs: Any) -> List[Any]:
+        """Flatten a call into the compile-time input order that the buffers use.
+
+        Bind the call as the compiled module's generated forward does: one
+        parameter per top-level input, the positional inputs first, then the
+        keyword inputs in compile-time order. Callers may pass an input by
+        position or by keyword, and may order keywords and dict keys freely.
+        """
+        spec = self.compiled_module._in_spec
+        bound = self._forward_signature.bind(*args, **kwargs)
+        values = tuple(bound.arguments.values())
+        num_args = spec.child(0).num_children
+        kwarg_values = dict(zip(spec.child(1).context, values[num_args:]))
+        inputs: List[Any] = tree_flatten_spec((values[:num_args], kwarg_values), spec)
+        return inputs
+
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """Invalidate capture when inputs need different buffers or kernels."""
         if self._has_torch_regions:
-            storage_groups: dict[int, int] = {}
             metadata = []
             for tensor in inputs:
                 if (
@@ -138,17 +202,12 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         "CUDA graph capture of PyTorch regions requires strided CUDA "
                         "tensor inputs without quantization or conjugate/negative view bits"
                     )
-                storage = tensor.untyped_storage()
-                group = storage_groups.setdefault(storage._cdata, len(storage_groups))
                 metadata.append(
                     (
                         tuple(tensor.shape),
                         tensor.dtype,
                         tensor.device,
                         tensor.stride(),
-                        tensor.storage_offset(),
-                        storage.nbytes(),
-                        group,
                         tensor.requires_grad,
                     )
                 )
@@ -156,7 +215,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 raise RuntimeError(
                     "CUDA graph capture of PyTorch regions requires inputs on one CUDA device"
                 )
-            new_shape_key: Tuple[Any, ...] = tuple(metadata)
+            self._input_layout = _region_input_layout(inputs)
+            _, placements = self._input_layout
+            new_shape_key: Tuple[Any, ...] = tuple(zip(metadata, placements))
         else:
             new_shape_key = tuple((tuple(t.shape), t.dtype, t.device) for t in inputs)
 
@@ -172,33 +233,34 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def _copy_region_inputs(
         self, inputs: Sequence[torch.Tensor], *, recapture: bool
     ) -> None:
-        """Copy backing storage once, preserving input views and shared storage."""
+        """Copy the storage bytes inputs reach, once for inputs that overlap."""
+        groups, placements = self._input_layout
+        sources = [
+            torch.empty(0, dtype=torch.uint8, device=inputs[i].device).set_(
+                inputs[i].untyped_storage(), start, (end - start,), (1,)
+            )
+            for i, start, end in groups
+        ]
         if recapture:
-            self._input_buffers = []
             self._input_storage_buffers = []
-        storage_groups: dict[int, int] = {}
-        for tensor in inputs:
-            storage = tensor.untyped_storage()
-            group = storage_groups.get(storage._cdata)
-            if group is None:
-                group = len(storage_groups)
-                storage_groups[storage._cdata] = group
-                # as_strided may read storage outside the input's visible elements.
-                source = torch.empty(0, dtype=torch.uint8, device=tensor.device).set_(
-                    storage, 0, (storage.nbytes(),), (1,)
+            for source in sources:
+                pad = source.data_ptr() % _ALIGNMENT
+                buffer = torch.empty(
+                    pad + source.numel(), dtype=torch.uint8, device=source.device
                 )
-                if recapture:
-                    self._input_storage_buffers.append(source.clone())
-                else:
-                    self._input_storage_buffers[group].copy_(source)
-            if recapture:
+                self._input_storage_buffers.append(buffer[pad:])
+            self._input_buffers = []
+            for tensor, (group, offset) in zip(inputs, placements):
+                buffer = self._input_storage_buffers[group]
                 view = torch.empty(0, dtype=tensor.dtype, device=tensor.device).set_(
-                    self._input_storage_buffers[group].untyped_storage(),
-                    tensor.storage_offset(),
+                    buffer.untyped_storage(),
+                    (buffer.storage_offset() + offset) // tensor.element_size(),
                     tensor.shape,
                     tensor.stride(),
                 )
                 self._input_buffers.append(view.requires_grad_(tensor.requires_grad))
+        for buffer, source in zip(self._input_storage_buffers, sources):
+            buffer.copy_(source)
 
     def _reset_captured_graph(self) -> None:
         if self.cudagraph:
@@ -285,9 +347,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self._engine_stream.synchronize()
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
-        inputs, _ = tree_flatten((args, kwargs))
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
+            inputs = self._flatten_inputs(args, kwargs)
             shape_changed = self.validate_input_shapes(inputs)
 
             current_device = (
@@ -371,7 +433,16 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if caller_on_default:
                 self._engine_stream.wait_stream(self._caller_stream)
 
-            with torch.cuda.stream(self._engine_stream):
+            # Make the graph record autocast's casts: cached copies are freed
+            # when the caller's autocast scope exits. Dynamo guards on the cache
+            # flag, so warmup runs with the same setting and the flag is left
+            # alone when CUDA autocast is off.
+            uncached_casts = (
+                disable_autocast_cache()
+                if torch.is_autocast_enabled("cuda")
+                else nullcontext()
+            )
+            with torch.cuda.stream(self._engine_stream), uncached_casts:
                 if need_cudagraphs_record:
                     self._warm_up_regions(args, kwargs)
                     self._check_monolithic_capturability(self._engine_stream)

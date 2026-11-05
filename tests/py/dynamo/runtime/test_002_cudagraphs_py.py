@@ -7,7 +7,12 @@ import unittest
 
 import torch
 import torch_tensorrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch.utils._pytree import tree_structure
+from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
+    CudaGraphsTorchTensorRTModule,
+)
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -223,6 +228,40 @@ class TestCudagraphsPython(TestCase):
                 msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
             )
         torch._dynamo.reset()
+
+    @parameterized.expand(
+        [
+            ("tensor", lambda y: y),
+            ("one_tuple", lambda y: (y,)),
+            ("pair", lambda y: (y, y - 1)),
+            ("nested_dict", lambda y: {"pair": (y, [y - 1]), "constant": 7}),
+        ]
+    )
+    def test_cudagraphs_fallback_preserves_output_structure(self, _, pack):
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                return pack(torch.relu((x + 2) * 0.5))
+
+        x = torch.randn(2, 8, device="cuda")
+        # The PyTorch fallback for mul selects the whole-graph wrapper.
+        compiled = torch_tensorrt.compile(
+            SampleModel().eval().cuda(),
+            ir="dynamo",
+            inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        with torch.no_grad():
+            expected = compiled(x)
+            with torch_tensorrt.runtime.enable_cudagraphs(compiled) as cg:
+                self.assertIsInstance(cg, CudaGraphsTorchTensorRTModule)
+                first = cg(x)
+                replay = cg(x + 1)
+            # Same containers as the compiled module (assert_close alone accepts
+            # a list for a tuple); the replay must not overwrite the first result.
+            self.assertEqual(tree_structure(first), tree_structure(expected))
+            torch.testing.assert_close(first, expected)
+            torch.testing.assert_close(replay, compiled(x + 1))
 
     @unittest.skipIf(
         os.environ.get("CI_BUILD") == "1",

@@ -3,10 +3,12 @@
 
 """Verify region backend selection, real Inductor execution, and TRT placement."""
 
+import copy
+import logging
+
 import pytest
 import torch
 from torch.utils._triton import has_triton
-
 from torch_tensorrt import region
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_manager import DynamoPassManager
@@ -19,7 +21,10 @@ from torch_tensorrt.dynamo.region_compilation import (
     normalize_region_scopes,
     region_hop_records,
 )
-from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+from torch_tensorrt.dynamo.region_compilation._types import (
+    REGION_ID_META_KEY,
+    REGION_META_KEY,
+)
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.region._session import RegionCompilationSession
 
@@ -89,6 +94,35 @@ def test_default_and_unowned_annotations_do_not_compile(monkeypatch):
     assert eager_graph.get_submodule(record.child_target)._compiled_call_impl is None
 
 
+@pytest.mark.parametrize("trace", ["strict_export", "nonstrict_export", "compile"])
+def test_unowned_trace_warns_once(trace, monkeypatch, caplog):
+    monkeypatch.setattr(region._context, "_warned_unowned_trace", False)
+    logger = region._context.logger.name
+
+    def messages():
+        return [r.getMessage() for r in caplog.records if r.name == logger]
+
+    model = RegionModel(backend="eager").eval()
+    x = torch.randn(2, 8)
+    with caplog.at_level(logging.WARNING, logger=logger):
+        model(x)
+        assert get_region_records(capture(model, x))
+        assert not messages()
+        for _ in range(2):
+            torch._dynamo.reset()
+            if trace == "compile":
+                # fullgraph: the warning must not add a graph break.
+                traced = torch.compile(model, backend="eager", fullgraph=True)
+            else:
+                strict = trace == "strict_export"
+                traced = torch.export.export(model, (x,), strict=strict).module()
+                assert not get_region_records(traced)
+            torch.testing.assert_close(traced(x), model(x))
+    torch._dynamo.reset()
+    assert len(messages()) == 1
+    assert "torch_tensorrt.compile(..., ir='dynamo', strict=True)" in messages()[0]
+
+
 def test_backend_metadata_survives_capture_with_repeated_names():
     class Mixed(torch.nn.Module):
         def forward(self, x):
@@ -107,7 +141,9 @@ def test_backend_metadata_survives_capture_with_repeated_names():
             "eager",
             "inductor",
         ]
-        graph = materialize_regions(exported.run_decompositions().module())
+        graph = materialize_regions(
+            exported.run_decompositions().module(), exported.graph_module
+        )
     records = get_region_records(graph)
     assert [r.backend for r in records] == ["eager", "inductor"]
     assert len({r.id for r in records}) == 2
@@ -139,7 +175,9 @@ def test_backend_metadata_loss_or_change_is_rejected(stage):
                     exported.graph_module, CompilationSettings()
                 )
             return
-        graph = materialize_regions(exported.run_decompositions().module())
+        graph = materialize_regions(
+            exported.run_decompositions().module(), exported.graph_module
+        )
     call = next(node for node in graph.graph.nodes if REGION_META_KEY in node.meta)
     del call.meta[REGION_META_KEY]["backend"]
     with pytest.raises(region.RegionError, match="backend"):
@@ -167,6 +205,21 @@ def test_real_inductor_is_lazy_reused_and_keeps_graph(observed_inductor):
     assert isinstance(child, torch.fx.GraphModule)
     assert str(child.graph) == before
     audit_region_placement(graph, [record])
+
+
+def test_deep_copies_keep_the_backend(observed_inductor):
+    x = torch.randn(2, 8)
+    model = RegionModel().eval()
+    graph = capture(model, x)
+    configure_region_backends(graph)
+    for _ in range(2):
+        # Copies, and copies of copies, must not run the region eagerly.
+        graph = copy.deepcopy(graph)
+        audit_region_placement(graph, get_region_records(graph))
+        with torch.no_grad():
+            torch.testing.assert_close(graph(x), model(x))
+    assert len(observed_inductor.requests) == 3
+    assert observed_inductor.executions == 2
 
 
 @pytest.mark.parametrize("suppress_errors", [False, True])
@@ -249,3 +302,46 @@ def test_dryrun_does_not_install_backend(observed_inductor):
         torch.testing.assert_close(compiled(x), model(x))
     assert observed_inductor.counter.frame_count == 0
     assert observed_inductor.executions == 0
+
+
+class LogProbs(torch.nn.Module):
+    def __init__(self, backend):
+        super().__init__()
+        self.backend = backend
+
+    def forward(self, x):
+        x = x + 1
+        with region.execute_in_torch(backend=self.backend):
+            # Torch-TensorRT's table lowers these to log(softmax(x)) and a copy.
+            y = torch.log_softmax(x, dim=-1).view(2, 2)
+        return y * 2
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+@pytest.mark.parametrize(
+    "backend",
+    [
+        "eager",
+        pytest.param(
+            "inductor",
+            marks=pytest.mark.skipif(
+                not has_triton(), reason="CUDA Inductor requires Triton"
+            ),
+        ),
+    ],
+)
+def test_region_runs_its_captured_operations(backend):
+    # log(softmax(x)) underflows to -inf for these logits; log_softmax does not.
+    x = torch.tensor([[0.0, -200.0, 50.0, -1000.0]], device="cuda")
+    model = LogProbs(backend).cuda().eval()
+    compiled = compile_regions(model, [x])
+    (child,) = (
+        module
+        for module in compiled.modules()
+        if REGION_ID_META_KEY in getattr(module, "meta", {})
+    )
+    targets = {node.target for node in child.graph.nodes}
+    assert torch.ops.aten.log.default not in targets
+    assert torch.ops.aten._reshape_copy.default not in targets
+    with torch.no_grad():
+        torch.testing.assert_close(compiled(x), model(x))

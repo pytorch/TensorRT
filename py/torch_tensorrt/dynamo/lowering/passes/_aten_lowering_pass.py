@@ -8,7 +8,6 @@ from typing import Any, Callable, List, Optional, Sequence, Union
 import torch
 import torch.utils._pytree as pytree
 from torch.fx.experimental.symbolic_shapes import statically_known_true
-
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater

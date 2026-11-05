@@ -7,7 +7,6 @@ from unittest import mock
 
 import pytest
 import torch
-
 import torch_tensorrt
 from torch_tensorrt import region
 from torch_tensorrt.dynamo._exporter import export, transform

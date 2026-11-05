@@ -20,8 +20,8 @@ The zero-argument kernel factory keeps the Triton object outside model tracing.
 The compiled model contains one TensorRT engine: native TensorRT arithmetic
 before and after a plugin layer running the fused Triton kernel. Fusion applies
 to the operations inside the annotated scope; the surrounding TensorRT layers
-remain separate. The example checks plugin ownership and prints the engine's
-layer information to show the generated plugin explicitly.
+remain separate. The example checks that the model compiles to one engine and
+prints that engine's layer information, which lists the generated plugin layer.
 
 The supplied kernel must implement the entire annotated computation. This
 example uses equal-shaped contiguous CUDA float32 inputs and checks numerical
@@ -33,12 +33,10 @@ import json
 
 import tensorrt.plugin as trtp
 import torch
+import torch_tensorrt
 import triton
 import triton.language as tl
-
-import torch_tensorrt
-from torch_tensorrt.dynamo.region_compilation import get_region_records
-from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.runtime import TorchTensorRTModule
 
 BLOCK = 256
 
@@ -71,6 +69,7 @@ class Model(torch.nn.Module):
         x = x + 1.0
         with torch_tensorrt.region.fused_kernel(
             kernel=lambda: bias_relu_scale_kernel,
+            inputs=(x, bias, scale),
             constexprs={"BLOCK": BLOCK},
             grid=launch_grid,
             extra_args_fn=kernel_extras,
@@ -99,16 +98,6 @@ def main():
     )
     engines = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
     assert len(engines) == 1, f"Expected one TensorRT engine, got {len(engines)}"
-    records = [r for r in get_region_records(compiled) if r.route == "plugin"]
-    assert len(records) == 1, f"Expected one plugin region, got {len(records)}"
-    record = records[0]
-    assert record.owner is not None, "The plugin region has no owning engine"
-    engine = compiled.get_submodule(record.owner)
-    assert engine is engines[0], "The plugin must belong to the single TensorRT engine"
-    # The outer FX graph only shows an engine call. Inspect the built engine
-    # itself to verify that it contains the generated plugin operator.
-    layer_info = engine.get_layer_info()
-    assert str(record.plugin_op) in layer_info, "Plugin missing from the built engine"
 
     with torch.inference_mode():
         torch.testing.assert_close(compiled(*inputs), model(*inputs))
@@ -117,13 +106,14 @@ def main():
         torch.testing.assert_close(compiled(*other), model(*other), equal_nan=True)
     print("Compiled graph (one TensorRT engine call):")
     print(compiled.graph)
-    print(f"\nExecution inside TensorRT engine {record.owner}:")
+    print("\nExecution inside the TensorRT engine:")
     print("  TensorRT: x + 1.0")
     print("  -> TensorRT plugin: bias_relu_scale_kernel (add bias -> ReLU -> scale)")
     print("  -> TensorRT: x - 0.5")
-    print(f"Plugin operator: {record.plugin_op}")
+    # The graph shows only the engine call. TensorRT's engine inspector lists the
+    # layers inside it, including the generated plugin layer.
     print("Engine layers (from TensorRT's inspector):")
-    print(json.dumps(json.loads(layer_info)["Layers"], indent=2))
+    print(json.dumps(json.loads(engines[0].get_layer_info())["Layers"], indent=2))
     print(
         "One TensorRT engine includes the fused kernel; both input cases match PyTorch."
     )

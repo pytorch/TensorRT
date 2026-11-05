@@ -12,7 +12,6 @@ from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partit
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.utils._pytree import tree_flatten
-
 from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,

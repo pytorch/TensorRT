@@ -25,8 +25,6 @@ from typing import (
 )
 
 import torch
-from typing_extensions import TypeGuard
-
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
@@ -34,10 +32,10 @@ from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
+from typing_extensions import TypeGuard
 
 if ENABLED_FEATURES.fx_frontend:
     import torch.fx
-
     from torch_tensorrt.fx import InputTensorSpec
     from torch_tensorrt.fx.lower import compile as fx_compile
     from torch_tensorrt.fx.utils import LowerPrecision
@@ -55,7 +53,6 @@ if ENABLED_FEATURES.torchscript_frontend:
 
 if ENABLED_FEATURES.dynamo_frontend:
     from torch.export import ExportedProgram
-
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
@@ -946,15 +943,18 @@ def save(
             )
 
             _validate_region_serialization(module)
+            # Both formats serialize the legacy exporter's inlined copy, which is also
+            # what torch_tensorrt.executorch.export(module) lowers. Retracing and the
+            # other formats would trace or recompile the regions instead.
             if (
-                output_format != "exported_program"
+                output_format not in ("exported_program", "executorch")
                 or retrace
                 or use_legacy_exporter is False
             ):
                 raise RegionError(
                     "Saving annotated regions currently requires "
-                    "output_format='exported_program', retrace=False, "
-                    "use_legacy_exporter=True"
+                    "output_format='exported_program' or 'executorch' with "
+                    "retrace=False and use_legacy_exporter=True"
                 )
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}

@@ -25,7 +25,6 @@ from torch.export.exported_program import (
     TensorArgument,
 )
 from torch.fx.graph import _PyTreeCodeGen
-
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
@@ -174,19 +173,9 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
-    # Reject unsupported backends before deepcopy drops their compiled dispatchers.
+    # Reject regions the artifact cannot preserve before cloning the module.
     _validate_region_serialization(gm)
-    original = gm
     gm = copy.deepcopy(gm)
-    if get_region_records(original):
-        # GraphModule deepcopy drops these execution annotations.
-        for name, child in original.named_modules():
-            for attr in (
-                "_torch_tensorrt_region_id",
-                "_torch_tensorrt_plugin_regions",
-            ):
-                if hasattr(child, attr):
-                    setattr(gm.get_submodule(name), attr, getattr(child, attr))
 
     # Expand regions before their enclosing fallback partitions.
     inline_torch_region_modules(gm)

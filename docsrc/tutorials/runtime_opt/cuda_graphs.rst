@@ -47,7 +47,10 @@ compiled model:
   entire forward pass — TRT subgraphs *and* PyTorch subgraphs between them — is
   captured as a single CUDA graph via ``CudaGraphsTorchTensorRTModule``. This
   eliminates inter-subgraph dispatch overhead even when the model is partially
-  executed in PyTorch.
+  executed in PyTorch. ``cg_module`` returns outputs in the same structure as the
+  compiled module (for example, a one-element tuple stays a tuple and a dict stays
+  a dict). Output tensors are copies, so results from earlier calls stay valid
+  after the graph replays.
 
   .. code-block:: python
 
@@ -73,19 +76,28 @@ You can also enable CUDA graphs globally for the session (without a context mana
 Prefer the context manager over ``set_cudagraphs_mode`` — it guarantees the mode is
 restored even if an exception occurs.
 
+.. _cuda_graphs_recording:
+
 How Recording Works
 ^^^^^^^^^^^^^^^^^^^^
 
 1. **Warm-up**: Three forward passes on a side CUDA stream. This forces memory
    allocations and kernel initializations to happen *before* recording, so they are
-   excluded from the graph.
+   excluded from the graph. Models with :ref:`PyTorch regions <execute_in_torch>`
+   instead warm up before each recording, on the capture stream and in the
+   caller's grad and autocast context.
 
-2. **Input shape tracking**: A shape key is computed from all input shapes. If the
-   key changes between calls, the captured graph is reset and re-recorded for the new
-   shapes.
+2. **Input shape tracking**: A key is computed from each input's shape, dtype, and
+   device. If the key or the caller's CUDA stream changes between calls, the
+   captured graph is reset and re-recorded. For models with PyTorch regions, the
+   key also covers strides, ``requires_grad``, and how inputs overlap in memory,
+   but not where a sliced input starts in a larger tensor. Changing the grad,
+   inference, or autocast mode also re-records these models. Each recording
+   synchronizes the device and empties the PyTorch caching allocator, so avoid
+   alternating between shapes, layouts, or streams.
 
-3. **Replay**: On a shape-key cache hit, input tensors are copied into pre-allocated
-   buffers and the captured graph is replayed in a single submission.
+3. **Replay**: Otherwise, input tensors are copied into pre-allocated buffers and
+   the captured graph is replayed in a single submission.
 
 Limitations
 ^^^^^^^^^^^

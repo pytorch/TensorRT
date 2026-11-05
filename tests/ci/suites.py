@@ -357,8 +357,10 @@ _L2: list[Suite] = [
         lanes=("nightly",),
         paths=(
             "executorch/",
-            # The regular region suite skips this case without ExecuTorch installed.
+            # The regular region suite skips these cases without ExecuTorch installed.
             "regions/test_fused_op.py::test_export_retains_custom_op[executorch]",
+            "regions/test_serialization.py::test_save_executorch_runs_region_program",
+            "regions/test_serialization.py::test_save_executorch_delegates_engines_around_region",
         ),
         keyword=(
             # The pairing test is the one check here that needs a real ExecuTorch installed, so
@@ -553,6 +555,8 @@ _PYTHON_ONLY: list[Suite] = [
             "executorch/test_cuda_graphs.py",
             "executorch/test_partitioner_target_device.py",
             "regions/test_fused_op.py::test_export_retains_custom_op[executorch]",
+            "regions/test_serialization.py::test_save_executorch_runs_region_program",
+            "regions/test_serialization.py::test_save_executorch_delegates_engines_around_region",
         ),
         setup=("executorch",),
         variants=("standard",),

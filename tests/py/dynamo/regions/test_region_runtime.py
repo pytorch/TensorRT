@@ -8,9 +8,8 @@ from contextlib import contextmanager
 
 import pytest
 import torch
-from torch.utils._triton import has_triton
-
 import torch_tensorrt
+from torch.utils._triton import has_triton
 from torch_tensorrt import region
 from torch_tensorrt.dynamo.region_compilation import (
     get_region_records,
@@ -24,13 +23,14 @@ from torch_tensorrt.dynamo.region_compilation._types import (
 from torch_tensorrt.dynamo.region_compilation._validation import (
     validate_region_mutations,
 )
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
 from torch_tensorrt.region._session import RegionCompilationSession
 from torch_tensorrt.runtime import _cudagraphs
 
-from ._utils import compile_regions
+from ._utils import compile_regions, save_and_load
 
 
 class CaptureStub(torch.nn.Module):
@@ -312,6 +312,38 @@ def test_eager_region_cudagraph_recaptures_for_autocast_and_dtype():
         hook.remove()
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+def test_eager_region_cudagraph_replays_autocast_casts_across_scopes():
+    class LinearRegion(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(8, 8)
+
+        def forward(self, x):
+            with region.execute_in_torch():
+                return self.linear(x)
+
+    x = torch.randn(2, 8, device="cuda")
+    model = LinearRegion().cuda().eval()
+    compiled = compile_regions(model, [x])
+    with (
+        torch.no_grad(),
+        torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped,
+    ):
+        graph = None
+        for step in range(3):
+            # Autocast caches casts of leaves that require grad until its scope exits.
+            with torch.autocast("cuda", dtype=torch.float16):
+                value = (x + step).requires_grad_()
+                torch.testing.assert_close(wrapped(value), model(value))
+                assert torch.is_autocast_cache_enabled()
+            assert graph is None or wrapped.cudagraph is graph
+            graph = wrapped.cudagraph
+            # The region shares these parameters, so replays must cast their
+            # current values rather than a cached copy freed with the scope.
+            model.linear.weight.add_(1)
+
+
 @pytest.mark.skipif(
     not torch.cuda.is_available() or not has_triton(),
     reason="CUDA Inductor requires Triton support on the device",
@@ -346,11 +378,19 @@ def test_inductor_cudagraph_warms_up_actual_context_and_stream(observed_inductor
             torch.testing.assert_close(result, model(x.double()))
             assert result.dtype == torch.float64
             assert wrapped.cudagraph is not graph
+        # Warmup must compile with the autocast cache flag that capture uses.
+        with torch.autocast("cuda", dtype=torch.float16):
+            torch.testing.assert_close(wrapped(x), model(x))
     assert wrapped.cudagraph is None
     assert observed_inductor.capture_states and not any(
         observed_inductor.capture_states
     )
-    assert observed_inductor.counter.frame_count >= 2
+    frames = observed_inductor.counter.frame_count
+    assert frames >= 2
+    # Without autocast the cache flag is untouched, so plain calls reuse the region.
+    with torch.no_grad():
+        torch.testing.assert_close(compiled(x), model(x))
+    assert observed_inductor.counter.frame_count == frames
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
@@ -377,6 +417,57 @@ def test_region_cudagraph_preserves_output_pytree_and_previous_results(nested):
         assert wrapped.cudagraph is captured
         # Later replay must not overwrite tensors already returned to callers.
         torch.testing.assert_close(first, expected)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+@pytest.mark.parametrize("use_fast_partitioner", [True, False], ids=["fast", "global"])
+@pytest.mark.parametrize(
+    "backend,serialized",
+    [("eager", False), ("eager", True), ("inductor", False)],
+    ids=["eager-compiled", "eager-loaded", "inductor-compiled"],
+)
+def test_region_cudagraph_captures_tensorrt_engines_around_region(
+    tmp_path, backend, serialized, use_fast_partitioner
+):
+    if backend == "inductor" and not has_triton():
+        pytest.skip("CUDA Inductor requires Triton support on the device")
+
+    class EngineRegionEngine(torch.nn.Module):
+        def forward(self, x):
+            x = x * 3 + 1
+            with region.execute_in_torch(backend=backend):
+                x = torch.relu(x) * 2
+            return x - 1
+
+    storage = torch.randn(16, device="cuda")
+    x = storage.view(8, 2).t()
+    model = EngineRegionEngine().eval()
+    compiled = compile_regions(model, [x], use_fast_partitioner=use_fast_partitioner)
+    assert sum(isinstance(m, TorchTensorRTModule) for m in compiled.modules()) == 2
+    if serialized:
+        compiled = save_and_load(compiled, tmp_path)
+        assert sum("execute_engine" in str(n.target) for n in compiled.graph.nodes) == 2
+    with torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
+        with torch.no_grad():
+            first, expected = wrapped(x), model(x)
+            torch.testing.assert_close(first, expected)
+            # The first engine reads the transposed input through a static view.
+            assert wrapped._input_buffers[0].stride() == x.stride()
+            graph = wrapped.cudagraph
+            storage.add_(1)
+            torch.testing.assert_close(wrapped(x), model(x))
+            assert wrapped.cudagraph is graph
+            torch.testing.assert_close(first, expected)
+        with torch.inference_mode():
+            torch.testing.assert_close(wrapped(x), model(x))
+            assert wrapped.cudagraph is not graph
+            graph = wrapped.cudagraph
+            caller, stream = torch.cuda.current_stream(), torch.cuda.Stream()
+            stream.wait_stream(caller)
+            with torch.cuda.stream(stream):
+                torch.testing.assert_close(wrapped(x), model(x))
+                assert wrapped.cudagraph is not graph
+            caller.wait_stream(stream)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
@@ -407,7 +498,7 @@ def test_unannotated_global_fallback_cudagraph_preserves_input_layout():
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
 @pytest.mark.parametrize("serialized", [False, True], ids=["compiled", "loaded"])
-def test_region_cudagraph_preserves_input_strides_and_storage_offset(
+def test_region_cudagraph_preserves_input_strides_across_storage_offsets(
     tmp_path, serialized
 ):
     class StorageOrder(torch.nn.Module):
@@ -420,15 +511,7 @@ def test_region_cudagraph_preserves_input_strides_and_storage_offset(
     model = StorageOrder().eval()
     compiled = compile_regions(model, [x])
     if serialized:
-        path = tmp_path / "region.pt2"
-        torch_tensorrt.save(
-            compiled,
-            str(path),
-            output_format="exported_program",
-            retrace=False,
-            use_legacy_exporter=True,
-        )
-        compiled = torch_tensorrt.load(str(path)).module()
+        compiled = save_and_load(compiled, tmp_path)
         assert not get_region_records(compiled)
         torch.testing.assert_close(compiled(x), model(x))
     with torch.no_grad(), torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
@@ -439,42 +522,125 @@ def test_region_cudagraph_preserves_input_strides_and_storage_offset(
         torch.testing.assert_close(wrapped(x), model(x))
         assert wrapped.cudagraph is graph and wrapped._input_buffers[0] is buffer
 
-        for stride, offset in (((4, 1), 0), ((4, 1), 5), ((0, 1), 5)):
+        # New strides need a new capture; a new storage offset alone does not.
+        for stride, offset, recaptured in (
+            ((4, 1), 0, True),
+            ((4, 1), 5, False),
+            ((0, 1), 5, True),
+        ):
             x = storage.as_strided((4, 4), stride, offset)
             torch.testing.assert_close(wrapped(x), model(x))
-            assert wrapped.cudagraph is not graph
+            assert (wrapped.cudagraph is not graph) == recaptured
             graph = wrapped.cudagraph
             assert wrapped._input_buffers[0].stride() == stride
-            assert wrapped._input_buffers[0].storage_offset() == offset
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_region_cudagraph_preserves_shared_storage_and_copies_hidden_values():
-    class StorageViews(torch.nn.Module):
+def test_region_cudagraph_copies_only_the_bytes_inputs_reach():
+    class ReadsPastView(torch.nn.Module):
         def forward(self, x, y):
             with region.execute_in_torch():
-                return x.as_strided((4,), (1,), storage_offset=12).clone() + y[:4]
+                return x.as_strided((12,), (1,))[8:].clone() + y[:4]
 
     storage = torch.arange(16, device="cuda", dtype=torch.float32)
     x, y = storage[:8], storage[4:12]
-    model = StorageViews().eval()
-    # hints_wrapper disallows aliased capture inputs; runtime views can still alias.
-    compiled = compile_regions(model, [x, storage.clone()[4:12]])
+    model = ReadsPastView().eval()
+    compiled = compile_regions(model, [x, y])
+    torch.testing.assert_close(compiled(x, y), model(x, y))
     with torch.no_grad(), torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
-        first = wrapped(x, y)
-        torch.testing.assert_close(first, model(x, y))
-        assert torch._C._is_alias_of(*wrapped._input_buffers)
+        # y overlaps x, so their shared copy holds the bytes x reads past its view.
+        torch.testing.assert_close(wrapped(x, y), model(x, y))
+        # x's own copy ends at its last element, so reading past it fails.
+        with pytest.raises(RuntimeError, match="out of bounds"):
+            wrapped(x, y.clone())
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+def test_region_cudagraph_replays_slices_of_larger_tensors():
+    class Rows(torch.nn.Module):
+        def forward(self, x, y):
+            with region.execute_in_torch():
+                return torch.relu(x) + y
+
+    batch = torch.randn(64, 8, device="cuda")
+    other = torch.randn(9, 8, device="cuda")
+    model = Rows().eval()
+    compiled = compile_regions(model, [batch[:2].clone(), batch[2:4].clone()])
+    with torch.no_grad(), torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
+        torch.testing.assert_close(
+            wrapped(batch[:2], batch[2:4]), model(batch[:2], batch[2:4])
+        )
         graph = wrapped.cudagraph
-        # The model reads backing storage outside either visible input view.
-        storage[12:].add_(100)
+        # Offsets, the distance between disjoint inputs, and whether they share
+        # storage vary; shapes and strides do not.
+        pairs = [(batch[i : i + 2], batch[j : j + 2]) for i, j in ((60, 3), (7, 9))]
+        for x, y in pairs + [(other[3:5], batch[40:42])]:
+            torch.testing.assert_close(wrapped(x, y), model(x, y))
+        assert wrapped.cudagraph is graph
+        # Each input copies only its own two rows.
+        assert [b.numel() for b in wrapped._input_storage_buffers] == [2 * 8 * 4] * 2
+
+        # Inputs that overlap, such as interleaved chunks, share one copy of
+        # the bytes they reach, with the distance between them in the layout.
+        wide = batch.view(32, 16)
+        for x, y in [
+            (batch[7:9], batch[8:10]),
+            (batch[5:7],) * 2,
+            wide[1:3].chunk(2, -1),
+        ]:
+            torch.testing.assert_close(wrapped(x, y), model(x, y))
+            assert torch._C._is_alias_of(*wrapped._input_buffers)
+        assert [b.numel() for b in wrapped._input_storage_buffers] == [2 * 16 * 4]
+        # The copy keeps the inputs' alignment, which kernels can depend on.
+        alignments = [t.data_ptr() % 256 for t in (x, y, *wrapped._input_buffers)]
+        assert alignments[:2] == alignments[2:]
+        graph = wrapped.cudagraph
+        x, y = wide[30:].chunk(2, -1)
         torch.testing.assert_close(wrapped(x, y), model(x, y))
         assert wrapped.cudagraph is graph
-        torch.testing.assert_close(model(x, y), first + 100)
 
-        independent_y = storage.clone()[4:12]
-        torch.testing.assert_close(wrapped(x, independent_y), model(x, independent_y))
-        assert wrapped.cudagraph is not graph
-        assert not torch._C._is_alias_of(*wrapped._input_buffers)
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+@pytest.mark.parametrize("annotated", [True, False], ids=["region", "global_fallback"])
+def test_cudagraph_binds_keyword_inputs_by_name(annotated):
+    class KeywordInputs(torch.nn.Module):
+        def forward(self, x, *, scale, bias, extra):
+            if annotated:
+                with region.execute_in_torch():
+                    return (x * scale + bias) * extra["gain"] - extra["shift"]
+            return (x * scale + bias) * extra["gain"] - extra["shift"]
+
+    def inputs():
+        x, scale, bias, gain, shift = (torch.randn(2, 8).cuda() for _ in range(5))
+        extra = {"gain": gain, "shift": shift}
+        return x, {"scale": scale, "bias": bias, "extra": extra}
+
+    def reverse(kwargs):
+        # The same keywords and dict keys, inserted in the opposite order.
+        return {
+            key: dict(reversed(value.items())) if isinstance(value, dict) else value
+            for key, value in reversed(kwargs.items())
+        }
+
+    model = KeywordInputs().eval()
+    fallback = {} if annotated else {"torch_executed_ops": {torch.ops.aten.mul.Tensor}}
+    x, kwargs = inputs()
+    compiled = compile_regions(model, [x], kwarg_inputs=kwargs, **fallback)
+    with torch.no_grad(), torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
+        assert isinstance(wrapped, CudaGraphsTorchTensorRTModule)
+        x, kwargs = inputs()
+        torch.testing.assert_close(wrapped(x, **reverse(kwargs)), model(x, **kwargs))
+        captured = wrapped.cudagraph
+        for call in (
+            lambda x, kw: wrapped(x, **kw),
+            lambda x, kw: wrapped(x, **reverse(kw)),
+            # Inputs bind by position or by keyword, as for compiled(...).
+            lambda x, kw: wrapped(x, kw["scale"], extra=kw["extra"], bias=kw["bias"]),
+            lambda x, kw: wrapped(**reverse(kw), x=x),
+        ):
+            x, kwargs = inputs()
+            torch.testing.assert_close(call(x, kwargs), model(x, **kwargs))
+            assert wrapped.cudagraph is captured
 
 
 @torch.library.custom_op("ttrt_region_runtime_test::noise", mutates_args=())

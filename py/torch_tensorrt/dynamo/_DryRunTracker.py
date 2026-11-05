@@ -6,10 +6,9 @@ import math
 import operator
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import torch
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
@@ -55,6 +54,7 @@ class DryRunTracker:
         compilation_settings (CompilationSettings): User Compilation Settings
         unsupported_ops (Dict[str, int]): Set of operators not supported in TRT
         to_run_in_torch (List[str]): Set of nodes to run in Torch
+        stop_reason (Optional[str]): Why the dry run stopped before partitioning
     """
 
     total_ops_in_graph: int = 0
@@ -70,6 +70,7 @@ class DryRunTracker:
     )
     unsupported_ops: Dict[str, int] = field(default_factory=dict)
     to_run_in_torch: List[str] = field(default_factory=list)
+    stop_reason: Optional[str] = None
 
 
 @observable()  # type: ignore[misc]
@@ -87,11 +88,16 @@ def dryrun_stats_display(
         else 0.0
     )
     formatted_stats += "+" * 50 + " Dry-Run Results for Graph " + "+" * 50 + "\n\n"
-    formatted_stats += (
-        f"The graph consists of {dryrun_tracker.total_ops_in_graph} Total Operators, "
-        f"of which {dryrun_tracker.supported_ops_in_graph} operators are supported, "
-        f"{coverage}% coverage\n\n"
-    )
+    if dryrun_tracker.stop_reason:
+        formatted_stats += (
+            f"Dry run stopped before partitioning: {dryrun_tracker.stop_reason}\n\n"
+        )
+    else:
+        formatted_stats += (
+            f"The graph consists of {dryrun_tracker.total_ops_in_graph} Total Operators, "
+            f"of which {dryrun_tracker.supported_ops_in_graph} operators are supported, "
+            f"{coverage}% coverage\n\n"
+        )
     if dryrun_tracker.unsupported_ops:
         parsed_ops = "\n".join(
             [f"{str(k)}: {str(v)}" for k, v in dryrun_tracker.unsupported_ops.items()]
@@ -294,7 +300,7 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
 
 
 def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
-    """Parses ordinary computations and explicit PyTorch regions from a GraphModule.
+    """Parses ordinary computations and region calls from a GraphModule.
     Excludes getitem nodes
 
     Returns a string representation of the nodes
@@ -317,6 +323,15 @@ def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
             node.op in ("call_function", "call_method")
             and node.target != operator.getitem
         ):
+            region = node.meta.get("torch_tensorrt_region")
+            # Partition calls and getitems that copy this metadata are skipped above.
+            if isinstance(region, dict) and region.get("route") == "plugin":
+                to_run_in_torch.append(
+                    f"Region: {region['id']}, fused_kernel region outside TensorRT "
+                    "(compiling without dryrun raises RegionError), "
+                    f"with layer location: {get_node_name(node)}"
+                )
+                continue
             to_run_in_torch.append(
                 f"Node: {ConverterRegistry.qualified_name_or_str(node.target)}, "
                 f"with layer location: {get_node_name(node)}"

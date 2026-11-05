@@ -12,7 +12,6 @@ The override path is what replaces the old ``custom_cuda_kernel_op`` /
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels._register import _infer_schema
@@ -437,14 +436,12 @@ def test_qdp_failure_cleans_up_torch_registration(monkeypatch):
 @skip_no_qdp
 def test_post_qdp_failure_rolls_back_all_state_and_can_retry(monkeypatch):
     """A failure after QDP wiring must not permanently occupy the plugin name."""
-    import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
-    from torch_tensorrt.kernels import _register
+    from torch_tensorrt.kernels import _qdp, _register
 
     op_name = "ttk_retry::post_qdp_failure"
     namespace, name = op_name.split("::")
@@ -483,7 +480,7 @@ def test_post_qdp_failure_rolls_back_all_state_and_can_retry(monkeypatch):
     assert op_name not in QDP_REGISTRY
     assert op_name not in QDP_CREATORS
     assert not hasattr(getattr(trtp.op, namespace, object()), name)
-    assert trt.get_plugin_registry().get_creator(name, "1", namespace) is None
+    assert _qdp._native_creator(name, namespace) is None
     assert converter_target["value"] not in DYNAMO_ATEN_CONVERTERS
 
     # The identical registration now succeeds, proving no hidden registry slot
@@ -501,7 +498,6 @@ def test_concurrent_same_name_registration_preserves_successful_state(monkeypatc
     import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -585,6 +581,75 @@ def test_concurrent_same_name_registration_preserves_successful_state(monkeypatc
     assert hasattr(getattr(trtp.op, namespace), name)
     assert trt.get_plugin_registry().get_creator(name, "1", namespace) is not None
     assert converter_target in DYNAMO_ATEN_CONVERTERS
+
+
+@skip_no_qdp
+def test_fresh_name_registration_reports_no_plugin_registry_errors():
+    """Checking that a new plugin name is free must not make TensorRT report errors.
+
+    TensorRT reports an ``IPluginRegistry.get_creator`` miss as an API usage
+    error and logs it at ERROR once any builder or runtime exists, so every
+    automatic ``fused_kernel`` registration on a recompile logged three errors.
+    """
+    import tensorrt as trt
+    from torch_tensorrt.kernels import _qdp, _register
+
+    class _Recorder(trt.IErrorRecorder):
+        def __init__(self):
+            trt.IErrorRecorder.__init__(self)
+            self.errors = []
+
+        def clear(self):
+            self.errors.clear()
+
+        def get_error_code(self, index):
+            return self.errors[index][0]
+
+        def get_error_desc(self, index):
+            return self.errors[index][1]
+
+        def has_overflowed(self):
+            return False
+
+        def num_errors(self):
+            return len(self.errors)
+
+        def report_error(self, code, desc):
+            self.errors.append((code, desc))
+            return False  # not fatal
+
+    def _meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    op_name = "ttk_quiet::fresh_name"
+    namespace, name = op_name.split("::")
+    registry = trt.get_plugin_registry()
+    recorder = _Recorder()
+    previous = registry.error_recorder
+    # Registry errors go to its recorder rather than to whichever logger the
+    # process's first TensorRT builder or runtime installed.
+    registry.error_recorder = recorder
+    try:
+        assert registry.get_creator(f"{name}_absent", "1", namespace) is None
+        assert len(recorder.errors) == 1, "a get_creator miss must be observable"
+        recorder.clear()
+
+        # The frontends' preflight, then the registrar's locked recheck and snapshot.
+        _register.validate_registration(op_name, check_available=True)
+        _register.register_precompiled_qdp_plugin(
+            op_name=op_name,
+            ptx=b".visible .entry k() { ret; }",
+            kernel_name="k",
+            aot_fn=lambda *args: None,
+            eager_fn=None,
+            meta_fn=_meta,
+        )
+        assert recorder.errors == []
+        creator = _qdp._native_creator(name, namespace)
+        assert creator is not None
+        assert creator is registry.get_creator(name, "1", namespace)
+    finally:
+        registry.error_recorder = previous
 
 
 # ---- GPU: NVRTC compilation ----

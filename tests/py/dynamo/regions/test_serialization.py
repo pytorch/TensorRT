@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""CPU coverage for region serialization; engine roundtrips live in integration tests."""
+"""Region serialization, including ExecuTorch programs with TensorRT delegates."""
 
 import copy
+import importlib.util
 import io
 
 import pytest
 import torch
-
 import torch_tensorrt
 from torch_tensorrt import region
 from torch_tensorrt.dynamo._exporter import export, transform
@@ -18,10 +18,13 @@ from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
     get_region_records,
 )
-from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+from torch_tensorrt.dynamo.region_compilation._types import (
+    REGION_ID_META_KEY,
+    REGION_META_KEY,
+)
 
 from ._utils import capture_regions as _captured_module
-from ._utils import graph_snapshot
+from ._utils import compile_regions, graph_snapshot
 
 
 class _TwoOutputs(torch.nn.Module):
@@ -39,8 +42,9 @@ class _TwoOutputs(torch.nn.Module):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("copied", [False, True], ids=["source", "deepcopy"])
 @pytest.mark.parametrize("nested", [False, True], ids=["direct", "fallback_child"])
-def test_legacy_export_keeps_region_state_outputs_and_source(nested):
+def test_legacy_export_keeps_region_state_outputs_and_source(nested, copied):
     model, x = _TwoOutputs().eval(), torch.randn(2, 3)
     source = _captured_module(model, x)
     if nested:
@@ -57,6 +61,9 @@ def test_legacy_export_keeps_region_state_outputs_and_source(nested):
         parent = torch.fx.GraphModule(root, graph)
         attach_region_records(parent, get_region_records(source))
         source = parent
+    if copied:
+        # A deep copy keeps each region leaf's identity.
+        source = copy.deepcopy(source)
 
     before = graph_snapshot(source)
     result = export(source, use_legacy_exporter=True)
@@ -101,7 +108,7 @@ def test_region_child_constants_do_not_overwrite_sibling_or_parent_state():
         child = torch.fx.symbolic_trace(Body(bias))
         # Child-owned constants are allowed to be non-persistent before export.
         child._non_persistent_buffers_set.add("bias")
-        child._torch_tensorrt_region_id = region_id
+        child.meta[REGION_ID_META_KEY] = region_id
         fallback_root = torch.nn.Module()
         fallback_root.add_module("region_body", child)
         fallback_graph = torch.fx.Graph()
@@ -151,6 +158,9 @@ def test_exporter_rejects_unqualified_region_paths(options):
     "overrides",
     [
         {"output_format": "torchscript"},
+        {"output_format": "aot_inductor"},
+        {"output_format": "executorch", "retrace": True},
+        {"output_format": "executorch", "use_legacy_exporter": False},
         {"retrace": True},
         {"use_legacy_exporter": False},
     ],
@@ -172,6 +182,83 @@ def test_save_rejects_unqualified_region_paths(overrides, tmp_path):
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
+    "overrides",
+    [{}, {"retrace": False, "use_legacy_exporter": True}],
+    ids=["defaults", "explicit"],
+)
+def test_save_accepts_executorch_for_regions(overrides, monkeypatch, tmp_path):
+    import torch_tensorrt._compile as compile_module
+
+    # Report ExecuTorch as missing, so every lane can check that the region gate lets
+    # the save through to the ExecuTorch requirement instead of rejecting the format.
+    monkeypatch.setattr(compile_module, "_has_executorch_exir", lambda: False)
+    source = _captured_module(_TwoOutputs().eval(), torch.randn(2, 3))
+    destination = tmp_path / "region.pte"
+    with pytest.raises(ImportError, match="requires executorch.exir"):
+        torch_tensorrt.save(
+            source, str(destination), output_format="executorch", **overrides
+        )
+    assert not destination.exists()
+
+
+def _assert_pte_matches(path, model, x):
+    from executorch.runtime import Runtime
+
+    method = Runtime.get().load_program(path).load_method("forward")
+    expected = tuple(output.cpu() for output in model(x))
+    torch.testing.assert_close(tuple(method.execute([x.cpu()])), expected)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_save_executorch_runs_region_program(device, tmp_path):
+    pytest.importorskip("executorch.exir")
+    # Checked at run time: remote GPU runners collect ExecuTorch lanes off the GPU host.
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA is required")
+
+    # ExecuTorch runs the region on its CPU kernels, so the .pte must hold the
+    # parameter and buffer the region reads as host data whatever their device.
+    model = _TwoOutputs().eval().to(device)
+    x = torch.randn(2, 3, device=device)
+    source = _captured_module(model, x)
+    before = graph_snapshot(source)
+    destination = tmp_path / "region.pte"
+    torch_tensorrt.save(source, str(destination), output_format="executorch")
+
+    _assert_pte_matches(destination, model, x)
+    assert graph_snapshot(source) == before
+
+
+@pytest.mark.unit
+def test_save_executorch_delegates_engines_around_region(tmp_path):
+    pytest.importorskip("executorch.exir")
+    # Checked at run time: remote GPU runners collect ExecuTorch lanes off the GPU host.
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is required to build TensorRT engines")
+    from executorch.exir._serialize._program import deserialize_pte_binary
+
+    # TensorRT builds one engine before the region and one after it.
+    model, x = _TwoOutputs().eval().cuda(), torch.randn(2, 3, device="cuda")
+    compiled = compile_regions(model, (x,))
+    destination = tmp_path / "region.pte"
+    torch_tensorrt.save(compiled, str(destination), output_format="executorch")
+
+    # Each engine becomes a delegate, and the region's operators, which TensorRT
+    # could convert, stay ExecuTorch kernels.
+    plan = deserialize_pte_binary(destination.read_bytes()).program.execution_plan[0]
+    assert [delegate.id for delegate in plan.delegates] == ["TensorRTBackend"] * 2
+    operators = {operator.name for operator in plan.operators}
+    assert {"aten::mm", "aten::relu", "aten::sigmoid"} <= operators
+
+    if importlib.util.find_spec("torch_tensorrt_executorch_runtime") is not None:
+        import torch_tensorrt_executorch_runtime  # noqa: F401
+
+        _assert_pte_matches(destination, model, x)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
     "corruption, message",
     [
         ("identity", "lost its child, target or route"),
@@ -185,7 +272,7 @@ def test_export_audits_region_clone_without_modifying_source(corruption, message
     call = next(n for n in source.graph.nodes if n.meta.get(REGION_META_KEY))
     child = source.get_submodule(call.target)
     if corruption == "identity":
-        child._torch_tensorrt_region_id = "wrong-region"
+        child.meta[REGION_ID_META_KEY] = "wrong-region"
     elif corruption == "route":
         call.meta[REGION_META_KEY]["route"] = "tensorrt"
     elif corruption == "bindings":

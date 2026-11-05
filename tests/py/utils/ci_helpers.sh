@@ -167,10 +167,12 @@ trt_tier_executorch() {
     # runner; this tier needs a GPU and a built wheel, which they do not. The one exception is
     # kept by name: it compares the pinned commit against the installed wheel's own recorded
     # source, so it needs an ExecuTorch the lint runner does not have and skips everywhere else.
-    # Run the region export case here too: this lane has ExecuTorch installed.
+    # Run the region export cases here too: this lane has ExecuTorch installed.
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
       _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" -k "(not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source) and not test_update_executorch_pin" executorch/ \
-        'regions/test_fused_op.py::test_export_retains_custom_op[executorch]' "$@" )
+        'regions/test_fused_op.py::test_export_retains_custom_op[executorch]' \
+        'regions/test_serialization.py::test_save_executorch_runs_region_program' \
+        'regions/test_serialization.py::test_save_executorch_delegates_engines_around_region' "$@" )
 }
 
 trt_tier_l2_plugin() {

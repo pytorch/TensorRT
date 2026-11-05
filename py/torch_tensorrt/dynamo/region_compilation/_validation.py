@@ -7,7 +7,6 @@ from typing import Sequence
 
 import torch
 from torch.export.graph_signature import OutputKind
-
 from torch_tensorrt.region._errors import RegionCaptureError
 
 
@@ -21,7 +20,7 @@ def validate_output_aliases(
         ):
             if any(torch._C._is_alias_of(output, value) for value in values):
                 raise RegionCaptureError(
-                    f"Region {region_id} outputs must not alias {boundary}; "
+                    f"Region {region_id!r} outputs must not alias {boundary}; "
                     "clone the aliased outputs inside the region"
                 )
 

@@ -3,13 +3,14 @@
 
 """Temporary scope markers, registered by the compilation session before tracing."""
 
-from typing import Optional
+from typing import Optional, Sequence
 
 import torch
 
 _LIBRARY = torch.library.Library("torch_tensorrt_region", "DEF")
 _LIBRARY.define(
-    'begin(str name, str backend="eager", str route="torch", int plugin=-1, int operator=-1) -> Tensor'
+    'begin(str name, str backend="eager", str route="torch", int plugin=-1, '
+    "int operator=-1, Tensor[]? inputs=None) -> Tensor"
 )
 _LIBRARY.define("end(Tensor sentinel) -> ()")
 
@@ -20,8 +21,10 @@ def _begin(
     route: str = "torch",
     plugin: int = -1,
     operator: int = -1,
+    inputs: Optional[Sequence[torch.Tensor]] = None,
 ) -> torch.Tensor:
-    # Composite dispatch handles this tensor-free call on any current device.
+    # ``inputs`` only records the replacement's argument order for capture;
+    # composite dispatch handles the call on any current device.
     return torch.empty((), dtype=torch.uint8, device="cpu")
 
 

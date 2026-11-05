@@ -58,14 +58,19 @@ class FakeExportedProgram:
 
     ``export()`` runs the mutation-declaration pass over every program it is handed, and
     that pass reads both members. Nothing here is mutated, so the pass finds nothing to
-    declare and hands back the same object.
+    declare and hands back the same object. The program holds no state either, so
+    moving its constants to the host after lowering finds nothing to copy.
     """
 
     def __init__(self):
         graph = torch.fx.Graph()
         graph.output((graph.placeholder("x"),))
         self.graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
-        self.graph_signature = SimpleNamespace(inputs_to_buffers={}, output_specs=[])
+        self.graph_signature = SimpleNamespace(
+            inputs_to_buffers={}, buffers_to_mutate={}, output_specs=[]
+        )
+        self.state_dict = {}
+        self.constants = {}
 
 
 class FakeEdgeProgramManager:
@@ -1313,6 +1318,42 @@ def test_stage_exported_program_shares_a_lifted_engine():
     assert custom_obj_specs[0].arg.fake_val is fake_engine
     assert staged.constants["engine_fqn"] is fake_engine
     assert engine.serializations == 0
+
+
+@pytest.mark.unit
+def test_move_constants_to_host_copies_all_but_mutated_buffers():
+    # Runtime gate (not a module-level skipif, which resolves at collection time and is
+    # fragile on remote-GPU runners): the constants have to start on the GPU.
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA required")
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = torch.nn.Parameter(torch.ones(2), requires_grad=False)
+            self.register_buffer("scale", torch.full((2,), 2.0), persistent=False)
+            self.register_buffer("count", torch.zeros(2))
+
+        def forward(self, x):
+            self.count.add_(1)
+            return x * self.weight * self.scale + self.count
+
+    model = Model().cuda()
+    # Decomposing turns the in-place update into a declared buffer mutation, as
+    # lowering to Edge does.
+    program = torch.export.export(
+        model, (torch.ones(2, device="cuda"),)
+    ).run_decompositions()
+    export_utils.move_constants_to_host(program)
+
+    weight = program.state_dict["weight"]
+    assert isinstance(weight, torch.nn.Parameter) and weight.device.type == "cpu"
+    assert program.constants["scale"].device.type == "cpu"
+    # ExecuTorch serializes no data for a mutated buffer, so copying it is waste.
+    assert program.state_dict["count"] is model.count
+    assert model.weight.device.type == "cuda"
+    program.validate()
 
 
 @pytest.mark.unit

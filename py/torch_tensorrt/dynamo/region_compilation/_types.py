@@ -4,16 +4,18 @@
 """Compile-local records and invariants for explicit execution regions."""
 
 import logging
+import operator
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Sequence, Union
+from typing import Any, Literal, Mapping, Optional, Sequence, Union
 
 import torch
-
 from torch_tensorrt.region._constants import SUPPORTED_BACKENDS
 from torch_tensorrt.region._errors import RegionError
 
 REGION_META_KEY = "torch_tensorrt_region"
 RECORDS_META_KEY = "torch_tensorrt_regions"
+# A leaf's GraphModule.meta, unlike its attributes, survives copy.deepcopy.
+REGION_ID_META_KEY = "torch_tensorrt_region_id"
 HOP_SCHEMA_KEY = "torch_tensorrt.region_schema"
 logger = logging.getLogger(__name__)
 
@@ -76,8 +78,8 @@ def is_torch_region_node(
         )
     except (AttributeError, KeyError):
         return False
-    return isinstance(child, torch.fx.GraphModule) and getattr(
-        child, "_torch_tensorrt_region_id", None
+    return isinstance(child, torch.fx.GraphModule) and child.meta.get(
+        REGION_ID_META_KEY
     ) == annotation.get("id")
 
 
@@ -88,10 +90,18 @@ def validate_region_settings(
     if not records:
         return True
     conflicts = []
-    if getattr(settings, "require_full_compilation", False) and any(
-        record.route == "torch" for record in records
-    ):
-        conflicts.append("require_full_compilation=True")
+    torch_region = next((r for r in records if r.route == "torch"), None)
+    if getattr(settings, "require_full_compilation", False) and torch_region:
+        conflicts.append(
+            f"require_full_compilation=True (region {torch_region.id!r} must run "
+            "outside TensorRT)"
+        )
+    plugin_region = next((r for r in records if r.route == "plugin"), None)
+    if getattr(settings, "hardware_compatible", False) and plugin_region:
+        conflicts.append(
+            f"hardware_compatible=True (fused_kernel region {plugin_region.id!r} "
+            "targets only this GPU's architecture)"
+        )
     for name in (
         "offload_module_to_cpu",
         "enable_autocast",
@@ -108,15 +118,17 @@ def validate_region_settings(
     if not conflicts:
         return True
     message = (
-        f"Region {records[0].id!r} is incompatible with "
+        "Regions are incompatible with "
         + ", ".join(conflicts)
         + ". The experimental region path requires these features disabled "
         "and immutable_weights=True."
     )
     if not settings.dryrun:
         raise RegionError(message)
-    gm.meta["torch_tensorrt_region_conflicts"] = [message]
-    logger.warning("Region dry-run stopped: %s", message)
+    # Each stage checks again, and export carries gm.meta forward: warn once.
+    if gm.meta.get("torch_tensorrt_region_conflicts") != [message]:
+        gm.meta["torch_tensorrt_region_conflicts"] = [message]
+        logger.warning("Region dry-run stopped: %s", message)
     return False
 
 
@@ -124,7 +136,7 @@ def audit_region_placement(
     gm: torch.fx.GraphModule,
     records: Sequence[RegionRecord],
     *,
-    require_plugins_in_trt: bool = False,
+    plugins_outside_trt: Literal["allow", "warn", "raise"] = "allow",
 ) -> None:
     """Verify actual call ownership, including nested fallback partitions."""
     if not records:
@@ -136,8 +148,8 @@ def audit_region_placement(
 
     def visit(module: torch.fx.GraphModule, path: str, accelerated: bool) -> None:
         for node in module.graph.nodes:
-            # Partition inputs inherit metadata but do not invoke the region.
-            if node.op == "placeholder":
+            # Partition inputs and output getitems inherit metadata but invoke nothing.
+            if node.op == "placeholder" or node.target is operator.getitem:
                 continue
             annotation = node.meta.get(REGION_META_KEY)
             # Count the plugin inside its partition, not the copied wrapper metadata.
@@ -161,11 +173,14 @@ def audit_region_placement(
                         raise RegionError(
                             f"Plugin region {region_id!r} lost its kernel"
                         )
-                    if require_plugins_in_trt and not accelerated:
-                        raise RegionError(
+                    if plugins_outside_trt != "allow" and not accelerated:
+                        message = (
                             f"fused_kernel region {region_id!r} must run in a TensorRT "
                             "plugin; check converter support, excluded ops and min_block_size"
                         )
+                        if plugins_outside_trt == "raise":
+                            raise RegionError(message)
+                        logger.warning("Region dry-run: %s", message)
                     occurrences[region_id].append(path or "<root>")
                     continue
                 if not is_torch_region_node(module, node):

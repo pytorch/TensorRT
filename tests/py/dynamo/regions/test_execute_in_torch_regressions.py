@@ -3,6 +3,8 @@
 
 """Capture boundaries, TensorRT placement, and serialization of PyTorch regions."""
 
+import copy
+import operator
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -10,18 +12,25 @@ from pathlib import Path
 from unittest import mock
 
 import torch
-from parameterized import parameterized
-from torch.testing._internal.common_utils import TestCase, run_tests
-
+import torch.nn.functional as F
 import torch_tensorrt
+from parameterized import parameterized
+from torch.nn.attention.flex_attention import flex_attention
+from torch.testing._internal.common_utils import TestCase, run_tests
+from torch.utils._triton import has_triton
 from torch_tensorrt import region
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering import get_decompositions
 from torch_tensorrt.dynamo.lowering.passes.pass_manager import DynamoPassManager
 from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
+    check_decomposed_regions,
     get_region_records,
+    is_region_hop,
     normalize_region_scopes,
+    region_hop_records,
 )
+from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.region._constants import (
     BACKEND_KEY,
@@ -30,11 +39,11 @@ from torch_tensorrt.region._constants import (
     ROUTE_KEY,
     TOKEN_KEY,
 )
-from torch_tensorrt.region._errors import RegionCaptureError
+from torch_tensorrt.region._errors import RegionCaptureError, RegionError
 from torch_tensorrt.region._marker_ops import BEGIN, END
 from torch_tensorrt.region._session import RegionCompilationSession
 
-from ._utils import capture_regions, compile_regions, run_python
+from ._utils import capture_regions, compile_regions, run_python, save_and_load
 
 
 class SharedBlock(torch.nn.Module):
@@ -101,6 +110,19 @@ class TensorLiteralRegion(torch.nn.Module):
         return y * 2
 
 
+class CpuScalarRegion(torch.nn.Module):
+    """A literal and a scalar buffer that stay on the CPU, as PyTorch allows."""
+
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("scale", torch.tensor(2.0))
+
+    def forward(self, x):
+        with region.execute_in_torch():
+            y = torch.relu(x) * self.scale + torch.tensor(0.5)
+        return y + 1
+
+
 class BufferRegion(torch.nn.Module):
     def __init__(self, constant_only=False):
         super().__init__()
@@ -112,6 +134,79 @@ class BufferRegion(torch.nn.Module):
         with region.execute_in_torch():
             y = torch.relu(self.bias * 2 if self.constant_only else x + folded)
         return x + y if self.constant_only else y * 3
+
+
+class DeadRegion(torch.nn.Module):
+    """Torch-TensorRT decomposes full_like into full(shape), so the region dies."""
+
+    def forward(self, x):
+        with region.execute_in_torch(name="shape_only"):
+            y = torch.relu(x) * 2
+        return torch.full_like(y, 3.0) + x
+
+
+class ShapeOnlyRegion(DeadRegion):
+    """A live region follows the region that decomposition removes."""
+
+    def forward(self, x):
+        z = super().forward(x)
+        with region.execute_in_torch(name="live"):
+            w = torch.sin(z)
+        return w + 1
+
+
+class Fp32Island(torch.nn.Module):
+    """An fp16 model that keeps an fp32 RMSNorm in PyTorch."""
+
+    def __init__(self, backend):
+        super().__init__()
+        self.backend = backend
+
+    def forward(self, x):
+        h = x + 1
+        with region.execute_in_torch(backend=self.backend):
+            f = h.float()
+            f = f * torch.rsqrt(f.pow(2).mean(-1, keepdim=True) + 1e-6)
+        return f.half() * 2
+
+
+class SeededRegion(torch.nn.Module):
+    """Operations tagged nondeterministic_seeded that draw no random numbers in eval."""
+
+    def __init__(self, kind, backend="eager"):
+        super().__init__()
+        self.kind, self.backend = kind, backend
+        self.attention = torch.nn.MultiheadAttention(
+            8, 2, dropout=0.1, batch_first=True
+        )
+        self.mlp = torch.nn.Sequential(
+            torch.nn.Linear(8, 8),
+            torch.nn.Dropout(0.1),
+            torch.nn.Dropout1d(0.1),
+            torch.nn.AlphaDropout(0.1),
+            torch.nn.FeatureAlphaDropout(0.1),
+            torch.nn.RReLU(),
+        )
+        self.lstm = torch.nn.LSTM(8, 8, batch_first=True)
+        self.gru = torch.nn.GRU(8, 8, batch_first=True)
+        self.rnn_tanh = torch.nn.RNN(8, 8, batch_first=True)
+        self.rnn_relu = torch.nn.RNN(8, 8, nonlinearity="relu", batch_first=True)
+
+    def forward(self, x):
+        x = x + 1
+        with region.execute_in_torch(backend=self.backend):
+            if self.kind == "sdpa":
+                y = F.scaled_dot_product_attention(x, x, x)
+            elif self.kind == "native_dropout":
+                # Traced, it returns its input, which a region must not output.
+                y = torch.native_dropout(x * 2, 0.1, False)[0]
+            elif self.kind == "attention":
+                y = self.mlp(self.attention(x, x, x, need_weights=False)[0])
+            elif self.kind == "mlp":
+                y = self.mlp(x)
+            else:
+                y = getattr(self, self.kind)(x)[0]
+        return y * 2
 
 
 def region_children(gm):
@@ -172,7 +267,7 @@ class TestExecuteInTorchCapture(TestCase):
         with RegionCompilationSession(strict=True):
             ep = torch.export.export(model.eval(), inputs, strict=True)
         if nested:
-            with self.assertRaisesRegex(RegionCaptureError, "higher-order"):
+            with self.assertRaisesRegex(RegionCaptureError, "'cond' around a region"):
                 normalize_region_scopes(ep)
         for child in ep.graph_module.modules():
             if not isinstance(child, torch.fx.GraphModule):
@@ -184,6 +279,76 @@ class TestExecuteInTorchCapture(TestCase):
             child.recompile()
         with self.assertRaisesRegex(RuntimeError, "without.*markers"):
             normalize_region_scopes(ep)
+
+    @parameterized.expand(
+        [
+            ("cond_inside", "cond", True, "'cond' inside a region"),
+            ("flex_inside", "flex_attention", True, "'flex_attention' inside"),
+            ("autocast_inside", "autocast", True, "'wrap_with_autocast' inside"),
+            ("autocast_around", "autocast", False, "'wrap_with_autocast' around"),
+            ("no_grad_inside", "no_grad", True, "'wrap_with_set_grad_enabled' inside"),
+            ("no_grad_around", "no_grad", False, "'wrap_with_set_grad_enabled' around"),
+        ]
+    )
+    def test_higher_order_nesting_is_named(self, _, construct, inside, message):
+        class Nested(torch.nn.Module):
+            def forward(self, x):
+                if construct == "cond":
+                    with region.execute_in_torch():
+                        y = torch.cond(x.sum() > 0, torch.sin, torch.cos, (x,))
+                elif construct == "flex_attention":
+                    q = x.view(1, 1, 2, 8)
+                    with region.execute_in_torch():
+                        y = flex_attention(q, q, q).view(2, 8)
+                else:
+                    scope = (
+                        torch.autocast("cpu", enabled=False)
+                        if construct == "autocast"
+                        else torch.no_grad()
+                    )
+                    if inside:
+                        with region.execute_in_torch(), scope:
+                            y = torch.relu(x)
+                    else:
+                        with scope, region.execute_in_torch():
+                            y = torch.relu(x)
+                return y + 1
+
+        model, x = Nested().eval(), torch.randn(2, 8)
+        with torch.enable_grad(), RegionCompilationSession(strict=True):
+            ep = torch.export.export(model, (x,), strict=True)
+        with self.assertRaisesRegex(
+            RegionCaptureError, f"{message}.*Compile under torch.no_grad"
+        ):
+            normalize_region_scopes(ep)
+        if construct == "no_grad":
+            # Export records a grad-mode block only if it changes the grad mode.
+            with torch.no_grad():
+                gm = capture_regions(model, x)
+            self.assertEqual(len(get_region_records(gm)), 1)
+            torch.testing.assert_close(gm(x), model(x))
+
+    @parameterized.expand([("autocast",), ("no_grad",)])
+    def test_higher_order_operator_can_read_region_output(self, construct):
+        class ReadAfter(torch.nn.Module):
+            def forward(self, x):
+                with region.execute_in_torch():
+                    y = torch.relu(x)
+                scope = (
+                    torch.autocast("cpu", enabled=False)
+                    if construct == "autocast"
+                    else torch.no_grad()
+                )
+                # The block's body copies y's tags onto its input and cast guard.
+                with scope:
+                    z = y.float().softmax(-1)
+                return z + 1
+
+        model, x = ReadAfter().eval(), torch.randn(2, 8)
+        with torch.enable_grad():
+            gm = capture_regions(model, x)
+        self.assertEqual(len(get_region_records(gm)), 1)
+        torch.testing.assert_close(gm(x), model(x))
 
     def test_only_annotated_call_to_shared_module_is_outlined(self):
         x = torch.randn(2, 8)
@@ -235,6 +400,53 @@ class TestExecuteInTorchCapture(TestCase):
         self.assertEqual(len(records[0].input_names), 3)
         torch.testing.assert_close(gm(x, y), model(x, y))
 
+    @parameterized.expand([("input",), ("interior",), ("output",), ("after",)])
+    def test_dtype_casts_in_or_after_scope_are_captured(self, position):
+        # Export guards each aten.to with an assert tagged from the cast's input.
+        class Cast(torch.nn.Module):
+            def forward(self, x):
+                with region.execute_in_torch(name="cast"):
+                    if position == "input":
+                        y = torch.relu(x.double())
+                    elif position == "interior":
+                        y = torch.relu(x * 2).double() * 3
+                    elif position == "output":
+                        y = torch.relu(x * 2).to(torch.float64)
+                    else:
+                        y = torch.relu(x * 2)
+                return y.double() + 1 if position == "after" else y + 1
+
+        model, x = Cast().eval(), torch.randn(2, 8)
+        gm = capture_regions(model, x)
+        (child,) = region_children(gm)
+        self.assertEqual(
+            torch.ops.aten.to.dtype in operator_targets(child), position != "after"
+        )
+        torch.testing.assert_close(gm(x), model(x))
+
+    @parameterized.expand(
+        [
+            ("eval_dropout", lambda x: F.dropout(x, 0.1, training=False)),
+            ("no_op_casts", lambda x: x.float().to(torch.float32)),
+        ]
+    )
+    def test_ops_returning_their_input_do_not_become_outputs(self, _, op):
+        class Residual(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc = torch.nn.Linear(8, 8)
+
+            def forward(self, x):
+                with region.execute_in_torch():
+                    h = self.fc(op(x))
+                # Export binds these reads of x to the op that returned it.
+                return x + h, x
+
+        model, x = Residual().eval(), torch.randn(2, 8)
+        gm = capture_regions(model, x)
+        self.assertEqual(len(get_region_records(gm)), 1)
+        torch.testing.assert_close(gm(x), model(x))
+
     def test_empty_and_dead_scopes_are_noops(self):
         class EmptyAndDead(torch.nn.Module):
             def forward(self, x):
@@ -242,6 +454,10 @@ class TestExecuteInTorchCapture(TestCase):
                     pass
                 with region.execute_in_torch(name="dead"):
                     unused = torch.relu(x)
+                with region.execute_in_torch(name="dead_eval_dropout"):
+                    unused = F.dropout(x * 2, 0.1, training=False)
+                with region.execute_in_torch(name="returns_input"):
+                    x = x.float()
                 return x * 2
 
         x = torch.randn(2, 8)
@@ -249,6 +465,25 @@ class TestExecuteInTorchCapture(TestCase):
         gm = capture_regions(model, x)
         self.assertEqual(len(get_region_records(gm)), 0)
         torch.testing.assert_close(gm(x), model(x))
+
+    def test_decomposition_may_drop_dead_regions_but_not_change_live_ones(self):
+        with RegionCompilationSession(strict=True):
+            ep = torch.export.export(
+                ShapeOnlyRegion().eval(), (torch.randn(2, 8),), strict=True
+            )
+        ep = normalize_region_scopes(ep)
+        captured = ep.graph_module
+        decomposed = ep.run_decompositions(get_decompositions()).graph_module
+        self.assertEqual(
+            [r.id for r in region_hop_records(captured)], ["shape_only#0", "live#1"]
+        )
+        self.assertEqual([r.id for r in region_hop_records(decomposed)], ["live#1"])
+        check_decomposed_regions(captured, decomposed)
+
+        (hop,) = (node for node in decomposed.graph.nodes if is_region_hop(node))
+        hop.kwargs = {"hints": {**hop.kwargs["hints"], "backend": "inductor"}}
+        with self.assertRaisesRegex(RegionError, "changed"):
+            check_decomposed_regions(captured, decomposed)
 
     @parameterized.expand([("live", True), ("dead", False)])
     def test_literal_normalization_removes_only_capture_metadata(self, _, live):
@@ -376,16 +611,24 @@ class TestExecuteInTorchCapture(TestCase):
         gm = capture_regions(model, x)
         self.assertEqual(len(get_region_records(gm)), 1)
 
-    def test_nested_regions_are_rejected(self):
+    @parameterized.expand(
+        [
+            ("plain", False, "Nested region scopes"),
+            ("cond_after_inner", True, "'cond' inside a region"),
+        ]
+    )
+    def test_nested_regions_are_rejected(self, _, cond_after_inner, message):
         class Nested(torch.nn.Module):
             def forward(self, x):
                 with region.execute_in_torch(name="outer"):
                     x = x + 1
                     with region.execute_in_torch(name="inner"):
                         x = torch.relu(x)
+                    if cond_after_inner:
+                        x = torch.cond(x.sum() > 0, torch.sin, torch.cos, (x,))
                 return x
 
-        with self.assertRaisesRegex(RuntimeError, "[Nn]est|overlap"):
+        with self.assertRaisesRegex(RegionCaptureError, message):
             capture_regions(Nested(), torch.randn(2, 8))
 
     def test_input_mutation_is_rejected(self):
@@ -412,15 +655,82 @@ class TestExecuteInTorchCapture(TestCase):
         self.assertEqual(len(get_region_records(gm)), 1)
         torch.testing.assert_close(gm(x), model(x))
 
-    def test_rng_effects_are_rejected(self):
+    @parameterized.expand(
+        [("chunk",), ("transpose",), ("unbind",), ("graph_inputs",), ("weights",)]
+    )
+    def test_inputs_sharing_storage_are_read_without_copies(self, kind):
+        class SharedStorage(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                # Views of one buffer, like cuDNN-flattened CUDA RNN weights.
+                flat = torch.randn(32)
+                self.w = torch.nn.Parameter(flat[:16].view(4, 4))
+                self.v = torch.nn.Parameter(flat[16:].view(4, 4))
+
+            def forward(self, x, y):
+                h = x + 1
+                if kind == "chunk":
+                    a, b = h.chunk(2, dim=-1)
+                elif kind == "transpose":
+                    a, b = h, h.t()
+                elif kind == "unbind":
+                    a, b = h.view(2, 8).unbind(0)
+                elif kind == "weights":
+                    a, b = self.w, self.v
+                else:
+                    a, b = x, y
+                with region.execute_in_torch():
+                    out = torch.sigmoid(a) * b
+                return out
+
+        storage = torch.randn(24)
+        x, y = storage[:16].view(4, 4), storage[8:].view(4, 4)
+        model = SharedStorage().eval()
+        gm = capture_regions(model, x, y)
+        self.assertEqual(len(get_region_records(gm)), 1)
+        # Decomposition needs copies, but the captured body reads the inputs.
+        self.assertNotIn(torch.ops.aten.clone.default, operator_targets(gm))
+        torch.testing.assert_close(gm(x, y), model(x, y))
+
+    @parameterized.expand(
+        [
+            ("rand_like", lambda x: x + torch.rand_like(x)),
+            ("train_dropout", lambda x: F.dropout(x * 2, 0.5, training=True)),
+            (
+                "attention_dropout",
+                lambda x: F.scaled_dot_product_attention(x, x, x, dropout_p=0.1),
+            ),
+        ]
+    )
+    def test_rng_effects_are_rejected(self, _, body):
         class Random(torch.nn.Module):
             def forward(self, x):
                 with region.execute_in_torch():
-                    y = x + torch.rand_like(x)
+                    y = body(x)
                 return y
 
-        with self.assertRaisesRegex(RuntimeError, "RNG|rand_like|nondetermin"):
-            capture_regions(Random(), torch.randn(2, 8))
+        with self.assertRaisesRegex(
+            RegionCaptureError, "Random operations.* in 'region#0'"
+        ):
+            capture_regions(Random(), torch.randn(1, 4, 8))
+
+    @parameterized.expand(
+        [
+            ("sdpa",),
+            ("attention",),
+            ("mlp",),
+            ("lstm",),
+            ("gru",),
+            ("rnn_tanh",),
+            ("rnn_relu",),
+            ("native_dropout",),
+        ]
+    )
+    def test_eval_mode_seeded_operations_are_supported(self, kind):
+        model, x = SeededRegion(kind).eval(), torch.randn(1, 4, 8)
+        gm = capture_regions(model, x)
+        self.assertEqual(len(get_region_records(gm)), 1)
+        torch.testing.assert_close(gm(x), model(x))
 
     def test_graph_break_inside_scope_is_rejected(self):
         class GraphBreak(torch.nn.Module):
@@ -485,6 +795,74 @@ class TestExecuteInTorchIntegration(TestCase):
         self.assertEqual(len(get_region_records(compiled)), count)
         torch.testing.assert_close(compiled(*inputs), expected, atol=5e-3, rtol=5e-3)
 
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_region_left_dead_by_decomposition_is_a_noop(self, _, fast):
+        model = ShapeOnlyRegion().eval().cuda()
+        x = torch.randn(2, 8, device="cuda")
+        compiled = self._compile(model, (x,), fast)
+        self.assertEqual([r.id for r in get_region_records(compiled)], ["live#1"])
+        torch.testing.assert_close(compiled(x), model(x))
+
+    def test_cpu_scalars_do_not_make_a_region_span_devices(self):
+        x = torch.randn(2, 8, device="cuda")
+        model = CpuScalarRegion().eval()  # Keep the 0-dim buffer on the CPU.
+        compiled = self._compile(model, [x])
+        self.assertEqual(len(get_region_records(compiled)), 1)
+        torch.testing.assert_close(compiled(x), model(x))
+        # A CPU tensor with dimensions still makes the region span devices.
+        with self.assertRaisesRegex(
+            RegionCaptureError, "'branches#0' cannot span multiple devices: cpu, cuda"
+        ):
+            capture_regions(MultipleOutputs().cuda(), x, torch.randn(2, 8))
+
+    @parameterized.expand([("eager",), ("inductor",)])
+    def test_eval_attention_region_compiles(self, backend):
+        if backend == "inductor" and not has_triton():
+            self.skipTest("CUDA Inductor requires Triton support on the device")
+        model = SeededRegion("attention", backend).eval().cuda()
+        x = torch.randn(1, 4, 8, device="cuda")
+        compiled = self._compile(model, (x,))
+        self.assertTrue(
+            any(isinstance(m, TorchTensorRTModule) for m in compiled.modules())
+        )
+        self.assertEqual(len(get_region_records(compiled)), 1)
+        torch.testing.assert_close(compiled(x), model(x), atol=5e-3, rtol=5e-3)
+
+    @parameterized.expand([("eager",), ("inductor",)])
+    def test_fp32_island_in_fp16_model_compiles(self, backend):
+        if backend == "inductor" and not has_triton():
+            self.skipTest("CUDA Inductor requires Triton support on the device")
+        model = Fp32Island(backend).eval().cuda()
+        x = torch.randn(2, 8, device="cuda", dtype=torch.float16)
+        compiled = self._compile(model, (x,))
+        self.assertEqual(len(get_region_records(compiled)), 1)
+        torch.testing.assert_close(compiled(x), model(x))
+
+    @parameterized.expand([("lstm",), ("gru",)])
+    def test_rnn_region_with_flattened_weights_compiles(self, kind):
+        model = SeededRegion(kind).eval().cuda()
+        weights = list(getattr(model, kind).parameters())
+        if not all(torch._C._is_alias_of(weights[0], w) for w in weights[1:]):
+            self.skipTest("cuDNN did not flatten the RNN weights into one buffer")
+        x = torch.randn(1, 4, 8, device="cuda")
+        compiled = self._compile(model, (x,))
+        ((owner, call),) = (
+            (module, node)
+            for module in compiled.modules()
+            if isinstance(module, torch.fx.GraphModule)
+            for node in module.graph.nodes
+            if REGION_META_KEY in node.meta
+        )
+        operands = [
+            operator.attrgetter(arg.target)(owner)
+            for arg in call.args
+            if arg.op == "get_attr"
+        ]
+        # Copied weights would make cuDNN repack them on every call.
+        self.assertEqual(len(operands), len(weights))
+        self.assertTrue(all(torch._C._is_alias_of(weights[0], w) for w in operands))
+        torch.testing.assert_close(compiled(x), model(x), atol=5e-3, rtol=5e-3)
+
     @parameterized.expand([("legacy", False), ("decomposition", True)])
     def test_complex_regions_are_rejected_before_lowering(
         self, _, use_complex_decomposition
@@ -526,18 +904,43 @@ class TestExecuteInTorchIntegration(TestCase):
                         target, side_effect=AssertionError(f"Unexpected {target}")
                     )
                 )
-            if not dryrun:
+            if dryrun:
+                # Given a path, a dry run also saves its report there.
+                directory = stack.enter_context(tempfile.TemporaryDirectory())
+                dryrun = str(Path(directory) / "report.txt")
+                logs = stack.enter_context(self.assertLogs("torch_tensorrt", "WARNING"))
+            else:
                 stack.enter_context(
                     self.assertRaisesRegex((RuntimeError, ValueError), setting)
                 )
             compiled = self._compile(model, (x,), dryrun=dryrun, **{setting: True})
+            if dryrun:
+                report = Path(dryrun).read_text()
         if dryrun:
+            stops = [line for line in logs.output if "Region dry-run stopped" in line]
+            self.assertEqual(len(stops), 1, logs.output)
             self.assertEqual(len(get_region_records(compiled)), 1)
-            self.assertTrue(compiled.meta.get("torch_tensorrt_region_conflicts"))
+            (conflict,) = compiled.meta["torch_tensorrt_region_conflicts"]
+            self.assertIn(f"Dry run stopped before partitioning: {conflict}", report)
             self.assertFalse(
                 any(isinstance(m, TorchTensorRTModule) for m in compiled.modules())
             )
             torch.testing.assert_close(compiled(x), model(x))
+
+    @parameterized.expand(
+        [("require_full_compilation",), ("enable_resource_partitioning",)]
+    )
+    def test_conflicting_dryrun_stops_when_decomposition_drops_the_region(
+        self, setting
+    ):
+        model, x = DeadRegion().eval().cuda(), torch.randn(2, 8, device="cuda")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.txt"
+            compiled = self._compile(model, (x,), dryrun=str(path), **{setting: True})
+            report = path.read_text()
+        (conflict,) = compiled.meta["torch_tensorrt_region_conflicts"]
+        self.assertIn(f"Dry run stopped before partitioning: {conflict}", report)
+        torch.testing.assert_close(compiled(x), model(x))
 
     def test_public_non_strict_capture_fails_explicitly(self):
         model, x = SharedBlock().eval().cuda(), torch.randn(2, 8, device="cuda")
@@ -570,6 +973,15 @@ class TestExecuteInTorchIntegration(TestCase):
                 strict=True,
                 offload_module_to_cpu=False,
             )
+
+    def test_deepcopy_of_compiled_model_saves_and_loads(self):
+        model, x = SharedBlock().eval().cuda(), torch.randn(2, 8, device="cuda")
+        expected = model(x)
+        copied = copy.deepcopy(self._compile(model, (x,)))
+        torch.testing.assert_close(copied(x), expected, atol=5e-3, rtol=5e-3)
+        with tempfile.TemporaryDirectory() as directory:
+            loaded = save_and_load(copied, Path(directory))
+            torch.testing.assert_close(loaded(x), expected, atol=5e-3, rtol=5e-3)
 
     @parameterized.expand(
         [

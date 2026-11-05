@@ -5,8 +5,6 @@ import logging
 from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
-
-from packaging import version
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
@@ -20,6 +18,8 @@ from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     _aliases_input,
     _storage_escapes,
 )
+
+from packaging import version
 
 # Modify import location of utilities based on Torch version
 if version.parse(sanitized_torch_version()) < version.parse("2.1.1"):

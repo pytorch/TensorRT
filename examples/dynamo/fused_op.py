@@ -5,7 +5,7 @@
 .. _fused_op_example:
 
 Replace an annotated region with a PyTorch custom operator
-=========================================================
+==========================================================
 
 Run with CUDA and Torch-TensorRT::
 
@@ -16,18 +16,16 @@ existing custom operator. The operator executes through PyTorch between two
 TensorRT engines; it does not require a QDP plugin or Triton kernel. Ordinary
 eager calls execute the original region body.
 
-Register the operator and its fake implementation before compiling. Its tensor
-arguments follow first use inside the region, and its outputs must match the
-entire region. The counter below verifies that compiled inference actually
-calls the supplied operator. Register the operator again before loading a
-saved model in a new process.
+Register the operator and its fake implementation before compiling. ``inputs``
+lists the tensors the region reads in the operator's argument order, and the
+operator's outputs must match the entire region. The counter below verifies
+that compiled inference actually calls the supplied operator. Register the
+operator again before loading a saved model in a new process.
 """
 
 import torch
-
 import torch_tensorrt
-from torch_tensorrt.dynamo.region_compilation import get_region_records
-from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.runtime import TorchTensorRTModule
 
 custom_op_calls = 0
 
@@ -51,6 +49,7 @@ class Model(torch.nn.Module):
         x = x + 1.0
         with torch_tensorrt.region.fused_op(
             torch.ops.region_fused_op_example.bias_relu_scale.default,
+            inputs=(x, bias, scale),
             name="bias_relu_scale",
         ):
             x = torch.relu(x + bias) * scale
@@ -75,26 +74,6 @@ def main():
 
     engines = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
     assert len(engines) == 2, f"Expected two TensorRT engines, got {len(engines)}"
-    records = get_region_records(compiled)
-    assert len(records) == 1
-    record = records[0]
-    assert record.route == "torch" and record.backend == "eager"
-    assert record.owner is not None
-    owner = (
-        compiled if record.owner == "<root>" else compiled.get_submodule(record.owner)
-    )
-    assert isinstance(owner, torch.fx.GraphModule)
-    children = [
-        module
-        for module in compiled.modules()
-        if getattr(module, "_torch_tensorrt_region_id", None) == record.id
-    ]
-    assert len(children) == 1
-    assert any(
-        node.op == "call_function"
-        and node.target == torch.ops.region_fused_op_example.bias_relu_scale.default
-        for node in children[0].graph.nodes
-    )
 
     with torch.inference_mode():
         for values in (inputs, tuple(torch.randn_like(value) for value in inputs)):

@@ -18,7 +18,6 @@ from torch.export.graph_signature import InputKind
 from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
-
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -881,14 +880,14 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     from torch_tensorrt.dynamo.region_compilation import (
-        RegionError,
+        check_decomposed_regions,
         configure_region_backends,
         materialize_regions,
         region_hop_records,
         validate_region_settings,
     )
 
-    captured_regions = region_hop_records(exported_program.graph_module)
+    captured = exported_program.graph_module
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
             get_decompositions(
@@ -902,20 +901,16 @@ def compile(
     )
     exported_program = remove_alias_from_exported_program(exported_program)
 
-    decomposed_regions = region_hop_records(exported_program.graph_module)
-    if [r.capture_signature for r in captured_regions] != [
-        r.capture_signature for r in decomposed_regions
-    ]:
-        raise RegionError(
-            "Decomposition changed or lost a region boundary or execution policy"
-        )
+    check_decomposed_regions(captured, exported_program.graph_module)
     from torch_tensorrt.dynamo.region_compilation._validation import (
         validate_region_mutations,
     )
 
     validate_region_mutations(exported_program)
-    gm = materialize_regions(exported_program.module())
-    if not validate_region_settings(gm, settings, captured_regions):
+    gm = materialize_regions(exported_program.module(), captured)
+    if not validate_region_settings(gm, settings, region_hop_records(captured)):
+        # Stop before lowering or offloading.
+        _report_stopped_dryrun(gm, settings)
         return gm
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
@@ -1346,6 +1341,19 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _report_stopped_dryrun(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> None:
+    """Report a dry run that a region settings conflict stopped."""
+    # No support or placement analysis ran, so report only the conflict.
+    tracker = DryRunTracker(
+        compilation_settings=settings,
+        stop_reason=gm.meta["torch_tensorrt_region_conflicts"][0],
+    )
+    parse_graph_io(gm, tracker)
+    dryrun_stats_display(tracker, settings.dryrun)
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1387,10 +1395,7 @@ def compile_module(
         # Audit before early returns or shortcuts can bypass partitioning.
         audit_region_placement(gm, region_records)
         if not validate_region_settings(gm, settings, region_records):
-            dryrun_tracker.compilation_settings = settings
-            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
-            parse_graph_io(gm, dryrun_tracker)
-            dryrun_stats_display(dryrun_tracker, settings.dryrun)
+            _report_stopped_dryrun(gm, settings)
             return gm
 
     if any(v.requires_grad for v in gm.state_dict().values()):
@@ -1478,7 +1483,9 @@ def compile_module(
             pin_torch_executed_state(gm, to_torch_device(settings.device))
         if region_records:
             audit_region_placement(
-                gm, region_records, require_plugins_in_trt=not settings.dryrun
+                gm,
+                region_records,
+                plugins_outside_trt="warn" if settings.dryrun else "raise",
             )
         return gm
     else:
@@ -1607,7 +1614,7 @@ def compile_module(
         audit_region_placement(
             partitioned_module,
             region_records,
-            require_plugins_in_trt=not settings.dryrun,
+            plugins_outside_trt="warn" if settings.dryrun else "raise",
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
@@ -1843,10 +1850,11 @@ def compile_module(
     _insert_complex_io_adapters(partitioned_module, gm, settings)
 
     if region_records:
+        # A dry run builds no engines and already warned after partitioning.
         audit_region_placement(
             partitioned_module,
             region_records,
-            require_plugins_in_trt=not settings.dryrun,
+            plugins_outside_trt="allow" if settings.dryrun else "raise",
         )
 
     # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)

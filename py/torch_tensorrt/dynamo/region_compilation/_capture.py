@@ -6,11 +6,15 @@
 import copy
 import logging
 import operator
-from typing import Any, Optional
+from typing import Any, Iterable, Optional, Sequence
 
 import torch
+from torch._prims_common import is_cpu_scalar_tensor
+from torch.fx.operator_schemas import normalize_function
 from torch.fx.passes.utils.fuser_utils import erase_nodes, fuse_as_graphmodule
-
+from torch_tensorrt.dynamo.lowering.passes.remove_assert_nodes import (
+    apply_remove_assert_nodes,
+)
 from torch_tensorrt.region._constants import (
     BACKEND_KEY,
     NAME_KEY,
@@ -24,6 +28,7 @@ from torch_tensorrt.region._errors import RegionCaptureError, RegionError
 
 from ._types import (
     HOP_SCHEMA_KEY,
+    REGION_ID_META_KEY,
     REGION_META_KEY,
     RegionRecord,
     attach_region_records,
@@ -32,6 +37,10 @@ from ._types import (
 from ._validation import validate_output_aliases
 
 logger = logging.getLogger(__name__)
+# The metadata a region scope puts on its members.
+_SCOPE_TAGS = (TOKEN_KEY, NAME_KEY, BACKEND_KEY, ROUTE_KEY, PLUGIN_KEY, OPERATOR_KEY)
+# Marks the copies _copy_shared_inputs makes of inputs that share storage.
+_ALIAS_COPY_KEY = "torch_tensorrt_region_alias_copy"
 
 
 def _marker_kind(node: torch.fx.Node) -> Optional[str]:
@@ -73,18 +82,42 @@ def assert_no_unresolved_regions(gm: torch.fx.GraphModule) -> None:
         )
 
 
-def _without_capture_tags(meta: dict[str, Any]) -> dict[str, Any]:
+def _reject_higher_order_nesting(gm: torch.fx.GraphModule) -> None:
+    """Reject HOP nesting by name before it reads as lost markers.
+
+    A HOP body is a separate graph, so it splits a scope's tags from its markers.
+    """
+    depth = 0
+    for node in gm.graph.nodes:
+        kind = _marker_kind(node)
+        if kind:
+            depth += 1 if kind == "begin" else -1
+        elif isinstance(node.target, torch._ops.HigherOrderOperator) and (
+            depth
+            or any(
+                _has_unresolved_regions(gm.get_submodule(str(arg.target)))
+                for arg in node.all_input_nodes
+                if arg.op == "get_attr"
+            )
+        ):
+            raise RegionCaptureError(
+                f"Higher-order operator {node.target.name()!r} "
+                f"{'inside' if depth else 'around'} a region is unsupported; "
+                "export captures torch.cond, flex_attention, torch.autocast, and "
+                "grad-mode changes such as torch.no_grad() as higher-order "
+                "operators. Compile under torch.no_grad() so that no_grad blocks "
+                "are not captured, use explicit casts instead of torch.autocast, "
+                "or keep the operator and the region apart"
+            )
+
+
+def _without_capture_tags(
+    meta: dict[str, Any], tags: Sequence[str] = _SCOPE_TAGS
+) -> dict[str, Any]:
     result = copy.copy(meta)
     if "custom" in result:
         custom = dict(result["custom"])
-        for key in (
-            TOKEN_KEY,
-            NAME_KEY,
-            BACKEND_KEY,
-            ROUTE_KEY,
-            PLUGIN_KEY,
-            OPERATOR_KEY,
-        ):
+        for key in tags:
             custom.pop(key, None)
         if custom:
             result["custom"] = custom
@@ -122,20 +155,117 @@ def _tensor_values(value: Any) -> list[torch.Tensor]:
     return values
 
 
-def _validate_members(members: list[torch.fx.Node], *, custom_op: bool = False) -> None:
+# nondeterministic_seeded tags these ops by name, but they draw no random
+# numbers when any listed argument is 0 or False, as in eval-mode dropout.
+_SAMPLING_SWITCHES: dict[torch._ops.OpOverloadPacket, tuple[str, ...]] = {
+    torch.ops.aten.dropout: ("p", "train"),
+    torch.ops.aten.feature_dropout: ("p", "train"),
+    torch.ops.aten.alpha_dropout: ("p", "train"),
+    torch.ops.aten.feature_alpha_dropout: ("p", "train"),
+    torch.ops.aten.native_dropout: ("p", "train"),
+    torch.ops.aten.rrelu: ("training",),
+    torch.ops.aten.scaled_dot_product_attention: ("dropout_p",),
+    torch.ops.aten.lstm: ("dropout", "train"),
+    torch.ops.aten.gru: ("dropout", "train"),
+    torch.ops.aten.rnn_tanh: ("dropout", "train"),
+    torch.ops.aten.rnn_relu: ("dropout", "train"),
+}
+
+
+def _draws_random_numbers(node: torch.fx.Node) -> bool:
+    target = node.target
+    if not isinstance(target, torch._ops.OpOverload) or (
+        torch.Tag.nondeterministic_seeded not in target.tags
+    ):
+        return False
+    switches = _SAMPLING_SWITCHES.get(target.overloadpacket)
+    if switches is None:
+        return True
+    arguments = normalize_function(
+        target, node.args, node.kwargs, normalize_to_only_use_kwargs=True
+    )
+    # Symbolic values and native_dropout's train=None keep sampling enabled.
+    return arguments is None or not any(
+        arguments.kwargs[name] in (0, False) for name in switches
+    )
+
+
+def _reject_dead_random_region(nodes: Iterable[torch.fx.Node], region_id: str) -> None:
+    if any(_draws_random_numbers(node) for node in nodes):
+        raise RegionCaptureError(
+            f"A random fused_op region must have a live output; {region_id!r} is "
+            "dead because its outputs are unused or used only for their shape or dtype"
+        )
+
+
+def _validate_members(
+    members: list[torch.fx.Node], region_id: str, *, allow_random: bool
+) -> None:
     for node in members:
         target = node.target
-        if isinstance(target, torch._ops.HigherOrderOperator):
+        if node.is_impure(impure_random=False):
             raise RegionCaptureError(
-                "Higher-order control flow inside a region is unsupported"
+                f"Mutation or effects inside regions are unsupported: {target} "
+                f"in {region_id!r}"
             )
-        # The replacement's fake contract checks metadata from exported dtype casts.
-        if custom_op and target == torch.ops.aten._assert_tensor_metadata.default:
+        if not allow_random and _draws_random_numbers(node):
+            raise RegionCaptureError(
+                "Random operations are supported only in fused_op regions: "
+                f"{target} in {region_id!r}"
+            )
+
+
+def _returns_its_input(node: torch.fx.Node) -> bool:
+    """Whether the op returns its first argument itself, as eval-mode dropout does."""
+    if not isinstance(node.target, torch._ops.OpOverload):
+        return False
+    args, kwargs = torch.fx.map_arg(
+        (node.args, node.kwargs), lambda arg: arg.meta.get("val")
+    )
+    value = node.meta.get("val")
+    # Views alias their input too; only the op's own kernel tells them apart.
+    return (
+        bool(args)
+        and isinstance(args[0], torch.Tensor)
+        and isinstance(value, torch.Tensor)
+        and torch._C._is_alias_of(value, args[0])
+        and node.target.decompose(*args, **kwargs) is args[0]
+    )
+
+
+def _bypass_members_returning_inputs(
+    ep: torch.export.ExportedProgram,
+    members: list[torch.fx.Node],
+    fused: Optional[str],
+) -> None:
+    """Make reads after a region bypass members that return their input itself.
+
+    ``fused`` names a fused_op or fused_kernel region, whose operator or kernel
+    may produce such a member as an output, so a bypass to an input raises.
+    """
+    # Export binds later reads of a tensor to the last op that returned it, so
+    # eval-mode dropout or a no-op cast would make the region output its input.
+    # Reverse order resolves chains such as x.float().float().
+    member_set = set(members)
+    for node in reversed(members):
+        if not _returns_its_input(node):
             continue
-        if node.is_impure(impure_random=not custom_op):
+        source = node.args[0]
+        if (
+            fused
+            and source not in member_set
+            and any(user not in member_set for user in node.users)
+        ):
+            # A later read may mean the input or one of the replacement's outputs.
             raise RegionCaptureError(
-                f"Mutation or effects inside regions are unsupported: {target}"
+                f"{fused} would output its input {source.name!r} unchanged, "
+                f"because {node.target} returns that tensor itself; clone "
+                f"{source.name!r} inside the region before that operation"
             )
+        node.replace_all_uses_with(
+            source, delete_user_cb=lambda user: user not in member_set
+        )
+        ep.graph_signature.replace_all_uses(node.name, source.name)
 
 
 def _functionalize_tensor_constructor_detaches(members: list[torch.fx.Node]) -> bool:
@@ -182,23 +312,83 @@ def _reject_complex_regions(gm: torch.fx.GraphModule) -> None:
                 )
 
 
+def _boundary(begin: torch.fx.Node) -> dict[str, Any]:
+    # Export drops trailing arguments that equal their schema defaults.
+    arguments = normalize_function(
+        begin.target, begin.args, begin.kwargs, normalize_to_only_use_kwargs=True
+    )
+    return dict(arguments.kwargs)
+
+
+def _describe(nodes: Sequence[torch.fx.Node]) -> str:
+    return ", ".join(
+        f"{node.name}{list(getattr(node.meta.get('val'), 'shape', ()))}"
+        for node in nodes
+    )
+
+
+def _bind_inputs(
+    live_ins: tuple[torch.fx.Node, ...],
+    listed: Optional[Sequence[torch.fx.Node]],
+    region: str,
+) -> tuple[torch.fx.Node, ...]:
+    """Order a replacement's arguments as its ``inputs=`` lists them."""
+    # Traced first use is not source order: ``up * silu(gate)`` reads gate first.
+    if listed is None:
+        if len(live_ins) <= 1:
+            return live_ins
+        raise RegionCaptureError(
+            f"{region} reads {len(live_ins)} tensors ({_describe(live_ins)}); "
+            "pass inputs=(...) to list them in argument order"
+        )
+    bound = tuple(listed)
+    if len(set(bound)) != len(bound) or set(bound) != set(live_ins):
+        raise RegionCaptureError(
+            f"{region} inputs= must list each tensor the region reads exactly "
+            f"once; it reads ({_describe(live_ins)}) but inputs= lists "
+            f"({_describe(bound)})"
+        )
+    return bound
+
+
+def _copy_shared_inputs(
+    gm: torch.fx.GraphModule, inputs: Sequence[torch.fx.Node]
+) -> tuple[torch.fx.Node, ...]:
+    """Copy inputs as needed so that no two region operands share storage.
+
+    hints_wrapper rejects operands that share storage, such as chunk results or
+    cuDNN-flattened RNN weights. Regions only read their inputs, so a copy
+    leaves the results unchanged. Bodies captured before decomposition do not
+    need the copies (_resolve_alias_copies).
+    """
+    operands: list[torch.fx.Node] = []
+    for node in inputs:
+        value = node.meta["val"]
+        if any(torch._C._is_alias_of(value, other.meta["val"]) for other in operands):
+            node = gm.graph.call_function(torch.ops.aten.clone.default, (node,))
+            node.meta["val"] = value.clone()
+            node.meta["custom"] = {_ALIAS_COPY_KEY: True}
+        operands.append(node)
+    return tuple(operands)
+
+
 def normalize_region_scopes(
     ep: torch.export.ExportedProgram,
 ) -> torch.export.ExportedProgram:
     """Validate exact membership and replace scopes with durable HOP children."""
     gm = ep.graph_module
+    _reject_higher_order_nesting(gm)
     for child in gm.modules():
         if not isinstance(child, torch.fx.GraphModule):
             continue
         has_markers = any(_marker_kind(node) for node in child.graph.nodes)
-        if child is not gm and (
-            has_markers or any(is_region_hop(node) for node in child.graph.nodes)
-        ):
-            raise RegionCaptureError(
-                "Regions inside higher-order control flow are unsupported"
-            )
+        # Placeholders and export's cast guards copy their input's tags, as in a
+        # torch.autocast block that reads a region output; neither is a member.
         if not has_markers and any(
-            TOKEN_KEY in node.meta.get("custom", {}) for node in child.graph.nodes
+            TOKEN_KEY in node.meta.get("custom", {})
+            for node in child.graph.nodes
+            if node.op != "placeholder"
+            and node.target != torch.ops.aten._assert_tensor_metadata.default
         ):
             raise RegionCaptureError(
                 "Region membership survived without its boundary markers"
@@ -218,6 +408,10 @@ def normalize_region_scopes(
             raise RegionCaptureError(
                 "Region markers reached effect-token functionalization"
             )
+    # Drop export's asserts now rather than in pre-lowering: the guard on each
+    # aten.to copies the region tags of the cast's input, not the cast's, so the
+    # membership checks below would misplace or reject it.
+    apply_remove_assert_nodes(gm)
 
     scopes = []
     active = None
@@ -235,17 +429,14 @@ def normalize_region_scopes(
             if active is None or node.args != (active,):
                 raise RegionCaptureError("Unmatched or crossed region markers")
             token = custom.get(TOKEN_KEY)
-            boundary = dict(
-                zip(("name", "backend", "route", "plugin", "operator"), active.args)
-            )
-            boundary.update(active.kwargs)
+            boundary = _boundary(active)
             name = boundary["name"]
-            backend = boundary.get("backend", "eager")
+            backend = boundary["backend"]
             if backend not in SUPPORTED_BACKENDS:
                 raise RegionCaptureError(f"Unsupported region backend {backend!r}")
-            route = boundary.get("route", "torch")
-            plugin = boundary.get("plugin", -1)
-            operator_key = boundary.get("operator", -1)
+            route = boundary["route"]
+            plugin = boundary["plugin"]
+            operator_key = boundary["operator"]
             if route not in ("torch", "plugin") or (route == "plugin" and plugin < 0):
                 raise RegionCaptureError("Invalid region plugin boundary")
             if operator_key >= 0 and (
@@ -299,17 +490,16 @@ def normalize_region_scopes(
         operator_key,
     ) in enumerate(scopes):
         region_id = f"{name or 'region'}#{index}"
+        fused = None
+        if route == "plugin" or operator_key >= 0:
+            api = "fused_kernel" if route == "plugin" else "fused_op"
+            fused = f"{api} region {region_id!r}"
         functionalized_constructor = _functionalize_tensor_constructor_detaches(members)
-        _validate_members(members, custom_op=operator_key >= 0)
+        _validate_members(members, region_id, allow_random=operator_key >= 0)
+        _bypass_members_returning_inputs(ep, members, fused)
         member_set = set(members)
         if not any(user not in member_set for node in members for user in node.users):
-            if any(
-                torch.Tag.nondeterministic_seeded in getattr(node.target, "tags", ())
-                for node in members
-            ):
-                raise RegionCaptureError(
-                    "A random fused_op region must have a live output"
-                )
+            _reject_dead_random_region(members, region_id)
             erase_nodes(gm, members)
             gm.graph.erase_node(end)
             gm.graph.erase_node(begin)
@@ -326,18 +516,11 @@ def normalize_region_scopes(
             )
         except (AssertionError, RuntimeError) as error:
             raise RegionCaptureError(
-                f"Cannot extract region {region_id}: {error}"
+                f"Cannot extract region {region_id!r}: {error}"
             ) from error
-        if route == "plugin" or operator_key >= 0:
-            # Kernel arguments follow first use in the region, not model argument order.
-            ordered_inputs = tuple(
-                dict.fromkeys(
-                    arg
-                    for member in members
-                    for arg in member.all_input_nodes
-                    if arg not in member_set
-                )
-            )
+        if fused is not None:
+            # Read the marker now: an earlier region may have replaced a listed tensor.
+            ordered_inputs = _bind_inputs(inputs, _boundary(begin)["inputs"], fused)
             if inputs != ordered_inputs:
                 placeholders = dict(
                     zip(inputs, (n for n in child.graph.nodes if n.op == "placeholder"))
@@ -365,9 +548,17 @@ def normalize_region_scopes(
         output_values = []
         for value in output_metadata:
             output_values.extend(_tensor_values(value))
-        devices = {value.device for value in input_values + output_values}
+        # As in PyTorch, 0-dim CPU tensors such as torch.tensor(2.0) join any device.
+        devices = {
+            value.device
+            for value in input_values + output_values
+            if not is_cpu_scalar_tensor(value)
+        }
         if len(devices) > 1:
-            raise RegionCaptureError("A region cannot span multiple devices")
+            raise RegionCaptureError(
+                f"Region {region_id!r} cannot span multiple devices: "
+                + ", ".join(sorted(map(str, devices)))
+            )
         validate_output_aliases(input_values, output_values, region_id)
         # Capture tokens are ephemeral and must not leak to later exports.
         for node in child.graph.nodes:
@@ -377,9 +568,10 @@ def normalize_region_scopes(
             body = gm.graph.get_attr(child_name)
         # Insert after all live-ins are available, before any external consumer.
         with gm.graph.inserting_before(end):
+            operands = _copy_shared_inputs(gm, inputs)
             hop = gm.graph.call_function(
                 hints_wrapper,
-                args=(body, inputs, {}),
+                args=(body, operands, {}),
                 kwargs={
                     "hints": {
                         HOP_SCHEMA_KEY: 1,
@@ -412,6 +604,26 @@ def normalize_region_scopes(
     for node in gm.graph.nodes:
         node.meta = _without_capture_tags(node.meta)
     return ep
+
+
+def check_decomposed_regions(
+    captured: torch.fx.GraphModule, decomposed: torch.fx.GraphModule
+) -> None:
+    """Let decomposition drop dead regions, but not change or reorder live ones."""
+    regions = region_hop_records(decomposed)
+    live = {record.id for record in regions}
+    kept = []
+    for record in region_hop_records(captured):
+        if record.id in live:
+            kept.append(record.capture_signature)
+            continue
+        # Decomposition removes regions left without users, for example when
+        # full_like(y) becomes full(y.shape) or a consumer is unused.
+        body = captured.get_submodule(record.child_target)
+        _reject_dead_random_region(body.graph.nodes, record.id)
+        logger.info("Region %s is dead after decomposition", record.id)
+    if kept != [record.capture_signature for record in regions]:
+        raise RegionError("Decomposition changed a region boundary or execution policy")
 
 
 def _custom_op_body(
@@ -477,8 +689,26 @@ def _custom_op_body(
     return torch.fx.GraphModule({}, graph)
 
 
-def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """Replace captured HOPs with PyTorch leaves or custom-kernel operators."""
+def _resolve_alias_copies(hop: torch.fx.Node, *, drop: bool) -> None:
+    """Unmark the copies _copy_shared_inputs made for a region, or drop them."""
+    for operand in hop.args[1]:
+        if not operand.meta.get("custom", {}).get(_ALIAS_COPY_KEY):
+            continue
+        operand.meta = _without_capture_tags(operand.meta, (_ALIAS_COPY_KEY,))
+        if drop:
+            hop.replace_input_with(operand, operand.args[0])
+            if not operand.users:
+                hop.graph.erase_node(operand)
+
+
+def materialize_regions(
+    gm: torch.fx.GraphModule, captured: torch.fx.GraphModule
+) -> torch.fx.GraphModule:
+    """Replace captured HOPs with PyTorch leaves or custom-kernel operators.
+
+    ``execute_in_torch`` regions run their bodies from ``captured``, the graph
+    before decomposition.
+    """
     region_nodes = [node for node in gm.graph.nodes if is_region_hop(node)]
     if not region_nodes:
         return gm
@@ -486,6 +716,10 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
     session = current_session()
     records = region_hop_records(gm)
+    bodies = {
+        record.id: captured.get_submodule(record.child_target)
+        for record in region_hop_records(captured)
+    }
     for index, (node, record) in enumerate(zip(region_nodes, records)):
         body_node = node.args[0]
         child = gm.get_submodule(record.child_target)
@@ -496,6 +730,8 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
             child_name += "_"
         route = record.route
         plugin_op = None
+        # A body captured before decomposition reads the inputs, not their copies.
+        _resolve_alias_copies(node, drop=route == "torch" and record.operator_key < 0)
         if route == "plugin":
             from ._plugins import register_region_plugin
 
@@ -503,9 +739,14 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 raise RegionError(
                     "fused_kernel requires its owning compilation session"
                 )
-            plugin_op = register_region_plugin(
-                child, session.plugins[record.plugin_key], region_id=record.id
-            )
+            try:
+                plugin_op = register_region_plugin(
+                    child, session.plugins[record.plugin_key], region_id=record.id
+                )
+            except ValueError as error:
+                # Kernel registration names the generated operator, not the region.
+                error.add_note(f"Raised for fused_kernel region {record.id!r}")
+                raise
         else:
             if record.operator_key >= 0:
                 if session is None or record.operator_key not in session.operators:
@@ -515,7 +756,10 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 child = _custom_op_body(
                     child, session.operators[record.operator_key], record.id
                 )
-            child._torch_tensorrt_region_id = record.id
+            else:
+                # Torch-TensorRT's decompositions target TensorRT, not PyTorch.
+                child = bodies[record.id]
+            child.meta[REGION_ID_META_KEY] = record.id
             gm.add_submodule(child_name, child)
         operands = tuple(node.args[1])
         with gm.graph.inserting_before(node):

@@ -3,7 +3,7 @@
 torch_tensorrt.region
 =====================
 
-.. currentmodule:: torch_tensorrt.region
+.. automodule:: torch_tensorrt.region
 
 These experimental context managers choose how a selected group of model
 operations executes. Use direct ``torch_tensorrt.compile(..., ir="dynamo",

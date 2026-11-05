@@ -446,6 +446,30 @@ def stage_exported_program(exported_program: Any) -> Any:
     )
 
 
+def move_constants_to_host(exported_program: Any) -> None:
+    """Replace a lowered program's device-resident constants with host copies.
+
+    ``to_executorch()`` serializes a constant by reading its storage as host memory,
+    so a CUDA one crashes the process. The operators that still read constants after
+    lowering run on ExecuTorch's CPU kernels, and the constants a delegate claimed
+    have left the program by then. Mutated buffers keep their device, since
+    ExecuTorch serializes only their shape and dtype.
+    """
+    mutated = set(exported_program.graph_signature.buffers_to_mutate.values())
+    for table in (exported_program.state_dict, exported_program.constants):
+        for name, value in table.items():
+            if (
+                isinstance(value, torch.Tensor)
+                and value.device.type != "cpu"
+                and name not in mutated
+            ):
+                host = value.detach().cpu()
+                # The program verifier requires a parameter to stay a Parameter.
+                if isinstance(value, torch.nn.Parameter):
+                    host = torch.nn.Parameter(host, requires_grad=value.requires_grad)
+                table[name] = host
+
+
 def _unique_engine_buffer_name(
     exported_program: Any, graph_module: torch.fx.GraphModule
 ) -> str:

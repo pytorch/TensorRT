@@ -37,7 +37,8 @@ def prepare_plugin(kernel: Any, **options: Any) -> KernelSpec | partial[None]:
 
     if not isinstance(getattr(kernel, "arg_names", None), (tuple, list)):
         raise TypeError(
-            "fused_kernel kernel must be a @triton.jit function or a CUDA KernelSpec"
+            "fused_kernel kernel factory must return a @triton.jit function or a "
+            f"CUDA KernelSpec; got {type(kernel).__name__}"
         )
     for name in ("signature", "constexprs"):
         value = options.get(name)

@@ -7,22 +7,30 @@ from pathlib import Path
 
 import pytest
 import torch
-from torch.utils._triton import has_triton
-
 import torch_tensorrt
+from torch.utils._triton import has_triton
 
 from ._utils import run_python
 
+ROOT = Path(__file__).resolve().parents[4]
+# Each example and the success message it prints.
+EXAMPLES = {
+    "execute_in_torch.py": "Both eager and inductor regions match PyTorch",
+    "fused_op.py": "The supplied custom operator runs in PyTorch",
+    "fused_kernel.py": "One TensorRT engine includes the fused kernel",
+}
+
+
+@pytest.mark.parametrize("script", EXAMPLES)
+def test_region_example_uses_only_public_api(script):
+    # Users copy examples; internal modules, metadata keys and attributes can change.
+    source = (ROOT / "examples" / "dynamo" / script).read_text(encoding="utf-8")
+    for internal in ("region_compilation", "torch_tensorrt_region", "_torch_tensorrt_"):
+        assert internal not in source, f"{script} uses internal {internal!r}"
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-@pytest.mark.parametrize(
-    ("script", "success"),
-    [
-        ("execute_in_torch.py", "Both eager and inductor regions match PyTorch"),
-        ("fused_op.py", "The supplied custom operator runs in PyTorch"),
-        ("fused_kernel.py", "One TensorRT engine includes the fused kernel"),
-    ],
-)
+@pytest.mark.parametrize(("script", "success"), EXAMPLES.items())
 def test_region_example(script, success):
     if script != "fused_op.py":
         pytest.importorskip("triton")
@@ -30,6 +38,5 @@ def test_region_example(script, success):
         pytest.skip("CUDA Inductor requires Triton support on the device")
     if script == "fused_kernel.py" and not torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
         pytest.skip("TensorRT QDP plugin support is required")
-    root = Path(__file__).resolve().parents[4]
-    output = run_python(root / "examples" / "dynamo" / script, cwd=root, timeout=180)
+    output = run_python(ROOT / "examples" / "dynamo" / script, cwd=ROOT, timeout=180)
     assert success in output

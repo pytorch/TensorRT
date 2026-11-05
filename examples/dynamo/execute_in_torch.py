@@ -29,9 +29,8 @@ inference context for warmup and subsequent calls.
 """
 
 import torch
-
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.runtime import TorchTensorRTModule
 
 
 class Model(torch.nn.Module):

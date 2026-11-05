@@ -13,7 +13,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import torch
-
 from torch_tensorrt.region._errors import RegionError
 
 from ._validation import validate_output_aliases
@@ -250,7 +249,7 @@ def register_region_plugin(
     namespace = "torch_tensorrt_region_fused"
     name = f"region_{uuid.uuid4().hex}"
     op_name = f"{namespace}::{name}"
-    common = dict(
+    common: dict[str, Any] = dict(
         meta_fn=meta_fn,
         eager_fn=eager_fn,
         schema=schema,
@@ -272,7 +271,7 @@ def register_region_plugin(
             ):
                 raise RegionError(
                     f"Plugin region {region_id!r} KernelSpec.inputs must describe "
-                    "the captured Tensor live-ins in first-use order"
+                    "the region's Tensor inputs in the order inputs= lists them"
                 )
             if registration.outputs is not None and len(registration.outputs) != len(
                 output_specs
@@ -300,6 +299,12 @@ def register_region_plugin(
                 **common,
             )
         else:
+            # fused_kernel defaults grid to None because a CUDA KernelSpec omits it.
+            if not callable(registration.keywords.get("grid")):
+                raise RegionError(
+                    f"Plugin region {region_id!r} requires a grid callback for "
+                    "its Triton kernel"
+                )
             signature = _triton_signature(
                 registration, input_specs, output_specs, region_id
             )

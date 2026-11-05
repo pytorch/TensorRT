@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 import torch
-
 import torch_tensorrt
 
 from ._utils import compile_regions, run_python

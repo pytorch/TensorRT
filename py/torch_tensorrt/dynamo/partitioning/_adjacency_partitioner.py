@@ -17,7 +17,6 @@ from torch.fx.passes.splitter_base import (
     _SplitterSettingBase,
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
-
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
