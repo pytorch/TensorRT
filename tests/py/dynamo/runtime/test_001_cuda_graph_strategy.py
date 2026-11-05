@@ -3,6 +3,7 @@
 
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -236,6 +237,8 @@ class TestCudaGraphStrategyInference(TestCase):
         torch.manual_seed(0)
 
     @parameterized.expand([("disabled",), ("whole_graph_capture",)])
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_strategy_matches_eager(self, strategy):
         compiled, model, inputs = _compile_conv(strategy)
         with torch.no_grad():
@@ -245,6 +248,8 @@ class TestCudaGraphStrategyInference(TestCase):
                 self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
                 torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_whole_graph_capture_with_graph_break(self):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,

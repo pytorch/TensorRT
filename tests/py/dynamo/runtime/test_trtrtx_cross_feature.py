@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -79,6 +80,8 @@ class TestTRTRTXCrossFeature(TestCase):
                         compiled(x).clone(), model(x), rtol=1e-3, atol=1e-3
                     )
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_cache_persists_with_cuda_graphs(self):
         model = ConvReluModel().eval().cuda()
         compiled = self._compile(
@@ -94,6 +97,8 @@ class TestTRTRTXCrossFeature(TestCase):
         self.assertGreater(Path(self.cache_path).stat().st_size, 0)
 
     @parameterized.expand([("lazy",), ("eager",)])
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_cache_reuse_across_dynamic_shapes(self, strategy):
         model = ConvReluModel().eval().cuda()
         settings = RuntimeSettings(
@@ -116,6 +121,8 @@ class TestTRTRTXCrossFeature(TestCase):
             self.assertTrue(cache.has_cache())
 
     @parameterized.expand([("lazy",), ("eager",)])
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_dynamic_shapes_with_cuda_graphs(self, strategy):
         model = ConvReluModel().eval().cuda()
         compiled = self._compile(

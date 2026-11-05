@@ -3,6 +3,7 @@
 
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -187,6 +188,8 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
     """End-to-end: compile + infer with each strategy on the build-selected runtime."""
 
     @parameterized.expand(_STRATEGIES)
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     def test_strategy_matches_eager_across_batch_sizes(self, strategy):
         self.addCleanup(torch._dynamo.reset)
         torch.manual_seed(0)

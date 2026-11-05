@@ -361,6 +361,8 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
                 f"Nested form should create exactly 1 context, got {n}",
             )
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     @unittest.skipIf(
         not ENABLED_FEATURES.tensorrt_rtx,
         "cuda_graph_strategy is TRT-RTX-only",
@@ -381,6 +383,8 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
         for module in modules:
             self.assertEqual(module.engine.num_execution_contexts_created(), 1)
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_rtx_only
     @unittest.skipIf(
         not ENABLED_FEATURES.tensorrt_rtx,
         "cuda_graph_strategy is TRT-RTX-only",
