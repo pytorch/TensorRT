@@ -578,16 +578,29 @@ buffers change, that call records again on the new ones. When they change a seco
 same input shapes, the engine records on GPU buffers of its own and copies the inputs in and the
 outputs out on every call. With few kernels, or with large inputs and outputs, those copies can
 cost more than the launches they save. A change of input shapes or profile starts this over, so
-buffers that move while the shapes change every few calls cost up to 3 recordings for each set of
-shapes.
+buffers that move on every call cost up to 3 recordings for each set of shapes in each graph, and
+never replay if the shapes also change every 4 calls or fewer.
+
+A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
+graph of their own, recorded there, and its replays stay on the green context's SMs. An engine
+keeps such a graph for up to 4 green contexts, and one for plain streams, so a caller that uses
+both replays on each. A fifth green context takes the place of the one called longest ago, and a
+replaced one starts over with a warm-up call, so one call on each of more than 4 green contexts in
+turn never replays. Each green graph keeps a stream in its green context until the engine is
+destroyed or its place is taken. TensorRT requires a green context to outlive the graphs recorded
+in it, so destroy the engine before its green contexts. If one is destroyed first, the error from
+releasing its graph later is logged and cleared, but CUDA may not free that graph's stream.
 
 Some calls never replay:
 
 * An engine whose input shapes change on every call never replays.
 * An engine with aliased outputs, a GPU without stream-ordered memory, and a driver older than
   CUDA 12.5 never replay. They take the ordinary path.
-* A call on a green context stream, or on a stream of another CUDA context, takes the ordinary
-  path for that call.
+* A green context stream while another regular context is current, and a plain stream while a
+  green context is current, take the ordinary path.
+* A stream of another device fails, with or without replay. So does a stream of a regular CUDA
+  context other than the one the engine was loaded in, except that, while that context is current, a
+  graph already recorded in the engine's own context replays on it.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.

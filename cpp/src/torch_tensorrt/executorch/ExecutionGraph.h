@@ -6,11 +6,14 @@
 #pragma once
 
 #include <NvInfer.h>
+#include <cuda.h>
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
 #include <cstdint>
+#include <memory>
 #include <shared_mutex>
+#include <utility>
 #include <vector>
 
 namespace torch_tensorrt {
@@ -50,11 +53,22 @@ class ExecutionGraph {
       const std::vector<size_t>& binding_bytes,
       const void* scratch);
 
+  // Whether the graph for the context of the last call that could replay is recorded.
   bool is_captured() const {
-    return graph_exec_ != nullptr;
+    return last_graph_->graph_exec_ != nullptr;
   }
 
  private:
+  // enqueue() in the context it found for the stream.
+  ::executorch::runtime::Error enqueue_in(
+      EngineHandle& handle,
+      cudaStream_t stream,
+      const std::vector<void*>& addresses,
+      const std::vector<size_t>& binding_bytes,
+      const void* scratch,
+      CUcontext stream_context,
+      CUgreenCtx stream_green,
+      unsigned long long stream_green_id);
   void drop_graph();
   void reset_graph();
   void release_buffers(cudaStream_t stream);
@@ -70,6 +84,12 @@ class ExecutionGraph {
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
   cudaStream_t capture_stream_ = nullptr;
+  // The context capture_stream_ was created in.
+  CUcontext capture_context_ = nullptr;
+  // The green context of this graph, or none. It is told apart by its id, since a destroyed one's
+  // handle can be handed out again; the handle only creates capture_stream_.
+  CUgreenCtx capture_green_ = nullptr;
+  unsigned long long capture_green_id_ = 0;
   int failed_captures_ = 0;
   // Times the caller's addresses moved away from a recording since the shapes or the profile last changed.
   int moves_ = 0;
@@ -79,6 +99,10 @@ class ExecutionGraph {
   // have moved twice for one set of shapes, the graph is recorded on buffers_ instead, and every
   // call copies its inputs in and its outputs out.
   bool staged_ = false;
+  // The graphs of green context calls, by green context id, most recently called first. This one
+  // serves plain contexts.
+  std::vector<std::pair<unsigned long long, std::unique_ptr<ExecutionGraph>>> greens_;
+  const ExecutionGraph* last_graph_ = this;
 };
 
 } // namespace executorch_backend

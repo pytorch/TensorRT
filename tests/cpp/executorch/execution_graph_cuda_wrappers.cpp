@@ -33,6 +33,7 @@ cudaError_t __real_cudaFree(void*);
 cudaError_t __real_cudaFreeAsync(void*, cudaStream_t);
 cudaError_t __real_cudaMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 cudaError_t __real_cudaStreamBeginCapture(cudaStream_t, cudaStreamCaptureMode);
+cudaError_t __real_cudaStreamEndCapture(cudaStream_t, cudaGraph_t*);
 cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
@@ -119,6 +120,14 @@ cudaError_t __wrap_cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCapture
   const auto result = __real_cudaStreamBeginCapture(stream, mode);
   if (result == cudaSuccess && active_calls && active_calls->during_capture) {
     active_calls->during_capture(stream);
+  }
+  return result;
+}
+
+cudaError_t __wrap_cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t* graph) {
+  const auto result = __real_cudaStreamEndCapture(stream, graph);
+  if (result == cudaSuccess && active_calls && active_calls->after_capture) {
+    active_calls->after_capture(*graph);
   }
   return result;
 }

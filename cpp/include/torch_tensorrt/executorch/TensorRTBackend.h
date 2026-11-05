@@ -93,9 +93,16 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * keep ordinary enqueueV3. An engine on the shared activation scratch pool drops
  * its recorded graph whenever the pool hands it a different buffer. Caller
  * streams in the current ordinary context can replay, as can a call with no
- * caller stream. Green context and other context streams take the plain path,
- * and the graph is kept unless the scratch buffer, the shapes, or the
- * optimization profile changed.
+ * caller stream. A green context stream of the engine's device records and
+ * replays in its own context while no other regular context is current. Up to
+ * 4 green contexts keep a graph and a stream each, until the engine is
+ * destroyed or a newer green context takes the place of the one called longest
+ * ago. TensorRT requires a green context to outlive the graphs recorded in it,
+ * so destroy the engine first. A stream of another device fails, and so does
+ * one of another regular context, unless that context is current and a graph
+ * recorded in the engine's own context replays on it. Other streams take the plain path, and the graphs are
+ * kept unless the scratch buffer, the shapes, or the optimization profile
+ * changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 
