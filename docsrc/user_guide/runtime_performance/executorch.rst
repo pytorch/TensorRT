@@ -687,6 +687,8 @@ In ``examples/torchtrt_executorch_example/``:
 * ``export_device_resident.py`` does the same with no copies at the edges of the program.
 * ``export_kv_cache_decode.py`` exports a decoder step whose KV cache stays in memory you own.
 * ``export_multi_profile.py`` exports one engine with two optimization profiles.
+* ``export_lerobot_pi05.py`` deploys a robot policy: LeRobot's pi0.5, a vision-language-action
+  model with 3.6 billion parameters, as one program that predicts a chunk of 50 actions.
 
 ``examples/executorch_reference_runner/`` loads and runs a ``.pte`` from Python and from C++,
 including optimization profiles and the green context option.
