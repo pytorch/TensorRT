@@ -425,7 +425,7 @@ def logical_not(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    # A constant reaches here when it is created after constant folding, as by the attention decomposition.
+    # isnan of a constant hands its folded eq result here as a torch.Tensor.
     input_val = get_trt_tensor(ctx, input_val, f"{name}_input")
     if input_val.dtype != trt.bool:
         input_val = cast_trt_tensor(ctx, input_val, trt.bool, name)

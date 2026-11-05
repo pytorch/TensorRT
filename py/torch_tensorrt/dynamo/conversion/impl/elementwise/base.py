@@ -187,13 +187,30 @@ def convert_binary_elementwise(
     ):
         trt_promoted_type = _enums.dtype._from(torch.int32).to(trt.DataType)
 
-    if trt_promoted_type != lhs_val.dtype:
-        lhs_val = cast_trt_tensor(
-            ctx, lhs_val, trt_promoted_type, f"{name}_cast_lhs_val", target, source_ir
+    # PyTorch computes a 16-bit float tensor with a Python float in float32 and rounds only
+    # the result. Do the same for a value the graph computes as a Python float, such as a
+    # quotient of dynamic sizes, so one above the float16 range still gives finite values.
+    # Comparisons are the exception: PyTorch compares in the tensor's type.
+    compute_type = trt_promoted_type
+    if (
+        trt_promoted_type in (trt.DataType.HALF, trt.DataType.BF16)
+        and op_type
+        not in (
+            trt.ElementWiseOperation.EQUAL,
+            trt.ElementWiseOperation.GREATER,
+            trt.ElementWiseOperation.LESS,
         )
-    if trt_promoted_type != rhs_val.dtype:
+        and (lhs_val in ctx.python_floats or rhs_val in ctx.python_floats)
+    ):
+        compute_type = trt.DataType.FLOAT
+
+    if compute_type != lhs_val.dtype:
+        lhs_val = cast_trt_tensor(
+            ctx, lhs_val, compute_type, f"{name}_cast_lhs_val", target, source_ir
+        )
+    if compute_type != rhs_val.dtype:
         rhs_val = cast_trt_tensor(
-            ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
+            ctx, rhs_val, compute_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
     if len(lhs_val.shape) == len(rhs_val.shape) and all(
@@ -212,6 +229,10 @@ def convert_binary_elementwise(
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
+    if output.dtype == compute_type != trt_promoted_type:
+        output = cast_trt_tensor(
+            ctx, output, trt_promoted_type, f"{name}_cast_output", target, source_ir
+        )
     kind: str = str(target.__name__) if callable(target) else target
     output.name = output.name + "_" + kind
     return output

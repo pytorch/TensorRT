@@ -243,6 +243,7 @@ class TestDecomposeUnsupportedAttention(TestCase):
                 self.cast, self.op, self.scale, self.mask = cast, op, scale, mask
                 self.out, self.view, self.lse = out, view, lse
                 self.register_buffer("bias", torch.randn(1, 2, 6, 8))
+                self.bias[0, 0, 0] = float("-inf")  # One query sees no key.
 
             def forward(self, q, k, v):
                 q, k, v = (
@@ -274,6 +275,8 @@ class TestDecomposeUnsupportedAttention(TestCase):
 
         settings = CompilationSettings(min_block_size=1, decompose_attention=False)
         for cast, options, decomposed in (
+            ("", {}, False),
+            ("", {"mask": True}, True),
             ("qkv", {}, True),
             ("k", {}, True),
             ("v", {}, True),
@@ -355,9 +358,227 @@ class TestDecomposeUnsupportedAttention(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
         )
+        # TensorRT-RTX ignores disable_tf32, so it can only match to TF32 precision. That
+        # still fails attention run in BF16, which is off by more than 2e-3.
+        tol = 1e-3 if ENABLED_FEATURES.tensorrt_rtx else 1e-4
         torch.testing.assert_close(
-            trt_model(*inputs), model(*inputs), rtol=1e-4, atol=1e-4
+            trt_model(*inputs), model(*inputs), rtol=tol, atol=tol
         )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_fully_masked_query_gives_zeros(self):
+        # PyTorch gives zeros for a query that the mask hides all keys from.
+        import torch_tensorrt
+
+        class Attention(nn.Module):
+            def __init__(self, op, upcast):
+                super().__init__()
+                self.op, self.upcast = op, upcast
+
+            def forward(self, q, k, v, mask):
+                if self.upcast:
+                    q, k, v = (t.float() for t in (q, k, v))
+                if self.op == "efficient":
+                    return (
+                        torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                            q, k, v, mask, False
+                        )[0]
+                    )
+                out = torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=mask, scale=0.5
+                )
+                return out.to(torch.bfloat16) if self.upcast else out
+
+        for op, mask, dtype, decompose, fully_masked, upcast in (
+            ("sdpa", "bool", torch.float32, False, True, False),
+            ("sdpa", "additive", torch.float32, False, True, False),
+            ("efficient", "additive", torch.float32, False, True, False),
+            ("sdpa", "bool", torch.float32, True, True, False),
+            ("sdpa", "additive", torch.float32, True, True, False),
+            # truncate_double runs the FP64 decomposition in FP32.
+            ("sdpa", "bool", torch.float64, True, True, False),
+            # A control, right without the fix too.
+            ("sdpa", "bool", torch.float32, False, False, False),
+            # TensorRT's 16-bit attention already gives zeros.
+            ("sdpa", "bool", torch.float16, False, True, False),
+            ("sdpa", "additive", torch.float16, False, True, False),
+            ("sdpa", "bool", torch.float16, True, True, False),
+            # Runs as one BF16 attention layer, which builds only with the cast back right after it.
+            ("sdpa", "bool", torch.bfloat16, False, True, True),
+        ):
+            with self.subTest(
+                op=op,
+                mask=mask,
+                dtype=dtype,
+                decompose=decompose,
+                fully_masked=fully_masked,
+                upcast=upcast,
+            ):
+                torch.manual_seed(0)
+                inputs = [
+                    torch.randn(2, 4, 16, 32, device="cuda", dtype=dtype)
+                    for _ in range(3)
+                ]
+                visible = torch.ones(2, 4, 16, 16, dtype=torch.bool, device="cuda")
+                visible[..., 12:] = False
+                if fully_masked:
+                    visible[0, :, :3] = False
+                if mask == "additive":
+                    visible = torch.zeros(
+                        visible.shape, device="cuda", dtype=dtype
+                    ).masked_fill(~visible, float("-inf"))
+                inputs.append(visible)
+                model = Attention(op, upcast)
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    decompose_attention=decompose,
+                    # The bias is not causal.
+                    attn_bias_is_causal=False,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    truncate_double=dtype == torch.float64,
+                )
+                torch.testing.assert_close(
+                    trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+                )
+
+    class _MaskedAttention(nn.Module):
+        def forward(self, q, k, v, mask):
+            return torch.nn.functional.scaled_dot_product_attention(
+                q, k, v, attn_mask=mask
+            )
+
+    class _AroundAttention(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.attention = TestDecomposeUnsupportedAttention._MaskedAttention()
+
+        def forward(self, q, k, v, mask):
+            return self.attention(q * 2, k, v, mask) + 1
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_masked_attention_without_keys_gives_zeros(self):
+        import torch_tensorrt
+
+        # The decomposed attention is left to PyTorch: TensorRT cannot build its empty matmuls.
+        for dtype, decompose, min_block_size in (
+            (torch.bool, False, 5),
+            (torch.float32, False, 5),
+            (torch.bool, True, 1000),
+            (torch.float32, True, 1000),
+        ):
+            with self.subTest(mask=dtype, decompose=decompose):
+                q = torch.randn(1, 1, 3, 32, device="cuda")
+                k = v = torch.randn(1, 1, 0, 32, device="cuda")
+                mask = torch.zeros(3, 0, device="cuda", dtype=dtype)
+                inputs = (q, k, v, mask)
+                model = self._MaskedAttention()
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    decompose_attention=decompose,
+                    min_block_size=min_block_size,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_model(*inputs), model(*inputs))
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_masked_fp32_attention_left_to_pytorch_stays_there(self):
+        import torch_tensorrt
+
+        inputs = [torch.randn(2, 4, 16, 32, device="cuda") for _ in range(3)]
+        inputs.append(torch.rand(2, 4, 16, 16, device="cuda") > 0.2)
+        model = self._AroundAttention()
+        attention = (
+            f"{self._MaskedAttention.__module__}.{self._MaskedAttention.__qualname__}"
+        )
+        for settings in (
+            {
+                "torch_executed_ops": {
+                    torch.ops.aten.scaled_dot_product_attention.default
+                }
+            },
+            {"torch_executed_modules": {attention}},
+        ):
+            with self.subTest(settings=settings):
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    attn_bias_is_causal=False,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    **settings,
+                )
+                kept = [
+                    node
+                    for name, part in trt_model.named_children()
+                    if "_run_on_gpu" in name
+                    for node in part.graph.nodes
+                    if node.target
+                    == torch.ops.aten.scaled_dot_product_attention.default
+                ]
+                self.assertEqual(len(kept), 1)
+                torch.testing.assert_close(
+                    trt_model(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+                )
+
+    class _MlaAttention(nn.Module):
+        def forward(self, q, k, v):
+            return torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+    class _AroundMla(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.attention = TestDecomposeUnsupportedAttention._MlaAttention()
+
+        def forward(self, q, k, v):
+            return self.attention(q * 2, k, v) + 1
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_declined_attention_left_to_pytorch_stays_there(self):
+        import torch_tensorrt
+
+        # K and V head dims differ, so the converter declines this attention.
+        inputs = [
+            torch.randn(1, 2, 4, 8, device="cuda", dtype=torch.half),
+            torch.randn(1, 2, 4, 8, device="cuda", dtype=torch.half),
+            torch.randn(1, 2, 4, 4, device="cuda", dtype=torch.half),
+        ]
+        model = self._AroundMla()
+        attention = f"{self._MlaAttention.__module__}.{self._MlaAttention.__qualname__}"
+        for settings in (
+            {
+                "torch_executed_ops": {
+                    torch.ops.aten.scaled_dot_product_attention.default
+                }
+            },
+            {"torch_executed_modules": {attention}},
+        ):
+            with self.subTest(settings=settings):
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    **settings,
+                )
+                kept = [
+                    node
+                    for name, part in trt_model.named_children()
+                    if "_run_on_gpu" in name
+                    for node in part.graph.nodes
+                    if node.target
+                    == torch.ops.aten.scaled_dot_product_attention.default
+                ]
+                self.assertEqual(len(kept), 1)
+                torch.testing.assert_close(
+                    trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+                )
 
     def test_attentions_sharing_a_bf16_query_are_decomposed(self):
         # Wan2.1's image-to-video cross-attention reads one query against text and image keys.

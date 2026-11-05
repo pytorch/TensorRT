@@ -3,9 +3,12 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 from torch.fx.experimental.proxy_tensor import make_fx
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     _PASS_THROUGH_OPS,
+    _inputs_quantized_to_fp8,
     attention_capability_validator,
     scaled_dot_product_attention_validator,
     scaled_dot_product_efficient_attention_validator,
@@ -18,6 +21,7 @@ from torch_tensorrt.dynamo.lowering._decompositions import (
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +85,7 @@ def _cast_back_to(node: torch.fx.Node, dtype: torch.dtype) -> bool:
     return True
 
 
-def _upcast_breaks_attention_layer(node: torch.fx.Node) -> bool:
+def _fp32_attention_layer_fails(node: torch.fx.Node) -> bool:
     # TensorRT 11.4 folds a cast from FP16 or BF16 to FP32 into its attention layer when the cast reaches the key
     # or value, or the query through a given scale (a scale computed from the query's shape stops it). It then
     # builds only if it can run the whole layer in one 16-bit type: all three inputs folded from it, no float
@@ -94,7 +98,22 @@ def _upcast_breaks_attention_layer(node: torch.fx.Node) -> bool:
         _upcast_source(value),
     ]
     mask = node.args[3] if len(node.args) > 3 else None
-    if not any(folded) or (
+    if not any(folded):
+        # An FP32 attention layer gives NaN for a query that the mask hides all keys from, where PyTorch and the
+        # decomposition give zeros. TensorRT splits an FP32 attention layer into the same matmuls and softmax.
+        # The fused FP8 attention is kept.
+        # With no keys no query is hidden, and the empty matmuls of the decomposition do not build.
+        if (
+            mask is None
+            or _dtype(query) != torch.float32
+            or _inputs_quantized_to_fp8(node)
+            or (
+                key.meta.get("val") is not None
+                and statically_known_true(key.meta["val"].size(-2) == 0)
+            )
+        ):
+            return False
+    elif (
         folded[0] is not None
         and folded.count(folded[0]) == 3
         and _dtype(mask) in (None, torch.bool)
@@ -108,6 +127,16 @@ def _upcast_breaks_attention_layer(node: torch.fx.Node) -> bool:
             item.args[1] == 0 for item in node.users if item.users
         )
     return True
+
+
+def _torch_executed(node: torch.fx.Node, settings: CompilationSettings) -> bool:
+    # The decomposition removes the op and its module metadata, so the partitioner could no longer keep it in PyTorch.
+    excluded = settings.torch_executed_ops
+    return (
+        node.target in excluded
+        or ConverterRegistry.qualified_name_or_str(node.target) in excluded
+        or node_in_torch_executed_module(node, settings.torch_executed_modules)
+    )
 
 
 def _example_val(x: Any) -> Any:
@@ -200,8 +229,9 @@ def decompose_unsupported_attention(
     rejects a node (e.g. MLA where K and V head dims differ), leave the rest of
     the graph on the native path and decompose only the declined nodes. Capability
     rejections (TensorRT-RTX on Turing, a constant key) keep the fused op intact for
-    PyTorch fallback. Attention on FP16 or BF16 inputs cast to FP32 that TensorRT's
-    attention layer fails to build is decomposed as well.
+    PyTorch fallback. FP32 attention that TensorRT's attention layer fails to build, or
+    that has a mask, for which the layer gives NaN where a query sees no key, is
+    decomposed as well when the decomposition can compute it.
     """
     if settings.decompose_attention:
         return gm
@@ -219,7 +249,9 @@ def decompose_unsupported_attention(
         # Decomposition cannot make FP32 GEMMs supported on Turing, and for a constant key
         # it is less exact than PyTorch (NaN for a fully masked row, FP16 overflow). Preserve
         # the fused op so partitioning falls back to PyTorch for the whole attention.
-        if not attention_capability_validator(node, settings):
+        if not attention_capability_validator(node, settings) or _torch_executed(
+            node, settings
+        ):
             continue
 
         if node.target in _ATTENTION_FALLBACKS:
@@ -230,7 +262,7 @@ def decompose_unsupported_attention(
         # The converter leaves the efficient attention it declines to PyTorch.
         elif not scaled_dot_product_efficient_attention_validator(node, settings):
             continue
-        if node.target in _FP32_ATTENTION and _upcast_breaks_attention_layer(node):
+        if node.target in _FP32_ATTENTION and _fp32_attention_layer_fails(node):
             declined.append((node, _FP32_ATTENTION[node.target]))
 
     for node, decomp in declined:

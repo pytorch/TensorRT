@@ -123,8 +123,8 @@ cmake --build build-torchtrt-executorch --target executorch_trt_backend -j
 - Link the archive into your program with `-Wl,--whole-archive`, together with
   `libextension_cuda.so`, ExecuTorch's portable kernels (`libportable_ops_lib.a`, also with
   `-Wl,--whole-archive`, and `libportable_kernels.a`), the ExecuTorch core (`libexecutorch_core.a`),
-  TensorRT's `nvinfer`, the CUDA runtime and pthreads. The delegate and the kernels register
-  themselves from static initializers, and a plain static link drops them.
+  TensorRT's `nvinfer` and `nvinfer_plugin`, the CUDA runtime and pthreads. The delegate and the
+  kernels register themselves from static initializers, and a plain static link drops them.
 - The portable kernels include the two copy operators that a default export puts at the edges of
   the program, `et_copy::_h2d_copy.out` and `et_copy::_d2h_copy.out`. Without them, loading fails
   with `Error::OperatorMissing`, and a build with ExecuTorch logging on also logs
@@ -159,6 +159,16 @@ answer is right; the cost is one copy per buffer per call, and two for a buffer 
 in place. `torch_tensorrt.save()` plans memory on 256-byte boundaries. ExecuTorch's own default is
 16 bytes, so a program finalized with `to_executorch()` directly should pass
 `MemoryPlanningPass(alignment=256)`, or its planned buffers are copied too.
+
+TensorRT also reads every input in row-major order. ExecuTorch can give an input another dim order,
+for example a channels-last program input, or the output of efficient attention in the CUDA backend.
+The delegate copies such an input into row-major order before every call, so the answer is right,
+and logs this once per engine. The cost depends on the layout. Attention's output and channels-last
+need only a few copy calls: about 0.25 ms for a 640x480 float32 image on an A100. A transposed
+matrix needs one call per row: about 6 ms for 1024x1024. From host memory the copy is much slower,
+tens of milliseconds or more for an image, so export such an input in row-major order where you can.
+An input that the engine updates in place must be row-major, or the call fails with
+`Error::InvalidArgument`.
 
 ### CUDA streams
 
