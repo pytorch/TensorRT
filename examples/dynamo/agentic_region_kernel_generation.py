@@ -39,16 +39,17 @@ from torch_tensorrt.dynamo.region_compilation import get_region_records
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.region import KernelGenerator, SearchPolicy, fused_kernel
 
+# The generator is configuration, created once outside the model, so the model
+# keeps its ordinary constructor. main() replaces it with the command-line options.
+GENERATOR = KernelGenerator()
+
 
 class Model(torch.nn.Module):
-    def __init__(self, generator):
-        super().__init__()
-        # Construct the generator before compilation, not inside forward.
-        self.generator = generator
-
     def forward(self, x, bias, scale):
         x = x + 1.0
-        with fused_kernel(generator=self.generator, name="bias_relu_scale"):
+        # Eager and training runs execute the block as written; only
+        # torch_tensorrt.compile generates and installs a kernel for it.
+        with fused_kernel(generator=GENERATOR, name="bias_relu_scale"):
             x = torch.relu(x + bias) * scale
         return x - 0.5
 
@@ -105,7 +106,8 @@ def main():
         # Keep the library defaults for every option that was not passed.
         return {name: value for name, value in options.items() if value is not None}
 
-    generator = KernelGenerator(
+    global GENERATOR
+    GENERATOR = KernelGenerator(
         provider=args.provider,
         backend=args.backend,
         instruction_files=tuple(args.instruction_file),
@@ -133,7 +135,7 @@ def main():
     )
     torch.manual_seed(0)
     inputs = tuple(torch.randn(257, 1025, device="cuda") for _ in range(3))
-    model = Model(generator).eval().cuda()
+    model = Model().eval().cuda()
     compiled = torch_tensorrt.compile(
         model,
         inputs=list(inputs),

@@ -68,7 +68,7 @@ def run(tmp_path):
     """A complete run as the controller saves it, in a task cache directory."""
     run = tmp_path / "cache" / "task-hash" / "run-1"
     run.mkdir(parents=True)
-    (run / "reference.pt").touch()
+    (run / "reference.json").touch()
     specs = [{"shape": [7], "dtype": "float32", "device": "cuda:0"}]
     instructions = load_instructions(
         "triton", get_backend("triton").instruction_resources
@@ -94,7 +94,7 @@ def run(tmp_path):
         "compile_options": COMPILE_OPTIONS,
     }
     template = {
-        "reference_path": "/where/it/was/generated/reference.pt",
+        "reference_path": "/where/it/was/generated/reference.json",
         "backend": "triton",
         "backend_version": "1",
         "proposal_schema_sha256": "schema-digest",
@@ -123,7 +123,7 @@ def _update_task(run, **changes):
 def _another_run(run, name="run-2"):
     other = run.parent / name
     other.mkdir()
-    for artifact in ("task.json", "reference.pt"):
+    for artifact in ("task.json", "reference.json"):
         shutil.copy(run / artifact, other / artifact)
     return other
 
@@ -228,7 +228,9 @@ def test_cli_evaluate_builds_a_fresh_holdout_request_from_the_template(
     (request,) = requests
     template = _read(run / "evaluation-template.json")
     assert request.pop("candidate") == {"source": "kernel source"}
-    assert request.pop("reference_path") == str(run / "reference.pt")
+    assert request.pop("reference_path") == str(run / "reference.json")
+    # The task records no validation samples.
+    assert request.pop("samples_path") is None
     assert request.pop("validation_phase") == "holdout"
     seed = request.pop("validation_seed")
     assert type(seed) is int and seed != template["validation_seed"]
@@ -238,6 +240,51 @@ def test_cli_evaluate_builds_a_fresh_holdout_request_from_the_template(
     assert gpu == [(run.parent.parent, "cuda:0")]
     assert result["report"]["meets_objective"]
     assert _read(Path(result["directory"]) / "feedback.json") == result["report"]
+
+
+def test_cli_evaluate_checks_only_the_samples_its_task_records(
+    run, monkeypatch, gpu, candidate
+):
+    from torch_tensorrt.dynamo.region_compilation._generation import _samples
+
+    template = _read(run / "evaluation-template.json")
+    _write(
+        run / "evaluation-template.json",
+        {**template, "samples_path": "/where/it/was/generated/samples.pt"},
+    )
+    samples = [(torch.arange(7.0),)]
+    _samples.save_samples(samples, run / "samples.pt")
+    _update_task(run, samples={"count": 1, "sha256": _samples.samples_digest(samples)})
+    requests = []
+
+    def evaluate(request, directory, timeout):
+        requests.append(request)
+        return {"status": "passed", "latency_ms": 0.1}
+
+    monkeypatch.setattr(_factory, "_evaluate", evaluate)
+    arguments = Namespace(candidate=candidate, timeout=30)
+    cli._evaluate(arguments, run)
+    assert requests[0]["samples_path"] == str(run / "samples.pt")
+    # As in replay, other or missing samples fail before any evaluation.
+    _samples.save_samples([(torch.full((7,), 123.0),)], run / "samples.pt")
+    with pytest.raises(ValueError, match="do not match the task digest"):
+        cli._evaluate(arguments, run)
+    (run / "samples.pt").unlink()
+    with pytest.raises(ValueError, match="samples.pt is missing"):
+        cli._evaluate(arguments, run)
+    assert len(requests) == 1
+
+
+def test_task_directory_without_a_manifest_resolves_to_the_accepting_run(run):
+    # With use_cache=False no task-level manifest names the run. A later run that
+    # only reused the kernel deleted its samples, so prefer the accepting run.
+    for name in ("accepted.json", "checkpoint.json"):
+        (run.parent / name).unlink(missing_ok=True)
+    _write(run / "accepted.json", {"candidate": {}})
+    reuse = _another_run(run)
+    os.utime(run, (1, 1))
+    os.utime(reuse, (2, 2))
+    assert cli._run_directory(run.parent) == run.resolve()
 
 
 @pytest.mark.parametrize("wait", ["lock_timeout", "acquired_too_late"])
@@ -381,6 +428,7 @@ def test_replay_preserves_saved_search_budget_and_instruction_snapshots(run):
             "finalists": 2,
             "resume": True,
             "tuning": {"num_warps": [4, 8]},
+            "screening": "engine",
         },
         diagnostics=True,
     )
@@ -396,6 +444,7 @@ def test_replay_preserves_saved_search_budget_and_instruction_snapshots(run):
     assert config.search.finalists == 2
     assert config.search.resume is True
     assert config.search.tuning["num_warps"] == (4, 8)
+    assert config.search.screening == "engine"
     assert config.diagnostics is True
     assert config.instructions == "Prefer sequential loads."
     assert {name: getattr(config, name) for name in BUDGET} == BUDGET
@@ -487,6 +536,8 @@ def test_generate_cli_parses_overrides_without_execution(run, monkeypatch, capsy
             "--diagnostics",
             "--tuning",
             '{"num_warps":[4,8]}',
+            "--screening",
+            "engine",
             "--attempts",
             "5",
             "--timeout",
@@ -510,6 +561,7 @@ def test_generate_cli_parses_overrides_without_execution(run, monkeypatch, capsy
     assert config.search.finalists == 2
     assert config.search.resume is True
     assert config.search.tuning["num_warps"] == (4, 8)
+    assert config.search.screening == "engine"
     assert config.diagnostics is True
     assert config.max_attempts == 5
     assert config.timeout_s == 1200
@@ -563,7 +615,7 @@ def test_replay_passes_exact_guidance_and_compile_options_to_the_controller(
     _, bundle = _saved_bundle(run)
     reference = torch.fx.symbolic_trace(torch.nn.Identity())
     monkeypatch.setattr(torch.cuda, "device", lambda _: nullcontext())
-    monkeypatch.setattr(torch, "load", lambda *args, **kwargs: reference)
+    monkeypatch.setattr(cli, "load_reference", lambda path: reference)
     monkeypatch.setattr(
         torch,
         "randn",
@@ -572,7 +624,10 @@ def test_replay_passes_exact_guidance_and_compile_options_to_the_controller(
     monkeypatch.setattr(_worker, "_restore_metadata", lambda *args: None)
     calls = []
 
-    def generate(reference, config, *, region_id, settings, instruction_bundle):
+    def generate(
+        reference, config, *, region_id, settings, instruction_bundle, samples
+    ):
+        assert samples is None
         calls.append((settings, instruction_bundle))
         replay = run.parent / "run-replay"
         replay.mkdir()
@@ -595,6 +650,43 @@ def test_replay_passes_exact_guidance_and_compile_options_to_the_controller(
     assert result["report"] == (
         {"status": "passed", "check": "cache"} if cache_hit else {"status": "passed"}
     )
+
+
+def test_replay_passes_the_samples_its_task_records(run, monkeypatch):
+    from torch_tensorrt.dynamo.region_compilation._generation import _samples, _worker
+
+    samples = [(torch.arange(7.0),), (torch.full((7,), -float("inf")),)]
+    _samples.save_samples(samples, run / "samples.pt")
+    task = _update_task(
+        run, samples={"count": 2, "sha256": _samples.samples_digest(samples)}
+    )
+    monkeypatch.setattr(torch.cuda, "device", lambda _: nullcontext())
+    monkeypatch.setattr(
+        cli, "load_reference", lambda path: torch.fx.symbolic_trace(torch.nn.Identity())
+    )
+    monkeypatch.setattr(_worker, "_restore_metadata", lambda *args: None)
+    replayed = []
+
+    def generate(reference, config, **kwargs):
+        replayed.append(kwargs["samples"])
+        directory = run.parent / "run-replay"
+        directory.mkdir()
+        _write(directory / "cache_check.json", {"status": "passed"})
+        return None, directory
+
+    monkeypatch.setattr(_factory, "_generate", generate)
+    assert cli._generate(_arguments(), run)["cache_hit"] is True
+    ((first, second),) = replayed
+    assert torch.equal(first[0], samples[0][0]) and torch.equal(
+        second[0], samples[1][0]
+    )
+    # Exact replay refuses samples that its task does not record.
+    _samples.save_samples(samples[:1], run / "samples.pt")
+    with pytest.raises(ValueError, match="do not match the task digest"):
+        cli._saved_samples(task, run)
+    (run / "samples.pt").unlink()
+    with pytest.raises(ValueError, match="samples.pt is missing"):
+        cli._saved_samples(task, run)
 
 
 @pytest.mark.parametrize(

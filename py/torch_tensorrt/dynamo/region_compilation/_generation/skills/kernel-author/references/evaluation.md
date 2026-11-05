@@ -1,9 +1,11 @@
 # Use evaluator evidence to improve the next proposal
 
-The controller evaluates proposals through TensorRT plugin registration and a
-trial engine. Successful source parsing does not mean that compilation,
-correctness, or measurement succeeded. A failed report names the stage to
-address:
+The controller registers each proposal with its backend. During the search it
+usually screens the proposal by launching the kernel directly
+(`execution: launch`); final validation runs the selected kernel as a TensorRT
+plugin inside a trial engine (`execution: engine`). Successful source parsing
+does not mean that compilation, correctness, or measurement succeeded. A failed
+report names the stage to address:
 
 - `source`: the proposal violates the backend contract or schema; repair that
   exact violation.
@@ -11,7 +13,8 @@ address:
   installed toolchain version. Do not guess that an unsupported API exists.
 - `correctness`: inspect the failing case and output; correct indexing,
   masking, broadcasting, dtype transitions, or arithmetic before tuning
-  performance. Writes outside a tensor fail here too.
+  performance. Writes outside a tensor fail here too. Cases named `sample N`
+  are region inputs captured from the user's real model inputs.
 - `benchmark`: the candidate is correct but could not be timed; distinguish
   unavailable timing from a slow kernel.
 - `timeout`: the kernel, or building and validating it, exceeded the
@@ -55,6 +58,9 @@ divided by candidate latency. Acceptance allows for observed timing variation:
 `baseline_median - baseline_MAD >= min_speedup * (candidate_median + candidate_MAD)`.
 MAD is median absolute deviation; this is a noise allowance, not a statistical
 confidence guarantee. The controller makes the decision from actual samples.
+Only engine measurements decide these objectives: a screened report leaves
+`meets_objective` null, and its latency ranks it against other screened
+candidates.
 Selection is followed by mandatory evaluation on fresh holdout inputs; passing
 search cases alone does not finish validation. With multiple finalists, a failed
 final check can fall through to the next shortlisted candidate. Resumed search

@@ -722,11 +722,44 @@ def _resolve_alias_copies(hop: torch.fx.Node, *, drop: bool) -> None:
                 hop.graph.erase_node(operand)
 
 
+def _validation_samples(
+    gm: torch.fx.GraphModule,
+    nodes: list[torch.fx.Node],
+    records: list[RegionRecord],
+    session: Optional["RegionCompilationSession"],
+    settings: Optional["CompilationSettings"],
+) -> dict[torch.fx.Node, list[tuple[torch.Tensor, ...]]]:
+    """Capture generated regions' inputs from their generators' validation batches.
+
+    Before any region is replaced, the parent graph still runs every region's
+    PyTorch reference with the model's own weights.
+    """
+    from torch_tensorrt.region import KernelGenerator
+
+    if session is None or (settings is not None and settings.dryrun):
+        return {}
+    sources = {}
+    for node, record in zip(nodes, records):
+        generator = session.plugins.get(record.plugin_key)
+        if (
+            record.route == "plugin"
+            and isinstance(generator, KernelGenerator)
+            and generator.validation_inputs is not None
+        ):
+            sources[node] = generator.validation_inputs
+    if not sources:
+        return {}
+    from ._generation._samples import capture_samples
+
+    return capture_samples(gm, sources)
+
+
 def _kernel_registration(
     child: torch.fx.GraphModule,
     record: RegionRecord,
     session: Optional["RegionCompilationSession"],
     settings: Optional["CompilationSettings"],
+    samples: Optional[list[tuple[torch.Tensor, ...]]] = None,
 ) -> Any:
     """Return a fused_kernel registration, or None to keep a dry run's reference."""
     from torch_tensorrt.region import KernelGenerator
@@ -757,6 +790,7 @@ def _kernel_registration(
         region_id=record.id,
         settings=settings,
         memo=session.generated_kernels,
+        samples=samples,
     )
 
 
@@ -783,6 +817,38 @@ def materialize_regions(
         record.id: captured.get_submodule(record.child_target)
         for record in region_hop_records(captured)
     }
+    samples = _validation_samples(gm, region_nodes, records, session, settings)
+    registrations = {}
+    for node, record in zip(region_nodes, records):
+        if record.route == "plugin":
+            # The generation memo keeps what identical regions still need.
+            registrations[node] = _kernel_registration(
+                gm.get_submodule(record.child_target),
+                record,
+                session,
+                settings,
+                samples.pop(node, None),
+            )
+    if session is not None and session.generated_kernels:
+        from torch_tensorrt.region import KernelGenerator
+
+        from ._generation._factory import final_registration
+
+        # A later identical region may have replaced the shared kernel with one
+        # that also passed the earlier regions' samples: every region takes it.
+        for node, record in zip(region_nodes, records):
+            generator = session.plugins.get(record.plugin_key)
+            if registrations.get(node) is not None and isinstance(
+                generator, KernelGenerator
+            ):
+                final = final_registration(
+                    gm.get_submodule(record.child_target),
+                    generator,
+                    region_id=record.id,
+                    memo=session.generated_kernels,
+                )
+                if final is not None:
+                    registrations[node] = final
     for index, (node, record) in enumerate(zip(region_nodes, records)):
         body_node = node.args[0]
         child = gm.get_submodule(record.child_target)
@@ -793,7 +859,7 @@ def materialize_regions(
             child_name += "_"
         plugin_op = None
         if record.route == "plugin":
-            registration = _kernel_registration(child, record, session, settings)
+            registration = registrations[node]
             if registration is None:
                 record.route = "torch"
             else:
@@ -865,6 +931,10 @@ def materialize_regions(
         record.output_names = tuple(n.name for n in output.all_input_nodes)
         record.reference_graph = str(child.graph) if route == "torch" else None
         record.plugin_op = plugin_op
+    if session is not None:
+        # Generation is over: drop the kernels and validation samples that
+        # identical regions shared, rather than hold them while engines build.
+        session.generated_kernels.clear()
     attach_region_records(gm, records)
     gm.graph.lint()
     gm.recompile()

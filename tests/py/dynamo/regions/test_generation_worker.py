@@ -8,6 +8,7 @@ import itertools
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import weakref
@@ -24,6 +25,8 @@ from torch_tensorrt.dynamo.region_compilation._generation import (
     _worker,
 )
 from torch_tensorrt.dynamo.region_compilation._generation._util import digest
+
+from ._generation_utils import save_reference
 
 pytestmark = pytest.mark.skipif(
     os.name != "posix", reason="Kernel generation requires a POSIX host"
@@ -300,6 +303,19 @@ def test_input_cases_are_labelled_and_cover_magnitudes_and_nonfinite_values():
     assert torch.isfinite(cases["input 1[0] = -inf"][0])
 
 
+def test_input_cases_end_with_the_captured_samples():
+    specs = [_boundary((4,)), _boundary(())]
+    samples = [
+        (torch.arange(4.0), torch.tensor(5.0)),
+        (torch.zeros(4), torch.tensor(-1.0)),
+    ]
+    cases = list(_worker._input_cases(specs, 1, False, 3, samples))
+    assert len(cases) == 1 + 4 + 3 + 2
+    assert [label for label, _ in cases[-2:]] == ["sample 1", "sample 2"]
+    for (_, case), sample in zip(cases[-2:], samples):
+        assert all(torch.equal(value, wanted) for value, wanted in zip(case, sample))
+
+
 @pytest.mark.parametrize("dtype", ["float32", "float16", "bfloat16"])
 def test_seeded_cases_are_repeatable_and_holdout_uses_new_random_values(dtype):
     specs = _worker._specs([_spec((16,), dtype), _spec((), dtype)])
@@ -488,8 +504,8 @@ def evaluation(monkeypatch, tmp_path):
     """A full request whose backend and TensorRT builds are stubs; the rest is real."""
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required")
-    torch.save(torch.fx.symbolic_trace(torch.nn.ReLU()), tmp_path / "reference.pt")
-    calls = []
+    save_reference(torch.nn.ReLU(), torch.randn(7), path=tmp_path / "reference.json")
+    calls, registered = [], []
     engines = {"candidate": torch.relu, "wrong": lambda x: torch.relu(x) + 1}
 
     def validate(proposal, *arity):
@@ -503,6 +519,12 @@ def evaluation(monkeypatch, tmp_path):
             raise RuntimeError("engine build failed")
         return engines[registration["kernel_name"]]
 
+    def register_plugin(reference, registration):
+        registered.append(registration["kernel_name"])
+        if registration["kernel_name"] == "unembeddable":
+            raise RuntimeError("requires non-zero scratch memory")
+        return torch.ops.aten.relu.default
+
     def build_baseline(reference, inputs, options):
         calls.append(("baseline", options))
         return engines["wrong"]  # a timing arm only: never checked
@@ -515,6 +537,7 @@ def evaluation(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(_backends, "get_backend", lambda name: backend)
     monkeypatch.setattr(_worker, "_build_engine", build_engine)
+    monkeypatch.setattr(_worker, "_register_plugin", register_plugin)
     monkeypatch.setattr(_worker, "_build_reference_engine", build_baseline)
     candidate = {
         "source": "source must not be copied into diagnostics",
@@ -524,7 +547,7 @@ def evaluation(monkeypatch, tmp_path):
         "shared_mem_bytes": 512,
     }
     request = {
-        "reference_path": str(tmp_path / "reference.pt"),
+        "reference_path": str(tmp_path / "reference.json"),
         "backend": "stub:Backend",
         "backend_version": "1",
         "proposal_schema_sha256": digest(backend.proposal_schema),
@@ -544,7 +567,11 @@ def evaluation(monkeypatch, tmp_path):
         "candidate": candidate,
     }
     return SimpleNamespace(
-        request=request, backend=backend, calls=calls, directory=tmp_path
+        request=request,
+        backend=backend,
+        calls=calls,
+        registered=registered,
+        directory=tmp_path,
     )
 
 
@@ -639,10 +666,10 @@ class _Half(torch.nn.Module):
     "breakage",
     [
         lambda request, directory: request.update(
-            reference_path=str(directory / "missing.pt")
+            reference_path=str(directory / "missing.json")
         ),
-        lambda request, directory: torch.save(
-            torch.fx.symbolic_trace(_Half()), request["reference_path"]
+        lambda request, directory: save_reference(
+            _Half(), torch.randn(7), path=request["reference_path"]
         ),
         lambda request, directory: request.pop("num_tests"),
     ],
@@ -706,6 +733,177 @@ def test_backends_with_a_launch_hook_get_a_guard_band_check(evaluation):
     error = _failure(evaluation)
     assert error.stage == "correctness"
     assert "Out-of-bounds write past output 0" in str(error)
+
+
+def _screened(evaluation, launches=None):
+    """Give the stub backend a direct launch and screen the search with it."""
+
+    def launch(candidate, inputs, outputs, directory):
+        if launches is not None:
+            launches.append(candidate["kernel_name"])
+        outputs[0].copy_(inputs[0].relu())
+
+    evaluation.backend.launch = launch
+    evaluation.request["screening"] = "launch"
+
+
+def test_search_screening_launches_kernels_without_building_engines(evaluation):
+    launches = []
+    _screened(evaluation, launches)
+    evaluation.request.update(
+        objective="tensorrt",
+        diagnostics=True,
+        incumbent=dict(evaluation.request["candidate"], kernel_name="incumbent"),
+    )
+    result = _worker.evaluate(evaluation.request, evaluation.directory)
+    assert result["status"] == "passed" and result["execution"] == "launch"
+    assert result["tests"] == 1 + 4 + 3 and result["guard_check"] == "passed"
+    # Both were registered as plugins, but neither they nor the TensorRT
+    # baseline were built as engines.
+    assert evaluation.registered == ["candidate", "incumbent"]
+    assert evaluation.calls == []
+    assert "baseline_latency_ms" not in result and "baseline" not in result["benchmark"]
+    assert result["latency_ms"] > 0 and result["incumbent_latency_ms"] > 0
+    assert {"candidate", "incumbent"} <= set(launches)
+    for name in ("candidate", "incumbent"):
+        details = result["diagnostics"][name]
+        assert details["compilation_scope"] == "backend_and_plugin_registration"
+        assert details["compilation_status"] == "completed"
+    json.dumps(result, allow_nan=False)
+
+
+def test_screening_rejects_what_only_the_plugin_registration_refuses(evaluation):
+    launches = []
+    _screened(evaluation, launches)
+    evaluation.request["candidate"]["kernel_name"] = "unembeddable"
+    evaluation.request["diagnostics"] = True
+    error = _failure(evaluation)
+    assert error.stage == "compile"
+    assert "requires non-zero scratch memory" in str(error)
+    assert launches == [] and evaluation.calls == []
+    assert error.diagnostics["candidate"]["compilation_status"] == "failed"
+
+
+@pytest.mark.parametrize("breaks", [False, True])
+def test_a_screen_builds_the_tensorrt_baseline_when_asked(
+    evaluation, monkeypatch, breaks
+):
+    def build(*args):
+        raise RuntimeError("TensorRT baseline contains eager computation")
+
+    _screened(evaluation)
+    evaluation.request.update(objective="tensorrt", check_baseline=True)
+    if breaks:
+        monkeypatch.setattr(_worker, "_build_reference_engine", build)
+        assert _failure(evaluation).stage == "baseline"
+        assert evaluation.registered == []
+        return
+    result = _worker.evaluate(evaluation.request, evaluation.directory)
+    assert result["execution"] == "launch" and result["baseline_latency_ms"] > 0
+    assert [name for name, _ in evaluation.calls] == ["baseline"]
+
+
+@pytest.mark.parametrize(
+    "phase, screening", [("holdout", "launch"), ("search", "engine"), ("search", None)]
+)
+def test_holdout_and_engine_screening_build_trial_engines(evaluation, phase, screening):
+    _screened(evaluation)
+    evaluation.request.update(
+        validation_phase=phase, screening=screening, objective="tensorrt"
+    )
+    result = _worker.evaluate(evaluation.request, evaluation.directory)
+    assert result["execution"] == "engine"
+    assert [name for name, _ in evaluation.calls] == ["baseline", "candidate"]
+    assert result["baseline_latency_ms"] > 0
+
+
+def test_screening_needs_a_backend_launch(evaluation):
+    evaluation.request["screening"] = "launch"
+    result = _worker.evaluate(evaluation.request, evaluation.directory)
+    assert result["execution"] == "engine"
+    assert [name for name, _ in evaluation.calls] == ["candidate"]
+
+
+def test_screened_kernels_are_checked_on_every_case(evaluation):
+    def launch(candidate, inputs, outputs, directory):
+        # Wrong only where an input is exactly -1, as the constant case is.
+        outputs[0].copy_(torch.where(inputs[0] == -1, 1.0, inputs[0].relu()))
+
+    _screened(evaluation)
+    evaluation.backend.launch = launch
+    error = _failure(evaluation)
+    assert error.stage == "correctness"
+    assert "Output 0 is wrong for case 'constant -1.0'" in str(error)
+    assert evaluation.calls == []
+
+
+@pytest.mark.parametrize("screening", ["launch", "engine"])
+def test_a_launch_that_raises_is_a_compile_failure(evaluation, screening):
+    def launch(candidate, inputs, outputs, directory):
+        raise RuntimeError("JIT compilation failed: unknown intrinsic")
+
+    _screened(evaluation)
+    evaluation.backend.launch = launch
+    evaluation.request.update(screening=screening, diagnostics=True)
+    error = _failure(evaluation)
+    assert error.stage == "compile"
+    assert "unknown intrinsic" in str(error)
+    # The registration completed, but compiling what the launch runs did not.
+    assert error.diagnostics["candidate"]["compilation_status"] == "failed"
+
+
+def test_a_kernel_wrong_only_on_real_magnitudes_fails_on_their_sample(
+    evaluation, monkeypatch
+):
+    # Correct for every synthetic magnitude, wrong past 1e3.
+    monkeypatch.setattr(
+        _worker,
+        "_build_engine",
+        lambda *args: lambda x: torch.relu(x).clamp(max=1e3),
+    )
+    path = evaluation.directory / "samples.pt"
+    evaluation.request["samples_path"] = str(path)
+    torch.save([[torch.randn(3, 129)]], path)
+    result = _worker.evaluate(evaluation.request, evaluation.directory)
+    assert result["status"] == "passed" and result["tests"] == 1 + 4 + 3 + 1
+    large = torch.randn(3, 129)
+    large[1, 7] = 1e4
+    torch.save([[torch.randn(3, 129)], [large]], path)
+    error = _failure(evaluation)
+    assert error.stage == "correctness"
+    assert "Output 0 is wrong for case 'sample 2'" in str(error)
+    assert "at index (1, 7)" in str(error)
+
+
+class _Payload:
+    """Unpickling this runs a command; weights-only loading refuses it."""
+
+    def __init__(self, marker):
+        self.marker = marker
+
+    def __reduce__(self):
+        return (os.system, (f"touch {self.marker}",))
+
+
+@pytest.mark.parametrize(
+    "content, message",
+    [
+        (lambda marker: [[_Payload(marker)]], "Weights only load failed"),
+        (lambda marker: [[torch.zeros(7)]], r"sample 1 input 0 is float32 \[7\];"),
+        (lambda marker: {"x": [torch.zeros(3, 129)]}, "does not hold a list"),
+    ],
+    ids=["pickled code", "wrong shape", "wrong structure"],
+)
+def test_saved_samples_load_only_as_checked_tensor_data(evaluation, content, message):
+    path = evaluation.directory / "samples.pt"
+    marker = evaluation.directory / "executed"
+    torch.save(content(marker), path)
+    evaluation.request["samples_path"] = str(path)
+    error = _failure(evaluation)
+    assert error.stage == "setup"
+    assert re.search(message, str(error))
+    assert not marker.exists()
+    assert evaluation.calls == []
 
 
 def test_optional_diagnostics_measure_existing_builds_without_inventing_resources(
@@ -925,7 +1123,9 @@ def generated(arg0, out0, out1, N: tl.constexpr, BLOCK: tl.constexpr):
 """
 
 
-def _run_worker(tmp_path, source, objective, *, incumbent=False):
+def _run_worker(
+    tmp_path, source, objective, *, incumbent=False, phase="holdout", screening=None
+):
     """Evaluate a Triton kernel for (relu(x + 0.25), x * x) in a worker process."""
     pytest.importorskip("triton")
 
@@ -933,8 +1133,8 @@ def _run_worker(tmp_path, source, objective, *, incumbent=False):
         def forward(self, x):
             return torch.relu(x + 0.25), x * x
 
-    reference_path = tmp_path / "reference.pt"
-    torch.save(torch.fx.symbolic_trace(Reference()), reference_path)
+    reference_path = tmp_path / "reference.json"
+    save_reference(Reference(), torch.randn(3, 129), path=reference_path)
     backend = _backends.get_backend("triton")
     spec = {"shape": [3, 129], "dtype": "float32", "device": "cuda:0"}
     request = {
@@ -961,7 +1161,8 @@ def _run_worker(tmp_path, source, objective, *, incumbent=False):
         "rtol": None,
         "atol": None,
         "validation_seed": 37,
-        "validation_phase": "holdout",
+        "validation_phase": phase,
+        "screening": screening,
         "objective": objective,
         "benchmark_repeats": 3,
         "diagnostics": True,
@@ -969,6 +1170,10 @@ def _run_worker(tmp_path, source, objective, *, incumbent=False):
     }
     if incumbent:
         request["incumbent"] = dict(request["candidate"])
+    return _run_request(tmp_path, request)
+
+
+def _run_request(tmp_path, request):
     request_path, result_path = tmp_path / "request.json", tmp_path / "result.json"
     request_path.write_text(json.dumps(request))
     process = subprocess.run(
@@ -1038,3 +1243,160 @@ def test_worker_rejects_a_real_kernel_that_writes_past_its_outputs(tmp_path):
     assert report["status"] == "error", report
     assert report["stage"] == "correctness"
     assert "Out-of-bounds write past output 0" in report["error"]
+
+
+@requires_qdp
+@pytest.mark.parametrize(
+    "change, stage",
+    [
+        (None, None),
+        (("values + 0.25", "values + 1.0"), "correctness"),
+        (("values * values", "tl.no_such_function(values)"), "compile"),
+    ],
+    ids=["correct", "wrong", "uncompilable"],
+)
+def test_worker_screens_a_real_kernel_by_launching_it(tmp_path, change, stage):
+    source = (
+        _MULTI_OUTPUT_KERNEL
+        if change is None
+        else _MULTI_OUTPUT_KERNEL.replace(*change)
+    )
+    report = _run_worker(
+        tmp_path,
+        source,
+        "tensorrt",
+        incumbent=stage is None,
+        phase="search",
+        screening="launch",
+    )
+    details = report["diagnostics"]["candidate"]
+    assert details["compilation_scope"] == "backend_and_plugin_registration"
+    # A kernel that does not compile never reports a completed compilation.
+    assert details["compilation_status"] == (
+        "failed" if stage == "compile" else "completed"
+    )
+    if stage is None:
+        assert report["status"] == "passed", report
+        assert report["execution"] == "launch"
+        assert report["tests"] == 2 + 4 + 3 + 3
+        assert report["guard_check"] == "passed"
+        assert report["latency_ms"] > 0 and report["incumbent_latency_ms"] > 0
+        # Screening builds no TensorRT baseline: the objective waits for an engine.
+        assert "baseline_latency_ms" not in report
+    else:
+        assert report["status"] == "error", report
+        assert report["stage"] == stage
+        if stage == "correctness":
+            assert "Output 0 is wrong for the guard-band launch" in report["error"]
+
+
+_MATMUL_KERNEL = """
+import triton
+import triton.language as tl
+
+
+@triton.jit
+def generated(
+    arg0, arg1, out0, M: tl.constexpr, BM: tl.constexpr, BN: tl.constexpr, BK: tl.constexpr
+):
+    rm = tl.program_id(0) * BM + tl.arange(0, BM)
+    rn = tl.program_id(1) * BN + tl.arange(0, BN)
+    rk = tl.arange(0, BK)
+    acc = tl.zeros((BM, BN), dtype=tl.float32)
+    for k in range(0, M, BK):
+        a = tl.load(arg0 + rm[:, None] * M + (k + rk)[None, :])
+        b = tl.load(arg1 + (k + rk)[:, None] * M + rn[None, :])
+        acc += tl.dot(a, b, input_precision="ieee")
+    tl.store(out0 + rm[:, None] * M + rn[None, :], acc)
+"""
+
+
+def _matmul_request(tmp_path, tile, block_k, num_stages, screening):
+    """A worker request for a 256 x 256 float32 Triton matmul."""
+    pytest.importorskip("triton")
+    reference_path = tmp_path / "reference.json"
+    save_reference(
+        torch.mm, torch.randn(256, 256), torch.randn(256, 256), path=reference_path
+    )
+    backend = _backends.get_backend("triton")
+    spec = {"shape": [256, 256], "dtype": "float32", "device": "cuda:0"}
+    constants = {"M": 256, "BM": tile, "BN": tile, "BK": block_k}
+    return {
+        "reference_path": str(reference_path),
+        "backend": "triton",
+        "backend_version": backend.version,
+        "proposal_schema_sha256": digest(backend.proposal_schema),
+        "candidate": {
+            "source": _MATMUL_KERNEL,
+            "kernel_name": "generated",
+            "constants": [{"name": k, "value": v} for k, v in constants.items()],
+            "grid": [256 // tile, 256 // tile],
+            "num_warps": 4,
+            "num_stages": num_stages,
+        },
+        "inputs": [spec, spec],
+        "outputs": [spec],
+        "num_tests": 1,
+        "check_nonfinite": False,
+        "benchmark_iters": 3,
+        "rtol": None,
+        "atol": None,
+        "validation_seed": 5,
+        "validation_phase": "search",
+        "screening": screening,
+        "objective": "candidate",
+        "benchmark_repeats": 3,
+        "diagnostics": False,
+        "compile_options": DEFAULT_COMPILE_OPTIONS,
+    }
+
+
+def _plugin_shared_memory(request, directory):
+    """The shared memory of the kernel that the request's plugin would embed."""
+    from torch_tensorrt.kernels._triton import compile_triton_to_ptx
+
+    candidate = request["candidate"]
+    kernel = _backends.get_backend("triton")._kernel(candidate, 2, 1, directory)
+    return compile_triton_to_ptx(
+        kernel,
+        {"arg0": "*fp32", "arg1": "*fp32", "out0": "*fp32"},
+        {item["name"]: item["value"] for item in candidate["constants"]},
+        num_warps=candidate["num_warps"],
+        num_stages=candidate["num_stages"],
+    ).shared_mem
+
+
+@requires_qdp
+@pytest.mark.parametrize(
+    "tile, block_k, num_stages, screening",
+    [
+        (128, 64, 1, "launch"),
+        # Null selects Triton's default num_stages, which pipelines the operand
+        # loads through additional shared memory buffers.
+        (64, 64, None, "launch"),
+        (64, 64, None, "engine"),
+    ],
+    ids=["wide-tile", "default-stages", "default-stages-engine"],
+)
+def test_worker_rejects_a_triton_kernel_a_plugin_launch_cannot_fit(
+    tmp_path, tile, block_k, num_stages, screening
+):
+    # Triton's own launcher opts into this much shared memory; TensorRT does not.
+    request = _matmul_request(tmp_path, tile, block_k, num_stages, screening)
+    limit = torch.cuda.get_device_properties(0).shared_memory_per_block
+    if _plugin_shared_memory(request, tmp_path / "kernel") <= limit:
+        pytest.skip("This GPU stages the tiles within the default shared memory")
+    report = _run_request(tmp_path, request)
+    assert report["status"] == "error", report
+    assert report["stage"] == "compile"
+    assert f"but a TensorRT plugin launch allows at most {limit}" in report["error"]
+
+
+@requires_qdp
+def test_worker_screens_a_triton_kernel_that_fits_a_plugin_launch(tmp_path):
+    request = _matmul_request(tmp_path, 64, 64, 1, "launch")
+    limit = torch.cuda.get_device_properties(0).shared_memory_per_block
+    assert _plugin_shared_memory(request, tmp_path / "kernel") <= limit
+    report = _run_request(tmp_path, request)
+    assert report["status"] == "passed", report
+    assert report["execution"] == "launch"

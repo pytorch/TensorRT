@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Evaluate generated kernels in a disposable process and a real TRT engine.
+"""Evaluate generated kernels in a disposable process.
+
+Search evaluations can screen a candidate: it is registered as the plugin an
+engine would embed, but its kernel is launched directly, without building an
+engine. Holdout evaluations always run it as a plugin inside a real TRT engine.
 
 Failures carry the stage that owns them: ``setup`` (the request, device or
 reference; the author cannot fix it), ``source``, ``compile``, ``engine``,
@@ -29,6 +33,8 @@ from typing import Any, Callable, Iterator, NamedTuple, Sequence, TypeVar
 import torch
 
 from .._plugins import _TensorBoundary
+from ._reference import load_reference
+from ._samples import check_samples, load_samples
 from ._util import digest, read_json_object, scrub, write_json
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,8 +146,13 @@ def _input_cases(
     num_tests: int,
     check_nonfinite: bool,
     seed: int,
+    samples: Sequence[tuple[torch.Tensor, ...]] = (),
 ) -> Iterator[tuple[str, tuple[torch.Tensor, ...]]]:
-    """Yield labelled input cases; the seed fixes every random value."""
+    """Yield labelled input cases; the seed fixes every random value.
+
+    ``samples`` are region inputs captured from real model batches; they
+    follow the synthetic cases.
+    """
     generator = torch.Generator(device=specs[0].device).manual_seed(seed)
 
     def random() -> tuple[torch.Tensor, ...]:
@@ -188,6 +199,10 @@ def _input_cases(
                 inputs = random()
                 inputs[index].reshape(-1)[0] = special
                 yield f"input {index}[0] = {special}", inputs
+    for number, sample in enumerate(samples, 1):
+        yield f"sample {number}", tuple(
+            value.to(spec.device) for value, spec in zip(sample, specs)
+        )
 
 
 def _restore_metadata(
@@ -224,6 +239,21 @@ def _compile(
     return compiled
 
 
+def _register_plugin(
+    reference: torch.fx.GraphModule, registration: Any
+) -> torch._ops.OpOverload:
+    """Register a candidate as the plugin operator an engine would embed.
+
+    This runs the plugin path's own compilation and checks, such as Triton's
+    and cuTile's ahead-of-time compilation, without building an engine.
+    """
+    from torch_tensorrt.dynamo.region_compilation._plugins import register_region_plugin
+
+    return register_region_plugin(
+        reference, registration, region_id="generated_candidate"
+    )
+
+
 def _build_engine(
     reference: torch.fx.GraphModule,
     registration: Any,
@@ -231,12 +261,9 @@ def _build_engine(
     num_outputs: int,
     options: dict[str, Any],
 ) -> torch.nn.Module:
-    from torch_tensorrt.dynamo.region_compilation._plugins import register_region_plugin
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-    op = register_region_plugin(
-        reference, registration, region_id="generated_candidate"
-    )
+    op = _register_plugin(reference, registration)
     graph = torch.fx.Graph()
     args = tuple(graph.placeholder(f"arg{index}") for index in range(len(inputs)))
     result = graph.call_function(op, args)
@@ -614,6 +641,30 @@ def _check_guard_bands(
     )
 
 
+def _launcher(
+    launch: Callable[..., None],
+    candidate: dict[str, Any],
+    output_specs: Sequence[_TensorBoundary],
+    directory: Path,
+) -> Callable[..., tuple[torch.Tensor, ...]]:
+    """Run a candidate through the backend's direct launch into fresh outputs.
+
+    The launch runs the candidate's source with its launch settings, as the
+    plugin does, but a backend may compile that source separately, as Triton
+    and cuTile do, so only an engine runs the plugin's own binary.
+    """
+
+    def run(*inputs: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        outputs = [
+            torch.empty(spec.shape, dtype=spec.dtype, device=spec.device)
+            for spec in output_specs
+        ]
+        launch(candidate, list(inputs), outputs, directory)
+        return tuple(outputs)
+
+    return run
+
+
 def _padded(like: torch.Tensor, fill: int) -> tuple[torch.Tensor, torch.Tensor]:
     """Return a buffer filled with ``fill`` bytes and its interior view."""
     pad = -(-_GUARD_BYTES // like.element_size())
@@ -634,7 +685,7 @@ def evaluate(request: dict[str, Any], directory: Path) -> dict[str, Any]:
     return result
 
 
-def _candidate_diagnostics(candidate: dict[str, Any]) -> dict[str, Any]:
+def _candidate_diagnostics(candidate: dict[str, Any], screened: bool) -> dict[str, Any]:
     return {
         "launch": {
             key: copy.deepcopy(candidate[key])
@@ -650,7 +701,13 @@ def _candidate_diagnostics(candidate: dict[str, Any]) -> dict[str, Any]:
             if key in candidate
         },
         "launch_basis": "validated_proposal",
-        "compilation_scope": "backend_registration_and_tensorrt_engine_build",
+        # A screened kernel's direct launch may compile it again on first use,
+        # outside this timing; a failure there still marks compilation failed.
+        "compilation_scope": (
+            "backend_and_plugin_registration"
+            if screened
+            else "backend_registration_and_tensorrt_engine_build"
+        ),
         "compilation_ms": None,
         "compilation_status": "not_started",
         "compiler_resources": {
@@ -703,25 +760,36 @@ def _evaluate(
     candidate = _run_stage(
         "source", backend.validate_candidate, request["candidate"], *arity
     )
+    launch = getattr(backend, "launch", None)
+    # Only an engine proves the kernel where it will run, so holdout checks
+    # always build one.
+    screened = (
+        launch is not None
+        and request["validation_phase"] == "search"
+        and request.get("screening") == "launch"
+    )
     if diagnostics is not None:
-        diagnostics["candidate"] = _candidate_diagnostics(candidate)
+        diagnostics["candidate"] = _candidate_diagnostics(candidate, screened)
 
     device = input_specs[0].device
     if not torch.cuda.is_available() or device.type != "cuda":
         raise RuntimeError("Generated-kernel evaluation requires a CUDA device")
     torch.cuda.set_device(device)
-    reference = torch.load(
-        request["reference_path"], map_location=device, weights_only=False
-    )
-    if not isinstance(reference, torch.fx.GraphModule):
-        raise TypeError("reference_path must contain a captured GraphModule")
+    # JSON data, not a pickle, so a shared or copied run cannot run code here.
+    reference = load_reference(request["reference_path"])
     reference.eval()
     rtol, atol = request["rtol"], request["atol"]
+    samples: list[tuple[torch.Tensor, ...]] = []
+    if request.get("samples_path") is not None:
+        # weights_only loading, so a shared or copied run cannot run code here.
+        samples = load_samples(request["samples_path"])
+        check_samples(samples, input_specs)
     cases = _input_cases(
         input_specs,
         request["num_tests"],
         request["check_nonfinite"],
         request["validation_seed"],
+        samples,
     )
     first_label, first = next(cases)
     exact_reference = _float64_reference(reference) if rtol is None else None
@@ -735,7 +803,12 @@ def _evaluate(
     timers = {"reference": _capture_timer(reference, first, iterations)}
 
     options = request["compile_options"]
-    if request["objective"] == "tensorrt":
+    # A screen decides no speedup objective, so it builds the baseline engine
+    # only when the controller asks: a baseline that TensorRT cannot build
+    # must still end the search early.
+    if request["objective"] == "tensorrt" and (
+        not screened or request.get("check_baseline")
+    ):
         # A timing arm only: TensorRT's own numerics are not held to the
         # candidate's tolerance.
         details = None
@@ -751,7 +824,7 @@ def _evaluate(
             "baseline", _capture_timer, baseline, first, iterations
         )
 
-    def build(name: str, proposal: dict[str, Any]) -> torch.nn.Module:
+    def build(name: str, proposal: dict[str, Any]) -> Callable[..., Any]:
         with _compilation_diagnostics(
             diagnostics[name] if diagnostics is not None else None
         ):
@@ -763,7 +836,12 @@ def _evaluate(
                 output_specs,
                 directory / name,
             )
-            return _run_stage(
+            if screened and launch is not None:
+                # Registering the plugin compiles what an engine would embed,
+                # so the screen rejects what only the plugin path refuses.
+                _run_stage("compile", _register_plugin, reference, registration)
+                return _launcher(launch, proposal, output_specs, directory / name)
+            engine: Callable[..., Any] = _run_stage(
                 "compile",
                 _build_engine,
                 reference,
@@ -772,22 +850,34 @@ def _evaluate(
                 len(output_specs),
                 options,
             )
+            return engine
 
-    engine = build("candidate", candidate)
-    launch = getattr(backend, "launch", None)
+    execute = build("candidate", candidate)
     if launch is not None:
-        _run_stage(
-            "correctness",
-            _check_guard_bands,
-            lambda inputs, outputs: launch(
-                candidate, inputs, outputs, directory / "candidate"
-            ),
-            first,
-            first_expected,
-            first_label,
-            rtol=rtol,
-            atol=atol,
-        )
+        try:
+            _run_stage(
+                "correctness",
+                _check_guard_bands,
+                # A launch that raises, such as the first one of a kernel that
+                # fails to JIT-compile, did not compute anything to check.
+                lambda inputs, outputs: _run_stage(
+                    "compile",
+                    launch,
+                    candidate,
+                    inputs,
+                    outputs,
+                    directory / "candidate",
+                ),
+                first,
+                first_expected,
+                first_label,
+                rtol=rtol,
+                atol=atol,
+            )
+        except _EvaluationError as error:
+            if error.stage == "compile" and diagnostics is not None:
+                diagnostics["candidate"]["compilation_status"] = "failed"
+            raise
     tests = 0
     for label, inputs in itertools.chain([(first_label, first)], cases):
         expected = (
@@ -800,7 +890,7 @@ def _evaluate(
         _run_stage(
             "correctness",
             _verify_case,
-            engine,
+            execute,
             inputs,
             expected,
             output_specs,
@@ -810,7 +900,7 @@ def _evaluate(
         )
         tests += 1
     timers["candidate"] = _run_stage(
-        "benchmark", _capture_timer, engine, first, iterations
+        "benchmark", _capture_timer, execute, first, iterations
     )
 
     incumbent_error = None
@@ -821,7 +911,7 @@ def _evaluate(
                 "source", backend.validate_candidate, request["incumbent"], *arity
             )
             if diagnostics is not None:
-                diagnostics["incumbent"] = _candidate_diagnostics(incumbent)
+                diagnostics["incumbent"] = _candidate_diagnostics(incumbent, screened)
             timers["incumbent"] = _run_stage(
                 "benchmark",
                 _capture_timer,
@@ -838,6 +928,7 @@ def _evaluate(
         benchmark["baseline"] = dict(benchmark["reference"])
     result = {
         "status": "passed",
+        "execution": "launch" if screened else "engine",
         "measurement": "cuda_graph",
         "latency_ms": benchmark["candidate"]["median_ms"],
         "reference_latency_ms": benchmark["reference"]["median_ms"],

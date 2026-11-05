@@ -418,6 +418,44 @@ def test_failure_uses_stdout_and_redacts_credentials(monkeypatch, tmp_path):
     assert len(str(error.value)) < 1600
 
 
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("HF_AUTH", "hf_abcdefghijkl"),
+        ("SHORT_TOKEN", "abc123"),
+        ("DB_PASSWD", "p4ssw0rd"),
+        ("UNRELATED", "ghp_abcdefghijklmnop"),
+    ],
+)
+def test_redaction_covers_auth_names_short_tokens_and_known_formats(
+    monkeypatch, name, value
+):
+    monkeypatch.setenv(name, value)
+    assert value not in _providers._redact(f"failed with {value} here")
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("DB_PASSWORD", "correcthorse"),
+        ("SERVICE_TOKEN", "QwErTyUiOpAsDf"),
+        ("API_KEY", "abcdefgh"),
+        ("MY_SECRET", "Zebrafish"),
+    ],
+)
+def test_redaction_covers_letter_only_secrets_of_eight_or_more_characters(
+    monkeypatch, name, value
+):
+    monkeypatch.setenv(name, value)
+    assert value not in _providers._redact(f"failed with {value} here")
+
+
+def test_redaction_keeps_ordinary_words(monkeypatch):
+    monkeypatch.setenv("DISABLE_AUTH", "true")
+    monkeypatch.setenv("AUTH_MODE", "device")
+    assert _providers._redact("true device user") == "true device user"
+
+
 def test_invalid_claude_json_preserves_bounded_redacted_diagnostics(
     monkeypatch, tmp_path
 ):

@@ -8,9 +8,12 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+import torch
 
 #: The ``module:attribute`` form of an extension ``provider`` or ``backend``.
 IMPORT_PATH = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*", re.ASCII)
@@ -108,6 +111,19 @@ class SearchPolicy:
             ``{"num_warps": (4, 8)}``. Each proposal is evaluated with up to
             ``max_variants`` combinations of these choices. The choices are
             copied as JSON data.
+        screening: How search evaluations run candidates and tuning variants.
+            ``"launch"`` registers each candidate as the plugin an engine
+            would embed, which applies the plugin's own compilation and checks,
+            then launches the kernel directly through the backend, checks it
+            on the same inputs and times those launches, without building a
+            TensorRT engine; ``"engine"`` builds a trial engine for every
+            evaluation. Either way, finalists, cached kernels and final
+            validation run inside a trial engine, and only those engine
+            measurements decide the ``"eager"`` and ``"tensorrt"``
+            objectives. Under ``"tensorrt"``, screens build the TensorRT
+            baseline until one search evaluation has built it, so a region
+            TensorRT cannot build stops the search at once. Backends without a
+            ``launch`` method always build engines.
     """
 
     batch_size: int = 1
@@ -117,6 +133,7 @@ class SearchPolicy:
     finalists: int = 1
     resume: bool = False
     tuning: dict[str, tuple[Any, ...]] = field(default_factory=dict, hash=False)
+    screening: str = "launch"
 
     def __post_init__(self) -> None:
         for name in ("batch_size", "max_variants", "finalists"):
@@ -124,6 +141,12 @@ class SearchPolicy:
         for name in ("max_candidates", "max_no_improvement"):
             _check(self, name, int, optional=True)
         _check(self, "resume", bool)
+        _check(self, "screening", str)
+        if self.screening not in ("launch", "engine"):
+            raise ValueError(
+                "SearchPolicy screening must be 'launch' or 'engine'; got "
+                f"{self.screening!r}"
+            )
         # Every variant of a proposal is materialized before evaluation.
         if self.max_variants > 128:
             raise ValueError(
@@ -137,11 +160,12 @@ class KernelGenerator:
     """Generate a region kernel during compilation with a logged-in agent CLI.
 
     Pass it to :func:`fused_kernel`, creating it outside the traced
-    ``forward``. The author proposes kernels; worker processes build each into
-    a trial TensorRT engine, check it against the captured PyTorch region and
-    time it. The selected kernel is checked again on fresh inputs before it is
-    cached and registered. Model requests include the captured graph, and
-    generated source runs locally.
+    ``forward``. The author proposes kernels; worker processes check each
+    against the captured PyTorch region and time it, by default launching the
+    kernel directly (see :class:`SearchPolicy` ``screening``). The selected
+    kernel is checked again on fresh inputs inside a trial TensorRT engine
+    before it is cached and registered. Model requests include the captured
+    graph, and generated source runs locally.
 
     Args:
         provider: Author CLI, ``"claude"`` or ``"codex"``, or a trusted
@@ -190,6 +214,27 @@ class KernelGenerator:
         search: Search budget and launch tuning.
         diagnostics: Include compiler and execution facts in feedback, and let
             the author request a diagnostic run of the best kernel so far.
+        allow_generation: Search for a new kernel when no cached kernel passes
+            revalidation. ``False`` only reuses a cached kernel and otherwise
+            fails compilation with a :class:`RegionError` before any provider
+            call, as CI or production builds may require; setting the
+            environment variable ``TORCH_TENSORRT_REGION_GENERATION=0`` does
+            the same for every generator. Requires ``use_cache=True``.
+        validation_inputs: Real model inputs to validate candidates on: a
+            reusable iterable of batches, such as a list or a
+            ``torch.utils.data.DataLoader``. Each batch is a tensor or a tuple
+            of tensors for the positional inputs given to
+            ``torch_tensorrt.compile``, followed by a dict of the keyword
+            inputs if it was given ``kwarg_inputs``; a dict alone holds only
+            keyword inputs. Compilation runs the model on the first 8 batches,
+            or fewer once the region inputs kept from them reach 1 GiB, keeps
+            the tensors that reach the region, and checks every candidate on
+            them as well as on synthetic inputs. Batches must have the
+            compiled shapes and dtypes and are moved to the inputs' device.
+            The kept tensors are saved with the run but are not part of the
+            cache key: a cached kernel is reused once it passes a check on
+            them, so new weights or other batches need no new search. Failure
+            feedback can show the author values from them.
     """
 
     provider: str = "claude"
@@ -214,6 +259,12 @@ class KernelGenerator:
     atol: float | None = None
     search: SearchPolicy = field(default_factory=SearchPolicy)
     diagnostics: bool = False
+    allow_generation: bool = True
+    # Batches are data, not configuration: equality, hashing and the cache key
+    # ignore them.
+    validation_inputs: Iterable[Any] | None = field(
+        default=None, compare=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         for name in ("provider", "backend", "objective"):
@@ -233,8 +284,13 @@ class KernelGenerator:
         _check(self, "min_speedup", float)
         for name in ("rtol", "atol"):
             _check(self, name, float, positive=False, optional=True)
-        for name in ("use_cache", "check_nonfinite", "diagnostics"):
+        for name in ("use_cache", "check_nonfinite", "diagnostics", "allow_generation"):
             _check(self, name, bool)
+        if not self.allow_generation and not self.use_cache:
+            raise ValueError(
+                "KernelGenerator allow_generation=False requires use_cache=True; "
+                "without generation, only a cached kernel can be used"
+            )
         if not isinstance(self.search, SearchPolicy):
             raise TypeError(
                 f"KernelGenerator search must be a SearchPolicy; got {self.search!r}"
@@ -243,6 +299,18 @@ class KernelGenerator:
             raise TypeError(
                 "KernelGenerator instruction_files must be a sequence of paths; "
                 f"got {self.instruction_files!r}"
+            )
+        batches = self.validation_inputs
+        # Every compilation iterates the batches again, which a one-shot
+        # iterator cannot do; a bare tensor would be iterated row by row.
+        if batches is not None and (
+            not isinstance(batches, Iterable)
+            or isinstance(batches, (Iterator, torch.Tensor, str, bytes, Mapping))
+        ):
+            raise TypeError(
+                "KernelGenerator validation_inputs must be a reusable iterable of "
+                "batches, such as a list or a DataLoader; got "
+                f"{type(batches).__name__}"
             )
 
         for name, builtins in (("provider", _PROVIDERS), ("backend", _BACKENDS)):

@@ -14,6 +14,8 @@ from torch_tensorrt import region
 from torch_tensorrt.dynamo.region_compilation import get_region_records
 from torch_tensorrt.dynamo.region_compilation._generation import _providers
 
+from ._generation_utils import require_cuda_cpp_toolchain
+
 pytestmark = pytest.mark.skipif(
     os.name != "posix"
     or not torch.cuda.is_available()
@@ -95,6 +97,8 @@ def test_generated_kernel_evaluation_engine_and_cache(
             validate_cutile_toolchain("generated kernel integration tests")
         except (ImportError, RuntimeError) as error:
             pytest.skip(str(error))
+    if backend == "cuda_cpp":
+        require_cuda_cpp_toolchain()
     tolerance = None if dtype == torch.float32 else 0
     generator = region.KernelGenerator(
         backend=backend,
@@ -191,6 +195,8 @@ def test_generated_kernel_evaluation_engine_and_cache(
         pytest.fail("A verified cache hit must not call the agent")
 
     monkeypatch.setattr(_providers, "propose", no_second_author)
+    # A cache-only build, as CI would run it, reuses the revalidated kernel.
+    monkeypatch.setenv("TORCH_TENSORRT_REGION_GENERATION", "0")
     with torch.inference_mode():
         cached = torch_tensorrt.compile(
             model,
@@ -206,6 +212,35 @@ def test_generated_kernel_evaluation_engine_and_cache(
     checks = list(tmp_path.glob("*/run-*/cache_check.json"))
     assert len(checks) == 1
     assert json.loads(checks[0].read_text())["status"] == "passed"
+
+
+def test_cache_only_compilation_fails_before_any_agent_or_worker(tmp_path, monkeypatch):
+    pytest.importorskip("triton")
+
+    def no_author(**request):
+        pytest.fail("Cache-only compilation must not call the agent")
+
+    monkeypatch.setattr(_providers, "propose", no_author)
+    generator = region.KernelGenerator(cache_dir=tmp_path, allow_generation=False)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            with region.fused_kernel(generator=generator, name="uncached"):
+                return torch.relu(x * 0.75 - 0.25)
+
+    with pytest.raises(region.RegionError, match="disabled by allow_generation=False"):
+        torch_tensorrt.compile(
+            Model().eval(),
+            inputs=[torch.randn(3, 257, device="cuda")],
+            ir="dynamo",
+            strict=True,
+            min_block_size=1,
+            offload_module_to_cpu=False,
+        )
+    (run,) = tmp_path.glob("*/run-*")
+    # No evaluation ran: nothing was cached to revalidate.
+    assert not list(run.glob("*/feedback.json"))
+    assert not (run / "cache_check.json").exists()
 
 
 def test_batched_tuning_selects_a_correct_kernel_inside_tensorrt(tmp_path, monkeypatch):
@@ -278,6 +313,10 @@ def test_batched_tuning_selects_a_correct_kernel_inside_tensorrt(tmp_path, monke
     reports = [report for report in feedback if report.get("stage") != "budget"]
     assert len(refused) == 1 and len(reports) == 3
     assert sum(report["status"] == "passed" for report in reports) == 1
+    # The search screens by direct launches; the finalist is proven in an engine.
+    passed = next(report for report in reports if report["status"] == "passed")
+    assert passed["execution"] == "launch"
+    assert accepted["validation"]["execution"] == "engine"
     assert all(
         report["diagnostics"]["candidate"]["compilation_ms"] > 0 for report in reports
     )
@@ -287,3 +326,79 @@ def test_batched_tuning_selects_a_correct_kernel_inside_tensorrt(tmp_path, monke
         str(records[0].plugin_op)
         in compiled.get_submodule(records[0].owner).get_layer_info()
     )
+
+
+# relu(x * 0.75 - 0.25) that multiplies by the mask: -inf * 0 gives NaN, not 0.
+MASK_MULTIPLYING_TRITON = """import triton
+import triton.language as tl
+
+@triton.jit
+def generated(arg0, out0, N: tl.constexpr, BLOCK: tl.constexpr):
+    offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    shifted = tl.load(arg0 + offsets, offsets < N, other=0.0) * 0.75 - 0.25
+    tl.store(out0 + offsets, shifted * (shifted > 0), offsets < N)
+"""
+
+
+def test_real_validation_batches_reject_a_kernel_that_passes_synthetic_inputs(
+    tmp_path, monkeypatch
+):
+    pytest.importorskip("triton")
+    candidate = dict(
+        source=MASK_MULTIPLYING_TRITON,
+        kernel_name="generated",
+        constants=[{"name": "N", "value": 771}, {"name": "BLOCK", "value": 128}],
+        grid=[7],
+        num_warps=4,
+        num_stages=None,
+    )
+    monkeypatch.setattr(_providers, "propose", lambda **request: _proposal(candidate))
+    # Real batches carry -inf, as masked scores do; synthetic inputs without the
+    # nonfinite checks never do.
+    masked = torch.randn(3, 257)
+    masked[1, 5:9] = -float("inf")
+
+    def compile(cache, validation_inputs):
+        generator = region.KernelGenerator(
+            cache_dir=tmp_path / cache,
+            max_attempts=1,
+            timeout_s=240,
+            candidate_timeout_s=90,
+            num_tests=2,
+            benchmark_iters=3,
+            check_nonfinite=False,
+            validation_inputs=validation_inputs,
+        )
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                x = x + 1
+                with region.fused_kernel(generator=generator, name="masked"):
+                    y = torch.relu(x * 0.75 - 0.25)
+                return y - 0.5
+
+        model = Model().eval()
+        with torch.inference_mode():
+            compiled = torch_tensorrt.compile(
+                model,
+                inputs=[torch.randn(3, 257, device="cuda")],
+                ir="dynamo",
+                strict=True,
+                min_block_size=1,
+                offload_module_to_cpu=False,
+            )
+        return model, compiled
+
+    model, compiled = compile("synthetic", None)
+    with torch.inference_mode():
+        assert compiled(masked.cuda()).isnan().any()
+        assert not model(masked.cuda()).isnan().any()
+    with pytest.raises(region.RegionError, match="no valid kernel"):
+        compile("sampled", [torch.randn(3, 257), masked])
+    (feedback,) = (tmp_path / "sampled").glob("*/run-*/attempt-1/feedback.json")
+    report = json.loads(feedback.read_text())
+    assert report["stage"] == "correctness"
+    assert "Output 0 is wrong for case 'sample 2': got nan at index (1, 5)" in (
+        report["error"]
+    )
+    assert not list((tmp_path / "sampled").glob("*/accepted.json"))

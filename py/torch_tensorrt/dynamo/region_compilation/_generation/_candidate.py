@@ -438,6 +438,47 @@ class _TritonBackend(_DslBackend):
             )
         return candidate
 
+    def make_registration(
+        self,
+        candidate: dict[str, Any],
+        input_specs: list[Any],
+        output_specs: list[Any],
+        directory: Path,
+    ) -> KernelSpec | partial[None]:
+        """Register the kernel after checking the plugin's compiled launch.
+
+        Triton's own launcher opts a kernel into more shared memory than a
+        block gets by default, but a TensorRT plugin launch does not, so such a
+        kernel passes a direct launch and then fails inside an engine.
+        """
+        from torch_tensorrt.kernels._triton import compile_triton_to_ptx
+
+        from .._plugins import _triton_signature
+
+        registration = super().make_registration(
+            candidate, input_specs, output_specs, directory
+        )
+        assert isinstance(registration, partial)
+        device = input_specs[0].device
+        # The same compilation the plugin registration performs, which reuses
+        # this result from Triton's cache.
+        with torch.cuda.device(device):
+            artifact = compile_triton_to_ptx(
+                registration.keywords["kernel"],
+                _triton_signature(registration, input_specs, output_specs, "generated"),
+                registration.keywords["constexprs"],
+                num_warps=candidate["num_warps"],
+                num_stages=candidate["num_stages"],
+            )
+        limit = torch.cuda.get_device_properties(device).shared_memory_per_block
+        if artifact.shared_mem > limit:
+            raise ValueError(
+                f"Generated Triton kernel needs {artifact.shared_mem} bytes of shared "
+                f"memory, but a TensorRT plugin launch allows at most {limit}; use "
+                "smaller tiles or fewer num_stages (null selects Triton's default)"
+            )
+        return registration
+
     def _registration(
         self, kernel: Any, candidate: dict[str, Any], grid: Callable[..., Any]
     ) -> KernelSpec | partial[None]:

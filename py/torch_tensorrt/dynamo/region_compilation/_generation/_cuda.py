@@ -189,16 +189,104 @@ def _validate_ptx(ptx: bytes, name: str, count: int, block: tuple[int, ...]) -> 
         raise ValueError("Generated CUDA PTX requires an unsupported launch contract")
 
 
+def _driver_rejection(ptx: bytes, name: str) -> str | None:
+    """Why the driver cannot JIT ``ptx``, or None when it loads."""
+    from cuda.bindings import driver
+
+    from torch_tensorrt.kernels._common import load_ptx
+
+    error = load_ptx(ptx.decode("utf-8"), name)
+    if error == driver.CUresult.CUDA_SUCCESS:
+        return None
+    return str(getattr(error, "name", error))
+
+
+def _ptx_kernel(ptx: bytes, name: str) -> Any:
+    try:
+        from cuda.core import ObjectCode
+    except ImportError:  # cuda-core 0.x
+        from cuda.core.experimental import ObjectCode
+    return ObjectCode.from_ptx(ptx).get_kernel(name)
+
+
 def _compiled(source: str, name: str, device: torch.device) -> tuple[bytes, Any]:
-    """Return PTX and a loaded kernel, compiling once per process."""
+    """Return PTX and the kernel loaded from that PTX, compiling once per process.
+
+    The eager launch uses the same PTX that the plugin embeds, so the driver's JIT
+    rejects in the eager checks exactly what would fail inside the engine.
+    """
     key = (sha256_text(source), name, device)
     if key not in _KERNELS:
         from torch_tensorrt.kernels._nvrtc import compile_to_ptx
 
         with torch.cuda.device(device):
-            ptx, _, kernel = compile_to_ptx(source, name, None, load_kernel=True)
-        _KERNELS[key] = ptx, kernel
+            ptx, _, _ = compile_to_ptx(source, name, None)
+            rejection = _driver_rejection(ptx, name)
+            if rejection is not None:
+                raise RuntimeError(
+                    f"The CUDA driver could not load the PTX that NVRTC produced "
+                    f"({rejection})"
+                )
+            _KERNELS[key] = ptx, _ptx_kernel(ptx, name)
     return _KERNELS[key]
+
+
+# The trivial kernel compiled to check that the driver loads NVRTC's PTX
+_PROBE = 'extern "C" __global__ void torch_tensorrt_probe(float* out) {}'
+# Load errors that every PTX from this NVRTC gets from this driver. Any other
+# error, such as a full GPU, may not recur, so it is reported but not cached.
+_PTX_REJECTIONS = frozenset(
+    {
+        "CUDA_ERROR_UNSUPPORTED_PTX_VERSION",
+        "CUDA_ERROR_INVALID_PTX",
+        "CUDA_ERROR_NO_BINARY_FOR_GPU",
+        "CUDA_ERROR_JIT_COMPILER_NOT_FOUND",
+        "CUDA_ERROR_JIT_COMPILATION_DISABLED",
+    }
+)
+# Probe results by device: None when the driver loads NVRTC's PTX
+_TOOLCHAIN: dict[torch.device, str | None] = {}
+
+
+def _toolchain_rejection(device: torch.device) -> str | None:
+    if device not in _TOOLCHAIN:
+        from torch_tensorrt.kernels._nvrtc import compile_to_ptx
+
+        with torch.cuda.device(device):
+            ptx, _, _ = compile_to_ptx(_PROBE, "torch_tensorrt_probe", None)
+            rejection = _driver_rejection(ptx, "torch_tensorrt_probe")
+        if rejection is not None and rejection not in _PTX_REJECTIONS:
+            raise RuntimeError(
+                f"The CUDA driver could not load a probe kernel ({rejection})"
+            )
+        _TOOLCHAIN[device] = rejection
+    return _TOOLCHAIN[device]
+
+
+def verify_toolchain(device: Any) -> None:
+    """Raise RegionError unless the driver loads the PTX that NVRTC produces.
+
+    A driver older than NVRTC rejects every candidate's PTX, so generation
+    checks this before it calls the author. Any other failure to load the probe
+    raises RuntimeError and is probed again on the next call.
+    """
+    from cuda.bindings import driver, nvrtc
+
+    from torch_tensorrt.region import RegionError
+
+    rejection = _toolchain_rejection(torch.device(device))
+    if rejection is not None:
+        _, version = driver.cuDriverGetVersion()
+        driver_version = (version // 1000, version % 1000 // 10)
+        _, major, minor = nvrtc.nvrtcVersion()
+        message = (
+            f"CUDA C++ generation needs a driver that loads NVRTC {major}.{minor} "
+            f"PTX; the CUDA {driver_version[0]}.{driver_version[1]} driver "
+            f"reported {rejection}."
+        )
+        if (major, minor) > driver_version:
+            message += " Install an NVRTC no newer than the driver, or a newer driver."
+        raise RegionError(message)
 
 
 def _kernel_attribute(kernel: Any, name: str) -> int:
@@ -232,6 +320,7 @@ class _CudaBackend:
         rtc_status, major, minor = nvrtc.nvrtcVersion()
         if int(status) or int(rtc_status):
             raise RegionError("CUDA C++ generation cannot query the CUDA toolchain")
+        verify_toolchain(device)
         return _target_metadata(
             device,
             {"driver": driver_version, "nvrtc": [major, minor]},

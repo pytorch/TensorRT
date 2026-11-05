@@ -28,6 +28,7 @@ def test_search_policy_defaults_preserve_single_proposal_behavior():
     assert first.search.batch_size == first.search.finalists == 1
     assert first.search.max_candidates is None
     assert first.search.max_no_improvement is None
+    assert first.search.screening == "launch"
     assert first.diagnostics is False
     assert hash(first) == hash(second)
     with pytest.raises(FrozenInstanceError):
@@ -58,6 +59,8 @@ def test_search_policy_snapshots_nested_user_tuning():
         ({"finalists": True}, TypeError),
         ({"finalists": 0}, ValueError),
         ({"resume": "yes"}, TypeError),
+        ({"screening": True}, TypeError),
+        ({"screening": "eager"}, ValueError),
         ({"tuning": []}, TypeError),
         ({"tuning": {"num_warps": ()}}, ValueError),
         ({"tuning": {"num_warps": "4"}}, TypeError),
@@ -321,6 +324,7 @@ def test_task_identity_ignores_scheduling_budget_diagnostics_and_device_index():
                 finalists=2,
                 resume=True,
                 tuning={"num_warps": (4, 8)},
+                screening="engine",
             )
         ),
         "budget": {"max_attempts": 8, "timeout_s": 60, "use_cache": False},

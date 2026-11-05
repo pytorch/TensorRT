@@ -4,7 +4,9 @@
 """Capture, feedback, selection, and cache policy without agent or GPU access."""
 
 import json
+import logging
 import os
+import stat
 import subprocess
 import sys
 from dataclasses import replace
@@ -19,6 +21,9 @@ from torch_tensorrt.dynamo.region_compilation import (
     normalize_region_scopes,
 )
 from torch_tensorrt.dynamo.region_compilation._generation import _factory
+from torch_tensorrt.dynamo.region_compilation._generation._reference import (
+    load_reference,
+)
 from torch_tensorrt.region import (
     KernelGenerator,
     RegionError,
@@ -117,6 +122,12 @@ def test_manual_and_generated_kernel_options_are_exclusive(options, error, match
         ({"instructions": 42}, TypeError, "instructions must be a string"),
         ({"instruction_files": "guide.md"}, TypeError, "sequence of paths"),
         ({"objective": "unknown"}, ValueError, "objective must be 'candidate'"),
+        ({"allow_generation": 0}, TypeError, "allow_generation must be a bool"),
+        (
+            {"allow_generation": False, "use_cache": False},
+            ValueError,
+            "allow_generation=False requires use_cache=True",
+        ),
     ],
 )
 def test_invalid_generation_budgets_and_tolerances_are_rejected(options, error, match):
@@ -140,7 +151,7 @@ def test_factory_retries_with_feedback_and_retains_the_fastest_valid_kernel(fact
     request = factory.evaluate.call_args_list[0].args[0]
     assert request["inputs"][0]["shape"] == [7]
     assert request["outputs"][0]["dtype"] == "float32"
-    saved_reference = torch.load(request["reference_path"], weights_only=False)
+    saved_reference = load_reference(request["reference_path"])
     inputs = torch.randn(7)
     torch.testing.assert_close(saved_reference(inputs), factory.graph(inputs))
     assert all(not node.meta for node in saved_reference.graph.nodes)
@@ -256,6 +267,205 @@ def test_cache_revalidation_failure_triggers_new_generation(factory):
     assert accepted["candidate"] == new
 
 
+def test_cache_only_generation_reuses_a_revalidated_kernel_without_an_agent(
+    factory,
+):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = _passed(0.2)
+    assert _generate(factory) == _candidate("published")
+    assert _generate(factory, allow_generation=False) == _candidate("published")
+    factory.author.assert_called_once()
+    factory.evaluate.assert_called_once()
+    # Final validation, then the cache-only compilation's revalidation.
+    assert factory.finalize.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "cache, reason",
+    [
+        ("missing", "no accepted kernel is cached for this task"),
+        ("corrupt", "its cached kernel entry is invalid"),
+        (
+            "stale",
+            "its cached kernel failed revalidation (correctness: Fresh inputs "
+            "disagree; see cache_check.json)",
+        ),
+    ],
+)
+def test_cache_only_generation_fails_without_a_usable_kernel(factory, cache, reason):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = _passed(0.2)
+    if cache == "missing":
+        factory.root.mkdir()
+    else:
+        _generate(factory)
+        factory.author.reset_mock()
+        factory.evaluate.reset_mock()
+    if cache == "corrupt":
+        manifest = next(factory.root.glob("*/accepted.json"))
+        stored = json.loads(manifest.read_text())
+        stored["candidate_sha256"] = "corrupted"
+        manifest.write_text(json.dumps(stored))
+    elif cache == "stale":
+        factory.finalize.return_value = {
+            "status": "error",
+            "stage": "correctness",
+            "error": "Fresh inputs disagree",
+        }
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False)
+    message = str(failure.value)
+    assert "'activation' is disabled by allow_generation=False" in message
+    assert reason in message
+    assert "Compile once with generation allowed" in message
+    factory.author.assert_not_called()
+    factory.evaluate.assert_not_called()
+    published = list(factory.root.glob("*/accepted.json"))
+    assert len(published) == (0 if cache == "missing" else 1)
+
+
+@pytest.mark.parametrize(
+    "stage, error, inconclusive",
+    [
+        ("budget", "GPU evaluation lock timed out", True),
+        ("setup", "Evaluator exited 1: CUDA out of memory", True),
+        ("timeout", "Evaluator exceeded its 120s timeout", True),
+        ("baseline", "TensorRT baseline build failed", True),
+        ("crash", "Evaluator was killed by signal 11", False),
+        ("correctness", "Output 0 is wrong for case 'random 1'", False),
+    ],
+)
+def test_cache_only_refusal_names_the_revalidation_failure(
+    factory, stage, error, inconclusive
+):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = _passed(0.2)
+    _generate(factory)
+    factory.finalize.return_value = {
+        "status": "error",
+        "stage": stage,
+        "error": f"Traceback (most recent call last):\n  ...\n{error}\n",
+    }
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False)
+    message = str(failure.value)
+    outcome = "could not be revalidated" if inconclusive else "failed revalidation"
+    assert f"its cached kernel {outcome} ({stage}: {error}; see" in message
+    # Only a check that says nothing about the kernel is worth retrying as is.
+    assert ("Retry once the cause is resolved" in message) == inconclusive
+    assert ("Compile once with generation allowed" in message) != inconclusive
+    factory.author.assert_called_once()
+
+
+def test_cache_only_refusal_reports_a_remeasured_speedup_below_the_objective(
+    factory,
+):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = {**_passed(1.0), "baseline_latency_ms": 1.2}
+    factory.finalize.return_value = {**_passed(1.0), "baseline_latency_ms": 1.2}
+    objective = {"objective": "eager", "min_speedup": 1.1}
+    _generate(factory, **objective)
+    factory.finalize.return_value = {
+        **_passed(1.0),
+        "baseline_latency_ms": 1.2,
+        "benchmark": {"baseline": {"mad_ms": 0.15}, "candidate": {"mad_ms": 0.0}},
+    }
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False, **objective)
+    message = str(failure.value)
+    # The raw ratio, 1.2x, would contradict the refusal; report the compared one.
+    assert (
+        "its cached kernel passed the correctness checks, but its remeasured "
+        "speedup over the eager baseline after allowing for timing noise, 1.05x "
+        "(baseline 1.2 ± 0.15 ms, kernel 1 ± 0 ms), is below min_speedup=1.1"
+    ) in message
+    # A correct kernel is most likely slow because the GPU is busy: retry first.
+    assert "Retry on a less busy GPU; if the speedup stays below min_speedup" in message
+
+
+def test_cache_only_compilation_never_creates_a_missing_cache_directory(factory):
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False)
+    assert (
+        f"the kernel cache directory {factory.root} does not exist; check cache_dir"
+    ) in str(failure.value)
+    assert not factory.root.exists()
+    factory.author.assert_not_called()
+
+
+def test_cache_only_miss_names_what_differs_from_a_cached_kernel(factory):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = _passed(0.2)
+    _generate(factory)
+    task = next(factory.root.glob("*/accepted.json")).parent
+    # A field outside the cache key, even one the cached task lacks, is no
+    # reason for a miss.
+    saved = next(task.glob("run-*/task.json"))
+    saved.write_text(
+        json.dumps(
+            {k: v for k, v in json.loads(saved.read_text()).items() if k != "budget"}
+        )
+    )
+    # Validation settings are part of the cache key; budgets are not.
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False, num_tests=9, max_attempts=7)
+    assert (
+        "no accepted kernel is cached for this task; a kernel is cached for the "
+        "same captured computation, but its task.json differs in validation "
+        f"(compare {task}/run-"
+    ) in str(failure.value)
+    factory.author.assert_called_once()
+
+
+def test_cache_only_miss_says_when_no_kernel_is_cached_for_the_computation(
+    factory,
+):
+    factory.root.mkdir()
+    with pytest.raises(RegionError) as failure:
+        _generate(factory, allow_generation=False)
+    assert (
+        "no accepted kernel is cached for this task, and none of the 0 kernels "
+        f"cached in {factory.root} is for this captured computation"
+    ) in str(failure.value)
+
+
+@pytest.mark.parametrize("switch", ["0", "1"])
+def test_environment_switch_can_forbid_generation_for_every_generator(
+    factory, monkeypatch, switch
+):
+    monkeypatch.setenv("TORCH_TENSORRT_REGION_GENERATION", switch)
+    factory.author.return_value = _candidate("allowed")
+    factory.evaluate.return_value = _passed(0.2)
+    if switch == "1":
+        assert _generate(factory) == _candidate("allowed")
+        return
+    with pytest.raises(
+        RegionError, match="disabled by TORCH_TENSORRT_REGION_GENERATION=0"
+    ):
+        _generate(factory)
+    factory.author.assert_not_called()
+    factory.evaluate.assert_not_called()
+
+
+@pytest.mark.parametrize("switch", ["false", "off", ""])
+def test_unrecognized_generation_switch_fails_before_any_work(
+    factory, monkeypatch, switch
+):
+    monkeypatch.setenv("TORCH_TENSORRT_REGION_GENERATION", switch)
+    with pytest.raises(RegionError, match="must be 0 or 1"):
+        _generate(factory)
+    factory.author.assert_not_called()
+    assert not factory.root.exists()
+
+
+def test_disabled_generation_and_cache_leave_nothing_to_use(factory, monkeypatch):
+    monkeypatch.setenv("TORCH_TENSORRT_REGION_GENERATION", "0")
+    with pytest.raises(RegionError, match="use_cache=False leaves no cached kernel"):
+        _generate(factory, use_cache=False)
+    factory.author.assert_not_called()
+    assert not factory.root.exists()
+
+
 def test_invalid_nan_proposal_cannot_discard_an_earlier_valid_winner(factory):
     best, invalid = _candidate("best"), _candidate("invalid")
     invalid["constants"][0]["value"] = float("nan")
@@ -356,7 +566,7 @@ def test_saved_reference_reuses_cache_and_reports_its_exact_validation_run(facto
     registration, first = _factory._generate(
         factory.graph, factory.config, region_id="original"
     )
-    restored = torch.load(first / "reference.pt", weights_only=False)
+    restored = load_reference(first / "reference.json")
     replayed, second = _factory._generate(
         restored, factory.config, region_id="interactive"
     )
@@ -857,6 +1067,7 @@ def test_task_records_budget_and_compile_options_used_by_every_request(factory):
     }
     assert set(template) == {
         "reference_path",
+        "samples_path",
         "backend",
         "backend_version",
         "proposal_schema_sha256",
@@ -872,9 +1083,15 @@ def test_task_records_budget_and_compile_options_used_by_every_request(factory):
         "atol",
         "validation_seed",
         "validation_phase",
+        "screening",
+        "check_baseline",
         "compile_options",
     }
     assert template["validation_phase"] == "search"
+    assert template["screening"] == "launch"
+    # Only the tensorrt objective has a TensorRT baseline to check.
+    assert template["check_baseline"] is False
+    assert template["samples_path"] is None and "samples" not in task
     assert template["compile_options"] == task["compile_options"]
     final = factory.finalize.call_args.args[0]
     assert final["compile_options"] == task["compile_options"]
@@ -1066,3 +1283,82 @@ def test_author_stop_without_a_kernel_says_why(factory):
         "no candidate was evaluated",
     ):
         _generate(factory, max_attempts=4)
+
+
+def test_cache_directories_are_private(tmp_path):
+    from torch_tensorrt.dynamo.region_compilation._generation import _util
+
+    task = _util.private_directory(_util.private_directory(tmp_path / "cache") / "task")
+    for directory in (tmp_path / "cache", task):
+        assert directory.stat().st_mode & 0o077 == 0, directory
+
+
+@pytest.mark.skipif(not hasattr(os, "getuid"), reason="POSIX ownership")
+def test_cache_directory_of_another_user_is_refused(monkeypatch, tmp_path):
+    from torch_tensorrt.dynamo.region_compilation._generation import _util
+
+    other = os.getuid() + 1
+    monkeypatch.setattr(_util.os, "getuid", lambda: other)
+    with pytest.raises(RegionError, match="belongs to another user"):
+        _util.private_directory(tmp_path / "cache")
+
+
+def test_writable_cache_directory_is_reported_once_and_left_unchanged(tmp_path, caplog):
+    from torch_tensorrt.dynamo.region_compilation._generation import _util
+
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o775)
+    with caplog.at_level(logging.WARNING, logger=_util.__name__):
+        for _ in range(3):
+            _util.private_directory(shared)
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == _util.__name__
+    ]
+    assert len(warnings) == 1 and "writable by other users" in warnings[0]
+    # Its owner may share it on purpose, so its permissions are left alone.
+    assert stat.S_IMODE(shared.stat().st_mode) == 0o775
+
+
+def test_generation_keeps_cache_task_and_run_directories_private(factory):
+    factory.author.return_value = _candidate("published")
+    factory.evaluate.return_value = _passed(0.2)
+    # Under this umask, plain mkdir would leave the directories readable.
+    umask = os.umask(0o022)
+    try:
+        _generate(factory)
+    finally:
+        os.umask(umask)
+    (task,) = (path for path in factory.root.iterdir() if path.is_dir())
+    (run,) = task.glob("run-*")
+    for directory in (factory.root, task, run):
+        assert directory.stat().st_mode & 0o077 == 0, directory
+
+
+def test_evaluator_keeps_the_candidate_directory_off_sys_path(tmp_path, monkeypatch):
+    # The worker runs in the candidate's directory, where a planted module must
+    # not shadow one that the worker imports.
+    commands = []
+
+    def run_process(command, *, cwd, **kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    monkeypatch.setattr(_factory._providers, "run_process", run_process)
+    _factory._evaluate({}, tmp_path, 1)
+    (command,) = commands
+    (tmp_path / "planted.py").write_text("")
+    # PYTHONSAFEPATH would keep the directory off sys.path even without the flag.
+    environment = {
+        name: value for name, value in os.environ.items() if name != "PYTHONSAFEPATH"
+    }
+    probe = subprocess.run(
+        [*command[: command.index("-m")], "-c", "import planted"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+    assert "ModuleNotFoundError: No module named 'planted'" in probe.stderr

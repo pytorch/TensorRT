@@ -4,9 +4,36 @@
 """Scripted candidates and reports for generation controller tests."""
 
 from dataclasses import replace
+from pathlib import Path
 
-from torch_tensorrt.dynamo.region_compilation._generation import _factory
+import pytest
+from torch.fx.experimental.proxy_tensor import make_fx
+
+from torch_tensorrt.dynamo.region_compilation._generation import (
+    _cuda,
+    _factory,
+    _reference,
+)
 from torch_tensorrt.dynamo.region_compilation._generation._backends import get_backend
+from torch_tensorrt.region import RegionError
+
+
+def require_cuda_cpp_toolchain():
+    """Skip unless the driver loads NVRTC's PTX, as CUDA C++ generation requires.
+
+    CI runners can have a driver older than NVRTC; generation refuses that
+    toolchain, so tests that compile and load real CUDA C++ skip there.
+    """
+    pytest.importorskip("cuda.core")
+    try:
+        _cuda.verify_toolchain("cuda")
+    except RegionError as error:
+        pytest.skip(str(error))
+
+
+def save_reference(module, *example_inputs, path):
+    """Save an ATen trace of ``module`` as the controller saves a captured region."""
+    _reference.save_reference(make_fx(module)(*example_inputs), Path(path))
 
 
 def validate_candidate(candidate, backend, num_inputs, num_outputs):

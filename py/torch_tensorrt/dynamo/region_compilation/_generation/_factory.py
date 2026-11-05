@@ -13,11 +13,11 @@ import secrets
 import sys
 import tempfile
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from functools import partial
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import torch
 from filelock import FileLock, Timeout
@@ -34,13 +34,28 @@ from ._backends import (
     validate_tuning_space,
 )
 from ._instructions import EvidenceCatalog, load_instructions, validate_instructions
-from ._util import digest, gpu_lock, read_json_object, scrub, strip_control, write_json
+from ._reference import FILENAME as REFERENCE_FILENAME
+from ._reference import encode_reference, save_reference
+from ._samples import FILENAME as SAMPLES_FILENAME
+from ._samples import check_samples, samples_digest, save_samples
+from ._util import (
+    digest,
+    gpu_lock,
+    private_directory,
+    read_json_object,
+    scrub,
+    strip_control,
+    write_json,
+)
 
 if TYPE_CHECKING:
     from torch_tensorrt.dynamo._settings import CompilationSettings
 
 _LOGGER = logging.getLogger(__name__)
 _VERSION = 5
+# "0" forbids generation for every KernelGenerator, as allow_generation=False
+# does for one, so CI can use only cached kernels without code changes.
+_GENERATION_ENV = "TORCH_TENSORRT_REGION_GENERATION"
 # Starting the worker or an author CLI alone takes about a second, so a shorter
 # time slice can only expire; the controller stops instead of launching it.
 _MIN_SLICE_S = 1.0
@@ -72,6 +87,10 @@ _BUDGET = (
 _TERMINAL_STAGES = frozenset({"provider", "setup", "baseline", "budget"})
 # These reproduce for an unchanged candidate on the run's fixed search inputs.
 _DETERMINISTIC_STAGES = frozenset({"source", "compile", "engine", "correctness"})
+# A worker reaches these only after building the TensorRT baseline.
+_AFTER_BASELINE = frozenset({"compile", "engine", "correctness", "benchmark"})
+# A revalidation that fails here has not shown that the cached kernel is wrong.
+_INCONCLUSIVE_STAGES = frozenset({"budget", "setup", "timeout", "baseline"})
 _PROTOCOL = (
     "\nRESPONSE PROTOCOL: Return action, candidates, resource, and offset; unused "
     "fields are null. For action=propose, candidates holds 1 to {batch_size} "
@@ -89,11 +108,13 @@ _PROTOCOL = (
 def _task_digest(task: dict[str, Any]) -> str:
     # Scheduling, budgets, diagnostics, and logical device indices do not change
     # kernel compatibility; "target" identifies the GPU. Tuning domains do: a
-    # cached candidate must satisfy the current user's constraints.
+    # cached candidate must satisfy the current user's constraints. Validation
+    # samples do not: they depend on model weights and on upstream numerics,
+    # and every reuse first checks a kernel on the current samples.
     identity = {
         key: value
         for key, value in task.items()
-        if key not in ("search", "budget", "diagnostics")
+        if key not in ("search", "budget", "diagnostics", "samples")
     }
     identity["tuning"] = task["search"]["tuning"]
     for side in ("inputs", "outputs"):
@@ -101,6 +122,21 @@ def _task_digest(task: dict[str, Any]) -> str:
             {**spec, "device": spec["device"].partition(":")[0]} for spec in task[side]
         ]
     return digest(identity)
+
+
+@dataclass
+class _Shared:
+    """The kernel that identical regions of one compilation share."""
+
+    candidate: dict[str, Any]
+    # The run whose copy of the kernel source these regions load.
+    run: Path
+    # Digests of the regions' samples that the kernel passed, and those
+    # samples, which a new search for an identical region must also pass.
+    checked: set[str]
+    samples: list[tuple[torch.Tensor, ...]]
+    # The ids of the regions that use it, which final_registration rebuilds.
+    regions: set[str] = field(default_factory=set)
 
 
 def _reference(
@@ -149,6 +185,13 @@ def _reference(
         nodes[node].meta = {}
     reference = torch.fx.GraphModule(child, graph)
     reference.meta = {}
+    try:
+        # Runs save the reference as data, never as a pickle; fail before any author call.
+        encode_reference(reference)
+    except TypeError as error:
+        raise RegionError(
+            f"Agent generation cannot save the reference: {error}"
+        ) from None
     return reference, constants
 
 
@@ -337,11 +380,18 @@ def _author(
     raise AssertionError("Author request loop did not return")
 
 
-def _meets_objective(report: dict[str, Any], config: KernelGenerator) -> bool:
+def _meets_objective(report: dict[str, Any], config: KernelGenerator) -> bool | None:
+    """Whether a report meets the objective; None when only an engine can tell.
+
+    A launch screen builds no engine, so it cannot decide a speedup over the
+    PyTorch or TensorRT baseline; final validation measures that in an engine.
+    """
     if report.get("status") != "passed":
         return False
     if config.objective == "candidate":
         return True
+    if report.get("execution") == "launch":
+        return None
     baseline = report.get("baseline_latency_ms")
     if not _positive(baseline):
         return False
@@ -416,6 +466,8 @@ def _evaluate(
     result_path.unlink(missing_ok=True)
     command = [
         sys.executable,
+        # Keep the candidate directory, the working directory, off sys.path.
+        "-P",
         "-m",
         "torch_tensorrt.dynamo.region_compilation._generation._worker",
         "--request",
@@ -472,6 +524,18 @@ def _evaluate(
     return _error("setup", "Evaluator returned an invalid report")
 
 
+def _generation_block(config: KernelGenerator) -> str | None:
+    """Name the setting that forbids a search, or None when one may run."""
+    switch = os.environ.get(_GENERATION_ENV, "1")
+    # Reject other spellings, so that a build meant to be cache-only never
+    # calls an agent because of a typo.
+    if switch not in ("0", "1"):
+        raise RegionError(f"{_GENERATION_ENV} must be 0 or 1; got {switch!r}")
+    if switch == "0":
+        return f"{_GENERATION_ENV}=0"
+    return None if config.allow_generation else "allow_generation=False"
+
+
 def _cache_root(config: KernelGenerator) -> Path:
     if config.cache_dir is not None:
         return Path(config.cache_dir).resolve()
@@ -486,17 +550,54 @@ def generate_registration(
     region_id: str,
     settings: CompilationSettings | None = None,
     memo: dict[str, Any] | None = None,
+    samples: Sequence[tuple[torch.Tensor, ...]] | None = None,
 ) -> KernelSpec | partial[None]:
     """Generate a kernel after capture and return the existing registration form.
 
     ``settings`` are the user's compilation settings; their engine options apply
     to evaluation engines. ``memo`` belongs to one compilation: identical regions
-    in it reuse one validated kernel without another search or check.
+    in it share one validated kernel, which a region reuses after a correctness
+    check on its samples if they are new; a region they fail searches again,
+    also on the samples of the identical regions before it, and replaces the
+    shared kernel. ``samples`` are region inputs captured from the generator's
+    ``validation_inputs``; every evaluation also checks them.
     """
     registration, _ = _generate(
-        child, config, region_id=region_id, settings=settings, memo=memo
+        child,
+        config,
+        region_id=region_id,
+        settings=settings,
+        memo=memo,
+        samples=samples,
     )
     return registration
+
+
+def final_registration(
+    child: torch.fx.GraphModule,
+    config: KernelGenerator,
+    *,
+    region_id: str,
+    memo: dict[str, Any],
+) -> KernelSpec | partial[None] | None:
+    """Rebuild a generated region's registration from its group's final kernel.
+
+    A later identical region's search may have replaced the kernel this region
+    was generated with by one that also passed this region's samples. The
+    lookup uses the task each region had when it was generated, so it never
+    searches, whatever changed since.
+    """
+    for shared in memo.values():
+        if region_id in shared.regions:
+            input_specs, output_specs = _boundaries(child, region_id)
+            return make_registration(
+                shared.candidate,
+                get_backend(config.backend),
+                input_specs,
+                output_specs,
+                shared.run,
+            )
+    return None
 
 
 def _generate(
@@ -507,10 +608,17 @@ def _generate(
     instruction_bundle: dict[str, Any] | None = None,
     settings: CompilationSettings | None = None,
     memo: dict[str, Any] | None = None,
+    samples: Sequence[tuple[torch.Tensor, ...]] | None = None,
 ) -> tuple[KernelSpec | partial[None], Path]:
     """Return a registration and the exact run containing its validation evidence."""
     cache: Path | None = None
     try:
+        blocked = _generation_block(config)
+        if blocked is not None and not config.use_cache:
+            raise RegionError(
+                f"Kernel generation for {region_id!r} is disabled by {blocked}, "
+                "and use_cache=False leaves no cached kernel to use"
+            )
         if settings is not None and settings.hardware_compatible:
             raise RegionError(
                 f"Kernel generation for {region_id!r} compiles for the build GPU, so it "
@@ -528,6 +636,14 @@ def _generate(
             )
         if any(math.prod(spec.shape) == 0 for spec in specs):
             raise RegionError("Agent-generated regions require nonempty tensors")
+        if samples is not None:
+            try:
+                check_samples(samples, input_specs)
+            except ValueError as error:
+                raise RegionError(
+                    f"KernelGenerator validation_inputs do not fit region "
+                    f"{region_id!r}: {error}"
+                ) from None
         reference, constants = _reference(child)
         backend = get_backend(config.backend)
         instructions = (
@@ -578,15 +694,34 @@ def _generate(
                 "atol": config.atol,
             },
         }
+        sampled = None
+        if samples:
+            # Replay checks a run's samples.pt against this record. The cache
+            # key leaves it out, so that new weights or nondeterministic
+            # upstream values reuse a kernel after a check on these samples.
+            sampled = samples_digest(samples)
+            task["samples"] = {"count": len(samples), "sha256": sampled}
         key = _task_digest(task)
-        if memo is not None and key in memo:
-            candidate, run = memo[key]
+        shared = None if memo is None else memo.get(key)
+        if shared is not None and (sampled is None or sampled in shared.checked):
+            shared.regions.add(region_id)
             return (
-                make_registration(candidate, backend, input_specs, output_specs, run),
-                run,
+                make_registration(
+                    shared.candidate, backend, input_specs, output_specs, shared.run
+                ),
+                shared.run,
             )
-        cache = _cache_root(config) / key
-        cache.mkdir(parents=True, exist_ok=True)
+        root = _cache_root(config)
+        if blocked is not None and not root.is_dir():
+            # Creating a mistyped or unrestored cache_dir would only hide why
+            # no kernel was found there.
+            raise RegionError(
+                f"Kernel generation for {region_id!r} is disabled by {blocked}, "
+                f"and the kernel cache directory {root} does not exist; check "
+                "cache_dir, or compile once with generation allowed to fill it"
+            )
+        cache = private_directory(root) / key
+        private_directory(cache)
         # timeout_s separately bounds the wait for a concurrent generation of
         # this task and the search, whose budget starts once the lock is held,
         # so a waiter can still revalidate what its peer published. The worst
@@ -603,10 +738,22 @@ def _generate(
                 output_specs=output_specs,
                 region_id=region_id,
                 cache=cache,
+                samples=samples,
+                blocked=blocked,
+                shared=shared,
             )
             candidate, registration = search.generate()
         if memo is not None:
-            memo[key] = (candidate, search.run)
+            # The kernel passed this region's samples. It is the shared one, or
+            # a search also checked it on every identical region's samples.
+            previous = shared or _Shared(candidate, search.run, set(), [])
+            memo[key] = _Shared(
+                candidate=candidate,
+                run=previous.run if candidate == previous.candidate else search.run,
+                checked=previous.checked | ({sampled} if sampled else set()),
+                samples=[*previous.samples, *(samples or ())],
+                regions=previous.regions | {region_id},
+            )
         return registration, search.run
     except RegionError:
         raise
@@ -638,18 +785,32 @@ class _Search:
         output_specs: list[Any],
         region_id: str,
         cache: Path,
+        samples: Sequence[tuple[torch.Tensor, ...]] | None = None,
+        blocked: str | None = None,
+        shared: _Shared | None = None,
     ) -> None:
         self.deadline = time.monotonic() + config.timeout_s
+        # What forbids a search on a cache miss, why a cached kernel was not
+        # used, and whether its revalidation was inconclusive.
+        self.blocked = blocked
+        self.shared, self.samples = shared, list(samples or ())
+        self.cache_miss: str | None = None
+        self.inconclusive = self.slow = False
         self.task, self.key, self.config, self.policy = task, key, config, config.search
         self.backend, self.instructions = backend, instructions
         self.input_specs, self.output_specs = input_specs, output_specs
         self.region_id, self.cache = region_id, cache
         self.run = Path(tempfile.mkdtemp(prefix="run-", dir=cache))
         self.schema = _response_schema(backend.proposal_schema, self.policy.batch_size)
-        reference_path = self.run / "reference.pt"
-        torch.save(reference, reference_path)
+        reference_path = self.run / REFERENCE_FILENAME
+        save_reference(reference, reference_path)
+        samples_path = None
+        if samples:
+            samples_path = self.run / SAMPLES_FILENAME
+            save_samples(samples, samples_path)
         self.template = {
             "reference_path": str(reference_path),
+            "samples_path": None if samples_path is None else str(samples_path),
             "backend": config.backend,
             "backend_version": task["backend_version"],
             "proposal_schema_sha256": task["proposal_schema_sha256"],
@@ -660,6 +821,11 @@ class _Search:
             **task["validation"],
             "validation_seed": secrets.randbits(63),
             "validation_phase": "search",
+            "screening": self.policy.screening,
+            # Screens also build the TensorRT baseline until one search
+            # evaluation gets past it, so a baseline that cannot be built ends
+            # the search at once, as it does under engine screening.
+            "check_baseline": config.objective == "tensorrt",
             "compile_options": task["compile_options"],
         }
         for name, value in (
@@ -672,7 +838,6 @@ class _Search:
         self.evidence = EvidenceCatalog()
         for resource in instructions["resources"]:
             self.evidence.add(resource["name"], resource["text"])
-        self.evidence.add("task.json", json.dumps(task, indent=2))
         # Final validation keeps a slice for every finalist, but never more than
         # a third of the budget.
         self.search_deadline = self.deadline - min(
@@ -713,6 +878,35 @@ class _Search:
         cached = self.from_cache()
         if cached is not None:
             return cached
+        if self.blocked is not None:
+            generate = (
+                f"compile once with generation allowed (allow_generation=True and "
+                f"{_GENERATION_ENV} unset or 1), the same cache_dir, GPU and "
+                "settings"
+            )
+            if self.inconclusive:
+                advice = (
+                    "Retry once the cause is resolved, for example with a less busy "
+                    "GPU or larger timeout_s and candidate_timeout_s"
+                )
+            elif self.slow:
+                # The kernel is correct; a busy GPU is the likeliest reason.
+                advice = (
+                    "Retry on a less busy GPU; if the speedup stays below "
+                    f"min_speedup, {generate}, to search for a faster kernel"
+                )
+            else:
+                advice = (
+                    f"{generate[0].upper()}{generate[1:]}, to validate and cache a "
+                    "kernel for this region; later compilations reuse it without "
+                    "an agent"
+                )
+            raise RegionError(
+                f"Kernel generation for region {self.region_id!r} is disabled by "
+                f"{self.blocked}, and {self.cache_miss or self.uncached()}. "
+                f"{advice}. Artifacts: {self.run}"
+            )
+        self.prepare_search()
         if self.policy.resume:
             self.resume()
         for attempt in range(self.config.max_attempts):
@@ -731,6 +925,26 @@ class _Search:
         )
 
     def from_cache(self) -> tuple[dict[str, Any], KernelSpec | partial[None]] | None:
+        """Reuse an accepted kernel that passes a holdout check on this run.
+
+        Identical regions of one compilation share a kernel, also with
+        ``use_cache=False``, and load one copy of it; materialize_regions
+        registers the final one for all of them.
+        """
+        if self.shared is not None:
+            # It met the objective on this GPU in this compilation; only its
+            # correctness on this region's samples is new.
+            result = self.recheck(
+                self.shared.candidate, self.shared.run, correctness_only=True
+            )
+            if result is None and self.inconclusive:
+                # Once more before a search or a cache-only refusal: a busy GPU
+                # is no reason for either, but a kernel that hangs on these
+                # samples is.
+                result = self.recheck(
+                    self.shared.candidate, self.shared.run, correctness_only=True
+                )
+            return result
         manifest = self.cache / "accepted.json"
         if not self.config.use_cache or not manifest.is_file():
             return None
@@ -743,14 +957,135 @@ class _Search:
             candidate = self.validate(stored["candidate"])
         except (OSError, KeyError, ValueError, TypeError) as error:
             _LOGGER.warning("Ignoring invalid agent region cache: %s", error)
+            self.cache_miss = f"its cached kernel entry is invalid ({error})"
             return None
-        report = self.evaluate(candidate, self.run, self.deadline, holdout=True)
+        return self.recheck(candidate, self.run)
+
+    def recheck(
+        self, candidate: dict[str, Any], directory: Path, correctness_only: bool = False
+    ) -> tuple[dict[str, Any], KernelSpec | partial[None]] | None:
+        """Return the candidate, registered from ``directory``, if it passes."""
+        report = self.evaluate(
+            candidate,
+            self.run,
+            self.deadline,
+            holdout=True,
+            objective="candidate" if correctness_only else None,
+        )
         write_json(self.run / "cache_check.json", report)
-        if not _meets_objective(report, self.config):
+        passed = (
+            report.get("status") == "passed"
+            if correctness_only
+            else _meets_objective(report, self.config)
+        )
+        if not passed:
             _LOGGER.warning("Agent region cache revalidation failed: %s", report)
+            self.cache_miss = self.revalidation_failure(report)
+            self.inconclusive = report.get("stage") in _INCONCLUSIVE_STAGES
+            self.slow = report.get("status") == "passed"
             return None
         _LOGGER.info("Agent region %s: cache hit (%s)", self.region_id, self.cache)
-        return candidate, self.register(candidate)
+        # Runs that reuse a kernel accumulate with every compilation, so they
+        # drop their copy of the samples once checked; the accepting run keeps
+        # its own.
+        (self.run / SAMPLES_FILENAME).unlink(missing_ok=True)
+        return candidate, make_registration(
+            candidate, self.backend, self.input_specs, self.output_specs, directory
+        )
+
+    def prepare_search(self) -> None:
+        """Add identical regions' samples to this run's, then publish its task."""
+        if self.shared is not None and self.shared.samples:
+            # A new kernel must also pass the samples of this compilation's
+            # identical regions, or their searches would keep replacing each
+            # other's cached kernel.
+            self.samples = [*self.shared.samples, *self.samples]
+            save_samples(self.samples, self.run / SAMPLES_FILENAME)
+            self.task["samples"] = {
+                "count": len(self.samples),
+                "sha256": samples_digest(self.samples),
+            }
+            write_json(self.run / "task.json", self.task)
+        self.evidence.add("task.json", json.dumps(self.task, indent=2))
+
+    def revalidation_failure(self, report: dict[str, Any]) -> str:
+        """Say why a cached kernel's revalidation report rules it out."""
+        objective = self.config.objective
+        if report.get("status") == "passed":
+            baseline, latency = report.get("baseline_latency_ms"), report["latency_ms"]
+            if not (_positive(baseline) and _positive(latency)):
+                return (
+                    "its cached kernel passed revalidation without a measured "
+                    f"{objective} baseline (see cache_check.json)"
+                )
+            measurements = report.get("benchmark", {})
+            baseline_noise = measurements.get("baseline", {}).get("mad_ms", 0)
+            latency_noise = measurements.get("candidate", {}).get("mad_ms", 0)
+            # The ratio that _meets_objective compares with min_speedup.
+            speedup = (baseline - baseline_noise) / (latency + latency_noise)
+            return (
+                "its cached kernel passed the correctness checks, but its "
+                f"remeasured speedup over the {objective} baseline after allowing "
+                f"for timing noise, {speedup:.3g}x (baseline {baseline:.4g} ± "
+                f"{baseline_noise:.2g} ms, kernel {latency:.4g} ± "
+                f"{latency_noise:.2g} ms), is below min_speedup="
+                f"{self.config.min_speedup:g} (see cache_check.json)"
+            )
+        stage = report.get("stage")
+        lines = str(report.get("error", "")).strip().splitlines()
+        outcome = (
+            "could not be revalidated"
+            if stage in _INCONCLUSIVE_STAGES
+            else "failed revalidation"
+        )
+        return (
+            f"its cached kernel {outcome} ({stage}: "
+            f"{lines[-1][:300] if lines else 'no error message'}; "
+            "see cache_check.json)"
+        )
+
+    def uncached(self) -> str:
+        """Explain a cache miss by a kernel cached for the same computation."""
+        root = self.cache.parent
+        manifests = sorted(root.glob("*/accepted.json"))
+        closest: tuple[list[str], Path] | None = None
+        for manifest in manifests:
+            try:
+                run = manifest.parent / Path(read_json_object(manifest)["run"]).name
+                other = read_json_object(run / "task.json")
+            except (OSError, KeyError, TypeError, ValueError):
+                continue
+            if other.get("reference") != self.task["reference"]:
+                continue
+            fields = [
+                name
+                for name in sorted(self.task.keys() | other.keys())
+                if self.changes_key(name, other)
+            ]
+            if fields and (closest is None or len(fields) < len(closest[0])):
+                closest = fields, run
+        if closest is None:
+            return (
+                "no accepted kernel is cached for this task, and none of the "
+                f"{len(manifests)} kernels cached in {root} is for this captured "
+                "computation"
+            )
+        fields, run = closest
+        return (
+            "no accepted kernel is cached for this task; a kernel is cached for the "
+            f"same captured computation, but its task.json differs in "
+            f"{', '.join(fields)} (compare {run / 'task.json'} with this run's)"
+        )
+
+    def changes_key(self, name: str, other: dict[str, Any]) -> bool:
+        """Whether taking field ``name`` from another task changes this cache key."""
+        task = {key: value for key, value in self.task.items() if key != name}
+        if name in other:
+            task[name] = other[name]
+        try:
+            return _task_digest(task) != self.key
+        except (KeyError, TypeError, AttributeError):
+            return True
 
     def resume(self) -> None:
         """Remeasure retained candidates; a checkpoint never carries current proof."""
@@ -958,6 +1293,7 @@ class _Search:
         *,
         holdout: bool = False,
         incumbent: dict[str, Any] | None = None,
+        objective: str | None = None,
     ) -> dict[str, Any]:
         """Measure one candidate before ``deadline``; stage "budget" means not now."""
         limit = self.config.candidate_timeout_s
@@ -976,6 +1312,8 @@ class _Search:
                         "budget", "Generation time ran out waiting for the GPU"
                     )
                 request = {**self.template, "candidate": candidate}
+                if objective is not None:
+                    request["objective"] = objective
                 if holdout:
                     request.update(
                         validation_seed=secrets.randbits(63),
@@ -988,6 +1326,10 @@ class _Search:
                 report = _evaluate(request, directory, granted)
         except Timeout:
             return _error("budget", "GPU evaluation lock timed out")
+        if not holdout and (
+            report.get("status") == "passed" or report.get("stage") in _AFTER_BASELINE
+        ):
+            self.template["check_baseline"] = False
         if report.get("stage") == "timeout" and granted < limit:
             # The deadline, not the candidate's own time limit, ended this run.
             return _error(
@@ -1137,8 +1479,11 @@ class _Search:
             },
         )
         self.save_checkpoint()
+        # Screened candidates whose speedup is undecided remain eligible.
         choices = [
-            entry for entry in self.ranked() if entry["report"]["meets_objective"]
+            entry
+            for entry in self.ranked()
+            if entry["report"]["meets_objective"] is not False
         ][: self.policy.finalists]
         if not choices:
             raise RegionError(self.failure())
@@ -1158,12 +1503,19 @@ class _Search:
                 {"candidate": entry["candidate"], "result": report, "action": "holdout"}
             )
             write_json(self.run / "history.json", self.history)
-            if report.get("status") == "passed" or report.get("stage") in (
-                "correctness",
-                "crash",
+            stage = report.get("stage")
+            # Drop a disproved finalist; an inconclusive check, such as a
+            # timeout, keeps it in the checkpoint for resume. A screened
+            # finalist met its first engine here, so a compile or engine failure
+            # reproduces, as in the search, rather than being a flaky rebuild.
+            if (
+                report.get("status") == "passed"
+                or stage in ("correctness", "crash")
+                or (
+                    entry["report"].get("execution") == "launch"
+                    and stage in ("compile", "engine")
+                )
             ):
-                # Fresh inputs disproved this finalist. An inconclusive check,
-                # such as a timeout, keeps it in the checkpoint for resume.
                 self.measured.pop(digest(entry["candidate"]), None)
             self.save_checkpoint()
         raise RegionError(

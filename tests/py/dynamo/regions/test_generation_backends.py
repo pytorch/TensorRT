@@ -8,6 +8,7 @@ import subprocess
 import sys
 from contextlib import nullcontext
 from functools import partial
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +21,11 @@ from torch_tensorrt.dynamo.region_compilation._generation._backends import get_b
 from torch_tensorrt.dynamo.region_compilation._generation._cuda import _validate_ptx
 from torch_tensorrt.region import RegionError
 
-from ._generation_utils import make_registration, validate_candidate
+from ._generation_utils import (
+    make_registration,
+    require_cuda_cpp_toolchain,
+    validate_candidate,
+)
 
 CUDA_SOURCE = """extern "C" __global__ void generated(const float* arg0, float* out0) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -281,11 +286,20 @@ def test_cuda_region_reuses_validated_ptx_and_guards_engine_bindings(
             name: (lambda value=value: value) for name, value in attributes.items()
         }
 
-    def compile_source(source, name, include_paths, *, load_kernel):
+    def compile_source(source, name, include_paths, *, load_kernel=False):
         compilations.append((source, name, load_kernel))
-        return ptx, None, SimpleNamespace(attributes=SimpleNamespace(**attributes))
+        return ptx, None, None
+
+    loaded = []
+
+    def load_kernel(code, name):
+        # The eager kernel comes from the same PTX that the plugin embeds.
+        loaded.append((code, name))
+        return SimpleNamespace(attributes=SimpleNamespace(**attributes))
 
     monkeypatch.setattr(_nvrtc, "compile_to_ptx", compile_source)
+    monkeypatch.setattr(_cuda, "_driver_rejection", lambda code, name: None)
+    monkeypatch.setattr(_cuda, "_ptx_kernel", load_kernel)
     monkeypatch.setattr(_cuda, "_KERNELS", {})
     monkeypatch.setattr(torch.cuda, "device", lambda device: nullcontext())
     monkeypatch.setattr(
@@ -319,7 +333,8 @@ def test_cuda_region_reuses_validated_ptx_and_guards_engine_bindings(
         _register, "register_precompiled_qdp_plugin", capture_registration
     )
     _plugins.register_region_plugin(child, registration, region_id="generated_cuda")
-    assert compilations == [(CUDA_SOURCE, "generated", True)]
+    assert compilations == [(CUDA_SOURCE, "generated", False)]
+    assert loaded == [(ptx, "generated")]
     assert captured["ptx"] is ptx
     assert captured["schema"] == "(Tensor arg0) -> Tensor"
     assert captured["supports_dynamic_shapes"] is False
@@ -339,11 +354,97 @@ def test_cuda_region_reuses_validated_ptx_and_guards_engine_bindings(
     assert launch.shared_mem == 0 and len(extras) == 0
 
 
+def test_cuda_toolchain_rejected_before_any_author_call(monkeypatch):
+    # A driver older than NVRTC cannot load its PTX; TensorRT would only fail when
+    # the engine runs, after every candidate passed its eager checks.
+    pytest.importorskip("cuda.core")
+    rejection = "CUDA_ERROR_UNSUPPORTED_PTX_VERSION"
+    monkeypatch.setattr(_cuda, "_toolchain_rejection", lambda device: rejection)
+    with pytest.raises(RegionError, match=rejection):
+        get_backend("cuda_cpp").target_metadata(torch.device("cuda", 0))
+
+
+def test_cuda_compile_rejects_ptx_the_driver_cannot_load(monkeypatch):
+    from torch_tensorrt.kernels import _nvrtc
+
+    monkeypatch.setattr(
+        _nvrtc, "compile_to_ptx", lambda source, name, include_paths: (b"ptx", 0, None)
+    )
+    monkeypatch.setattr(
+        _cuda, "_driver_rejection", lambda code, name: "CUDA_ERROR_INVALID_PTX"
+    )
+    monkeypatch.setattr(_cuda, "_KERNELS", {})
+    monkeypatch.setattr(torch.cuda, "device", lambda device: nullcontext())
+    with pytest.raises(RuntimeError, match="CUDA_ERROR_INVALID_PTX"):
+        _cuda._compiled(CUDA_SOURCE, "generated", torch.device("cuda", 0))
+
+
+def _scripted_probe(monkeypatch, *results):
+    """Return each of ``results`` from successive driver loads of the probe."""
+    from torch_tensorrt.kernels import _nvrtc
+
+    loads = []
+
+    def load(code, name):
+        loads.append(name)
+        return results[len(loads) - 1]
+
+    monkeypatch.setattr(
+        _nvrtc, "compile_to_ptx", lambda source, name, include_paths: (b"ptx", 0, None)
+    )
+    monkeypatch.setattr(_cuda, "_driver_rejection", load)
+    monkeypatch.setattr(_cuda, "_TOOLCHAIN", {})
+    monkeypatch.setattr(torch.cuda, "device", lambda device: nullcontext())
+    return loads
+
+
+def test_cuda_toolchain_probe_retries_after_a_transient_driver_error(monkeypatch):
+    # A full GPU must not condemn the toolchain for the rest of the process.
+    pytest.importorskip("cuda.core")
+    loads = _scripted_probe(monkeypatch, "CUDA_ERROR_OUT_OF_MEMORY", None)
+    device = torch.device("cuda", 0)
+    with pytest.raises(
+        RuntimeError, match=r"could not load a probe kernel \(CUDA_ERROR_OUT_OF_MEMORY"
+    ):
+        _cuda.verify_toolchain(device)
+    _cuda.verify_toolchain(device)
+    _cuda.verify_toolchain(device)
+    assert len(loads) == 2
+
+
+@pytest.mark.parametrize(
+    "encoded, version, rejection, advice",
+    [
+        (13000, "13.0", "CUDA_ERROR_UNSUPPORTED_PTX_VERSION", True),
+        (13030, "13.3", "CUDA_ERROR_JIT_COMPILATION_DISABLED", False),
+    ],
+)
+def test_cuda_toolchain_rejection_is_remembered_and_names_both_versions(
+    monkeypatch, encoded, version, rejection, advice
+):
+    pytest.importorskip("cuda.core")
+    from cuda.bindings import driver, nvrtc
+
+    loads = _scripted_probe(monkeypatch, rejection)
+    monkeypatch.setattr(driver, "cuDriverGetVersion", lambda: (0, encoded))
+    monkeypatch.setattr(nvrtc, "nvrtcVersion", lambda: (0, 13, 2))
+    for _ in range(2):
+        with pytest.raises(RegionError) as error:
+            _cuda.verify_toolchain(torch.device("cuda", 0))
+        message = str(error.value)
+        assert f"NVRTC 13.2 PTX; the CUDA {version} driver reported {rejection}." in (
+            message
+        )
+        # Only a driver older than NVRTC calls for a different version.
+        assert ("Install an NVRTC no newer than the driver" in message) is advice
+    assert len(loads) == 1
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
 def test_cuda_registration_compiles_real_source_and_derives_trusted_launch(
     tmp_path, monkeypatch
 ):
-    pytest.importorskip("cuda.core")
+    require_cuda_cpp_toolchain()
     trtp = pytest.importorskip("tensorrt.plugin")
 
     spec = boundary()
@@ -369,3 +470,35 @@ def test_region_rejects_unsupported_registration_forms(monkeypatch, registration
     monkeypatch.setattr(torch.cuda, "device", lambda device: nullcontext())
     with pytest.raises(RegionError, match="KernelSpec or a functools.partial"):
         _plugins.register_region_plugin(child, registration, region_id="unsupported")
+
+
+def test_toolchain_suite_selects_tests_from_every_file_it_lists(monkeypatch):
+    # CI reruns these files with cuTile and cuda-core installed, selecting only
+    # their toolchain cases; a listed file without one would select nothing.
+    root = Path(__file__).resolve().parents[4]
+    monkeypatch.syspath_prepend(str(root))
+    from tests.ci.suites import by_name
+
+    suite = by_name("regions-generation").for_variant("standard")
+    collection = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "-n",
+            "0",
+            "-p",
+            "no:cacheprovider",
+            "-k",
+            suite["keyword"],
+            *suite["paths"],
+        ],
+        cwd=root / suite["cwd"],
+        capture_output=True,
+        text=True,
+    )
+    assert collection.returncode == 0, collection.stdout + collection.stderr
+    for path in suite["paths"]:
+        assert f"{path}::" in collection.stdout, path

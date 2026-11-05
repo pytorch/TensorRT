@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tempfile
@@ -15,6 +16,10 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from filelock import FileLock
+
+_LOGGER = logging.getLogger(__name__)
+# Directories already reported as writable by others; each is reported once.
+_REPORTED: set[Path] = set()
 
 _CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
@@ -67,6 +72,33 @@ def scrub(text: str, directory: Path, placeholder: str = "<evaluation>") -> str:
             pattern = rf"(?<![\w.-]){re.escape(str(path))}(?![\w.-])"
             text = re.sub(pattern, name, text)
     return text
+
+
+def private_directory(path: Path) -> Path:
+    """Create ``path`` readable only by its owner, and refuse another user's.
+
+    Runs hold prompts, provider logs, and kernels that are revalidated and then
+    loaded, so a cache directory must not be shared with other users. An
+    existing directory keeps its permissions, which its owner may have chosen;
+    one that others can write is reported once per process.
+    """
+    from torch_tensorrt.region import RegionError
+
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = path.stat()
+    if hasattr(os, "getuid") and info.st_uid != os.getuid():
+        raise RegionError(
+            f"Kernel cache directory {path} belongs to another user; use a "
+            "cache_dir that only you can write"
+        )
+    if info.st_mode & 0o022 and path not in _REPORTED:
+        _REPORTED.add(path)
+        _LOGGER.warning(
+            "Kernel cache directory %s is writable by other users, who could "
+            "replace its kernels; restrict it with chmod 700",
+            path,
+        )
+    return path
 
 
 def gpu_lock(root: Path, device: Any) -> FileLock:

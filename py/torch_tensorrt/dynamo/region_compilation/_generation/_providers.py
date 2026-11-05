@@ -152,12 +152,34 @@ def run_process(
     return subprocess.CompletedProcess(argv, returncode, output, errors)
 
 
+# Environment variables whose values are credentials
+_SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASS(?:WORD|WD)?|AUTH|CREDENTIAL", re.I)
+# Credential formats recognized wherever they appear
+_SECRET_VALUE = re.compile(
+    r"\b(?:sk-(?:ant-)?|hf_|gh[pousr]_|github_pat_|xox[abpr]-|glpat-|AKIA|ya29\.)"
+    r"[A-Za-z0-9_.-]{6,}"
+)
+
+
 def _redact(message: str) -> str:
-    for name, value in os.environ.items():
-        if len(value) >= 8 and re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.I):
-            message = message.replace(value, "[redacted]")
+    # Longest first, so a secret that contains another is removed whole.
+    secrets = sorted(
+        (
+            value
+            for name, value in os.environ.items()
+            # Values of six or seven characters count only if they are not all
+            # letters, and shorter ones never: plain words such as "true" would
+            # erase log text.
+            if _SECRET_NAME.search(name)
+            and (len(value) >= 8 or (len(value) >= 6 and not value.isalpha()))
+        ),
+        key=len,
+        reverse=True,
+    )
+    for value in secrets:
+        message = message.replace(value, "[redacted]")
     message = re.sub(r"(?i)(bearer\s+)\S+", r"\1[redacted]", message)
-    message = re.sub(r"\b(?:sk-|sk-ant-)[A-Za-z0-9_-]+", "[redacted]", message)
+    message = _SECRET_VALUE.sub("[redacted]", message)
     return strip_control(message)
 
 

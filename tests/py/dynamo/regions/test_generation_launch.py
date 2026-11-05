@@ -10,6 +10,8 @@ from torch_tensorrt.dynamo.region_compilation import _plugins
 from torch_tensorrt.dynamo.region_compilation._generation import _cuda
 from torch_tensorrt.dynamo.region_compilation._generation._backends import get_backend
 
+from ._generation_utils import require_cuda_cpp_toolchain
+
 pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
 
 # 258 elements leave the last 128-element block partial.
@@ -69,7 +71,7 @@ def _backend(name):
         except RuntimeError as error:
             pytest.skip(str(error))
     else:
-        pytest.importorskip("cuda.core")
+        require_cuda_cpp_toolchain()
     backend = get_backend(name)
     return backend, backend.validate_candidate(CANDIDATES[name], 1, 1)
 
@@ -143,6 +145,16 @@ def test_unmasked_triton_kernel_writes_past_an_interior_output_view(tmp_path):
     assert not torch.isnan(trailing[:126]).any()
     assert torch.isnan(trailing[126:]).all()
     assert torch.isnan(buffer[:512]).all()
+
+
+def test_cuda_cpp_launches_skip_when_the_driver_rejects_nvrtc_ptx(monkeypatch):
+    # A driver older than NVRTC rejects its PTX, so generation refuses that
+    # toolchain; real CUDA C++ tests must then skip rather than fail.
+    pytest.importorskip("cuda.core")
+    rejection = "CUDA_ERROR_UNSUPPORTED_PTX_VERSION"
+    monkeypatch.setattr(_cuda, "_toolchain_rejection", lambda device: rejection)
+    with pytest.raises(pytest.skip.Exception, match=rejection):
+        _backend("cuda_cpp")
 
 
 def test_cuda_registration_and_launch_compile_once(tmp_path, monkeypatch):

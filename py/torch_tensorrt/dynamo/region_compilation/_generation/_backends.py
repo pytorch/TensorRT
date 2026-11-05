@@ -36,7 +36,17 @@ class GenerationBackend(Protocol):
     which launches a validated candidate once on the current torch CUDA stream
     without synchronizing. It reads ``inputs`` and writes ``outputs``: contiguous
     CUDA tensors with the captured shapes and dtypes, possibly interior views of
-    larger buffers. The evaluator uses it to detect out-of-bounds writes.
+    larger buffers. The evaluator uses it to detect out-of-bounds writes and,
+    under the default ``SearchPolicy(screening="launch")``, as the search's
+    executor: it checks every case through ``launch`` and ranks candidates by
+    timing it in CUDA graphs. A launch must therefore run the kernel its plugin
+    runs, with the same source and launch settings, and must be safe to capture
+    in a CUDA graph after warm-up launches. The evaluator registers the plugin
+    before a screen, which applies the plugin path's own checks, so
+    ``make_registration`` should reject a candidate that the direct launch can
+    run but the plugin cannot, as the Triton backend does for more shared
+    memory than a plugin launch allows. A backend whose launch cannot meet
+    these needs ``screening="engine"``.
     """
 
     @property

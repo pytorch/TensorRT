@@ -17,6 +17,9 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Iterator
 
+from ._reference import FILENAME as REFERENCE_FILENAME
+from ._reference import load_reference
+from ._samples import FILENAME as SAMPLES_FILENAME
 from ._util import gpu_lock, read_json_object, write_json
 
 if TYPE_CHECKING:
@@ -39,6 +42,7 @@ _SEARCH_OPTIONS = (
     "finalists",
     "resume",
     "tuning",
+    "screening",
 )
 _PATH_HELP = (
     "A saved run, a path inside one, or a task cache directory (the reported "
@@ -47,7 +51,9 @@ _PATH_HELP = (
 
 
 def _is_run(directory: Path) -> bool:
-    return all((directory / name).is_file() for name in ("task.json", "reference.pt"))
+    return all(
+        (directory / name).is_file() for name in ("task.json", REFERENCE_FILENAME)
+    )
 
 
 def _manifest_run(manifest: Path) -> Path | None:
@@ -80,7 +86,10 @@ def _run_directory(path: Path) -> Path:
             "PATH must identify a saved generation run, a path inside one, or a "
             "task cache directory"
         )
-    return max(runs, key=lambda run: run.stat().st_mtime)
+    # Without a task-level manifest (use_cache=False), a run that accepted a
+    # kernel keeps its samples, unlike a later run that only reused it.
+    accepted = [run for run in runs if (run / "accepted.json").is_file()]
+    return max(accepted or runs, key=lambda run: run.stat().st_mtime)
 
 
 def _read_task(run: Path) -> dict[str, Any]:
@@ -126,10 +135,14 @@ def _evaluate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
     request = {
         **read_json_object(run / "evaluation-template.json"),
         # The run may have moved since the template was written.
-        "reference_path": str(run / "reference.pt"),
+        "reference_path": str(run / REFERENCE_FILENAME),
         "validation_seed": secrets.randbits(63),
         "validation_phase": "holdout",
         "candidate": proposal.get("candidate", proposal),
+        # As in replay, only the samples that the task records are checked.
+        "samples_path": (
+            None if _saved_samples(task, run) is None else str(run / SAMPLES_FILENAME)
+        ),
     }
     directory = Path(tempfile.mkdtemp(prefix="evaluation-", dir=run))
     report: dict[str, Any] = {
@@ -256,6 +269,26 @@ def _saved_instruction_bundle(
     return bundle
 
 
+def _saved_samples(task: dict[str, Any], run: Path) -> list[Any] | None:
+    """Return the run's validation samples once they match the task's record."""
+    from ._samples import load_samples, samples_digest
+
+    if task.get("samples") is None:
+        return None
+    path = run / SAMPLES_FILENAME
+    if not path.is_file():
+        raise ValueError(
+            f"Saved {SAMPLES_FILENAME} is missing; the task records validation "
+            "samples, which every evaluation checks. A run that reused a cached "
+            "kernel deletes them after its check: pass the task cache directory "
+            "to use the run that accepted the kernel"
+        )
+    samples = load_samples(path)
+    if samples_digest(samples) != task["samples"]["sha256"]:
+        raise ValueError("Saved validation samples do not match the task digest")
+    return samples
+
+
 def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
     import torch
 
@@ -267,14 +300,11 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
 
     task = _read_task(run)
     instruction_bundle = _saved_instruction_bundle(args, task, run)
+    samples = _saved_samples(task, run)
     config = _generation_config(args, task, run)
     device = torch.device(task["inputs"][0]["device"])
     with torch.cuda.device(device), torch.inference_mode():
-        reference = torch.load(
-            run / "reference.pt", map_location=device, weights_only=False
-        )
-        if not isinstance(reference, torch.fx.GraphModule):
-            raise ValueError("Saved reference must be a GraphModule")
+        reference = load_reference(run / REFERENCE_FILENAME)
         inputs = tuple(
             torch.randn(
                 spec["shape"], dtype=getattr(torch, spec["dtype"]), device=device
@@ -288,6 +318,7 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
             region_id="interactive",
             settings=CompilationSettings(**task["compile_options"]),
             instruction_bundle=instruction_bundle,
+            samples=samples,
         )
     # A cache hit revalidates the accepted kernel and runs no search.
     searched = (directory / "search.json").is_file()
@@ -429,6 +460,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     generate.add_argument(
         "--tuning", type=_tuning, help='JSON knob domains, e.g. {"num_warps":[4,8]}'
+    )
+    generate.add_argument(
+        "--screening",
+        choices=("launch", "engine"),
+        help="Run search evaluations as direct launches or trial engines; "
+        "finalists always run in an engine",
     )
     return parser
 

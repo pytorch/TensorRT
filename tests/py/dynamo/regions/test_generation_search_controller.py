@@ -86,6 +86,81 @@ def test_improving_correct_candidates_can_progress_toward_the_baseline_objective
     factory.finalize.assert_called_once()
 
 
+def test_search_requests_carry_the_screening_policy(factory):
+    factory.author.return_value = _candidate("screened")
+    factory.evaluate.return_value = _passed(0.2)
+    _generate(factory)
+    assert factory.evaluate.call_args.args[0]["screening"] == "launch"
+    _generate(factory, use_cache=False, search=SearchPolicy(screening="engine"))
+    assert factory.evaluate.call_args.args[0]["screening"] == "engine"
+
+
+def test_tensorrt_screens_build_the_baseline_until_a_search_gets_past_it(factory):
+    factory.author.side_effect = [_candidate(name) for name in ("a", "b", "c")]
+    screened = {**_passed(0.5), "execution": "launch"}
+    factory.evaluate.side_effect = [
+        {"status": "error", "stage": "source", "error": "rejected first"},
+        screened,
+        screened,
+    ]
+    factory.finalize.return_value = {**_passed(0.4), "baseline_latency_ms": 1.0}
+    _generate(factory, objective="tensorrt", max_attempts=3)
+    requests = [call.args[0] for call in factory.evaluate.call_args_list]
+    # The worker checks the source before it builds the baseline.
+    assert [request["check_baseline"] for request in requests] == [True, True, False]
+
+
+def test_a_tensorrt_baseline_failure_ends_a_screened_search_at_once(factory):
+    factory.author.return_value = _candidate("screened")
+    factory.evaluate.return_value = {
+        "status": "error",
+        "stage": "baseline",
+        "error": "TensorRT baseline contains eager computation",
+    }
+    with pytest.raises(RegionError, match="no proposal can fix"):
+        _generate(factory, objective="tensorrt", max_attempts=4)
+    factory.author.assert_called_once()
+    request = factory.evaluate.call_args.args[0]
+    assert request["screening"] == "launch" and request["check_baseline"] is True
+
+
+@pytest.mark.parametrize(
+    "screened_baseline, final_baseline, accepted",
+    [(0.9, 2.0, True), (2.0, 1.0, False)],
+    ids=["screen-slower-engine-faster", "screen-faster-engine-slower"],
+)
+def test_screened_speedups_are_decided_on_final_engine_measurements(
+    factory, screened_baseline, final_baseline, accepted
+):
+    candidate = _candidate("screened")
+    factory.author.return_value = candidate
+    factory.evaluate.return_value = {
+        **_passed(1.0),
+        "execution": "launch",
+        "baseline_latency_ms": screened_baseline,
+    }
+    factory.finalize.return_value = {
+        **_passed(1.0),
+        "execution": "engine",
+        "baseline_latency_ms": final_baseline,
+    }
+    if accepted:
+        assert _generate(factory, objective="eager", min_speedup=1.05) == candidate
+    else:
+        with pytest.raises(
+            RegionError, match="final validation.*Performance objective"
+        ):
+            _generate(factory, objective="eager", min_speedup=1.05)
+    factory.finalize.assert_called_once()
+    run = next(factory.root.glob("*/run-*"))
+    # The screen's timing neither rejects nor accepts the candidate.
+    assert (
+        json.loads((run / "attempt-1" / "feedback.json").read_text())["meets_objective"]
+        is None
+    )
+    assert bool(list(factory.root.glob("*/accepted.json"))) == accepted
+
+
 def test_interrupted_batch_resumes_pending_and_remeasures_historical_winner(
     factory,
 ):
@@ -254,26 +329,38 @@ def test_final_validation_reserves_a_slice_per_finalist(
     assert factory.finalize.call_args.args[2] == 100
 
 
+@pytest.mark.parametrize("execution", ["engine", "launch"])
 @pytest.mark.parametrize(
-    "failure,retained",
+    "failure, retained",
     [
         ({"status": "error", "stage": "timeout", "error": "slow"}, True),
         ({"status": "error", "stage": "budget", "error": "late"}, True),
-        ({"status": "error", "stage": "compile", "error": "flaky build"}, True),
+        # After an engine screen the search built the same engine, so only a
+        # flaky build fails here.
+        ({"status": "error", "stage": "compile", "error": "flaky"}, "engine"),
+        ({"status": "error", "stage": "engine", "error": "flaky"}, "engine"),
         ({"status": "error", "stage": "correctness", "error": "wrong"}, False),
         ({"status": "error", "stage": "crash", "error": "signal 11"}, False),
         ({**_passed(0.2), "validation_phase": "holdout"}, False),
     ],
+    ids=["timeout", "budget", "compile", "engine", "correctness", "crash", "slow"],
 )
-def test_only_a_disproving_final_check_drops_the_finalist(factory, failure, retained):
+def test_only_a_disproving_final_check_drops_the_finalist(
+    factory, failure, retained, execution
+):
     candidate = _candidate("finalist")
     factory.author.return_value = candidate
-    factory.evaluate.return_value = {**_passed(1.0), "baseline_latency_ms": 2.0}
+    factory.evaluate.return_value = {
+        **_passed(1.0),
+        "baseline_latency_ms": 2.0,
+        "execution": execution,
+    }
     factory.finalize.return_value = failure
     with pytest.raises(RegionError, match="final validation"):
         _generate(factory, objective="eager", search=SearchPolicy(resume=True))
     state = json.loads(next(factory.root.glob("*/checkpoint.json")).read_text())
-    assert state["state"]["finalists"] == ([candidate] if retained else [])
+    kept = retained is True or retained == execution
+    assert state["state"]["finalists"] == ([candidate] if kept else [])
 
 
 def test_evaluation_cut_short_by_the_deadline_stays_pending(factory, monkeypatch):
