@@ -106,11 +106,15 @@ ExecutionGraph::~ExecutionGraph() {
   }
 }
 
-void ExecutionGraph::reset_graph() {
+void ExecutionGraph::drop_graph() {
   if (graph_exec_ != nullptr) {
     cudaGraphExecDestroy(graph_exec_);
     graph_exec_ = nullptr;
   }
+}
+
+void ExecutionGraph::reset_graph() {
+  drop_graph();
   warmed_up_ = false;
 }
 
@@ -127,11 +131,12 @@ void ExecutionGraph::release_buffers(cudaStream_t stream) {
 Error ExecutionGraph::enqueue(
     EngineHandle& handle,
     cudaStream_t stream,
+    const std::vector<void*>& addresses,
     const std::vector<size_t>& binding_bytes,
     const void* scratch) {
   auto& context = *handle.exec_ctx;
   const size_t count = handle.num_inputs + handle.num_outputs;
-  if (binding_bytes.size() != count) {
+  if (addresses.size() != count || binding_bytes.size() != count) {
     return Error::InvalidArgument;
   }
   // A recorded graph keeps the scratch address it was recorded with. The shared pool frees that
@@ -140,74 +145,68 @@ Error ExecutionGraph::enqueue(
     reset_graph();
     scratch_ = scratch;
   }
-  std::vector<const void*> caller_ptrs(count);
-  std::vector<nvinfer1::Dims> shapes;
-  shapes.reserve(count);
-  // A graph replays the kernels of the profile it was captured under, so a
-  // profile switch with unchanged shapes must recapture just like a shape change.
+  // A graph replays the kernels of the shapes and the profile it was captured under, so a change of
+  // either must record again.
   // ponytail: one graph per handle, so alternating profiles every call never
   // replays; a graph per profile is the upgrade if that pattern matters.
-  const int32_t profile = context.getOptimizationProfile();
-  bool changed = shapes_.size() != count || profile != profile_;
-  for (size_t i = 0; i < count; ++i) {
-    const char* name = binding_name(handle, i).c_str();
-    caller_ptrs[i] = context.getTensorAddress(name);
-    shapes.push_back(context.getTensorShape(name));
-    if (!changed) {
-      const auto& previous = shapes_[i];
-      const auto& current = shapes[i];
-      changed = previous.nbDims != current.nbDims;
-      for (int d = 0; !changed && d < current.nbDims; ++d) {
-        changed = previous.d[d] != current.d[d];
-      }
-    }
-  }
-  if (changed) {
+  if (handle.shape_epoch != shape_epoch_) {
     reset_graph();
     capture_failed_ = false;
     failed_captures_ = 0;
-    shapes_ = std::move(shapes);
-    profile_ = profile;
+    moves_ = 0;
+    staged_ = false;
+    shape_epoch_ = handle.shape_epoch;
   }
   // The graph and its buffers do not depend on the caller stream, so a call that cannot replay keeps them.
   if (capture_failed_ || !can_replay_on(stream)) {
     return enqueue_plain(context, stream);
   }
-  buffers_.resize(count, nullptr);
-  capacities_.resize(count, 0);
-  for (size_t i = 0; i < count; ++i) {
-    // TensorRT refuses a null address even for an empty tensor.
-    const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
-    if (capacities_[i] < bytes) {
-      reset_graph();
-      // Doubling keeps a shape that grows a little on every call from allocating on every call.
-      const size_t capacity = std::max(bytes, capacities_[i] * 2);
-      void* buffer = nullptr;
-      const auto allocation = cudaMalloc(&buffer, capacity);
-      if (allocation != cudaSuccess) {
-        fall_back("buffer allocation failed", allocation);
-        capture_failed_ = true;
-        release_buffers(stream);
-        return enqueue_plain(context, stream);
-      }
-      if (buffers_[i] != nullptr) {
-        retire(buffers_[i], stream);
-      }
-      buffers_[i] = buffer;
-      capacities_[i] = capacity;
-    }
+  // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
+  // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
+  // sets, would record on every call, so the second move switches to buffers this graph owns.
+  if (!staged_ && graph_exec_ != nullptr && addresses != recorded_) {
+    drop_graph();
+    staged_ = ++moves_ > 1;
   }
-  for (size_t i = 0; i < count; ++i) {
-    const auto& name = binding_name(handle, i);
-    if (!context.setTensorAddress(name.c_str(), buffers_[i])) {
-      ET_LOG(Error, "TensorRTBackend::execute: CUDA graph setTensorAddress failed for '%s'", name.c_str());
-      return Error::InvalidState;
+  if (staged_) {
+    buffers_.resize(count, nullptr);
+    capacities_.resize(count, 0);
+    for (size_t i = 0; i < count; ++i) {
+      // TensorRT refuses a null address even for an empty tensor.
+      const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
+      if (capacities_[i] < bytes) {
+        reset_graph();
+        // Doubling keeps a shape that grows a little on every call from allocating on every call.
+        const size_t capacity = std::max(bytes, capacities_[i] * 2);
+        void* buffer = nullptr;
+        const auto allocation = cudaMalloc(&buffer, capacity);
+        if (allocation != cudaSuccess) {
+          fall_back("buffer allocation failed", allocation);
+          capture_failed_ = true;
+          release_buffers(stream);
+          return enqueue_plain(context, stream);
+        }
+        if (buffers_[i] != nullptr) {
+          retire(buffers_[i], stream);
+        }
+        buffers_[i] = buffer;
+        capacities_[i] = capacity;
+      }
     }
-    if (i < handle.num_inputs && binding_bytes[i] != 0) {
-      const auto error = cuda_error(
-          cudaMemcpyAsync(buffers_[i], caller_ptrs[i], binding_bytes[i], cudaMemcpyDefault, stream), "input copy");
-      if (error != Error::Ok) {
-        return error;
+    for (size_t i = 0; i < count; ++i) {
+      if (!handle.bind_address(i, buffers_[i])) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: CUDA graph setTensorAddress failed for '%s'",
+            binding_name(handle, i).c_str());
+        return Error::InvalidState;
+      }
+      if (i < handle.num_inputs && binding_bytes[i] != 0) {
+        const auto error = cuda_error(
+            cudaMemcpyAsync(buffers_[i], addresses[i], binding_bytes[i], cudaMemcpyDefault, stream), "input copy");
+        if (error != Error::Ok) {
+          return error;
+        }
       }
     }
   }
@@ -259,10 +258,11 @@ Error ExecutionGraph::enqueue(
             Info, "TensorRTBackend::execute: TensorRT refused the enqueue during CUDA graph capture; using enqueueV3");
         cudaGetLastError();
       }
+      // Rebound unconditionally: whatever made TensorRT refuse may have changed what the context holds.
+      handle.forget_bound_addresses();
       for (size_t i = 0; i < count; ++i) {
-        const auto& name = binding_name(handle, i);
-        if (!context.setTensorAddress(name.c_str(), const_cast<void*>(caller_ptrs[i]))) {
-          ET_LOG(Error, "TensorRTBackend::execute: restoring binding '%s' failed", name.c_str());
+        if (!handle.bind_address(i, addresses[i])) {
+          ET_LOG(Error, "TensorRTBackend::execute: restoring binding '%s' failed", binding_name(handle, i).c_str());
           return Error::InvalidState;
         }
       }
@@ -277,6 +277,7 @@ Error ExecutionGraph::enqueue(
       }
       return enqueue_plain(context, stream);
     }
+    recorded_ = staged_ ? buffers_ : addresses;
   }
   if (graph_exec_ != nullptr) {
     const auto error = cuda_error(cudaGraphLaunch(graph_exec_, stream), "launch");
@@ -290,13 +291,14 @@ Error ExecutionGraph::enqueue(
     }
     warmed_up_ = true;
   }
-  for (size_t i = handle.num_inputs; i < count; ++i) {
-    if (binding_bytes[i] != 0) {
-      const auto error = cuda_error(
-          cudaMemcpyAsync(const_cast<void*>(caller_ptrs[i]), buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream),
-          "output copy");
-      if (error != Error::Ok) {
-        return error;
+  if (staged_) {
+    for (size_t i = handle.num_inputs; i < count; ++i) {
+      if (binding_bytes[i] != 0) {
+        const auto error = cuda_error(
+            cudaMemcpyAsync(addresses[i], buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream), "output copy");
+        if (error != Error::Ok) {
+          return error;
+        }
       }
     }
   }

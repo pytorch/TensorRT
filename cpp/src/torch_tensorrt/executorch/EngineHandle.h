@@ -44,6 +44,17 @@ struct EngineHandle {
   std::vector<size_t> cached_input_sizes;
   std::vector<void*> cached_output_ptrs;
   std::vector<size_t> cached_output_sizes;
+  // What exec_ctx holds, so execute() skips the TensorRT call when a shape or an address is the one it
+  // already gave. Each such call costs around a microsecond, and most callers pass the same ones every
+  // time. An unknown shape has nbDims -1 and an unknown address is null. Only this delegate may set
+  // shapes, addresses or the profile on exec_ctx, or these go stale.
+  std::vector<nvinfer1::Dims> bound_input_dims;
+  std::vector<void*> bound_addresses;
+  // Changes whenever exec_ctx's input shapes or optimization profile may have changed, so a recorded
+  // CUDA graph can tell that the shapes it was recorded under are gone.
+  uint64_t shape_epoch = 0;
+  // Whether inferShapes has succeeded since the shapes last changed.
+  bool shapes_inferred = false;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
   // Per output binding [0..num_outputs): index into input_binding_names of the
@@ -94,6 +105,11 @@ struct EngineHandle {
   bool pin_ignored_reported = false;
   // Same reasoning: an unaligned buffer is usually the same view on every call.
   bool unaligned_io_reported = false;
+
+  // setTensorAddress for binding `index`, inputs then outputs, unless exec_ctx already holds `address`.
+  bool bind_address(size_t index, void* address);
+  // For when exec_ctx may hold addresses other than bound_addresses, so the next bind_address sets each.
+  void forget_bound_addresses();
 
   ~EngineHandle();
 };

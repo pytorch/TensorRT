@@ -203,6 +203,20 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::EngineHandle() = default;
 
+bool EngineHandle::bind_address(size_t index, void* address) {
+  if (address != nullptr && bound_addresses[index] == address) {
+    return true;
+  }
+  const std::string& name = index < num_inputs ? input_binding_names[index] : output_binding_names[index - num_inputs];
+  const bool bound = exec_ctx->setTensorAddress(name.c_str(), address);
+  bound_addresses[index] = bound ? address : nullptr;
+  return bound;
+}
+
+void EngineHandle::forget_bound_addresses() {
+  std::fill(bound_addresses.begin(), bound_addresses.end(), nullptr);
+}
+
 EngineHandle::~EngineHandle() {
   const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
   // Freeing runs on the engine's device. Borrowed rather than selected outright,
@@ -740,41 +754,38 @@ bool is_tensor_address_aligned(const void* ptr) {
   return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
 }
 
-bool is_cuda_accessible_ptr(const void* ptr) {
-  if (ptr == nullptr) {
-    return false;
-  }
-  cudaPointerAttributes attrs{};
-  const cudaError_t err = cudaPointerGetAttributes(&attrs, ptr);
-  if (err != cudaSuccess) {
-    cudaGetLastError();
-    return false;
-  }
-  return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
-}
+// What execute() needs to know about a buffer, from one cudaPointerGetAttributes per buffer.
+struct BufferPlacement {
+  // Device or managed memory.
+  bool cuda_accessible = false;
+  // The device the buffer is tied to, or -1 for host, managed, and this engine's own.
+  int foreign_device = -1;
+};
 
-// The device a pointer is tied to, or -1 for host, managed, and this engine's own.
-int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
+BufferPlacement placement_of(const void* ptr, int engine_device) {
+  BufferPlacement placement;
   if (ptr == nullptr) {
-    return -1;
+    return placement;
   }
   cudaPointerAttributes attrs{};
   // Let through: an older runtime reports plain host memory as an outright failure.
   if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
     cudaGetLastError();
-    return -1;
+    return placement;
   }
-  if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
-    return -1;
-  }
+  placement.cuda_accessible = attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
   // A non-null devicePointer is an address usable from here, which is the question. Asking instead
   // whether the two cards CAN reach each other answered yes on every pair measured and still faulted,
   // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
   // once it is.
-  if (attrs.devicePointer != nullptr) {
-    return -1;
+  if (attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device && attrs.devicePointer == nullptr) {
+    placement.foreign_device = attrs.device;
   }
-  return attrs.device;
+  return placement;
+}
+
+bool same_dims(const nvinfer1::Dims& a, const nvinfer1::Dims& b) {
+  return a.nbDims == b.nbDims && std::equal(a.d, a.d + std::max(a.nbDims, 0), b.d);
 }
 
 // A caller's hold on one device's shared scratch: the device lock, plus the
@@ -1588,8 +1599,8 @@ Result<DelegateHandle*> TensorRTBackend::init(
 // ---------------------------------------------------------------------------
 // execute
 //
-// Binds the ExecuTorch tensors to TensorRT. Graph replay stages these bindings
-// through persistent device buffers, then copies results to the caller's outputs.
+// Binds the ExecuTorch tensors to TensorRT and enqueues the engine, through
+// ExecutionGraph when CUDA graph replay is on.
 //
 // Args layout (mirroring the Python exporter):
 //   args[0 .. num_inputs-1]                               -- input EValues
@@ -1732,6 +1743,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     engine->cached_output_ptrs.resize(num_outputs, nullptr);
     engine->cached_output_sizes.resize(num_outputs, 0);
   }
+  if (engine->bound_addresses.empty()) {
+    engine->bound_addresses.resize(num_inputs + num_outputs, nullptr);
+    nvinfer1::Dims unknown{};
+    unknown.nbDims = -1;
+    engine->bound_input_dims.resize(num_inputs, unknown);
+  }
 
   // ------------------------------------------------------------------
   // 1. Collect the input shapes and settle on an optimization profile
@@ -1740,12 +1757,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // for dynamic inputs, so the shapes are gathered and the profile chosen,
   // validated, and switched up front rather than inside the binding loop below.
   // ------------------------------------------------------------------
-  // Device pointer each input binding was bound to; aliased outputs reuse the
-  // pointer of the input they alias so their update lands in-place.
-  std::vector<void*> input_bind_ptrs(num_inputs, nullptr);
+  // Device pointer each binding was bound to, inputs then outputs; aliased outputs
+  // reuse the pointer of the input they alias so their update lands in-place.
+  std::vector<void*> bind_ptrs(num_inputs + num_outputs, nullptr);
   std::vector<size_t> binding_bytes(num_inputs + num_outputs);
   size_t arg_idx = 0; // running index into delegate args
   std::vector<nvinfer1::Dims> input_dims(num_inputs);
+  std::vector<BufferPlacement> input_placements(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
     EValue* arg = args[arg_idx++];
     TORCHTRT_ET_CHECK_NOT_NULL(
@@ -1759,7 +1777,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
-    const int input_device = cuda_foreign_device_of_ptr(et_in.const_data_ptr(), engine->device_id);
+    input_placements[i] = placement_of(et_in.const_data_ptr(), engine->device_id);
+    const int input_device = input_placements[i].foreign_device;
     if (input_device >= 0) {
       ET_LOG(
           Error,
@@ -1845,6 +1864,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // return, so arm the drain before the switch is submitted. It writes none of a
     // user-managed context's scratch, which is why it can precede the pool claim.
     drain_on_early_return.arm();
+    // TensorRT wants every input shape set again after a switch. Forgotten before it, because a switch
+    // that fails leaves the context in a state nothing here can tell.
+    for (auto& dims : engine->bound_input_dims) {
+      dims.nbDims = -1;
+    }
+    engine->forget_bound_addresses();
+    ++engine->shape_epoch;
+    engine->shapes_inferred = false;
     if (!ctx->setOptimizationProfileAsync(profile, stream)) {
       ET_LOG(Error, "TensorRTBackend::execute: setOptimizationProfileAsync(%d) failed", profile);
       return Error::InvalidState;
@@ -1879,13 +1906,20 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     const std::string& name = engine->input_binding_names[i];
     const nvinfer1::Dims& dims = input_dims[i];
 
-    if (!ctx->setInputShape(name.c_str(), dims)) {
-      ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
-      return Error::InvalidState;
+    nvinfer1::Dims& bound_dims = engine->bound_input_dims[i];
+    if (!same_dims(bound_dims, dims)) {
+      ++engine->shape_epoch;
+      engine->shapes_inferred = false;
+      if (!ctx->setInputShape(name.c_str(), dims)) {
+        bound_dims.nbDims = -1;
+        ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
+        return Error::InvalidState;
+      }
+      bound_dims = dims;
     }
 
     const bool device_reachable =
-        et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
+        et_in.nbytes() > 0 && (engine->pageable_host_access || input_placements[i].cuda_accessible);
     // Caller-owned aliased input: an aliased output binds in-place to this
     // input's pointer, so its update must land in the caller's storage. Host
     // memory is refused. A device buffer the branches below stage for alignment
@@ -1944,8 +1978,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
     }
 
-    input_bind_ptrs[i] = bind_ptr;
-    if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
+    bind_ptrs[i] = bind_ptr;
+    if (!engine->bind_address(i, bind_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for input '%s'", name.c_str());
       return Error::InvalidState;
     }
@@ -1954,7 +1988,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 3. Infer output shapes (requires all input shapes to be set first)
   // ------------------------------------------------------------------
-  {
+  if (!engine->shapes_inferred) {
     const int32_t io_size = engine->engine->getNbIOTensors();
     std::vector<const char*> unresolved(static_cast<size_t>(io_size), nullptr);
     const int32_t n_unresolved = ctx->inferShapes(io_size, unresolved.data());
@@ -1962,6 +1996,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: inferShapes could not resolve %d tensor(s)", n_unresolved);
       return Error::InvalidState;
     }
+    engine->shapes_inferred = true;
   }
 
   // ------------------------------------------------------------------
@@ -1981,12 +2016,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // place, so bind this output binding to the aliased input's device pointer.
     const int alias_in = engine->output_aliased_input_idx[o];
     if (alias_in >= 0) {
-      void* bind_ptr = input_bind_ptrs[static_cast<size_t>(alias_in)];
+      void* bind_ptr = bind_ptrs[static_cast<size_t>(alias_in)];
       if (bind_ptr == nullptr) {
         ET_LOG(Error, "TensorRTBackend::execute: aliased output '%s' has no bound input pointer", name.c_str());
         return Error::InvalidState;
       }
-      if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
+      bind_ptrs[num_inputs + o] = bind_ptr;
+      if (!engine->bind_address(num_inputs + o, bind_ptr)) {
         ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for aliased output '%s'", name.c_str());
         return Error::InvalidState;
       }
@@ -2045,7 +2081,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       // The ordinary output path asks this and the aliased one did not, so a buffer on a card
       // this engine cannot reach was copied into rather than refused.
-      const int foreign_alias_device = cuda_foreign_device_of_ptr(dst, engine->device_id);
+      const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;
       if (foreign_alias_device >= 0) {
         ET_LOG(
             Error,
@@ -2075,7 +2111,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     exec_aten::Tensor et_out = arg->toTensor();
     // Asked separately, because an output address comes from the caller rather than the engine.
-    const int output_device = cuda_foreign_device_of_ptr(et_out.const_data_ptr(), engine->device_id);
+    const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id);
+    const int output_device = output_placement.foreign_device;
     if (output_device >= 0) {
       ET_LOG(
           Error,
@@ -2115,7 +2152,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     binding_bytes[num_inputs + o] = et_out.nbytes();
     void* bind_ptr = nullptr;
     const bool device_reachable =
-        et_out.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr()));
+        et_out.nbytes() > 0 && (engine->pageable_host_access || output_placement.cuda_accessible);
     if (et_out.nbytes() == 0) {
       if (engine->cached_output_sizes[o] == 0) {
         cuda_err = cudaMalloc(&engine->cached_output_ptrs[o], 1);
@@ -2148,7 +2185,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       outputs_needing_copy.push_back({arg_i, bind_ptr});
     }
 
-    if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
+    bind_ptrs[num_inputs + o] = bind_ptr;
+    if (!engine->bind_address(num_inputs + o, bind_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for output '%s'", name.c_str());
       return Error::InvalidState;
     }
@@ -2224,7 +2262,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
   const Error enqueue_err = engine->execution_graph
-      ? engine->execution_graph->enqueue(*engine, stream, binding_bytes, scratch_buffer)
+      ? engine->execution_graph->enqueue(*engine, stream, bind_ptrs, binding_bytes, scratch_buffer)
       : enqueue_plain(*ctx, stream);
   if (enqueue_err != Error::Ok) {
     return enqueue_err;
