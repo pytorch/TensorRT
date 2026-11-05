@@ -4159,6 +4159,57 @@ def aten_ops_adaptive_avg_poolNd(
     )
 
 
+def adaptive_max_pool_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Only the pooled values are converted, so the indices output must be unused.
+    if not one_user_validator(node):
+        return False
+    # The pooling bins are computed from the sizes when the engine is built, and an empty
+    # output has none.
+    input_val = node.args[0].meta.get("val")
+    if input_val is None:
+        return False
+    output_size = node.args[1]
+    spatial_size = input_val.shape[-len(output_size) :]
+    return all(
+        isinstance(size, int) and size > 0 for size in (*spatial_size, *output_size)
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool2d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool3d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_max_poolNd(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    output = impl.pool.adaptive_max_poolNd(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=args[0],
+        output_size=args[1],
+    )
+    return output, None
+
+
 def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     k = node.args[1]
     return topk_sort_validator(k)
