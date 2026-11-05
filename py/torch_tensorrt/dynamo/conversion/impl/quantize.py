@@ -294,7 +294,14 @@ def dequantize_affine(
         # Myelin currently matches INT4 blocked DQ -> FP32, not BF16.
         trt_output_dtype = trt.DataType.FLOAT
     else:
-        qdata_trt = get_trt_tensor(ctx, qdata, f"{name}_qdata", dtype=input_dtype)
+        int8_qdata = torch.int8 in (input_dtype, getattr(qdata, "dtype", None))
+        qdata_trt = get_trt_tensor(
+            ctx,
+            qdata,
+            f"{name}_qdata",
+            dtype=input_dtype,
+            target_quantized_type=trt.DataType.INT8 if int8_qdata else None,
+        )
 
         axis = None
         if isinstance(scale, torch.Tensor):
