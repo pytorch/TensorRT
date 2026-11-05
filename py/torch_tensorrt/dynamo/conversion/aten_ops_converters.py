@@ -1179,9 +1179,10 @@ else:
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
         # dequantize_affine(input, block_size, scale, zero_point, input_dtype,
         #                   quant_min=None, quant_max=None, output_dtype=...)
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = kwargs.get("output_dtype")
         if output_dtype is None:
-            output_dtype = args[7] if len(args) > 7 else torch.float16
+            output_dtype = args[7] if len(args) > 7 else torch.float32
         input_dtype = args[4] if len(args) > 4 else None
         zero_point = kwargs.get("zero_point")
         if zero_point is None and len(args) > 3:
@@ -1247,8 +1248,9 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = (
-            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.bfloat16)
+            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.float32)
         )
         return impl.quantize.dequantize_affine_float8(
             ctx,
