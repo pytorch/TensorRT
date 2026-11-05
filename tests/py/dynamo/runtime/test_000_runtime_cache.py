@@ -26,6 +26,8 @@ from torch_tensorrt.runtime import (
     runtime_cache,
 )
 
+pytestmark = [pytest.mark.trt_rtx_only]
+
 
 class SimpleModel(torch.nn.Module):
     def forward(self, x):
@@ -164,8 +166,6 @@ class TestRuntimeCacheSetup(TestCase):
 class TestRuntimeCachePersistence(TestCase):
     """End-to-end: compile with a cache path, infer, destroy, reload, infer again."""
 
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_cache_saved_on_del(self):
         self.addCleanup(torch._dynamo.reset)
         with tempfile.TemporaryDirectory() as tmp:
@@ -180,8 +180,6 @@ class TestRuntimeCachePersistence(TestCase):
             self.assertTrue(os.path.isfile(path))
             self.assertGreater(os.path.getsize(path), 0)
 
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_cache_loaded_in_fresh_process(self):
         self.addCleanup(torch._dynamo.reset)
         with tempfile.TemporaryDirectory() as tmp:
@@ -303,8 +301,6 @@ class TestRuntimeCacheContextManager(TestCase):
                 _ = compiled(*inputs)
             self.assertFalse(os.listdir(tmp), "No files should be created for path=''")
 
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_shared_cache_pointer_across_modules(self):
         self.addCleanup(torch._dynamo.reset)
         first, inputs = _fresh_conv_model_and_inputs()
@@ -1082,8 +1078,6 @@ class TestRuntimeCacheBadFile(TestCase):
         self.assertGreater(Path(path).stat().st_size, 0)
 
     @parameterized.expand([("empty",), ("random",), ("truncated",)])
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_invalid_cache_file_recovers_and_matches_eager(self, kind):
         model, inputs = _fresh_conv_model_and_inputs()
         if kind == "truncated":

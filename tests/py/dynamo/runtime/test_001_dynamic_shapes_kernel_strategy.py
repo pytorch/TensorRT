@@ -11,6 +11,8 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
+pytestmark = [pytest.mark.trt_rtx_only]
+
 _STRATEGIES = [("lazy",), ("eager",), ("none",)]
 
 
@@ -188,8 +190,6 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
     """End-to-end: compile + infer with each strategy on the build-selected runtime."""
 
     @parameterized.expand(_STRATEGIES)
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_strategy_matches_eager_across_batch_sizes(self, strategy):
         self.addCleanup(torch._dynamo.reset)
         torch.manual_seed(0)

@@ -11,6 +11,8 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
+pytestmark = [pytest.mark.trt_rtx_only]
+
 
 class CudaGraphConvModel(torch.nn.Module):
     def __init__(self):
@@ -237,8 +239,6 @@ class TestCudaGraphStrategyInference(TestCase):
         torch.manual_seed(0)
 
     @parameterized.expand([("disabled",), ("whole_graph_capture",)])
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_strategy_matches_eager(self, strategy):
         compiled, model, inputs = _compile_conv(strategy)
         with torch.no_grad():
@@ -248,8 +248,6 @@ class TestCudaGraphStrategyInference(TestCase):
                 self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
                 torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
 
-    @pytest.mark.trt_api
-    @pytest.mark.trt_rtx_only
     def test_whole_graph_capture_with_graph_break(self):
         from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
             TorchTensorRTModule,
