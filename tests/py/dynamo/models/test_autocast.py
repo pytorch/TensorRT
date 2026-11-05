@@ -377,6 +377,60 @@ def test_nested_pytorch_autocast():
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize(
+    "split",
+    [
+        lambda y: torch.chunk(y, 2, dim=-1),
+        lambda y: torch.split(y, 16, dim=-1),
+        lambda y: torch.unbind(y.view(4, 2, 16), dim=1),
+    ],
+    ids=["chunk", "split", "unbind"],
+)
+def test_autocast_ops_with_list_outputs(split):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 32)
+
+        def forward(self, x):
+            a, b = split(self.linear(x))
+            return a * b
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    trt_model = torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    out = trt_model(x)
+    assert out.dtype == torch.float16
+    torch.testing.assert_close(out.float(), model(x), rtol=1e-2, atol=1e-2)
+
+    # An excluded op that reads a list element must get float32 inputs:
+    # 300 * 300 overflows float16.
+    with torch.no_grad():
+        model.linear.weight.zero_()
+        model.linear.bias.fill_(300.0)
+    ep = torch.export.export(model, (x,))
+    trt_model = torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_ops={"torch.ops.aten.mul.Tensor"},
+    )
+    out = trt_model(x)
+    assert out.dtype == torch.float32
+    torch.testing.assert_close(out, model(x))
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_warns_without_calibration_dataloader(caplog):
     class LargeIntermediateModel(nn.Module):
         def forward(self, x):

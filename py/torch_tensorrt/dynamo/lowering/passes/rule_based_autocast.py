@@ -6,6 +6,7 @@ import operator
 from typing import Any
 
 import torch
+import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
@@ -20,6 +21,11 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
+
+
+def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
+    # Ops like chunk, split and unbind produce a list of tensors.
+    return pytree.tree_map_only(torch.Tensor, lambda t: t.to(target_dtype), val)
 
 
 def rule_based_autocast(
@@ -126,10 +132,13 @@ def rule_based_autocast(
 
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
-            if (
-                node.target == torch.ops.higher_order.wrap_with_autocast
-                or node.target == operator.getitem
-            ):
+            if node.target == torch.ops.higher_order.wrap_with_autocast:
+                continue
+            if node.target == operator.getitem:
+                # Follow the retyped list, so users of this element cast it correctly.
+                src, idx = node.args
+                if isinstance(src.meta.get("val"), (list, tuple)):
+                    node.meta["val"] = src.meta["val"][idx]
                 continue
 
             if node.name in low_precision_nodes:
@@ -139,7 +148,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_low_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_low_precision_type)
+                node.meta["val"] = _retype_tensors(
+                    node.meta["val"], autocast_low_precision_type
+                )
             elif node.name in high_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(
                     node, node.args, autocast_high_precision_type
@@ -147,7 +158,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_high_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_high_precision_type)
+                node.meta["val"] = _retype_tensors(
+                    node.meta["val"], autocast_high_precision_type
+                )
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)
