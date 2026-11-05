@@ -21,6 +21,25 @@ struct CudaCall {
   cudaStream_t stream;
 };
 
+// While alive, cuCtxGetId reports a new id for every context under its old handle, as for a new context the
+// driver gives a destroyed one's handle.
+struct RenewedContextIds {
+  RenewedContextIds();
+  ~RenewedContextIds();
+  RenewedContextIds(const RenewedContextIds&) = delete;
+  RenewedContextIds& operator=(const RenewedContextIds&) = delete;
+};
+
+// While alive, each cuCtxFromGreenCtx takes 200 microseconds, so calls from 2 threads that are not serialized
+// overlap. most_at_once() is the most calls that were inside it at the same time.
+struct SlowGreenContextCalls {
+  SlowGreenContextCalls();
+  ~SlowGreenContextCalls();
+  SlowGreenContextCalls(const SlowGreenContextCalls&) = delete;
+  SlowGreenContextCalls& operator=(const SlowGreenContextCalls&) = delete;
+  int most_at_once() const;
+};
+
 // Linker wrappers observe only this thread and only while this scope is alive.
 struct CudaCalls {
   CudaCalls();
@@ -45,6 +64,7 @@ struct CudaCalls {
   std::vector<cudaStream_t> launches;
   std::vector<cudaStream_t> retirements;
   std::function<void(cudaStream_t)> during_capture;
+  std::function<void(cudaGraph_t)> after_capture;
   std::function<void(cudaStream_t)> after_launch;
   std::function<void(cudaStream_t)> before_synchronize;
   std::vector<CudaCall> operations;

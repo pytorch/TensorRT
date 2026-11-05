@@ -73,6 +73,7 @@ cc_test(
         "-Wl,--wrap=cudaFreeAsync",
         "-Wl,--wrap=cudaMemcpyAsync",
         "-Wl,--wrap=cudaStreamBeginCapture",
+        "-Wl,--wrap=cudaStreamEndCapture",
         "-Wl,--wrap=cudaGraphLaunch",
         "-Wl,--wrap=cudaDeviceGetAttribute",
         "-Wl,--wrap=cudaStreamSynchronize",

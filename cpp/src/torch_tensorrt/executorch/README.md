@@ -292,10 +292,25 @@ Keep each input and output in the same buffer from call to call, as ExecuTorch's
 does, and as a caller that reuses its device tensors does. When the buffers change, that call
 records again on the new ones. When they change a second time, for any shapes, the engine stops
 following them, also after its shapes or its profile change: it records on one GPU buffer of its own
-per input and output, and every call copies its inputs in and its outputs out. For an engine with
-few kernels, or with large inputs and outputs, these copies can cost more than they save. So a
-caller that moves its buffers on every call records up to 3 times for a set of shapes until it has
-moved them twice. After that, each new set of shapes records once.
+per input and output, for each graph, and every call copies its inputs in and its outputs out. For
+an engine with few kernels, or with large inputs and outputs, these copies can cost more than they
+save. So a caller that moves its buffers on every call records up to 3 times for a set of shapes in
+each graph until it has moved them twice, once more if the shared scratch grows in between. After
+that, each new set of shapes records once.
+
+A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
+graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
+An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
+caller that uses both, or up to 4 green contexts in turn, replays on each. These graphs share one
+record of the engine's input shapes, so they replay only while every caller passes the same shapes:
+a call with other shapes starts every graph over, not only its own. A fifth green context
+takes the place of the one called longest ago, and a green context whose graph was replaced starts
+over: a warm-up call, then a recording on its next call. So a caller that makes one call on each of
+more than 4 green contexts in turn never replays. Each green graph holds a stream of its own in its
+green context, and any buffers it records on, until the engine is destroyed or its place is taken.
+TensorRT requires a green context to outlive the graphs recorded in it, so destroy the engine before
+its green contexts. If one is destroyed first, the error from releasing its graph later is logged
+and cleared, but CUDA may not free that graph's stream.
 
 Some calls do not replay:
 
@@ -304,10 +319,15 @@ Some calls do not replay:
   on the same buffers as before. A loop that changes shape or profile on every call never replays.
 - An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
   12.5 never replays. The delegate logs the reason.
-- A call on a green context stream, or on a stream from another CUDA context, takes the ordinary
-  path. The recorded graph is kept for the next call that can replay it.
+- A green context stream while a regular context other than its device's primary one is current,
+  and a plain stream while a green context is current, take the ordinary path, and the recorded
+  graphs are kept.
+- A stream on another device fails, with or without replay. So does a stream from a regular CUDA
+  context other than the one the engine was loaded in, except that, while that context is current, a
+  graph already recorded in the engine's own context replays on it.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
-  ordinary path until its shapes or its profile change.
+  ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
+  that gives up its place to a newer green context starts over.
 
 Engines on the shared activation scratch replay too.
 

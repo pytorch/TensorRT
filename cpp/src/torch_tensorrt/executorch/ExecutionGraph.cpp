@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
@@ -25,17 +26,33 @@ std::shared_mutex& cuda_graph_capture_mutex() {
 
 namespace {
 constexpr int kMaxCaptureAttempts = 3;
+// Green contexts with a graph of their own per engine. An engine is rarely shared by more SM
+// partitions than this, and each graph holds a capture stream and possibly buffers.
+constexpr size_t kMaxGreenGraphs = 4;
 
-bool can_replay_on(cudaStream_t stream) {
-  static const auto get_context = [] {
-    void* entry = nullptr;
-    if (cudaGetDriverEntryPointByVersion("cuStreamGetCtx", &entry, 12050, cudaEnableDefault) != cudaSuccess ||
-        entry == nullptr) {
-      cudaGetLastError();
-      return static_cast<PFN_cuStreamGetCtx_v12050>(nullptr);
-    }
-    return reinterpret_cast<PFN_cuStreamGetCtx_v12050>(entry);
-  }();
+// CUDA allows a green context handle on one CPU thread at a time, and engines that share a green context can run
+// on several threads.
+std::mutex& green_context_mutex() {
+  static auto* mutex = new std::mutex();
+  return *mutex;
+}
+
+template <typename Function>
+Function driver_entry(const char* name) {
+  void* entry = nullptr;
+  if (cudaGetDriverEntryPointByVersion(name, &entry, 12050, cudaEnableDefault) != cudaSuccess || entry == nullptr) {
+    cudaGetLastError();
+    return nullptr;
+  }
+  return reinterpret_cast<Function>(entry);
+}
+
+// Finds the context `stream` runs its work in, when a graph can be recorded there: the stream's green
+// context, or else the context current on this thread. Graph nodes keep the context they were
+// recorded in, not that of the stream that launches them, so a graph recorded anywhere else would run
+// a green context's work outside its SMs.
+bool recording_context(cudaStream_t stream, CUcontext& context, CUgreenCtx& green, unsigned long long& green_id) {
+  static const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx");
   if (get_context == nullptr) {
     // Logging can wait for a lock held by another caller, so it must not hold the initialization guard.
     static std::atomic_flag logged = ATOMIC_FLAG_INIT;
@@ -44,12 +61,50 @@ bool can_replay_on(cudaStream_t stream) {
     }
     return false;
   }
-  CUcontext caller_context = nullptr, current_context = nullptr;
-  CUgreenCtx caller_green = nullptr, current_green = nullptr;
-  // Graph nodes retain the capture context, not the context of the stream used to launch them.
-  return get_context(stream, &caller_context, &caller_green) == CUDA_SUCCESS &&
-      get_context(nullptr, &current_context, &current_green) == CUDA_SUCCESS && caller_green == nullptr &&
-      current_green == nullptr && caller_context == current_context;
+  if (get_context(stream, &context, &green) != CUDA_SUCCESS) {
+    return false;
+  }
+  // A green stream reports the primary context of its device, so this also refuses one on another device.
+  CUcontext current_context = nullptr;
+  CUgreenCtx current_green = nullptr;
+  if (get_context(nullptr, &current_context, &current_green) != CUDA_SUCCESS || current_context != context) {
+    return false;
+  }
+  if (green == nullptr) {
+    green_id = 0;
+    // A plain capture stream is created in the current context, so that one must not be green either.
+    return current_green == nullptr;
+  }
+  // A destroyed green context's handle can be handed out again, but its id never is.
+  static const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx");
+  static const auto context_id = driver_entry<PFN_cuCtxGetId_v12000>("cuCtxGetId");
+  if (from_green == nullptr || context_id == nullptr) {
+    return false;
+  }
+  CUcontext green_context = nullptr;
+  const std::lock_guard<std::mutex> lock(green_context_mutex());
+  return from_green(&green_context, green) == CUDA_SUCCESS && context_id(green_context, &green_id) == CUDA_SUCCESS;
+}
+
+cudaError_t create_capture_stream(CUgreenCtx green, cudaStream_t& stream) {
+  if (green == nullptr) {
+    return cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+  }
+  static const auto create_stream = driver_entry<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate");
+  if (create_stream == nullptr) {
+    return cudaErrorNotSupported;
+  }
+  CUstream created = nullptr;
+  CUresult result = CUDA_SUCCESS;
+  {
+    const std::lock_guard<std::mutex> lock(green_context_mutex());
+    result = create_stream(&created, green, CU_STREAM_NON_BLOCKING, 0);
+  }
+  if (result != CUDA_SUCCESS) {
+    return result == CUDA_ERROR_OUT_OF_MEMORY ? cudaErrorMemoryAllocation : cudaErrorUnknown;
+  }
+  stream = created;
+  return cudaSuccess;
 }
 
 const std::string& binding_name(const EngineHandle& handle, size_t index) {
@@ -71,11 +126,29 @@ void fall_back(const char* reason, cudaError_t error) {
   cudaGetLastError();
 }
 
+// TensorRT requires a green context to outlive the graphs recorded in it, but a caller that re-partitions its SMs
+// may destroy one first. Releasing that graph or its stream then fails, and the error must not reach the caller's
+// next CUDA call, which may be another context's execute().
+void released(cudaError_t error) {
+  if (error != cudaSuccess) {
+    ET_LOG(
+        Info,
+        "TensorRTBackend: releasing a CUDA graph or its capture stream failed (%s); its green context was likely "
+        "destroyed before the engine",
+        cudaGetErrorString(error));
+    cudaGetLastError();
+  }
+}
+
 // A stream-ordered free that fails still leaves a buffer this call is done with.
 void retire(void* buffer, cudaStream_t stream) {
   const auto error = cudaFreeAsync(buffer, stream);
   if (error != cudaSuccess) {
-    fall_back("stream-ordered free failed, freeing after a device wait", error);
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: freeing a CUDA graph buffer on the stream failed (%s); freeing it after a device wait",
+        cudaGetErrorString(error));
+    cudaGetLastError();
     cudaFree(buffer);
     cudaGetLastError();
   }
@@ -102,13 +175,13 @@ ExecutionGraph::~ExecutionGraph() {
     }
   }
   if (capture_stream_ != nullptr) {
-    cudaStreamDestroy(capture_stream_);
+    released(cudaStreamDestroy(capture_stream_));
   }
 }
 
 void ExecutionGraph::drop_graph() {
   if (graph_exec_ != nullptr) {
-    cudaGraphExecDestroy(graph_exec_);
+    released(cudaGraphExecDestroy(graph_exec_));
     graph_exec_ = nullptr;
   }
 }
@@ -134,11 +207,50 @@ Error ExecutionGraph::enqueue(
     const std::vector<void*>& addresses,
     const std::vector<size_t>& binding_bytes,
     const void* scratch) {
-  auto& context = *handle.exec_ctx;
   const size_t count = handle.num_inputs + handle.num_outputs;
   if (addresses.size() != count || binding_bytes.size() != count) {
     return Error::InvalidArgument;
   }
+  CUcontext stream_context = nullptr;
+  CUgreenCtx stream_green = nullptr;
+  unsigned long long stream_green_id = 0;
+  // A call that cannot replay keeps the graphs and their buffers for the next call that can.
+  if (!recording_context(stream, stream_context, stream_green, stream_green_id)) {
+    return enqueue_plain(*handle.exec_ctx, stream);
+  }
+  if (stream_green == nullptr) {
+    last_graph_ = this;
+    return enqueue_in(handle, stream, addresses, binding_bytes, scratch, stream_context, nullptr);
+  }
+  // Each green context keeps a graph of its own, so a caller that also calls from a plain stream, or
+  // from a few green contexts in turn, replays on each instead of recording at every switch.
+  auto found =
+      std::find_if(greens_.begin(), greens_.end(), [&](const auto& green) { return green.first == stream_green_id; });
+  if (found == greens_.end()) {
+    if (greens_.size() == kMaxGreenGraphs) {
+      greens_.back().second->release_buffers(stream);
+      greens_.pop_back();
+    }
+    greens_.emplace_back(stream_green_id, std::make_unique<ExecutionGraph>());
+    found = greens_.end() - 1;
+  }
+  // Most recent first, so the one dropped for a new green context is the one called longest ago.
+  std::rotate(greens_.begin(), found, found + 1);
+  ExecutionGraph& green = *greens_.front().second;
+  last_graph_ = &green;
+  return green.enqueue_in(handle, stream, addresses, binding_bytes, scratch, stream_context, stream_green);
+}
+
+Error ExecutionGraph::enqueue_in(
+    EngineHandle& handle,
+    cudaStream_t stream,
+    const std::vector<void*>& addresses,
+    const std::vector<size_t>& binding_bytes,
+    const void* scratch,
+    CUcontext stream_context,
+    CUgreenCtx stream_green) {
+  auto& context = *handle.exec_ctx;
+  const size_t count = handle.num_inputs + handle.num_outputs;
   // A recorded graph keeps the scratch address it was recorded with. The shared pool frees that
   // buffer when it grows, so a graph recorded on another buffer must not be replayed.
   if (scratch != scratch_) {
@@ -147,7 +259,7 @@ Error ExecutionGraph::enqueue(
   }
   // A graph replays the kernels of the shapes and the profile it was captured under, so a change of
   // either must record again.
-  // ponytail: one graph per handle, so alternating profiles every call never
+  // ponytail: one graph per handle and kind of context, so alternating profiles every call never
   // replays; a graph per profile is the upgrade if that pattern matters.
   if (handle.shape_epoch != shape_epoch_) {
     reset_graph();
@@ -158,8 +270,7 @@ Error ExecutionGraph::enqueue(
     staged_ = moves_ > 1;
     shape_epoch_ = handle.shape_epoch;
   }
-  // The graph and its buffers do not depend on the caller stream, so a call that cannot replay keeps them.
-  if (capture_failed_ || !can_replay_on(stream)) {
+  if (capture_failed_) {
     return enqueue_plain(context, stream);
   }
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
@@ -227,11 +338,18 @@ Error ExecutionGraph::enqueue(
   if (capture_lock.owns_lock()) {
     cudaGraph_t graph = nullptr;
     cudaError_t error = cudaSuccess;
+    // A graph keeps replaying on a stream of another regular context, where TensorRT itself cannot
+    // run, but records only on a capture stream of the current context.
+    if (capture_stream_ != nullptr && capture_context_ != stream_context) {
+      released(cudaStreamDestroy(capture_stream_));
+      capture_stream_ = nullptr;
+    }
     if (capture_stream_ == nullptr) {
-      error = cudaStreamCreateWithFlags(&capture_stream_, cudaStreamNonBlocking);
+      error = create_capture_stream(stream_green, capture_stream_);
       if (error != cudaSuccess) {
         capture_stream_ = nullptr;
       }
+      capture_context_ = stream_context;
     }
     bool enqueued = true;
     // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
@@ -279,9 +397,10 @@ Error ExecutionGraph::enqueue(
       if (++failed_captures_ == kMaxCaptureAttempts) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: CUDA graph recording failed %d times; this engine uses enqueueV3 until an "
-            "input shape changes. Its outputs are not affected.",
-            kMaxCaptureAttempts);
+            "TensorRTBackend::execute: CUDA graph recording failed %d times; this engine's calls from this %scontext "
+            "use enqueueV3 until its input shapes or profile change. Their outputs are not affected.",
+            kMaxCaptureAttempts,
+            stream_green != nullptr ? "green " : "");
         capture_failed_ = true;
         release_buffers(stream);
       }

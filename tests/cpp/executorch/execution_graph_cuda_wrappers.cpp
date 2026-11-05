@@ -5,13 +5,70 @@
 
 #include "execution_graph_cuda_wrappers.h"
 
+#include <cudaTypedefs.h>
+
+#include <atomic>
+#include <chrono>
 #include <cstring>
+#include <thread>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
 namespace testing {
 
 thread_local CudaCalls* active_calls = nullptr;
+
+namespace {
+PFN_cuCtxGetId_v12000 real_context_id = nullptr;
+PFN_cuCtxFromGreenCtx_v12040 real_from_green = nullptr;
+std::atomic<bool> slow_green_calls{false};
+std::atomic<int> green_calls_inside{0};
+std::atomic<int> most_green_calls_inside{0};
+
+CUresult slow_from_green(CUcontext* context, CUgreenCtx green) {
+  const int inside = ++green_calls_inside;
+  int most = most_green_calls_inside.load();
+  while (inside > most && !most_green_calls_inside.compare_exchange_weak(most, inside)) {
+  }
+  if (slow_green_calls) {
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+  }
+  const CUresult result = real_from_green(context, green);
+  --green_calls_inside;
+  return result;
+}
+std::atomic<unsigned long long> context_id_offset{0};
+
+CUresult renewable_context_id(CUcontext context, unsigned long long* id) {
+  const CUresult result = real_context_id(context, id);
+  if (result == CUDA_SUCCESS) {
+    *id += context_id_offset.load();
+  }
+  return result;
+}
+} // namespace
+
+// Far above any id the driver hands out in one process, since it counts them up from 1.
+RenewedContextIds::RenewedContextIds() {
+  context_id_offset = 1ull << 40;
+}
+
+RenewedContextIds::~RenewedContextIds() {
+  context_id_offset = 0;
+}
+
+SlowGreenContextCalls::SlowGreenContextCalls() {
+  most_green_calls_inside = 0;
+  slow_green_calls = true;
+}
+
+SlowGreenContextCalls::~SlowGreenContextCalls() {
+  slow_green_calls = false;
+}
+
+int SlowGreenContextCalls::most_at_once() const {
+  return most_green_calls_inside.load();
+}
 
 CudaCalls::CudaCalls() : previous_(active_calls) {
   active_calls = this;
@@ -33,6 +90,7 @@ cudaError_t __real_cudaFree(void*);
 cudaError_t __real_cudaFreeAsync(void*, cudaStream_t);
 cudaError_t __real_cudaMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 cudaError_t __real_cudaStreamBeginCapture(cudaStream_t, cudaStreamCaptureMode);
+cudaError_t __real_cudaStreamEndCapture(cudaStream_t, cudaGraph_t*);
 cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
@@ -56,7 +114,18 @@ cudaError_t __wrap_cudaGetDriverEntryPointByVersion(
       return cudaErrorNotSupported;
     }
   }
-  return __real_cudaGetDriverEntryPointByVersion(name, entry, version, flags, status);
+  const auto result = __real_cudaGetDriverEntryPointByVersion(name, entry, version, flags, status);
+  if (result != cudaSuccess || *entry == nullptr) {
+    return result;
+  }
+  if (std::strcmp(name, "cuCtxFromGreenCtx") == 0) {
+    real_from_green = reinterpret_cast<PFN_cuCtxFromGreenCtx_v12040>(*entry);
+    *entry = reinterpret_cast<void*>(&slow_from_green);
+  } else if (std::strcmp(name, "cuCtxGetId") == 0) {
+    real_context_id = reinterpret_cast<PFN_cuCtxGetId_v12000>(*entry);
+    *entry = reinterpret_cast<void*>(&renewable_context_id);
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaDeviceGetAttribute(int* value, cudaDeviceAttr attribute, int device) {
@@ -119,6 +188,14 @@ cudaError_t __wrap_cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCapture
   const auto result = __real_cudaStreamBeginCapture(stream, mode);
   if (result == cudaSuccess && active_calls && active_calls->during_capture) {
     active_calls->during_capture(stream);
+  }
+  return result;
+}
+
+cudaError_t __wrap_cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t* graph) {
+  const auto result = __real_cudaStreamEndCapture(stream, graph);
+  if (result == cudaSuccess && active_calls && active_calls->after_capture) {
+    active_calls->after_capture(*graph);
   }
   return result;
 }
