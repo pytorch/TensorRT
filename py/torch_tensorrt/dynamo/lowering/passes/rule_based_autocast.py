@@ -9,7 +9,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-from .nodeclassifier import NodeClassifier
+from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import clean_up_graph_after_modifications
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,18 @@ def rule_based_autocast(
         settings.autocast_intermediate_node_outputs
     )
     del settings.autocast_intermediate_node_outputs
-    if not reference_data:
+    recorded_nodes = settings._autocast_calibrated_high_precision_nodes
+    replay_rule = None
+    if not reference_data and recorded_nodes is not None:
+        missing = recorded_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions it chose with calibration data, "
+                f"because these nodes are not in the graph: {sorted(missing)}. "
+                "Compile the model again with autocast_calibration_dataloader."
+            )
+        replay_rule = NodeNameSetRule(recorded_nodes)
+    elif not reference_data:
         skipped, needs = "autocast_max_output_threshold is", "it needs"
         if autocast_max_depth_of_reduction is not None:
             skipped = (
@@ -64,8 +75,14 @@ def rule_based_autocast(
         excluded_ops=autocast_excluded_ops,
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
+        custom_rule=replay_rule,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(reference_data)
+    if reference_data:
+        # A saved program drops the calibration data, so refit reuses this.
+        settings._autocast_calibrated_high_precision_nodes = frozenset(
+            high_precision_nodes
+        )
 
     def _cast_all_tensor_args_to_dtype(
         node: torch.fx.Node, arg: Any, dtype: torch.dtype

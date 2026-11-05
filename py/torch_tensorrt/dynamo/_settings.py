@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from dataclasses import dataclass, field
-from typing import Any, Collection, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, FrozenSet, List, Optional, Set, Tuple, Union
 
 import tensorrt as trt
 import torch
@@ -244,6 +244,11 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    # Set by autocast, not by users: the nodes it kept in high precision using the
+    # calibration data. Saved in place of the data so refit can reuse the choice.
+    _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
+        default=None, repr=False
+    )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
@@ -328,6 +333,7 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
 

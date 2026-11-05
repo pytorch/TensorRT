@@ -72,6 +72,21 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
         )
 
 
+class NodeNameSetRule(NodeRuleBase):
+    """Rule for keeping the nodes with the given exact names in high precision."""
+
+    def __init__(self, node_names):
+        """Initialize the rule.
+
+        Args:
+            node_names: Collection of node names to keep in high precision.
+        """
+        self.node_names = node_names
+
+    def _check_inner(self, node):
+        return node.name in self.node_names
+
+
 class DisabledOpTypes(NodeRuleBase):
     """Rule for keeping nodes with specific ATen ops in high precision."""
 

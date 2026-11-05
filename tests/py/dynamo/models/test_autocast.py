@@ -1,12 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import base64
 import logging
 
 import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering import pre_export_lowering
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import SERIALIZED_METADATA_IDX
 
 
 @pytest.mark.unit
@@ -394,3 +399,88 @@ def test_autocast_warns_without_calibration_dataloader(caplog):
             autocast_low_precision_type=torch.float16,
         )
     assert any("autocast_calibration_dataloader" in r.message for r in caplog.records)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Refit of a loaded program needs the Torch-TensorRT C++ runtime",
+)
+def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
+    class MaskedScores(nn.Module):
+        def __init__(self):
+            super(MaskedScores, self).__init__()
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x, mask):
+            # -1e9 is out of the float16 range, so the calibration data keeps
+            # these nodes in float32.
+            return torch.softmax(self.linear(x) + (1.0 - mask) * -1e9, dim=-1)
+
+    inputs = (
+        torch.randn((2, 8, 16), dtype=torch.float32, device="cuda"),
+        (torch.rand((2, 8, 16), device="cuda") > 0.3).float(),
+    )
+    batch = torch.randn((64, 8, 16), dtype=torch.float32, device="cuda")
+    batch_mask = (torch.rand((64, 8, 16), device="cuda") > 0.3).float()
+    calibration_dataloader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(batch, batch_mask), batch_size=2
+    )
+    trt_autocast_mod = torch_tensorrt.dynamo.compile(
+        torch.export.export(MaskedScores().cuda().eval(), inputs),
+        arg_inputs=inputs,
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=calibration_dataloader,
+        immutable_weights=False,
+    )
+
+    (engine,) = [
+        m for m in trt_autocast_mod.modules() if isinstance(m, TorchTensorRTModule)
+    ]
+    encoded = engine._pack_engine_info()[SERIALIZED_METADATA_IDX]
+    # Every saved program carries this metadata, so it must not carry the batch.
+    settings = TorchTensorRTModule.decode_metadata(encoded)["settings"]
+    assert settings.autocast_calibration_dataloader is None
+    metadata = base64.b64decode(encoded)
+    assert len(metadata) < batch.nbytes
+    assert batch[0, 0, :16].cpu().numpy().tobytes() not in metadata
+    assert engine.settings.autocast_calibration_dataloader is not None
+
+    # Refit of the loaded program must pick the precisions the engine was built with.
+    path = tmp_path / "model.ep"
+    torch_tensorrt.save(trt_autocast_mod, path, arg_inputs=list(inputs))
+    new_model = MaskedScores().cuda().eval()
+    refitted = torch_tensorrt.dynamo.refit_module_weights(
+        torch_tensorrt.load(path),
+        torch.export.export(new_model, inputs),
+        arg_inputs=inputs,
+    )
+    assert torch.allclose(
+        refitted(*inputs).to(torch.float32), new_model(*inputs), atol=1e-3, rtol=1e-3
+    ), "Refit after load does not match PyTorch!"
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_refuses_calibrated_precisions_for_another_graph():
+    class LinearModel(nn.Module):
+        def __init__(self):
+            super(LinearModel, self).__init__()
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x):
+            return self.linear(x)
+
+    inputs = (torch.randn((2, 16), dtype=torch.float32, device="cuda"),)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        _autocast_calibrated_high_precision_nodes=frozenset({"not_in_this_graph"}),
+    )
+    with pytest.raises(RuntimeError, match="not_in_this_graph"):
+        pre_export_lowering(
+            torch.export.export(LinearModel().cuda().eval(), inputs), settings
+        )
