@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import logging
+
 import pytest
 import torch
 import torch.nn as nn
@@ -365,3 +367,30 @@ def test_nested_pytorch_autocast():
             assert torch.allclose(
                 a.to(torch.float32), w.to(torch.float32), atol=1e-2, rtol=1e-2
             ), f"Autocast and Pytorch outputs do not match! autocast_outs[{i}] = {a}, pytorch_outs[{i}] = {w}"
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_warns_without_calibration_dataloader(caplog):
+    class LargeIntermediateModel(nn.Module):
+        def forward(self, x):
+            # The intermediates exceed the FP16 range, but the output does not.
+            y = x * 1000.0
+            return torch.sqrt(torch.mean(y * y, dim=-1, keepdim=True)) / 1000.0
+
+    model = LargeIntermediateModel().cuda().eval()
+    inputs = (torch.randn((8, 64), dtype=torch.float32, device="cuda"),)
+    ep = torch.export.export(model, inputs)
+
+    with caplog.at_level(
+        logging.WARNING,
+        logger="torch_tensorrt.dynamo.lowering.passes.rule_based_autocast",
+    ):
+        torch_tensorrt.dynamo.compile(
+            ep,
+            arg_inputs=inputs,
+            min_block_size=1,
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+        )
+    assert any("autocast_calibration_dataloader" in r.message for r in caplog.records)

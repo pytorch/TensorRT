@@ -45,6 +45,18 @@ def rule_based_autocast(
         settings.autocast_intermediate_node_outputs
     )
     del settings.autocast_intermediate_node_outputs
+    if not reference_data:
+        skipped, needs = "autocast_max_output_threshold is", "it needs"
+        if autocast_max_depth_of_reduction is not None:
+            skipped = (
+                "autocast_max_output_threshold and autocast_max_depth_of_reduction are"
+            )
+            needs = "they need"
+        logger.warning(
+            f"{skipped} not applied, because {needs} reference values from "
+            "autocast_calibration_dataloader and none was given. Nodes with large "
+            f"values may then run in {autocast_low_precision_type}."
+        )
 
     node_classifier = NodeClassifier(
         gm.graph.nodes,
