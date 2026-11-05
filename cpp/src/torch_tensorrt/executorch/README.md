@@ -281,17 +281,27 @@ loaded. The first match wins:
 4. The process option, which is off if it was never set.
 
 How it runs: the first call with a set of input shapes runs normally, the second records the graph
-and launches it, and later calls replay it. With the shared activation scratch on, a call does not
-wait while another engine loads, is destroyed or records. It runs normally, and a later call
-records. Each engine keeps one GPU buffer per input and output, and every call through the graph
-copies the inputs in and the outputs out. For an engine with few kernels, or with large inputs and
-outputs, these copies can cost more than they save.
+on the buffers of that call's inputs and outputs and launches it, and later calls with the same
+buffers replay it with no copies of its own. A buffer the delegate copies without replay, such as
+host memory on a GPU that does not read host memory directly, pinned or not, memory not aligned to
+256 bytes, or an input not in row-major order, is still copied. With the shared activation scratch
+on, a call does not wait while another engine loads, is destroyed or records. It runs normally, and
+a later call records.
+
+Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
+does, and as a caller that reuses its device tensors does. When the buffers change, that call
+records again on the new ones. When they change a second time, for any shapes, the engine stops
+following them, also after its shapes or its profile change: it records on one GPU buffer of its own
+per input and output, and every call copies its inputs in and its outputs out. For an engine with
+few kernels, or with large inputs and outputs, these copies can cost more than they save. So a
+caller that moves its buffers on every call records up to 3 times for a set of shapes until it has
+moved them twice. After that, each new set of shapes records once.
 
 Some calls do not replay:
 
-- A change of input shapes, or of the optimization profile, records again. So does a growth of the
-  shared activation scratch below. A loop that changes shape or profile on every call never
-  replays, and still pays the copies.
+- A change of input shapes, or of the optimization profile, records again.
+  A growth of the shared activation scratch below runs one call without a graph, then records again
+  on the same buffers as before. A loop that changes shape or profile on every call never replays.
 - An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
   12.5 never replays. The delegate logs the reason.
 - A call on a green context stream, or on a stream from another CUDA context, takes the ordinary
@@ -347,8 +357,8 @@ Set it before you load the methods that should use the pool. What it costs:
 - **No `cudaDeviceReset()`.** The pool keeps its buffer, an event and a stream for the life of the
   process. Do not reset a device that ran a pooled engine.
 
-With `use_cuda_graphs` on as well, each replaying engine still keeps its own buffers for its inputs
-and outputs.
+With `use_cuda_graphs` on as well, an engine that copies through buffers of its own, as described
+above, keeps them apart from the pool.
 
 #### Capturing a call into a CUDA graph is not supported
 
