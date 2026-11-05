@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../../../_static/documentation_options.js?v=9f082ce4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -486,6 +486,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils._pytree</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pytree</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._export.non_strict_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_constraints</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch._export.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">_detect_fake_mode_from_gm</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._library.fake_class_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeScriptObject</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">ExportGraphSignature</span>
@@ -638,9 +639,9 @@ document.write(`
     <span class="n">state_dict</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
     <span class="n">constants</span> <span class="o">=</span> <span class="p">{}</span>
 
-    <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
-        <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">)</span>
-    <span class="p">)</span>
+    <span class="c1"># When no input is a tensor (no inputs, or only ints), the fake mode comes from</span>
+    <span class="c1"># the other nodes.</span>
+    <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">_detect_fake_mode_from_gm</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
     <span class="k">assert</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
     <span class="c1"># This map stores the names of outputs (old to new)</span>
@@ -666,6 +667,7 @@ document.write(`
     <span class="c1"># codegen emits the target, so lifting that target twice yields a forward() with</span>
     <span class="c1"># a duplicated argument that fails to compile.</span>
     <span class="n">lifted_placeholders</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">last_lifted</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">:</span>
             <span class="n">existing</span> <span class="o">=</span> <span class="n">lifted_placeholders</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
@@ -708,8 +710,14 @@ document.write(`
 
             <span class="k">assert</span> <span class="n">lift_val</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">input_kind</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
-            <span class="c1"># Replace get_attr nodes with placeholder nodes and copy metadata.</span>
-            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">first_user_input</span><span class="p">):</span>
+            <span class="c1"># Replace get_attr nodes with placeholder nodes and copy metadata. Chaining</span>
+            <span class="c1"># each one after the previous one keeps the order of input_specs, also when</span>
+            <span class="c1"># there is no user input.</span>
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">last_lifted</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">last_lifted</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">first_user_input</span><span class="p">)</span>
+            <span class="p">):</span>
                 <span class="c1"># Ensure name doesn't contain period as it is used for submodules</span>
                 <span class="n">const_placeholder_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span> <span class="s2">"_"</span><span class="p">)</span>
                 <span class="n">const_placeholder_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">placeholder</span><span class="p">(</span><span class="n">const_placeholder_name</span><span class="p">)</span>
@@ -730,6 +738,7 @@ document.write(`
 
                 <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">const_placeholder_node</span><span class="p">)</span>
                 <span class="n">lifted_placeholders</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_placeholder_node</span>
+                <span class="n">last_lifted</span> <span class="o">=</span> <span class="n">const_placeholder_node</span>
                 <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 
                 <span class="c1"># Verify if the const_placeholder being added is one of the output nodes</span>
@@ -1063,13 +1072,9 @@ document.write(`
     <span class="c1">#      symbol from tensor shapes and scalar placeholder values, then look up</span>
     <span class="c1">#      its bound directly in the shape_env.  This is the retrace=False path where the</span>
     <span class="c1">#      caller didn't supply inputs.</span>
-    <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
-        <span class="nb">tuple</span><span class="p">(</span>
-            <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
-            <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
-            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
-        <span class="p">)</span>
-    <span class="p">)</span>
+    <span class="c1"># Falls back to the other nodes, so a program whose inputs are all ints keeps</span>
+    <span class="c1"># their ranges.</span>
+    <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">_detect_fake_mode_from_gm</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
     <span class="n">range_constraints</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">if</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">shape_env</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">has_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span>
