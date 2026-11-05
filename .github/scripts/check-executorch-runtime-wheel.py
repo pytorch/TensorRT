@@ -238,6 +238,14 @@ def main() -> None:
                         f"the repository pins executorch=={pinned}, but this wheel was built "
                         f"against {installed}, whose version differs from that pin"
                     )
+                # A labelled wheel is for the PyTorch indexes, where the ExecuTorch it requires
+                # carries its label too. Built against PyPI's unlabelled ExecuTorch, its
+                # requirement cannot name the build it linked.
+                if version.local and not installed.local:
+                    reject(
+                        f"this wheel is labelled {version}, but it was built against executorch "
+                        f"{installed}, which has no label to require"
+                    )
                 # A wheel for PyPI carries no label, so neither does its requirement.
                 expected_version = str(installed) if version.local else installed.public
             else:
