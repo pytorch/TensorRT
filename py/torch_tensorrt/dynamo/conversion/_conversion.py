@@ -456,7 +456,7 @@ def convert_module(
         num_user_outputs=serialized_interpreter_result.num_user_outputs,
     )
     if offload:
-        # Inside compile_and_save: the engine stays in its file, which the save streams into the program.
+        # Inside compile_and_save: the engine stays in its file until the save.
         module.serialized_engine = offload_engine(
             serialized_interpreter_result.serialized_engine, name
         )

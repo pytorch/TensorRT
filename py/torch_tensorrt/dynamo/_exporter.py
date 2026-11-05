@@ -1038,7 +1038,7 @@ def inline_trt_modules(
             elif trt_module.engine is None and engine_file_of(
                 trt_module._plan_buffer()
             ):
-                # Inside torch_tensorrt.executorch.compile_and_save: the engine stays in its file. It is
+                # compile_and_save to ExecuTorch, the only save that keeps the engine in its file. It is
                 # passed as a uint8 buffer mapped from the file, the form the ExecuTorch backend packs,
                 # and the backend streams the file itself into the program.
                 # A Python-only build registers the placeholder op only with meta_ops.

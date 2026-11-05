@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from ._compiler import (
         compile,
+        compile_and_save,
         convert_exported_program_to_serialized_trt_engine,
         cross_compile_for_windows,
         load_cross_compiled_exported_program,

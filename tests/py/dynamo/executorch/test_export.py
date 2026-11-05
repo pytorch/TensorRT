@@ -888,9 +888,10 @@ def test_python_only_build_saves_engines_from_their_files(tmp_path):
 
     example = (torch.randn(2, 3, 4, 4, device="cuda"),)
     output = tmp_path / "python-only-engine-files.pte"
-    torch_tensorrt.executorch.compile_and_save(
+    torch_tensorrt.dynamo.compile_and_save(
         torch.export.export(AddOne().eval().cuda(), example),
         output,
+        output_format="executorch",
         arg_inputs=example,
         min_block_size=1,
     )

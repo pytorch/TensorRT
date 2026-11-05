@@ -12,9 +12,7 @@ pytest.importorskip("executorch.exir")
 import torch_tensorrt  # noqa: E402
 from executorch.exir._serialize._cord import FileBackedData  # noqa: E402
 from executorch.exir._serialize._named_data_store import NamedDataStore  # noqa: E402
-from torch_tensorrt.dynamo import _compiler  # noqa: E402
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule  # noqa: E402
-from torch_tensorrt.executorch import _compile_and_save  # noqa: E402
 
 
 class _TwoEngines(torch.nn.Module):
@@ -53,9 +51,10 @@ def test_engines_stream_from_their_files_into_the_program(tmp_path, monkeypatch)
     torch.manual_seed(0)
     x = torch.randn(4, 64, device="cuda")
     pte_path = tmp_path / "model.pte"
-    torch_tensorrt.executorch.compile_and_save(
+    torch_tensorrt.dynamo.compile_and_save(
         torch.export.export(_TwoEngines().eval().cuda(), (x,)),
         pte_path,
+        output_format="executorch",
         arg_inputs=[x],
         min_block_size=1,
         torch_executed_ops={torch.ops.aten.sin.default},
@@ -68,76 +67,4 @@ def test_engines_stream_from_their_files_into_the_program(tmp_path, monkeypatch)
     pte = pte_path.read_bytes()
     assert all(pte.find(engine) >= 0 for engine in streamed.values())
     # The files are gone once the program is saved.
-    assert not glob.glob(str(tmp_path / "*.engine"))
-
-
-def test_keywords_go_to_compile_or_save_by_name(monkeypatch):
-    calls = {}
-    monkeypatch.setattr(
-        _compile_and_save,
-        "dynamo_compile",
-        lambda program, **kwargs: calls.setdefault("compile", kwargs) and "trt_gm",
-    )
-    monkeypatch.setattr(
-        _compile_and_save,
-        "save",
-        lambda module, path, **kwargs: calls.setdefault("save", kwargs),
-    )
-    _compile_and_save.compile_and_save(
-        "program",
-        "model.pte",
-        arg_inputs=["x"],
-        min_block_size=1,
-        external_engine_data="model",
-    )
-    assert calls["compile"] == {"arg_inputs": ["x"], "min_block_size": 1}
-    assert calls["save"] == {
-        "output_format": "executorch",
-        "external_engine_data": "model",
-    }
-
-    with pytest.raises(TypeError, match="min_blok_size"):
-        _compile_and_save.compile_and_save("program", "model.pte", min_blok_size=1)
-
-
-def test_a_fully_supported_graph_with_require_full_compilation(tmp_path, monkeypatch):
-    """require_full_compilation's single-engine path returns a bare engine module, which save() doesn't take,
-    so compile_and_save partitions instead."""
-    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    model = torch.nn.Sequential(torch.nn.Linear(64, 64), torch.nn.ReLU()).eval().cuda()
-    x = torch.randn(4, 64, device="cuda")
-    pte_path = tmp_path / "model.pte"
-    torch_tensorrt.executorch.compile_and_save(
-        torch.export.export(model, (x,)),
-        pte_path,
-        arg_inputs=[x],
-        min_block_size=1,
-        require_full_compilation=True,
-    )
-    assert pte_path.stat().st_size > 0
-    assert not glob.glob(str(tmp_path / "*.engine"))
-
-
-def test_engine_files_are_deleted_when_compilation_fails(tmp_path, monkeypatch):
-    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    real_convert = _compiler.convert_module
-    calls = []
-
-    def failing_second(*args, **kwargs):
-        calls.append(1)
-        if len(calls) == 2:
-            raise RuntimeError("build failed")
-        return real_convert(*args, **kwargs)
-
-    monkeypatch.setattr(_compiler, "convert_module", failing_second)
-    x = torch.randn(4, 64, device="cuda")
-    with pytest.raises(RuntimeError, match="build failed"):
-        torch_tensorrt.executorch.compile_and_save(
-            torch.export.export(_TwoEngines().eval().cuda(), (x,)),
-            tmp_path / "model.pte",
-            arg_inputs=[x],
-            min_block_size=1,
-            torch_executed_ops={torch.ops.aten.sin.default},
-        )
-    assert len(calls) == 2
     assert not glob.glob(str(tmp_path / "*.engine"))

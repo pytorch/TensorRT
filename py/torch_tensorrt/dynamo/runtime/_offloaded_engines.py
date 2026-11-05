@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Compiled engines kept in files while ``torch_tensorrt.executorch.compile_and_save`` runs.
+"""Compiled engines kept in files while ``torch_tensorrt.dynamo.compile_and_save`` runs.
 
 Inside ``keep_offloaded_engines()``, ``convert_module`` writes each engine to a temporary file as soon as it is
 built, and gives its ``TorchTensorRTModule`` the file memory-mapped as the plan. The engines built so far are
 then held neither on the GPU nor in host memory while the next ones build. ``compile_module`` leaves them in their
-files, the save streams each file into the program, and the files are deleted when the block ends.
+files: an ExecuTorch save streams each file into the program, and ``compile_and_save`` loads them before any other
+save. The files are deleted when the block ends.
 """
 
 import contextlib
