@@ -233,6 +233,95 @@ class TestCudaGraphStrategyInference(TestCase):
         self.assertTrue(torch.isfinite(y).all().item())
 
 
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "CUDA graph strategy requires TensorRT-RTX",
+)
+class TestCudaGraphStrategyUsage(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
+        torch.manual_seed(0)
+
+    def test_runtime_cm_strategy_applies(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        model = CudaGraphConvModel().eval().cuda()
+        x = torch.randn(2, 3, 16, 16, device="cuda")
+        compiled = torchtrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(cuda_graph_strategy="disabled", runtime_cache=None),
+        )
+        modules = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
+        self.assertTrue(modules)
+        with torch.no_grad():
+            with torchtrt.runtime.enable_cudagraphs(
+                compiled, cuda_graph_strategy="whole_graph_capture"
+            ) as captured:
+                for module in modules:
+                    self.assertEqual(
+                        module.runtime_settings.cuda_graph_strategy,
+                        "whole_graph_capture",
+                    )
+                for _ in range(3):
+                    x = torch.randn_like(x)
+                    torch.testing.assert_close(
+                        captured(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                    )
+        for module in modules:
+            self.assertEqual(module.runtime_settings.cuda_graph_strategy, "disabled")
+
+    def test_whole_graph_capture_with_graph_break(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        class Model(CudaGraphConvModel):
+            def forward(self, x):
+                return torch.relu(self.conv(x))
+
+        model = Model().eval().cuda()
+        x = torch.randn(2, 3, 16, 16, device="cuda")
+        compiled = torchtrt.compile(
+            model,
+            ir="dynamo",
+            inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.relu.default"},
+        )
+        self.assertTrue(
+            any(
+                isinstance(module, torch.fx.GraphModule)
+                and any(
+                    node.op == "call_function"
+                    and node.target == torch.ops.aten.relu.default
+                    for node in module.graph.nodes
+                )
+                for module in compiled.modules()
+            )
+        )
+        self.assertTrue(
+            any(isinstance(m, TorchTensorRTModule) for m in compiled.modules())
+        )
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(
+                cuda_graph_strategy="whole_graph_capture", runtime_cache=None
+            ),
+        )
+        with torch.no_grad():
+            for _ in range(3):
+                x = torch.randn_like(x)
+                torch.testing.assert_close(
+                    compiled(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                )
+
+
 class TestCudaGraphStrategyInvalidValue(TestCase):
     """Invalid strategy names are rejected at ``RuntimeSettings.__post_init__``."""
 

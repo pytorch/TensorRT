@@ -5,8 +5,11 @@ import gc
 import io
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import torch
@@ -988,6 +991,108 @@ class TestPostLoadOwnsNoCache(TestCase):
                 os.path.exists(RUNTIME_CACHE_PATH),
                 "an unrelated CM wrote the shared default cache file",
             )
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache requires TensorRT-RTX",
+)
+class TestRuntimeCacheUsage(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(torch._dynamo.reset)
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = str(Path(self.directory.name) / "cache.bin")
+
+    def _run_and_save(self, model, inputs, path):
+        compiled = _compile(model, inputs, runtime_cache_path=path)
+        with torch.no_grad():
+            torch.testing.assert_close(
+                compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+            )
+        del compiled
+        gc.collect()
+        self.assertTrue(Path(path).is_file())
+        self.assertGreater(Path(path).stat().st_size, 0)
+
+    def test_warm_load_in_fresh_process(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        payload = str(Path(self.directory.name) / "model.pt")
+        torch.save(
+            {"state": model.cpu().state_dict(), "input": inputs[0].cpu()}, payload
+        )
+        model.cuda()
+        self._run_and_save(model, inputs, self.path)
+        cold_size = Path(self.path).stat().st_size
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).with_name("_runtime_cache_process_helper.py")),
+                self.path,
+                payload,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + "\n" + result.stderr)
+        self.assertGreaterEqual(Path(self.path).stat().st_size, cold_size)
+
+    def test_two_modules_share_one_cache_file(self):
+        first, inputs = _fresh_conv_model_and_inputs()
+        second = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 16, 5, padding=2), torch.nn.ReLU())
+            .eval()
+            .cuda()
+        )
+        modules = [_compile(model, inputs) for model in (first, second)]
+        for module in modules:
+            apply_runtime_settings(module, RuntimeSettings(runtime_cache=None))
+        with torch.no_grad():
+            with runtime_cache(modules, self.path) as cache:
+                torch.testing.assert_close(
+                    modules[0](*inputs), first(*inputs), rtol=1e-3, atol=1e-3
+                )
+                one = io.BytesIO()
+                cache.save_to_stream(one)
+                self.assertGreater(len(one.getvalue()), 0)
+                torch.testing.assert_close(
+                    modules[1](*inputs), second(*inputs), rtol=1e-3, atol=1e-3
+                )
+        self.assertGreater(Path(self.path).stat().st_size, len(one.getvalue()))
+
+    @parameterized.expand([("empty",), ("random",), ("truncated",)])
+    def test_corrupt_and_empty_file(self, kind):
+        model, inputs = _fresh_conv_model_and_inputs()
+        if kind == "truncated":
+            self._run_and_save(model, inputs, self.path)
+            data = Path(self.path).read_bytes()
+            data = data[: len(data) // 2]
+        else:
+            data = b"" if kind == "empty" else b"invalid runtime cache" * 8
+        Path(self.path).write_bytes(data)
+        self._run_and_save(model, inputs, self.path)
+        self.assertGreater(Path(self.path).stat().st_size, len(data))
+
+    def test_cache_and_whole_graph_capture(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(
+                runtime_cache=self.path, cuda_graph_strategy="whole_graph_capture"
+            ),
+        )
+        with torch.no_grad():
+            for _ in range(3):
+                x = torch.randn_like(inputs[0])
+                torch.testing.assert_close(
+                    compiled(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                )
+        del compiled
+        gc.collect()
+        self.assertGreater(Path(self.path).stat().st_size, 0)
 
 
 if __name__ == "__main__":

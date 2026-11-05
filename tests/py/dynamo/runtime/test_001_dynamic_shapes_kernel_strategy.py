@@ -194,6 +194,37 @@ class TestDynamicShapesKernelStrategyInference(TestCase):
         self.assertEqual(tuple(y.shape), (2, 8, 16, 16))
         self.assertTrue(torch.isfinite(y).all().item())
 
+    @parameterized.expand(_STRATEGIES)
+    def test_strategy_matches_eager(self, strategy):
+        torch.manual_seed(0)
+        model = DynamicConvModel().eval().cuda()
+        compiled = torchtrt.compile(
+            model,
+            ir="dynamo",
+            inputs=[
+                torchtrt.Input(
+                    min_shape=(1, 3, 16, 16),
+                    opt_shape=(2, 3, 16, 16),
+                    max_shape=(4, 3, 16, 16),
+                    dtype=torch.float32,
+                )
+            ],
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+        )
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
+        )
+        with torch.no_grad():
+            for batch in (1, 2, 4):
+                with self.subTest(batch=batch):
+                    x = torch.randn(batch, 3, 16, 16, device="cuda")
+                    torch.testing.assert_close(
+                        compiled(x), model(x), rtol=1e-3, atol=1e-3
+                    )
+        torch._dynamo.reset()
+
     def test_dynamic_shape_with_eager(self):
         """Exercise shape changes under eager kernel specialization."""
         compiled = _compile_dynamic_conv("eager")
