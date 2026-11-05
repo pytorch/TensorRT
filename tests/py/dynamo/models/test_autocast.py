@@ -3,6 +3,7 @@
 
 import base64
 import logging
+import pickle
 
 import pytest
 import torch
@@ -484,3 +485,43 @@ def test_autocast_refuses_calibrated_precisions_for_another_graph():
         pre_export_lowering(
             torch.export.export(LinearModel().cuda().eval(), inputs), settings
         )
+
+
+@pytest.mark.unit
+def test_autocast_excluded_ops_accepts_op_overloads():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+
+        def forward(self, x):
+            return torch.flatten(self.linear(x), 1)
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 2, 8, device="cuda")
+    trt_model = torch_tensorrt.compile(
+        model,
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_ops={torch.ops.aten.flatten.using_ints},
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    out = trt_model(x)
+    assert out.dtype == torch.float32
+    torch.testing.assert_close(out, model(x), rtol=1e-2, atol=1e-2)
+
+    single = CompilationSettings(autocast_excluded_ops="torch.ops.aten.softmax.int")
+    assert single.autocast_excluded_ops == {"torch.ops.aten.softmax.int"}
+    assert (
+        CompilationSettings(autocast_excluded_ops=None).autocast_excluded_ops == set()
+    )
+    # Settings pickled by older versions, for example in an engine cache, hold
+    # the entries as given.
+    old = CompilationSettings()
+    old.autocast_excluded_ops = ["torch.ops.aten.softmax.int"]
+    loaded = pickle.loads(pickle.dumps(old))
+    assert loaded.autocast_excluded_ops == {"torch.ops.aten.softmax.int"}

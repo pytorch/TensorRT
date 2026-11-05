@@ -97,6 +97,20 @@ def _normalize_disabled_constant_fold_exclusions(
     return normalized
 
 
+def _autocast_op_names(ops: Optional[Collection[Target]]) -> Set[str]:
+    # Autocast matches ops by name, and op objects cannot be pickled into the
+    # engine metadata.
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+        ConverterRegistry,
+    )
+
+    if ops is None:
+        return set()
+    if isinstance(ops, str):
+        ops = (ops,)
+    return {ConverterRegistry.qualified_name_or_str(op) for op in ops}
+
+
 @dataclass
 class CompilationSettings:
     """Compilation settings for Torch-TensorRT Dynamo Paths
@@ -287,6 +301,7 @@ class CompilationSettings:
                 'attn_bias_is_causal must be True, False or "proven", got '
                 f"{self.attn_bias_is_causal!r}"
             )
+        self.autocast_excluded_ops = _autocast_op_names(self.autocast_excluded_ops)
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -314,6 +329,9 @@ class CompilationSettings:
             _normalize_disabled_constant_fold_exclusions(
                 state.get("disabled_constant_fold_exclusions", ())
             )
+        )
+        state["autocast_excluded_ops"] = _autocast_op_names(
+            state.get("autocast_excluded_ops", ())
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
         state.setdefault("fallback_pytorch_plugin_ops", FALLBACK_PYTORCH_PLUGIN_OPS)
