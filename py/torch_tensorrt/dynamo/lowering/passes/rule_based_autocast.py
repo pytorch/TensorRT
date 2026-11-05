@@ -6,6 +6,7 @@ import operator
 from typing import Any
 
 import torch
+from torch.utils._pytree import tree_map
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
@@ -20,6 +21,14 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
+
+
+def _cast_meta_value_to_dtype(value: Any, target_dtype: torch.dtype) -> Any:
+    """Cast tensor leaves in node metadata while preserving its pytree structure."""
+    return tree_map(
+        lambda leaf: leaf.to(target_dtype) if isinstance(leaf, torch.Tensor) else leaf,
+        value,
+    )
 
 
 def rule_based_autocast(
@@ -81,7 +90,9 @@ def rule_based_autocast(
                     # copy the meta of the original tensor to the casted tensor
                     cast.meta.update(arg.meta)
                     # update the dtype of the casted tensor
-                    cast.meta["val"] = cast.meta["val"].to(dtype)
+                    cast.meta["val"] = _cast_meta_value_to_dtype(
+                        cast.meta["val"], dtype
+                    )
                     return cast
         elif isinstance(arg, (tuple, list)):
             return type(arg)(
@@ -110,7 +121,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_low_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_low_precision_type)
+                node.meta["val"] = _cast_meta_value_to_dtype(
+                    node.meta["val"], autocast_low_precision_type
+                )
             elif node.name in high_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(
                     node, node.args, autocast_high_precision_type
@@ -118,7 +131,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_high_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_high_precision_type)
+                node.meta["val"] = _cast_meta_value_to_dtype(
+                    node.meta["val"], autocast_high_precision_type
+                )
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)
