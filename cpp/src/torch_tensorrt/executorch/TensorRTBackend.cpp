@@ -749,10 +749,11 @@ bool is_tensor_address_aligned(const void* ptr) {
 
 // Size-1 dims are skipped, since they move no element, and a tensor built without strides is row-major.
 int innermost_non_row_major_dim(const exec_aten::Tensor& t) {
-  const auto strides = t.strides();
-  if (strides.data() == nullptr) {
+  // Asked before strides(), which asserts in debug builds when a tensor has no strides array.
+  if (!t.unsafeGetTensorImpl()->has_layout_metadata()) {
     return -1;
   }
+  const auto strides = t.strides();
   int64_t row_major_stride = 1;
   for (int d = static_cast<int>(t.dim()) - 1; d >= 0; --d) {
     if (t.size(d) != 1 && strides[d] != row_major_stride) {
