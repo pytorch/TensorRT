@@ -99,7 +99,7 @@ fi
 for entry in $(needed_entries "${dyn}"); do
     case "${entry}" in
         libexecutorch.so|libexecutorch_extension_cuda.so|libexecutorch_threadpool.so) ;;
-        libnvinfer.so.*|libcudart.so.*) ;;
+        libnvinfer.so.*|libnvinfer_plugin.so.*|libcudart.so.*) ;;
         libstdc++.so.*|libc.so.*|libm.so.*|libgcc_s.so.*|libdl.so.*|librt.so.*|libpthread.so.*) ;;
         ld-linux-*.so.*|libatomic.so.*|libz.so.*) ;;
         *) fail "${target} links ${entry}, which is not one of the libraries this wheel may depend on" ;;

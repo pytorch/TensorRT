@@ -28,12 +28,14 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     HW_COMPATIBLE_IDX,
     INPUT_BINDING_NAMES_IDX,
     OUTPUT_BINDING_NAMES_IDX,
-    REQUIRES_OUTPUT_ALLOCATOR_IDX,
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     deserialize_aliased_io,
 )
-from torch_tensorrt.executorch._export_utils import ENGINE_BYTES_ATTR
+from torch_tensorrt.executorch._export_utils import (
+    ENGINE_BYTES_ATTR,
+    validate_engine_info,
+)
 from torch_tensorrt.executorch.serialization import (
     TensorRTBlobMetadata,
     TensorRTIOBinding,
@@ -242,14 +244,7 @@ def _validate_engine_info(engine_info: List[Any]) -> None:
             "TensorRT ExecuTorch backend received incomplete engine "
             "serialization info."
         )
-    if (
-        len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
-        and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
-    ):
-        raise RuntimeError(
-            "ExecuTorch export does not support TensorRT engines that require "
-            "an output allocator (data-dependent output shapes)."
-        )
+    validate_engine_info(engine_info)
 
 
 def _split_binding_names(value: Any) -> List[str]:
