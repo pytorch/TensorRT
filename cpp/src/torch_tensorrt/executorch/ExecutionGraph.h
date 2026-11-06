@@ -20,7 +20,8 @@ namespace executorch_backend {
 
 struct EngineHandle;
 
-// Loads and destruction share this lock; only the capture window takes it exclusively.
+// Loads and destruction share this lock. A recording takes it exclusively for its capture window, and a
+// call from another regular context from before it sets up the graph's own buffers.
 std::shared_mutex& cuda_graph_capture_mutex();
 
 // enqueueV3, logging the error the delegate reports when TensorRT refuses the enqueue.

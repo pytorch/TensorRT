@@ -331,7 +331,10 @@ Some calls do not replay:
   context other than the one the engine was loaded in, except that, while the stream's own context is
   current, the engine's own graph replays on it. When that caller's buffers are not the
   ones the graph was recorded on, the engine records again in its own context, on buffers of its
-  own, and copies the inputs in and the outputs out until its shapes or its profile change.
+  own, and copies the inputs in and the outputs out until its shapes or its profile change. When
+  that recording cannot go ahead (the shared activation scratch is busy, the engine has not run the
+  shapes in its own context yet, or the recording fails), the call fails with an error that says
+  why, and the engine's own calls keep their graph.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
   ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
   that gives up its place to a newer green context starts over.

@@ -105,9 +105,10 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * fails, and so does one of another regular context, unless that context is
  * current and a graph recorded in the engine's own context replays on it. On
  * other buffers than that graph's, the engine records again in its own context,
- * on buffers of its own. Other streams take the ordinary path, and the graphs
- * are kept unless the scratch buffer, the shapes, or the optimization profile
- * changed.
+ * on buffers of its own; when that recording cannot go ahead, the call fails and
+ * the engine keeps the graph of its own calls. Other streams take the ordinary
+ * path, and the graphs are kept unless the scratch buffer, the shapes, or the
+ * optimization profile changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 

@@ -1815,6 +1815,135 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
   EXPECT_EQ(copied.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
 
+// A call from another regular context that cannot record fails, and the engine's own context keeps its
+// graph and keeps replaying it.
+TEST_F(ExecutionGraphReplayTest, FailedRecordingsFromAnotherRegularContextLeaveTheOwnGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    calls.fail_captures = 3;
+    for (int i = 0; i < 3; ++i) {
+      EXPECT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::InvalidState);
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  restore.reset();
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, streams_[0]));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
+}
+
+// A pooled call from another regular context does not wait for the capture lock. While another thread
+// holds it, the call fails, and the engine's own context keeps replaying its graph.
+TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextWithoutTheCaptureLockKeepsTheOwnGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+  const SizesType rows = 8;
+  const SizesType cols = 32;
+  const auto blob = build_scratch_blob(rows, cols);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(blob), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    const size_t count = static_cast<size_t>(rows) * cols;
+    const std::vector<float> ones(count, 1.0f);
+    std::vector<float> actual(count);
+    for (int slot = 0; slot < 2; ++slot) {
+      ASSERT_EQ(cudaMemcpy(inputs_[slot], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+    }
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    ASSERT_TRUE(engine.is_captured());
+
+    // Holds the capture lock the way a load does while the call below runs.
+    std::promise<void> held;
+    std::promise<void> done;
+    std::thread holder([&] {
+      const std::shared_lock<std::shared_mutex> lock(cuda_graph_capture_mutex());
+      held.set_value();
+      done.get_future().wait();
+    });
+    held.get_future().wait();
+    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+    const Error error = engine.run(inputs_[1], outputs_[1], rows, cols, other_stream);
+    EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    done.set_value();
+    holder.join();
+    EXPECT_NE(error, Error::Ok);
+    EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+    CudaCalls back;
+    ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    for (float value : actual) {
+      ASSERT_FLOAT_EQ(value, 1.0f / rows);
+    }
+    EXPECT_TRUE(back.captures.empty());
+    EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
 // The driver often gives a new green context the handle of one just destroyed. The old graph lived in the
 // destroyed context, so the new one must record its own.
 TEST_F(ExecutionGraphReplayTest, AGreenContextOnADestroyedOnesHandleRecordsAgain) {
