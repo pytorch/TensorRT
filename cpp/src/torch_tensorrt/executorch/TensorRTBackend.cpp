@@ -1840,6 +1840,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (capture_err != Error::Ok) {
       return capture_err;
     }
+    // The pool's completion event belongs to the engine's context, so such a call would fail only after
+    // it had set its shapes and claimed, and maybe grown, the pool in that other context.
+    if (engine->execution_graph && engine->execution_graph->serves_another_regular_context(stream)) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: an engine on the shared activation scratch cannot run on a stream of "
+          "another regular CUDA context");
+      return Error::InvalidState;
+    }
   }
 
   bool input_staged_from_host = false;

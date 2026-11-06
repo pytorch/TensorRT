@@ -43,17 +43,19 @@ class ExecutionGraph {
   // installed none. The caller holds the pool's claim until the stream is drained or the enqueue is
   // recorded on the pool's handoff event, so the buffer stays live for the work submitted here. With
   // scratch set, a call never waits for cuda_graph_capture_mutex(): if it is taken, recording moves
-  // to a later call. With scratch set, a call on a stream of another regular context fails before it
-  // records or launches, since the pool's completion event belongs to the engine's context. The
-  // context may hold other addresses on return. A change of input shapes or of the optimization
-  // profile is seen only through handle.shape_epoch. Returns Ok after submission, before the stream
-  // is drained.
+  // to a later call. The context may hold other addresses on return. A change of input shapes or of
+  // the optimization profile is seen only through handle.shape_epoch. Returns Ok after submission,
+  // before the stream is drained.
   ::executorch::runtime::Error enqueue(
       EngineHandle& handle,
       cudaStream_t stream,
       const std::vector<void*>& addresses,
       const std::vector<size_t>& binding_bytes,
       const void* scratch);
+
+  // Whether `stream` belongs to a regular CUDA context other than the one the engine ran in, while
+  // that context is current. False until the engine has run in its own context.
+  bool serves_another_regular_context(cudaStream_t stream) const;
 
   // Whether the graph for the context of the last call that could replay is recorded.
   bool is_captured() const {

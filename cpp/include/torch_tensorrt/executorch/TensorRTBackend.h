@@ -109,10 +109,10 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * shapes. Buffers allocated for such a call belong to that context, which must
  * outlive the engine. An engine on the shared activation scratch pool fails on a
  * stream of another regular context, since the pool's completion event belongs
- * to the engine's context; such a call can still grow the pool in its context,
- * which must then outlive the engine. Other streams take the ordinary path, and
- * the graphs are kept unless the scratch buffer, the shapes, or the optimization
- * profile changed.
+ * to the engine's context; once the engine has run in its own context, such a
+ * call fails before it sets its shapes or claims the pool. Other streams take the
+ * ordinary path, and the graphs are kept unless the scratch buffer, the shapes,
+ * or the optimization profile changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 
