@@ -600,8 +600,10 @@ Some calls never replay:
 * A green context stream while another regular context is current, and a plain stream while a
   green context is current, take the ordinary path.
 * A stream of another device fails, with or without replay. So does a stream of a regular CUDA
-  context other than the one the engine was loaded in, except that, while that context is current, a
-  graph already recorded in the engine's own context replays on it.
+  context other than the one the engine was loaded in, except that, while the stream's own context is
+  current, the engine's own graph replays on it. When that caller's buffers are not the
+  ones the graph was recorded on, the engine records again in its own context, on buffers of its
+  own, and copies the inputs in and the outputs out until its shapes or its profile change.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.

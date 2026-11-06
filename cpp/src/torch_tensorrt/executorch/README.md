@@ -323,8 +323,10 @@ Some calls do not replay:
   and a plain stream while a green context is current, take the ordinary path, and the recorded
   graphs are kept.
 - A stream on another device fails, with or without replay. So does a stream from a regular CUDA
-  context other than the one the engine was loaded in, except that, while that context is current, a
-  graph already recorded in the engine's own context replays on it.
+  context other than the one the engine was loaded in, except that, while the stream's own context is
+  current, the engine's own graph replays on it. When that caller's buffers are not the
+  ones the graph was recorded on, the engine records again in its own context, on buffers of its
+  own, and copies the inputs in and the outputs out until its shapes or its profile change.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
   ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
   that gives up its place to a newer green context starts over.

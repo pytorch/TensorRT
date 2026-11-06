@@ -85,6 +85,8 @@ class ExecutionGraph {
   cudaStream_t capture_stream_ = nullptr;
   // The context capture_stream_ was created in.
   CUcontext capture_context_ = nullptr;
+  // The regular context a plain warm-up ran in, where TensorRT can run this engine.
+  CUcontext engine_context_ = nullptr;
   int failed_captures_ = 0;
   // Times the caller's addresses moved away from a recording on them, across shapes and profiles.
   int moves_ = 0;

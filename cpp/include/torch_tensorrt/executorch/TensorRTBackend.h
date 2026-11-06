@@ -100,7 +100,9 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * ago. TensorRT requires a green context to outlive the graphs recorded in it,
  * so destroy the engine first. A stream of another device fails, and so does
  * one of another regular context, unless that context is current and a graph
- * recorded in the engine's own context replays on it. Other streams take the plain path, and the graphs are
+ * recorded in the engine's own context replays on it. On other buffers than
+ * that graph's, the engine records again in its own context, on buffers of its
+ * own. Other streams take the plain path, and the graphs are
  * kept unless the scratch buffer, the shapes, or the optimization profile
  * changed.
  */
