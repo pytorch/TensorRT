@@ -563,7 +563,7 @@ def test_zero_amax(ir, quant, dtype, calib_value, dynamic_amax, run_input):
 
     if quant == "fp8" and torch.cuda.get_device_capability() < (8, 9):
         pytest.skip("FP8 quantization requires compute capability 8.9 or later")
-    # BF16 results sit close to the tolerance, so fix the random data.
+    # Some results sit close to the tolerance, so fix the random data.
     torch.manual_seed(0)
 
     class SimpleNetwork(torch.nn.Module):
