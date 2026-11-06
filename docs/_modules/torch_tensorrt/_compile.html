@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ff90bd1c"></script>
+    <script src="../../_static/documentation_options.js?v=e84df5e3"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -480,6 +480,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">importlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -2072,7 +2073,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">_save_as_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Save an engine-bearing ExportedProgram as an ExecuTorch program."""</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: F401</span>
             <span class="n">check_zero_copy_kv</span><span class="p">,</span>
             <span class="n">export</span><span class="p">,</span>
             <span class="n">zero_copy_backend_config</span><span class="p">,</span>
@@ -2084,6 +2085,21 @@ document.write(`
             <span class="s2">"Windows x86-64. "</span>
             <span class="s2">"Setup: "</span> <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">_lower_and_write_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_release_lowering_caches</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_lower_and_write_executorch</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">check_zero_copy_kv</span><span class="p">,</span>
+        <span class="n">export</span><span class="p">,</span>
+        <span class="n">zero_copy_backend_config</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="c1"># save() only ever lowers a single method, so keep rejecting the per-method</span>
     <span class="c1"># mappings that torch_tensorrt.executorch.export() accepts.</span>
     <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"partitioners"</span><span class="p">,</span> <span class="s2">"compile_specs"</span><span class="p">):</span>
@@ -2145,6 +2161,51 @@ document.write(`
         <span class="c1"># persist the ETRecord as "&lt;pte_base&gt;_etrecord.bin" next to the .pte.</span>
         <span class="n">etrecord_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">file_path</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s2">"_etrecord.bin"</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">get_etrecord</span><span class="p">()</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">etrecord_path</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_release_lowering_caches</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Drop the cache entries that point at the lowered program once it is written, also when the save</span>
+<span class="sd">    failed.</span>
+
+<span class="sd">    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's</span>
+<span class="sd">    dispatch cache keys entries on the ``executorch_call_delegate`` arguments: in the class-wide</span>
+<span class="sd">    cache, or with symbolic shapes in the ShapeEnv of ``exp_program``'s fake mode, which the</span>
+<span class="sd">    compiled module keeps. They keep the lowered modules, and with them every serialized engine,</span>
+<span class="sd">    alive after save() returns, so each saved program stays resident until the process exits.</span>
+<span class="sd">    Clearing them frees nothing still in use; they refill on demand. The program is a web of</span>
+<span class="sd">    reference cycles (graph and nodes), so it is collected here rather than at some</span>
+<span class="sd">    later automatic collection, which can land in the middle of the next save. The freed</span>
+<span class="sd">    heap goes back to the system, which is what a Jetson shares with the GPU.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch._subclasses.fake_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeTensorMode</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">trim_host_heap</span>
+
+    <span class="c1"># TODO: remove once ExecuTorch bounds or scopes the is_same_node memo (an unbounded lru_cache on FX</span>
+    <span class="c1"># nodes, exir/backend/utils.py), and PyTorch stops keying the negative cache entry it stores for</span>
+    <span class="c1"># executorch_call_delegate (registered skip_cache=True) on the lowered module itself.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_same_node</span>
+
+        <span class="n">is_same_node</span><span class="o">.</span><span class="n">cache_clear</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ImportError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"ExecuTorch's is_same_node cache is gone; nothing to clear"</span><span class="p">)</span>
+    <span class="n">FakeTensorMode</span><span class="o">.</span><span class="n">cache_clear</span><span class="p">()</span>
+    <span class="c1"># The save may have failed on its arguments, so don't assume a program: an error here would hide that.</span>
+    <span class="n">nodes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">"graph"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">"nodes"</span><span class="p">,</span> <span class="p">())</span>
+    <span class="n">shape_envs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="nb">id</span><span class="p">(</span><span class="n">env</span><span class="p">):</span> <span class="n">env</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">env</span> <span class="o">:=</span> <span class="nb">getattr</span><span class="p">(</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"val"</span><span class="p">),</span> <span class="s2">"fake_mode"</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="s2">"shape_env"</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">env</span> <span class="ow">in</span> <span class="n">shape_envs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">env</span><span class="p">,</span> <span class="s2">"fake_tensor_cache"</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+    <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+    <span class="n">trim_host_heap</span><span class="p">()</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="s2">"ExportedProgram"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
