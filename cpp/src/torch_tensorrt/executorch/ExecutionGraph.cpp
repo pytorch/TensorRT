@@ -300,6 +300,16 @@ Error ExecutionGraph::enqueue_in(
   const CUcontext record_context =
       stream_green == nullptr && engine_context_ != nullptr ? engine_context_ : stream_context;
   const bool other_context = record_context != stream_context;
+  // The shared scratch's completion event belongs to the engine's context, so such a call would fail
+  // after its work was submitted, and a recording made for it would cost the engine's own calls their
+  // graph.
+  if (other_context && scratch != nullptr) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: an engine on the shared activation scratch cannot run on a stream of "
+        "another regular CUDA context");
+    return Error::InvalidState;
+  }
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
   // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
   // sets, would record on every call, so the second move switches to buffers this graph owns.
@@ -316,22 +326,15 @@ Error ExecutionGraph::enqueue_in(
   const bool own_buffers = staged_ || records_for_other_context;
   std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
   if (records_for_other_context) {
-    const char* reason = nullptr;
+    // Pooled calls never get here: the check above refuses a pooled call from another regular context first.
     if (!warmed_up_) {
-      reason = "the engine has not run these shapes in its own context yet";
-    } else if (scratch == nullptr) {
-      capture_lock.lock();
-    } else if (!capture_lock.try_lock()) {
-      reason = "another engine is being loaded, destroyed or recorded";
-    }
-    if (reason != nullptr) {
       ET_LOG(
           Error,
           "TensorRTBackend::execute: a call on a stream of another regular CUDA context needs a CUDA graph "
-          "recorded in the engine's context, and none can be recorded now: %s",
-          reason);
+          "recorded in the engine's context, and the engine has not run these shapes there yet");
       return Error::InvalidState;
     }
+    capture_lock.lock();
   }
   if (own_buffers) {
     buffers_.resize(count, nullptr);

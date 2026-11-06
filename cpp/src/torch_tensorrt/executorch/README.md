@@ -288,7 +288,7 @@ buffers replay it with no copies of its own. A buffer the delegate copies withou
 host memory on a GPU that does not read host memory directly, pinned or not, memory not aligned to
 256 bytes, or an input not in row-major order, is still copied. With the shared activation scratch
 on, a call does not wait while another engine loads, is destroyed or records. It runs normally, and
-a later call records.
+a later call records. A stream of another regular CUDA context is the exception (see below).
 
 Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
 does, and as a caller that reuses its device tensors does. When the buffers change, that call
@@ -334,9 +334,13 @@ Some calls do not replay:
   current, the engine's own graph replays on it. When that caller's buffers are not the
   ones the graph was recorded on, the engine records again in its own context, on buffers of its
   own, and copies the inputs in and the outputs out until its shapes or its profile change. When
-  that recording cannot go ahead (the shared activation scratch is busy, the engine has not run the
-  shapes in its own context yet, or the recording fails), the call fails with an error that says
-  why, and the engine's own calls keep their graph.
+  that recording cannot go ahead (the engine's own context has not run the shapes yet, or the
+  recording fails), the call fails with an error that says why, and the engine's own calls keep
+  their graph. Buffers the delegate allocates for such a call, to copy an input or output it cannot
+  use in place, belong to that context, so that context must outlive the engine.
+- An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
+  at all, with or without replay: the scratch's completion event belongs to the engine's context,
+  so such a call fails before it runs, and the engine keeps its graphs.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
   ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
   that gives up its place to a newer green context starts over.
