@@ -77,6 +77,7 @@ cc_test(
         "-Wl,--wrap=cudaGraphLaunch",
         "-Wl,--wrap=cudaDeviceGetAttribute",
         "-Wl,--wrap=cudaStreamSynchronize",
+        "-Wl,--wrap=cudaStreamDestroy",
         "-Wl,--wrap=cudaGetDriverEntryPointByVersion",
     ],
     linkstatic = True,

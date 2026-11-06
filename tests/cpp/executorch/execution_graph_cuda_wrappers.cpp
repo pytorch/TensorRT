@@ -94,6 +94,7 @@ cudaError_t __real_cudaStreamEndCapture(cudaStream_t, cudaGraph_t*);
 cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
+cudaError_t __real_cudaStreamDestroy(cudaStream_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
     void**,
@@ -223,5 +224,12 @@ cudaError_t __wrap_cudaStreamSynchronize(cudaStream_t stream) {
     }
   }
   return __real_cudaStreamSynchronize(stream);
+}
+
+cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {
+  if (active_calls) {
+    active_calls->destroyed_streams.push_back(stream);
+  }
+  return __real_cudaStreamDestroy(stream);
 }
 }
