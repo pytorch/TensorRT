@@ -117,14 +117,22 @@ class TestAddConverter(DispatchTestCase):
 
         model = add().cuda().eval()
         inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
-        trt_model = torch_tensorrt.dynamo.compile(
-            torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
-        )
+        with self.assertLogs(
+            "torch_tensorrt.dynamo.conversion.impl.elementwise.base", level="WARNING"
+        ) as logs:
+            trt_model = torch_tensorrt.dynamo.compile(
+                torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+            )
+        self.assertTrue(any("does not wrap around" in line for line in logs.output))
         torch.testing.assert_close(
             trt_model(*inputs).cpu(),
             torch.tensor([200.0, -200.0, 240.0, 10.0]),
             rtol=0,
             atol=0,
+        )
+        # PyTorch wraps around in int8; the engine does not, as the warning says.
+        torch.testing.assert_close(
+            model(*inputs).cpu(), torch.tensor([-56.0, 56.0, -16.0, 10.0])
         )
 
 
