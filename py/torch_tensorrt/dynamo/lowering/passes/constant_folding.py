@@ -185,13 +185,24 @@ def _ieee_float32() -> Iterator[None]:
     """A folded value is baked into the engine as it was computed, so with disable_tf32
     compute it in full float32. PyTorch lets cuDNN convolutions use TF32 by default, which
     disable_tf32 does not reach."""
-    conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
-    saved = conv.fp32_precision, matmul.fp32_precision
-    conv.fp32_precision = matmul.fp32_precision = "ieee"
-    try:
-        yield
-    finally:
-        conv.fp32_precision, matmul.fp32_precision = saved
+    matmul = torch.backends.cuda.matmul
+    if hasattr(matmul, "fp32_precision"):
+        conv = torch.backends.cudnn.conv
+        saved = conv.fp32_precision, matmul.fp32_precision
+        conv.fp32_precision = matmul.fp32_precision = "ieee"
+        try:
+            yield
+        finally:
+            conv.fp32_precision, matmul.fp32_precision = saved
+    else:
+        # PyTorch before 2.9, as on the JetPack build, has only these flags.
+        cudnn = torch.backends.cudnn
+        saved = cudnn.allow_tf32, matmul.allow_tf32
+        cudnn.allow_tf32 = matmul.allow_tf32 = False
+        try:
+            yield
+        finally:
+            cudnn.allow_tf32, matmul.allow_tf32 = saved
 
 
 def replace_node_with_constant(

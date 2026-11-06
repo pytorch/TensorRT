@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+import types
 import unittest
 from unittest import mock
 
@@ -184,6 +185,18 @@ class TestConstantFolding(TestCase):
                 for expected in (expected_conv, expected_matmul):
                     error = (folded[tuple(expected.shape)].double() - expected).abs()
                     self.assertLess(error.max().item(), 1e-5)
+
+    def test_float32_folding_works_without_fp32_precision(self):
+        # PyTorch before 2.9 has only the allow_tf32 flags.
+        cudnn = types.SimpleNamespace(allow_tf32=True)
+        matmul = types.SimpleNamespace(allow_tf32=True)
+        with (
+            mock.patch.object(torch.backends, "cudnn", cudnn),
+            mock.patch.object(torch.backends.cuda, "matmul", matmul),
+        ):
+            with constant_folding._ieee_float32():
+                self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (False, False))
+        self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (True, True))
 
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
