@@ -140,6 +140,10 @@ def rule_based_autocast(
                 if isinstance(src.meta.get("val"), (list, tuple)):
                     node.meta["val"] = src.meta["val"][idx]
                 continue
+            if not any(is_tensor_node(n) for n in node.all_input_nodes):
+                # A factory op such as torch.zeros has no inputs to cast, so its
+                # output keeps the dtype it was created with.
+                continue
 
             if node.name in low_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(

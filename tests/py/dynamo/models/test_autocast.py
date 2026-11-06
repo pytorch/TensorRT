@@ -679,3 +679,46 @@ def test_autocast_excluded_ops_accepts_op_overloads():
     old.autocast_excluded_ops = ["torch.ops.aten.softmax.int"]
     loaded = pickle.loads(pickle.dumps(old))
     assert loaded.autocast_excluded_ops == {"torch.ops.aten.softmax.int"}
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda x: torch.zeros(x.shape[0], 1, device=x.device),
+        lambda x: torch.ones(x.shape[0], 1, device=x.device) - 1.0,
+        lambda x: torch.full((x.shape[0], 1), 0.0, device=x.device),
+        lambda x: torch.arange(x.shape[0], dtype=torch.float32, device=x.device)[
+            :, None
+        ]
+        * 0.0,
+    ],
+    ids=["zeros", "ones", "full", "arange"],
+)
+def test_autocast_factory_ops_keep_their_dtype(factory):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 32)
+            self.norm = nn.LayerNorm(32)
+            self.conv = nn.Conv1d(1, 4, 3, padding=1)
+
+        def forward(self, x):
+            keep = 1.0 - factory(x)
+            y = self.norm(self.linear(x) * keep)
+            return self.conv(y[:, None, :] * keep[:, :, None])
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
