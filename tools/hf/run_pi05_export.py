@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
+"""Smoke EdgeExporter on pi05 model.
+
+Pass the LeRobot PI05Policy, not policy.model — prepare_sample_inputs
+needs the preprocessor on the policy wrapper.
+"""
+
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
-_TRT_PY = _REPO_ROOT / "py"
-
-import torch  # noqa: E402
-import torch_tensorrt  # noqa: E402
-
-_src_pkg = str(_TRT_PY / "torch_tensorrt")
-if _src_pkg not in list(torch_tensorrt.__path__):
-    torch_tensorrt.__path__.append(_src_pkg)
-
+import torch
+import torch_tensorrt
+from exporters import EdgeConfig, EdgeExporter
+from exporters.measure import print_bench
+from exporters.plugin.plugin_utils import load_plugins_for_trt
+from exporters.utils import force_hf_attention
 from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.policies.pi05 import PI05Policy
 from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE
-from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
-from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch, force_hf_attention
 
 
 def load_pi05(device: torch.device) -> PI05Policy:
@@ -59,7 +59,6 @@ def main() -> None:
     parser.add_argument("--engine-dir", default="/tmp/pi05_edge_exporter")
     args = parser.parse_args()
 
-    configure_thor_pytorch()
     load_plugins_for_trt()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -78,9 +77,6 @@ def main() -> None:
         model_type="pi05",  # optional; inferred from paligemma_with_expert
         engine_dir=args.engine_dir,
         max_seq_len=968,
-        dryrun=not args.compile,  # True = no TRT, still writes config.json + runtime graph
-        skip_runtime_export=False,  # False = also torch.export the stitched execute_engine graph
-        # components=("vision",),    # uncomment to export only vision
     )
 
     # Spec loads libero + preprocessor because we pass the policy, not a tensor dict.
@@ -102,6 +98,7 @@ def main() -> None:
 
     out = velocity[0] if isinstance(velocity, (tuple, list)) else velocity
     print("velocity", tuple(out.shape), "mean", float(out.float().mean()))
+    print_bench(exporter.bench)
 
 
 if __name__ == "__main__":

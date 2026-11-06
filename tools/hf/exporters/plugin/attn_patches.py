@@ -20,7 +20,8 @@ from typing import Any, Callable
 
 import torch
 import torch.nn as nn
-from torch_tensorrt.hf.exporters.plugin.attention import ContextAttentionMaskType
+
+from .attention import ContextAttentionMaskType
 
 _PATCHES: dict[str, list[tuple[str, Callable]]] = {}
 _LANGUAGE_MASK_TYPE = int(ContextAttentionMaskType.PADDING)
