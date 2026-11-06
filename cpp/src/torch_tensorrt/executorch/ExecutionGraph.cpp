@@ -47,10 +47,10 @@ Function driver_entry(const char* name) {
   return reinterpret_cast<Function>(entry);
 }
 
-// Finds the context `stream` runs its work in, when a graph can be recorded there: the stream's green
+// Finds the context `stream` runs its work in, and whether a graph can serve it: the stream's green
 // context, or else the context current on this thread. Graph nodes keep the context they were
-// recorded in, not that of the stream that launches them, so a graph recorded anywhere else would run
-// a green context's work outside its SMs.
+// recorded in, not that of the stream that launches them, so a green context's graph is recorded in
+// that green context. enqueue_in picks the context a plain graph is recorded in.
 bool recording_context(cudaStream_t stream, CUcontext& context, CUgreenCtx& green, unsigned long long& green_id) {
   static const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx");
   if (get_context == nullptr) {
@@ -281,8 +281,8 @@ Error ExecutionGraph::enqueue_in(
   }
   // A graph replays the kernels of the shapes and the profile it was captured under, so a change of
   // either must record again.
-  // ponytail: one graph per handle and kind of context, so alternating profiles every call never
-  // replays; a graph per profile is the upgrade if that pattern matters.
+  // Each graph holds one recording, so alternating profiles every call never replays; a
+  // recording per profile is the upgrade if that pattern matters.
   if (handle.shape_epoch != shape_epoch_) {
     reset_graph();
     capture_failed_ = false;
