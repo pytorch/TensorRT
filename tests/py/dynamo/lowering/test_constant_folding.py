@@ -17,6 +17,9 @@ from torch_tensorrt.dynamo.lowering.passes import (
 )
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
+# PyTorch before 2.9, as on JetPack, has only the older allow_tf32 flags.
+_HAS_FP32_PRECISION = hasattr(torch.backends.cuda.matmul, "fp32_precision")
+
 
 class _Permute(torch.nn.Module):
     def __init__(self):
@@ -133,6 +136,7 @@ class TestConstantFolding(TestCase):
         not torch.cuda.is_available() or torch.cuda.get_device_capability() < (8, 0),
         "TF32 needs an Ampere or newer GPU",
     )
+    @unittest.skipUnless(_HAS_FP32_PRECISION, "needs the fp32_precision flags")
     def test_float32_folds_follow_disable_tf32(self):
         class Model(torch.nn.Module):
             def __init__(self):
@@ -218,6 +222,7 @@ class TestConstantFolding(TestCase):
                 )
         self.assertEqual((cudnn.allow_tf32, state["matmul"]), (True, "medium"))
 
+    @unittest.skipUnless(_HAS_FP32_PRECISION, "needs the fp32_precision flags")
     def test_overlapping_float32_folds_wait_for_each_other(self):
         conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
         saved = conv.fp32_precision, matmul.fp32_precision
