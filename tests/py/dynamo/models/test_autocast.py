@@ -495,7 +495,8 @@ def test_autocast_calibration_keeps_large_indices_exact(indices):
 
 
 @pytest.mark.unit
-def test_autocast_calibration_names_torch_cond_as_unsupported():
+@pytest.mark.parametrize("calibrate", [True, False])
+def test_autocast_names_torch_cond_as_unsupported(calibrate):
     class Model(nn.Module):
         def __init__(self):
             super().__init__()
@@ -510,6 +511,7 @@ def test_autocast_calibration_names_torch_cond_as_unsupported():
 
     model = Model().cuda().eval()
     x = torch.randn(4, 16, device="cuda")
+    loader = torch.utils.data.DataLoader([(x,)], batch_size=None) if calibrate else None
     with pytest.raises(RuntimeError, match="does not support models with torch.cond"):
         torch_tensorrt.dynamo.compile(
             torch.export.export(model, (x,)),
@@ -517,9 +519,7 @@ def test_autocast_calibration_names_torch_cond_as_unsupported():
             min_block_size=1,
             enable_autocast=True,
             autocast_low_precision_type=torch.float16,
-            autocast_calibration_dataloader=torch.utils.data.DataLoader(
-                [(x,)], batch_size=None
-            ),
+            autocast_calibration_dataloader=loader,
         )
 
 

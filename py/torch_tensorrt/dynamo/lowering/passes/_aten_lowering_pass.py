@@ -266,13 +266,11 @@ def pre_export_lowering(
 
     # Only for rule-based autocast to collect the intermediate node outputs
     if settings.enable_autocast:
-        if (
-            settings.autocast_calibration_dataloader is not None
-            and iter_cond_subgraphs(ep.graph_module)
-        ):
+        if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
-                "Autocast calibration does not support models with torch.cond yet: it records "
-                "values only in the main graph, so the branches would get no range check."
+                "Autocast does not support models with torch.cond yet: it would cast every "
+                "operand of torch.cond, integers included, to the low precision type, and "
+                "calibration records values only in the main graph."
             )
         settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
             ep.module(),
