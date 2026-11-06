@@ -40,6 +40,13 @@ class TestAdaptiveMaxPoolConverter(DispatchTestCase):
         ]
     )
     def test_adaptive_max_pool2d(self, _, input_shape, output_size, dtype):
+        if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and any(
+            out > size for out, size in zip(output_size, input_shape[-2:])
+        ):
+            self.skipTest(
+                "An output axis larger than its input falls back to PyTorch on TensorRT-RTX"
+            )
+
         class TestModule(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.adaptive_max_pool2d.default(x, output_size)[0]

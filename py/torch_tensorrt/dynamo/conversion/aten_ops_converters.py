@@ -4270,8 +4270,14 @@ def adaptive_max_pool_validator(
     # output has none.
     output_size = node.args[1]
     spatial_size = input_val.shape[-len(output_size) :]
-    return all(
+    if not all(
         isinstance(size, int) and size > 0 for size in (*spatial_size, *output_size)
+    ):
+        return False
+    # TensorRT-RTX hits an illegal memory access on an output axis larger than its input.
+    return not (
+        ENABLED_FEATURES.tensorrt_rtx
+        and any(out > size for out, size in zip(output_size, spatial_size))
     )
 
 
