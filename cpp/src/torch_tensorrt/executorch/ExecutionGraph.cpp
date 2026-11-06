@@ -204,9 +204,6 @@ ExecutionGraph::~ExecutionGraph() {
       cudaFree(buffer);
     }
   }
-  if (capture_stream_ != nullptr) {
-    released(cudaStreamDestroy(capture_stream_));
-  }
 }
 
 void ExecutionGraph::drop_graph() {
@@ -386,27 +383,20 @@ Error ExecutionGraph::enqueue_in(
       // The engine is captured on a stream of its own in record_context. The scope ends before the launch
       // below, which runs on the caller's stream, in whichever context it belongs to.
       ContextScope scope(record_context, other_context);
+      cudaStream_t capture_stream = nullptr;
       if (scope.ok()) {
-        error = cudaSuccess;
-        if (capture_stream_ != nullptr && capture_context_ != record_context) {
-          released(cudaStreamDestroy(capture_stream_));
-          capture_stream_ = nullptr;
-        }
-        if (capture_stream_ == nullptr) {
-          error = create_capture_stream(stream_green, capture_stream_);
-          if (error != cudaSuccess) {
-            capture_stream_ = nullptr;
-          }
-          capture_context_ = record_context;
-        }
+        error = create_capture_stream(stream_green, capture_stream);
       }
       // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
       if (error == cudaSuccess) {
-        error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
+        error = cudaStreamBeginCapture(capture_stream, cudaStreamCaptureModeThreadLocal);
         if (error == cudaSuccess) {
-          enqueued = context.enqueueV3(capture_stream_);
-          error = cudaStreamEndCapture(capture_stream_, &graph);
+          enqueued = context.enqueueV3(capture_stream);
+          error = cudaStreamEndCapture(capture_stream, &graph);
         }
+        // The graph does not need its stream, and a stream kept in a green context could not be freed
+        // once that context is destroyed.
+        released(cudaStreamDestroy(capture_stream));
       }
       capture_lock.unlock();
       if (error == cudaSuccess && enqueued) {

@@ -82,9 +82,6 @@ class ExecutionGraph {
   const void* scratch_ = nullptr;
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
-  cudaStream_t capture_stream_ = nullptr;
-  // The context capture_stream_ was created in.
-  CUcontext capture_context_ = nullptr;
   // The regular context a plain warm-up ran in, where TensorRT can run this engine.
   CUcontext engine_context_ = nullptr;
   int failed_captures_ = 0;
