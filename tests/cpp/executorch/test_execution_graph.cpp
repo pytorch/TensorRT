@@ -2129,12 +2129,13 @@ TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
   }
 }
 
-// Releasing a graph whose green context is gone, on eviction or on engine destruction, leaves no CUDA error behind.
-TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) {
+// TensorRT requires a green context to outlive the graphs recorded in it, so the engine is destroyed first.
+// That releases each green graph it kept, as does a newer green context taking the place of one.
+TEST_F(ExecutionGraphReplayTest, AnEngineDestroyedBeforeItsGreenContextsReleasesTheirGraphs) {
   if (!green_contexts_supported()) {
     GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
   }
-  GreenStream green[4];
+  GreenStream green[5];
   for (GreenStream& each : green) {
     ASSERT_NO_FATAL_FAILURE(each.create());
   }
@@ -2142,24 +2143,37 @@ TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) 
   auto graph = std::make_unique<LoadedGraphEngine>();
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, *graph));
   int seed = 0;
-  const auto record_then_destroy = [&] {
-    auto doomed = std::make_unique<GreenStream>();
-    ASSERT_NO_FATAL_FAILURE(doomed->create());
-    for (int i = 0; i < 2; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, doomed->stream));
+  {
+    CudaCalls calls;
+    // The fifth of these takes the place of the first one's graph.
+    for (GreenStream& each : green) {
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, each.stream));
+        EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+      }
     }
-    ASSERT_TRUE(graph->is_captured());
-  };
-  ASSERT_NO_FATAL_FAILURE(record_then_destroy());
-  // The fourth of these takes the place of the destroyed context's graph.
-  for (GreenStream& each : green) {
-    for (int i = 0; i < 2; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, each.stream));
-      EXPECT_EQ(cudaGetLastError(), cudaSuccess);
-    }
+    EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>({cudaSuccess}));
   }
-  ASSERT_NO_FATAL_FAILURE(record_then_destroy());
+  CudaCalls calls;
   graph.reset();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>(4, cudaSuccess));
+}
+
+// A failed release is logged and cleared, so the caller's next CUDA call does not report it.
+TEST_F(ExecutionGraphReplayTest, AFailedGraphReleaseLeavesNoErrorBehind) {
+  LoadedGraphEngine plain;
+  auto graph = std::make_unique<LoadedGraphEngine>();
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, *graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph->is_captured());
+  CudaCalls calls;
+  calls.fail_graph_exec_destroys = true;
+  graph.reset();
+  ASSERT_EQ(calls.graph_exec_destroys.size(), 1u);
+  EXPECT_NE(calls.graph_exec_destroys[0], cudaSuccess);
   EXPECT_EQ(cudaGetLastError(), cudaSuccess);
 }
 

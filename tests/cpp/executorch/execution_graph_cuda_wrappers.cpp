@@ -95,6 +95,7 @@ cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
 cudaError_t __real_cudaStreamDestroy(cudaStream_t);
+cudaError_t __real_cudaGraphExecDestroy(cudaGraphExec_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
     void**,
@@ -231,5 +232,17 @@ cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {
     active_calls->destroyed_streams.push_back(stream);
   }
   return __real_cudaStreamDestroy(stream);
+}
+
+cudaError_t __wrap_cudaGraphExecDestroy(cudaGraphExec_t graph) {
+  auto result = __real_cudaGraphExecDestroy(graph);
+  if (active_calls && active_calls->fail_graph_exec_destroys) {
+    // An invalid device fails without changing the current one, and leaves its error for cudaGetLastError.
+    result = cudaSetDevice(-1);
+  }
+  if (active_calls) {
+    active_calls->graph_exec_destroys.push_back(result);
+  }
+  return result;
 }
 }
