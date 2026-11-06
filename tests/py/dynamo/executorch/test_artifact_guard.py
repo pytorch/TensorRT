@@ -1267,8 +1267,8 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
 # The TensorRT calls that change what an execution context holds, and the one EngineHandle helper
 # allowed to make each. Nothing may set an input or output tensor address the old way.
 _CONTEXT_SETTER = re.compile(
-    r"(?:->|\.)\s*(setTensorAddress|setInputTensorAddress|setOutputTensorAddress|setInputShape"
-    r"|setOptimizationProfileAsync)\s*\("
+    r"(?:->|\.)\s*(setTensorAddress|setInputTensorAddress|setOutputTensorAddress|setOutputAllocator"
+    r"|setInputShape|setOptimizationProfileAsync)\s*\("
 )
 _CONTEXT_SETTER_HELPERS = {
     "setTensorAddress": "bool EngineHandle::bind_address(",
@@ -1323,6 +1323,7 @@ def _assert_context_setters_stay_in_their_helpers(sources: dict) -> None:
         "profile-set-in-a-header",
         "old-input-address-call",
         "old-output-address-call",
+        "output-allocator-call",
         "helper-renamed",
     ],
 )
@@ -1377,6 +1378,12 @@ def test_context_setters_go_through_the_binding_cache(mutation) -> None:
             backend,
             "Error TensorRTBackend::execute(",
             'ctx->setOutputTensorAddress("output_0", nullptr);',
+        )
+    elif mutation == "output-allocator-call":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setOutputAllocator("output_0", nullptr);',
         )
     else:
         original = "bool EngineHandle::switch_profile("
