@@ -192,8 +192,9 @@ Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream) {
   ET_LOG(
       Error,
       "TensorRTBackend::execute: enqueueV3 failed. Likely an output with no address: supply each "
-      "with set_output_data_ptr. Else the guard's stream is on another device, or is the "
-      "per-thread stream inside a green context, which is invalid there.");
+      "with set_output_data_ptr. Else the guard's stream is on another device, belongs to another "
+      "regular CUDA context, where only a CUDA graph the engine recorded in its own context can run, "
+      "or is the per-thread stream inside a green context, which is invalid there.");
   return Error::InvalidState;
 }
 
