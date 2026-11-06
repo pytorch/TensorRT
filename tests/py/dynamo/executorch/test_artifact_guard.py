@@ -1251,6 +1251,42 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         _assert_wrong_device_buffers_are_refused(source)
 
 
+def _log_format(source: str, start: str) -> str:
+    """The format text of the log call whose text starts with ``start``, adjacent literals joined."""
+    index = source.index('"' + start)
+    literals = re.match(r'(?:"(?:[^"\\]|\\.)*"\s*)+', source[index:]).group(0)
+    return "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', literals))
+
+
+# The widest value each conversion in these messages can print.
+_CONVERSION_WIDTHS = {"%d": 11, "%zu": 20, "%lld": 20}
+
+
+@pytest.mark.parametrize(
+    "path, start",
+    [
+        (
+            "cpp/src/torch_tensorrt/executorch/ExecutionGraph.cpp",
+            "TensorRTBackend::execute: enqueueV3 failed.",
+        ),
+    ],
+)
+@pytest.mark.unit
+def test_a_log_that_must_print_whole_fits_executorch_s_limit(path, start) -> None:
+    """ExecuTorch prints 255 characters of a log message and drops the rest without a mark. These
+    messages were cut that way before they were shortened, so a later edit that grows one past the
+    limit fails here instead of losing its last cause in the log. Each conversion counts as the
+    widest value it can print, and none of them takes a string.
+    """
+    text = _log_format((_ROOT / path).read_text(encoding="utf-8"), start)
+    conversions = re.findall(r"%[a-z]+", text)
+    assert set(conversions) <= set(_CONVERSION_WIDTHS), conversions
+    width = len(re.sub(r"%[a-z]+", "", text)) + sum(
+        _CONVERSION_WIDTHS[c] for c in conversions
+    )
+    assert width <= 255, f"{width} characters: {text}"
+
+
 @pytest.mark.parametrize(
     "mutation", [None, "availability-builds-one", "commented-out", "handle-owns-one"]
 )
