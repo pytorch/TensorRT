@@ -1477,6 +1477,28 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
 }
 
 // A non-blocking stream on a green context.
+// Green contexts need a driver and a GPU that support them. Tests that need one skip where creation is
+// refused, as the multi-GPU tests skip without a second device.
+bool green_contexts_supported(int device = 0) {
+  const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
+  const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
+  const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
+  const auto destroy = driver_entry<PFN_cuGreenCtxDestroy_v12040>("cuGreenCtxDestroy", 12040);
+  if (get_resource == nullptr || generate_desc == nullptr || create_green == nullptr || destroy == nullptr) {
+    return false;
+  }
+  CUdevResource resource{};
+  CUdevResourceDesc descriptor{};
+  CUgreenCtx context = nullptr;
+  if (get_resource(device, &resource, CU_DEV_RESOURCE_TYPE_SM) != CUDA_SUCCESS ||
+      generate_desc(&descriptor, &resource, 1) != CUDA_SUCCESS ||
+      create_green(&context, descriptor, device, CU_GREEN_CTX_DEFAULT_STREAM) != CUDA_SUCCESS) {
+    cudaGetLastError();
+    return false;
+  }
+  return destroy(context) == CUDA_SUCCESS;
+}
+
 struct GreenStream {
   ~GreenStream() {
     if (stream) {
@@ -1547,6 +1569,9 @@ std::vector<CUcontext> kernel_contexts(cudaGraph_t graph) {
 // CUDA allows a green context handle on one CPU thread at a time, so two engines replaying on streams of one
 // green context from two threads still use the handle one thread at a time.
 TEST_F(ExecutionGraphReplayTest, EnginesOnOneGreenContextUseItOneThreadAtATime) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto create_stream = driver_entry<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate", 12050);
@@ -1578,6 +1603,9 @@ TEST_F(ExecutionGraphReplayTest, EnginesOnOneGreenContextUseItOneThreadAtATime) 
 // Graph nodes run in the context they were recorded in, so a green context stream records its own
 // graph there, and its replays stay on the green context's SMs. The plain stream's graph is kept.
 TEST_F(ExecutionGraphReplayTest, GreenContextStreamRecordsInItsOwnContext) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
@@ -1630,6 +1658,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph)
   if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count < 2) {
     GTEST_SKIP() << "Requires two CUDA devices for a green context on another device";
   }
+  if (!green_contexts_supported(1)) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   for (int i = 0; i < 2; ++i) {
@@ -1655,6 +1686,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph)
 // A plain stream while a green context is current takes the ordinary path, since a capture stream made in
 // the current context would be green, and the engine keeps the graph it has.
 TEST_F(ExecutionGraphReplayTest, PlainStreamWithAGreenContextCurrentKeepsTheGraph) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx", 12040);
@@ -1784,6 +1818,9 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
 // The driver often gives a new green context the handle of one just destroyed. The old graph lived in the
 // destroyed context, so the new one must record its own.
 TEST_F(ExecutionGraphReplayTest, AGreenContextOnADestroyedOnesHandleRecordsAgain) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   // Declared before the engines, so the green context the graph is recorded in outlives them, as TensorRT
   // requires.
   GreenStream green;
@@ -1805,6 +1842,9 @@ TEST_F(ExecutionGraphReplayTest, AGreenContextOnADestroyedOnesHandleRecordsAgain
 
 // Beyond 4 green contexts, the one called longest ago gives up its graph to the new one.
 TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheLeastRecentlyUsed) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green[5];
   for (GreenStream& each : green) {
     ASSERT_NO_FATAL_FAILURE(each.create());
@@ -1829,11 +1869,16 @@ TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheLeastRecent
 // A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
 // once a caller destroyed that context.
 TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
+  const bool green_supported = green_contexts_supported();
   GreenStream green;
-  ASSERT_NO_FATAL_FAILURE(green.create());
+  std::vector<cudaStream_t> streams{streams_[0]};
+  if (green_supported) {
+    ASSERT_NO_FATAL_FAILURE(green.create());
+    streams.push_back(green.stream);
+  }
   LoadedGraphEngine graph;
   ASSERT_NO_FATAL_FAILURE(load_graph(graph));
-  for (cudaStream_t stream : {streams_[0], green.stream}) {
+  for (cudaStream_t stream : streams) {
     CudaCalls calls;
     for (int i = 0; i < 2; ++i) {
       ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, stream), Error::Ok);
@@ -1842,10 +1887,16 @@ TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
     ASSERT_EQ(calls.captures.size(), 1u);
     EXPECT_EQ(calls.destroyed_streams, calls.captures);
   }
+  if (!green_supported) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU, so only the plain stream was checked";
+  }
 }
 
 // Releasing a graph whose green context is gone, on eviction or on engine destruction, leaves no CUDA error behind.
 TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green[4];
   for (GreenStream& each : green) {
     ASSERT_NO_FATAL_FAILURE(each.create());
@@ -1878,6 +1929,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) 
 // After 3 failed recordings a green context stops recording, and that says nothing about the caller's other
 // context.
 TEST_F(ExecutionGraphReplayTest, FailedGreenRecordingsLeaveThePlainStreamReplaying) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   LoadedGraphEngine plain, graph;
@@ -1960,8 +2014,12 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
 // A pool growth has to drop every graph recorded on the old buffer, whichever stream the next call uses,
 // including graphs recorded in a green context.
 TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamShapes) {
-  GreenStream green;
-  ASSERT_NO_FATAL_FAILURE(green.create());
+  // Only the green context cases need a green context, so the first case runs everywhere.
+  std::unique_ptr<GreenStream> green;
+  if (green_contexts_supported()) {
+    green = std::make_unique<GreenStream>();
+    ASSERT_NO_FATAL_FAILURE(green->create());
+  }
   const auto small_blob = build_scratch_blob(8, 32);
   const auto large_blob = build_scratch_blob(64, 256);
   ASSERT_FALSE(small_blob.empty());
@@ -1975,8 +2033,12 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamSh
       ASSERT_FLOAT_EQ(value, 1.0f / rows);
     }
   };
-  const std::pair<std::optional<cudaStream_t>, std::optional<cudaStream_t>> cases[] = {
-      {std::nullopt, std::nullopt}, {green.stream, green.stream}, {streams_[0], green.stream}};
+  std::vector<std::pair<std::optional<cudaStream_t>, std::optional<cudaStream_t>>> cases = {
+      {std::nullopt, std::nullopt}};
+  if (green) {
+    cases.push_back({green->stream, green->stream});
+    cases.push_back({streams_[0], green->stream});
+  }
   for (const auto& [record_on, after_growth_on] : cases) {
     SCOPED_TRACE(
         ::testing::Message() << "record on " << static_cast<const void*>(record_on.value_or(nullptr)) << ", then "
