@@ -9,7 +9,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.export import Dim
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering import post_lowering
+from torch_tensorrt.dynamo.lowering import get_decompositions, post_lowering
 from torch_tensorrt.dynamo.lowering.passes.fold_slice_into_constant_pad import (
     fold_slice_into_constant_pad,
 )
@@ -89,6 +89,23 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         gm, before, after = _lower(module, x)
         self.assertIn(SLICE, before)
         self.assertEqual(before, after)
+
+    def test_leaves_a_slice_read_by_as_strided_alone(self):
+        # Lowering turns unfold into as_strided with the strides of the padded tensor.
+        class PadSliceUnfold(torch.nn.Module):
+            def forward(self, x):
+                return F.pad(x, (3, 0))[..., :8].unfold(1, 4, 2)
+
+        module, x = PadSliceUnfold(), torch.randn(2, 8)
+        gm = (
+            torch.export.export(module, (x,))
+            .run_decompositions(get_decompositions(False))
+            .graph_module
+        )
+        self.assertIn(torch.ops.aten.as_strided.default, _targets(gm))
+        gm = fold_slice_into_constant_pad(gm, CompilationSettings())
+        self.assertIn(SLICE, _targets(gm))
+        torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
 
     def test_leaves_symbolic_amounts_alone(self):
         class SymbolicPad(torch.nn.Module):

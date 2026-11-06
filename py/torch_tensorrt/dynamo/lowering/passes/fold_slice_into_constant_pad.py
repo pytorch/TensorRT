@@ -13,6 +13,7 @@ pad: ``constant_pad_nd(x, (d, -d))``.
 """
 
 import logging
+import operator
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -22,6 +23,26 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 logger = logging.getLogger(__name__)
 
+# Ops that address the storage of their input directly, with strides fixed in the graph.
+_STORAGE_READERS = (
+    torch.ops.aten.as_strided.default,
+    torch.ops.aten.as_strided_copy.default,
+    torch.ops.aten.as_strided_scatter.default,
+)
+
+
+def _reaches_storage_reader(node: torch.fx.Node) -> bool:
+    users = list(node.users)
+    while users:
+        user = users.pop()
+        if user.target in _STORAGE_READERS:
+            return True
+        if user.target is operator.getitem or (
+            isinstance(user.target, torch._ops.OpOverload) and user.target.is_view
+        ):
+            users.extend(user.users)
+    return False
+
 
 def fold_slice_into_constant_pad(
     gm: torch.fx.GraphModule, settings: CompilationSettings
@@ -30,7 +51,7 @@ def fold_slice_into_constant_pad(
 
     Only when every amount is a plain int, the slice has step 1 and static
     bounds on a dim that the pad pads, keeps at least one element of the pad's
-    input, and the pad has no other user.
+    input, the pad has no other user, and no as_strided reads the slice.
     """
     del settings
     folded = 0
@@ -49,6 +70,10 @@ def fold_slice_into_constant_pad(
             or pad_node.kwargs
             or len(pad_node.users) != 1
         ):
+            continue
+        # The slice views the padded tensor. The folded pad has a smaller storage of its
+        # own, so an as_strided made for the slice's strides would read past it.
+        if _reaches_storage_reader(node):
             continue
         padded = pad_node.meta.get("val")
         pad = list(pad_node.args[1])
