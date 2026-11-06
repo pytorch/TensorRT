@@ -1711,7 +1711,7 @@ TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextFailsAndKeep
         done.set_value();
         holder.join();
       }
-      EXPECT_NE(error, Error::Ok);
+      EXPECT_EQ(error, Error::InvalidState);
       ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
 
       {
@@ -1780,7 +1780,7 @@ TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextLeavesThePoo
     ASSERT_EQ(set_current(other), CUDA_SUCCESS);
     cudaStream_t other_stream = nullptr;
     ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
-    EXPECT_NE(engine.run(inputs_[0], outputs_[1], rows, cols, other_stream), Error::Ok);
+    EXPECT_EQ(engine.run(inputs_[0], outputs_[1], rows, cols, other_stream), Error::InvalidState);
     EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
     EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
     ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
