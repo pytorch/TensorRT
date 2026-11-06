@@ -551,6 +551,29 @@ def test_autocast_calibration_joins_0_dim_values_across_batches():
 
 
 @pytest.mark.unit
+def test_autocast_calibrates_a_cpu_program_with_a_bool_mask():
+    class Model(nn.Module):
+        def forward(self, x, mask):
+            return x * torch.chunk(mask, 2)[0].float()
+
+    # The program and the calibration batch stay on the CPU.
+    model = Model().eval()
+    x, mask = torch.randn(4, 8), torch.rand(8, 8) > 0.5
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x, mask)),
+        arg_inputs=[x, mask],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x, mask)], batch_size=None
+        ),
+    )
+    out = trt_model(x.cuda(), mask.cuda())
+    torch.testing.assert_close(out.float().cpu(), model(x, mask), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
 def test_autocast_depth_of_reduction_reads_a_recorded_convolution_weight():
     class Model(nn.Module):
         def __init__(self):
