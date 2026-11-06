@@ -311,13 +311,18 @@ context's SMs.
 An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
 caller that uses both, or up to 4 green contexts in turn, replays on each. These graphs share one
 record of the engine's input shapes, so they replay only while every caller passes the same shapes:
-a call with other shapes starts every graph over, not only its own. A fifth green context
-takes the place of the one called longest ago, and a green context whose graph was replaced starts
-over: a warm-up call, then a recording on its next call. So a caller that makes one call on each of
-more than 4 green contexts in turn never replays. Each green graph holds any buffers it records on
-until the engine is destroyed or its place is taken. TensorRT requires a green context to outlive the
-graphs recorded in it, so destroy the engine before its green contexts. The stream a graph is
-recorded on is destroyed right after the recording, so it is not kept in the green context.
+a call with other shapes starts every graph over, not only its own. A fifth green context takes the
+place of the one called longest ago, and a green context whose graph was replaced starts over: a
+warm-up call, then a recording on its next call. So a caller that makes one call on each of more
+than 4 green contexts in turn never replays. A caller may free its own buffers after any call,
+since a later call on other addresses records again or copies.
+
+Destroy the engine before the green contexts it ran on. TensorRT requires a green context to outlive
+every CUDA graph recorded in it, and the engine keeps a green context's graph until the engine is
+destroyed or a newer green context takes its place. With TensorRT 11.4 and newer, an engine with
+auxiliary streams needs this order even with replay off: TensorRT makes those streams in the green
+context it runs in, and destroying the engine after that context logs a "context is destroyed"
+error.
 
 Some calls do not replay:
 

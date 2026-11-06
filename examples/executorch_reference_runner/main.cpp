@@ -346,8 +346,8 @@ int main(int argc, char** argv) {
   HierarchicalAllocator planned_memory{{planned_spans.data(), planned_spans.size()}};
   MemoryManager memory_manager{&method_allocator, &planned_memory, &temp_allocator};
 
-  // Declared before the method so it is destroyed after it: TensorRT requires a green context to
-  // outlive the engines that recorded CUDA graphs in it.
+  // Declared before the method so it is destroyed after it: TensorRT requires a green context to outlive the
+  // CUDA graphs recorded in it and the auxiliary streams it creates there.
   CUgreenCtx green_ctx = nullptr;
   std::unique_ptr<CUgreenCtx, void (*)(CUgreenCtx*)> destroy_green_ctx(&green_ctx, [](CUgreenCtx* green) {
     if (*green == nullptr || g_cuda_driver == nullptr) {
