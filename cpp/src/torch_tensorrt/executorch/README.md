@@ -302,8 +302,8 @@ over: a warm-up call, then a recording on its next call. So a caller that makes 
 more than 4 green contexts in turn never replays. Each green graph holds a stream of its own in its
 green context, and any buffers it records on, until the engine is destroyed or its place is taken.
 TensorRT requires a green context to outlive the graphs recorded in it, so destroy the engine before
-its green contexts. If one is destroyed first, the error from releasing its graph later is logged
-and cleared, but CUDA may not free that graph's stream.
+its green contexts. If one is destroyed first, its graph still releases, but CUDA cannot destroy the
+stream kept in it: the error is logged and cleared, and the stream's device memory stays allocated.
 
 Some calls do not replay:
 

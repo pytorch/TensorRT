@@ -98,7 +98,8 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * 4 green contexts keep a graph and a stream each, until the engine is
  * destroyed or a newer green context takes the place of the one called longest
  * ago. TensorRT requires a green context to outlive the graphs recorded in it,
- * so destroy the engine first. A stream of another device fails, and so does
+ * so destroy the engine first. Otherwise CUDA cannot free the stream the engine
+ * keeps in that green context. A stream of another device fails, and so does
  * one of another regular context, unless that context is current and a graph
  * recorded in the engine's own context replays on it. On other buffers than
  * that graph's, the engine records again in its own context, on buffers of its
