@@ -1212,54 +1212,44 @@ def test_autocast_leaves_tiny_factors_alone(scale):
 
 @pytest.mark.unit
 @pytest.mark.critical
-@pytest.mark.parametrize("low", [torch.float16, torch.bfloat16], ids=["fp16", "bf16"])
-def test_autocast_keeps_the_round_trip_of_a_strided_slice(low):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_autocast_keeps_the_upcast_a_view_needs(dtype):
     class Model(nn.Module):
         def forward(self, x):
-            # x[::2].float() is a contiguous copy, so the view of it is allowed.
+            # x[::2] is strided; its .float() copy is contiguous, so view(-1) works.
             return x[::2].float().view(-1) * 2
 
     model = Model().cuda().eval()
-    x = torch.randn(4, 4, device="cuda", dtype=low)
+    x = torch.randn(4, 4, device="cuda", dtype=dtype)
     trt_model = torch_tensorrt.dynamo.compile(
         torch.export.export(model, (x,)),
         arg_inputs=[x],
         min_block_size=1,
         enable_autocast=True,
-        autocast_low_precision_type=low,
+        autocast_low_precision_type=dtype,
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_autocast_skips_float16_float32_float16_round_trips():
+def test_autocast_keeps_the_upcast_an_in_place_op_writes():
     class Model(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv1 = nn.Conv1d(4, 4, 3, padding=1)
-            self.conv2 = nn.Conv1d(4, 4, 3, padding=1)
-
         def forward(self, x):
-            return self.conv2(self.conv1(x).float() * 2)
+            # add_ writes into the float32 copy, so x itself must stay unchanged.
+            y = x.float()
+            y.add_(1)
+            return y * 2, x * 3
 
     model = Model().cuda().eval()
-    x = torch.randn(2, 4, 16, device="cuda")
-    settings = CompilationSettings(
-        enable_autocast=True, autocast_low_precision_type=torch.float16
-    )
-    gm = pre_export_lowering(torch.export.export(model, (x,)), settings).graph_module
-    casts = [n for n in gm.graph.nodes if n.target == torch.ops.aten.to.dtype]
-    assert not any(n.args[0] in casts for n in casts), gm.code
-
+    x = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float16)
     trt_model = torch_tensorrt.dynamo.compile(
-        torch.export.export(model, (x,)),
-        arg_inputs=[x],
+        torch.export.export(model, (x.clone(),)),
+        arg_inputs=[x.clone()],
         min_block_size=1,
         enable_autocast=True,
         autocast_low_precision_type=torch.float16,
-        autocast_calibration_dataloader=torch.utils.data.DataLoader(
-            [(x,)], batch_size=None
-        ),
     )
-    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+    doubled, tripled = trt_model(x.clone())
+    torch.testing.assert_close(doubled.float(), torch.tensor([4.0, 6.0], device="cuda"))
+    torch.testing.assert_close(tripled.float(), torch.tensor([3.0, 6.0], device="cuda"))

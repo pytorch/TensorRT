@@ -54,22 +54,6 @@ def _is_given_a_dtype(n: torch.fx.Node) -> bool:
     return False
 
 
-def _is_exact_upcast(n: torch.fx.Node, target_dtype: torch.dtype) -> bool:
-    if n.target != torch.ops.aten.to.dtype or n.kwargs or len(n.args) != 2:
-        return False
-    src, upcast_dtype = n.args
-    val = src.meta.get("val") if isinstance(src, torch.fx.Node) else None
-    return (
-        isinstance(val, torch.Tensor)
-        and val.dtype == target_dtype
-        # The cast of a strided slice makes a contiguous copy that a view may need.
-        and val.is_contiguous()
-        and upcast_dtype in (torch.float32, torch.float64)
-        and target_dtype.is_floating_point
-        and torch.finfo(target_dtype).bits < torch.finfo(upcast_dtype).bits
-    )
-
-
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
     tensors = [
         v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
@@ -207,9 +191,6 @@ def rule_based_autocast(
                 # A mask such as the condition of torch.where must stay bool.
                 if val.dtype == dtype or val.dtype == torch.bool:
                     return arg
-                elif _is_exact_upcast(arg, dtype):
-                    # x.float() of a float16 x, read back as float16, is x.
-                    return arg.args[0]
                 else:
                     with gm.graph.inserting_before(node):
                         cast = gm.graph.call_function(
