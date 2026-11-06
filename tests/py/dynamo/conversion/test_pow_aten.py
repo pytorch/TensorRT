@@ -123,6 +123,43 @@ class TestPowConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ("float_root", trt.float32, 0.5, trt.LayerType.UNARY),
+            ("half_root", trt.float16, 0.5, trt.LayerType.UNARY),
+            ("bfloat16_root", trt.bfloat16, 0.5, trt.LayerType.UNARY),
+            ("other_fraction", trt.float32, 0.25, trt.LayerType.ELEMENTWISE),
+            ("integer_root", trt.int32, 0.5, trt.LayerType.ELEMENTWISE),
+        ]
+    )
+    def test_square_root_is_a_sqrt(self, _, dtype, exponent, layer_type):
+        # A vector norm ends in pow(sum, 0.5), and TensorRT's POW is much slower than SQRT.
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        impl.elementwise.pow(
+            ConversionContext(network),
+            torch.ops.aten.pow.Tensor_Scalar,
+            SourceIR.ATEN,
+            "pow",
+            network.add_input("x", dtype, (2, 3)),
+            exponent,
+        )
+        types = [network.get_layer(i).type for i in range(network.num_layers)]
+        self.assertIn(layer_type, types)
+        if layer_type == trt.LayerType.UNARY:
+            self.assertNotIn(trt.LayerType.ELEMENTWISE, types)
+
+    def test_square_root_special_values(self):
+        # PyTorch's CUDA pow computes an exponent of 0.5 with sqrt, so -inf gives NaN; POW gave +inf.
+        class Root(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.pow.Tensor_Scalar(x, 0.5)
+
+        inf = float("inf")
+        inputs = [torch.tensor([[-inf, -4.0, -0.0, 0.0, 0.25, 4.0, inf]])]
+        self.run_test(Root(), inputs)
+
+    @parameterized.expand(
+        [
             (
                 "2d_dim_dtype_half",
                 (1, 1),
