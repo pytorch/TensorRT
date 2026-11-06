@@ -83,13 +83,10 @@ class ExecutionGraph {
   const void* scratch_ = nullptr;
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
-  cudaStream_t capture_stream_ = nullptr;
-  // The context capture_stream_ was created in.
-  CUcontext capture_context_ = nullptr;
   // The regular context a plain warm-up ran in, where TensorRT can run this engine.
   CUcontext engine_context_ = nullptr;
   // The green context of this graph, or none. It is told apart by its id, since a destroyed one's
-  // handle can be handed out again; the handle only creates capture_stream_.
+  // handle can be handed out again; the handle only creates the capture stream.
   CUgreenCtx capture_green_ = nullptr;
   unsigned long long capture_green_id_ = 0;
   int failed_captures_ = 0;

@@ -1347,13 +1347,16 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamRecordsInItsOwnContext) {
   {
     CudaCalls calls;
     std::vector<CUcontext> contexts;
-    calls.after_capture = [&](cudaGraph_t recorded) { contexts = kernel_contexts(recorded); };
+    // The capture stream is destroyed right after the recording, so it is asked about before that.
+    calls.after_capture = [&](cudaGraph_t recorded) {
+      contexts = kernel_contexts(recorded);
+      EXPECT_EQ(get_context(calls.captures.back(), &owner, &capture_green), CUDA_SUCCESS);
+    };
     for (int i = 0; i < 5; ++i) {
       ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, green.stream));
       EXPECT_EQ(graph.is_captured(), i >= 1);
     }
     ASSERT_EQ(calls.captures.size(), 1u);
-    ASSERT_EQ(get_context(calls.captures.front(), &owner, &capture_green), CUDA_SUCCESS);
     EXPECT_EQ(capture_green, green.context) << "the graph for the green stream was recorded outside its context";
     ASSERT_FALSE(contexts.empty());
     EXPECT_EQ(contexts, std::vector<CUcontext>(contexts.size(), green_context)) << "a kernel would run outside it";
@@ -1945,6 +1948,9 @@ TEST_F(ExecutionGraphReplayTest, CaptureAllowsConcurrentLegacyStreamWork) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 1, streams_[0]));
   CudaCalls calls;
   size_t legacy_operations = 0;
+  unsigned int flags = 0;
+  // The capture stream is destroyed right after the recording, so it is asked about before that.
+  calls.after_capture = [&](cudaGraph_t) { EXPECT_EQ(cudaStreamGetFlags(calls.captures.back(), &flags), cudaSuccess); };
   calls.during_capture = [&](cudaStream_t capture_stream) {
     EXPECT_NE(capture_stream, streams_[0]);
     std::thread legacy([&] {
@@ -1962,8 +1968,6 @@ TEST_F(ExecutionGraphReplayTest, CaptureAllowsConcurrentLegacyStreamWork) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 2, streams_[0]));
   EXPECT_EQ(legacy_operations, 32u);
   ASSERT_EQ(calls.captures.size(), 1u);
-  unsigned int flags = 0;
-  ASSERT_EQ(cudaStreamGetFlags(calls.captures.front(), &flags), cudaSuccess);
   EXPECT_NE(flags & cudaStreamNonBlocking, 0u);
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }

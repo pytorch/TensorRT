@@ -299,11 +299,10 @@ An engine keeps such a graph for each of up to 4 green contexts, and one for pla
 caller that uses both, or up to 4 green contexts in turn, replays on each. A fifth green context
 takes the place of the one called longest ago, and a green context whose graph was replaced starts
 over: a warm-up call, then a recording on its next call. So a caller that makes one call on each of
-more than 4 green contexts in turn never replays. Each green graph holds a stream of its own in its
-green context, and any buffers it records on, until the engine is destroyed or its place is taken.
-TensorRT requires a green context to outlive the graphs recorded in it, so destroy the engine before
-its green contexts. If one is destroyed first, its graph still releases, but CUDA cannot destroy the
-stream kept in it: the error is logged and cleared, and the stream's device memory stays allocated.
+more than 4 green contexts in turn never replays. Each green graph holds any buffers it records on
+until the engine is destroyed or its place is taken. TensorRT requires a green context to outlive the
+graphs recorded in it, so destroy the engine before its green contexts. The stream a graph is
+recorded on is destroyed right after the recording, so it is not kept in the green context.
 
 Some calls do not replay:
 

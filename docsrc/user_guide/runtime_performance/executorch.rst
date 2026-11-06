@@ -588,11 +588,8 @@ graph of their own, recorded there, and its replays stay on the green context's 
 keeps such a graph for up to 4 green contexts, and one for plain streams, so a caller that uses
 both replays on each. A fifth green context takes the place of the one called longest ago, and a
 replaced one starts over with a warm-up call, so one call on each of more than 4 green contexts in
-turn never replays. Each green graph keeps a stream in its green context until the engine is
-destroyed or its place is taken. TensorRT requires a green context to outlive the graphs recorded
-in it, so destroy the engine before its green contexts. If one is destroyed first, its graph still
-releases, but CUDA cannot destroy the stream kept in it: the error is logged and cleared, and the
-stream's device memory stays allocated.
+turn never replays. TensorRT requires a green context to outlive the graphs recorded in it, so
+destroy the engine before its green contexts.
 
 Some calls never replay:
 
