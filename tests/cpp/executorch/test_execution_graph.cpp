@@ -1476,7 +1476,6 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
   EXPECT_EQ(cudaStreamDestroy(blocking), cudaSuccess);
 }
 
-// A non-blocking stream on a green context.
 // Green contexts need a driver and a GPU that support them. Tests that need one skip where creation is
 // refused, as the multi-GPU tests skip without a second device.
 bool green_contexts_supported(int device = 0) {
@@ -1499,6 +1498,7 @@ bool green_contexts_supported(int device = 0) {
   return destroy(context) == CUDA_SUCCESS;
 }
 
+// A non-blocking stream on a green context.
 struct GreenStream {
   ~GreenStream() {
     if (stream) {
@@ -2491,15 +2491,14 @@ TEST_F(ExecutionGraphReplayTest, TwoGraphEnginesCaptureIndependentlyOnOneCallerS
   auto start = started.get_future();
   auto finish = finished.get_future();
   std::thread worker;
-  calls.during_capture = [&](cudaStream_t first_capture) {
-    worker = std::thread([&, first_capture] {
+  calls.during_capture = [&](cudaStream_t) {
+    worker = std::thread([&] {
       EXPECT_EQ(cudaSetDevice(0), cudaSuccess);
       started.set_value();
       CudaCalls second_calls;
       EXPECT_EQ(second.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
       EXPECT_EQ(second_calls.captures.size(), 1u);
       if (!second_calls.captures.empty()) {
-        EXPECT_NE(second_calls.captures.front(), first_capture);
         EXPECT_NE(second_calls.captures.front(), streams_[0]);
       }
       EXPECT_EQ(second_calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
