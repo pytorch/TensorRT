@@ -244,7 +244,8 @@ def batch_norm(
                 eps,
             )
             input_scale = adjusted_scale.to(input_dtype)
-            # Rounded separately, scale and shift no longer cancel at a large running mean.
+            # The shift uses the rounded scale, so at a large running mean its only
+            # error is its own rounding: at most half a step of input_dtype.
             input_bias = (bias.float() - running_mean.float() * input_scale.float()).to(
                 input_dtype
             )
