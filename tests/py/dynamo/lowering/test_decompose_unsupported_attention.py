@@ -6,6 +6,7 @@ from unittest import mock
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     scaled_dot_product_attention_validator,
