@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=f524bc92"></script>
+    <script src="../../../../_static/documentation_options.js?v=ff90bd1c"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,6 +481,7 @@ document.write(`
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
@@ -763,7 +764,11 @@ document.write(`
             <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
         <span class="p">)</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">"settings"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
+            <span class="c1"># Leave out the calibration data, so the engine metadata does not carry</span>
+            <span class="c1"># the user's inputs.</span>
+            <span class="s2">"settings"</span><span class="p">:</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="n">autocast_calibration_dataloader</span><span class="o">=</span><span class="kc">None</span>
+            <span class="p">),</span>
             <span class="s2">"inout_symexprs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
             <span class="s2">"num_user_outputs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span><span class="p">,</span>
             <span class="s2">"pytorch_plugin_ops"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pytorch_plugin_ops</span><span class="p">,</span>

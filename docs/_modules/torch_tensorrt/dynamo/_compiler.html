@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=f524bc92"></script>
+    <script src="../../../_static/documentation_options.js?v=ff90bd1c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1124,8 +1124,8 @@ document.write(`
 <span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
 <span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
 <span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
-<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.</span>
-<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.</span>
+<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.</span>
+<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
@@ -2256,9 +2256,10 @@ document.write(`
             <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
-    <span class="c1"># compile() offloaded gm before this call. The global partitioner leaves the PyTorch</span>
-    <span class="c1"># nodes in this graph, so the state they read must go back to the device.</span>
-    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">offload_module_to_cpu</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
+    <span class="c1"># compile() offloaded gm before this call, so the state that runs in PyTorch must go</span>
+    <span class="c1"># back to the device: the PyTorch nodes the global partitioner leaves in this graph,</span>
+    <span class="c1"># and with either partitioner, a parameter or buffer that the graph returns as is.</span>
+    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">offload_module_to_cpu</span><span class="p">:</span>
         <span class="n">pin_torch_executed_state</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
 
     <span class="c1"># Post-partition complex I/O boundary pass — runs in both normal and dryrun mode</span>

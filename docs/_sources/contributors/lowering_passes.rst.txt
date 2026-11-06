@@ -163,16 +163,17 @@ When ``enable_autocast=True`` in ``CompilationSettings``, this pass inserts prec
 cast nodes into the graph based on a set of rules:
 
 1. **Output range check** — nodes whose outputs exceed ``autocast_max_output_threshold``
-   are kept in FP32 (guarded against overflow).
+   are kept in FP32 (guarded against overflow). Needs calibration data (step 5).
 2. **Reduction depth check** — nodes with reduction depth exceeding
    ``autocast_max_depth_of_reduction`` are kept in FP32 (guarded against accumulated
-   error).
+   error). Needs calibration data (step 5).
 3. **Name exclusions** — nodes matching any pattern in ``autocast_excluded_nodes`` are
    kept in FP32.
 4. **Op exclusions** — nodes with targets in ``autocast_excluded_ops`` are kept in FP32.
 5. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
    ranges are measured by running the model on calibration data before applying the
-   threshold check.
+   threshold check. Without a dataloader, the range and depth checks are skipped and
+   a warning is logged.
 
 The pass inserts explicit ``aten._to_copy`` cast nodes around qualified operations to
 reduce them to ``autocast_low_precision_type`` (FP16 or BF16).

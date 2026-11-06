@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=f524bc92"></script>
+    <script src="../../../_static/documentation_options.js?v=ff90bd1c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -478,7 +478,7 @@ document.write(`
 <span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">FrozenSet</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -573,6 +573,20 @@ document.write(`
     <span class="k">return</span> <span class="n">normalized</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_autocast_op_names</span><span class="p">(</span><span class="n">ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="c1"># Autocast matches ops by name, and op objects cannot be pickled into the</span>
+    <span class="c1"># engine metadata.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">ConverterRegistry</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ops</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">ops</span> <span class="o">=</span> <span class="p">(</span><span class="n">ops</span><span class="p">,)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">}</span>
+
+
 <div class="viewcode-block" id="CompilationSettings">
 <a class="viewcode-back" href="../../../user_guide/compilation/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">[docs]</a>
 <span class="nd">@dataclass</span>
@@ -629,8 +643,8 @@ document.write(`
 <span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
 <span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
 <span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
-<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.</span>
-<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.</span>
+<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.</span>
+<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
@@ -722,6 +736,11 @@ document.write(`
     <span class="n">autocast_calibration_dataloader</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span>
     <span class="p">)</span>
+    <span class="c1"># Set by autocast, not by users: the nodes it kept in high precision using the</span>
+    <span class="c1"># calibration data. Saved in place of the data so refit can reuse the choice.</span>
+    <span class="n">_autocast_calibrated_high_precision_nodes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FrozenSet</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_RESOURCE_PARTITIONING</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
@@ -760,6 +779,7 @@ document.write(`
                 <span class="s1">'attn_bias_is_causal must be True, False or "proven", got '</span>
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">attn_bias_is_causal</span><span class="si">!r}</span><span class="s2">"</span>
             <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_ops</span> <span class="o">=</span> <span class="n">_autocast_op_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_ops</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_compute_capabilities</span><span class="p">:</span>
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 
@@ -788,6 +808,9 @@ document.write(`
                 <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span> <span class="p">())</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"autocast_excluded_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_autocast_op_names</span><span class="p">(</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"autocast_excluded_ops"</span><span class="p">,</span> <span class="p">())</span>
+        <span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">,</span> <span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"collapse_high_rank_permutes"</span><span class="p">,</span> <span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">)</span>
@@ -806,6 +829,7 @@ document.write(`
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_algorithm"</span><span class="p">,</span> <span class="n">ACCURACY_ALGORITHM</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_atol"</span><span class="p">,</span> <span class="n">ACCURACY_ATOL</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_rtol"</span><span class="p">,</span> <span class="n">ACCURACY_RTOL</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_autocast_calibrated_high_precision_nodes"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 

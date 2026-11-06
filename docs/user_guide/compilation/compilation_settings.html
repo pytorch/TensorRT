@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=f524bc92"></script>
+    <script src="../../_static/documentation_options.js?v=ff90bd1c"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -736,6 +736,7 @@ numerically sensitive. Enable it with <code class="docutils literal notranslate"
     <span class="n">autocast_low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
     <span class="n">autocast_excluded_ops</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">softmax</span><span class="o">.</span><span class="n">int</span><span class="p">},</span>
     <span class="n">autocast_max_output_threshold</span><span class="o">=</span><span class="mf">1024.0</span><span class="p">,</span>
+    <span class="n">autocast_calibration_dataloader</span><span class="o">=</span><span class="n">calibration_dataloader</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -777,20 +778,22 @@ decisions. Example: <code class="docutils literal notranslate"><span class="pre"
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">512.0</span></code></p></td>
 <td><p>Nodes whose outputs exceed this absolute value are kept in FP32. Guards against
-overflow in activations with large dynamic range (e.g., unnormalized logits).</p></td>
+overflow in activations with large dynamic range (e.g., unnormalized logits).
+Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (∞)</p></td>
 <td><p>Maximum reduction depth allowed in low precision. Reduction depth measures how
 many reduction operations (sum, mean, etc.) feed into a node. Nodes with higher
-depth are kept in FP32 to prevent error accumulation. <code class="docutils literal notranslate"><span class="pre">None</span></code> means no limit.</p></td>
+depth are kept in FP32 to prevent error accumulation. <code class="docutils literal notranslate"><span class="pre">None</span></code> means no limit.
+Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
 <td><p>A <code class="docutils literal notranslate"><span class="pre">torch.utils.data.DataLoader</span></code> used to calibrate output statistics (e.g.,
-absolute max values) for each node. When provided, the autocast pass runs the
-model on calibration data to make per-node precision decisions based on
-observed ranges rather than static thresholds.</p></td>
+absolute max values) for each node. The autocast pass runs the model on this
+data to check <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code> and
+<code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>. Without it, both rules are skipped.</p></td>
 </tr>
 </tbody>
 </table>
