@@ -31,6 +31,7 @@ from typing import Optional
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.dynamo.conversion.impl import select
@@ -61,8 +62,9 @@ def index_copy_kv(
     ``index`` is the position tensor: shape ``[s_update]``. For the
     eligible case (s_update == 1) this is a single value that we use
     directly as the write start. KVCacheUpdate's ``writeIndices`` arg
-    expects shape ``[batch]``, so we broadcast/repeat the single index
-    value across the batch dimension.
+    expects shape ``[batch]``, so we broadcast the single index value
+    across the batch dimension: ``index_copy`` writes every row at the
+    same position.
     """
     cache_shape = tuple(input.shape)
     batch = cache_shape[0]
@@ -72,24 +74,13 @@ def index_copy_kv(
     if index.dtype != trt.int32:
         index = cast_trt_tensor(ctx, index, trt.int32, name + "_index_to_int32")
 
-    # writeIndices shape must be [batch]. For batch=1 with index shape [1]
-    # this is already correct. For batch > 1, broadcast: emit a constant
-    # of shape [batch] filled with the single index value at runtime via
-    # a gather/expand pattern. The validator's job is to allow only cases
-    # where this is well-defined; for now we restrict to batch == 1 (see
-    # the validator).
+    # writeIndices shape must be [batch]: index's single value, once per row
+    # (the validator only admits static shapes).
     write_indices = index
-
-    # When batch > 1, we'd need to broadcast `index` (shape [1]) to
-    # [batch]. The validator currently keeps us in the batch==1 case.
-    if isinstance(batch, int) and batch > 1:
-        # Defensive: shouldn't happen if the validator is correct, but
-        # fall back rather than emit a wrong layer.
-        logger.debug(
-            "index_copy_kv: batch > 1 not yet supported for runtime indices; "
-            "falling back to scatter"
+    if batch != 1:
+        write_indices = impl.slice.expand(
+            ctx, target, source_ir, name + "_write_indices", index, (batch,)
         )
-        return index_copy_fallback(ctx, target, source_ir, name, input, dim, index, src)
 
     out = emit_kv_cache_update_layer(ctx, name, input, src, write_indices)
     if out is None:
