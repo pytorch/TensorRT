@@ -1055,3 +1055,34 @@ def test_autocast_keeps_bool_tensors_bool(masked):
     torch.testing.assert_close(
         trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
     )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_gives_autocast_regions_their_traced_dtypes():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 8, 3, padding=1)
+            self.linear = nn.Linear(64, 16)
+
+        def forward(self, x):
+            y = self.conv(x).flatten(2)
+            with torch.autocast(x.device.type, enabled=False):
+                y = nn.functional.normalize(y.float(), dim=1)
+                sim = torch.einsum("bci,bcj->bij", y, y)
+            return self.linear(sim)
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 3, 8, 8, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)

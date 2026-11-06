@@ -181,9 +181,24 @@ def rule_based_autocast(
             for k, v in node.kwargs.items()
         }
 
+    traced_dtypes = {
+        n: n.meta["val"].dtype
+        for n in gm.graph.nodes
+        if isinstance(n.meta.get("val"), torch.Tensor)
+    }
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
             if node.target == torch.ops.higher_order.wrap_with_autocast:
+                # The region keeps its own precision and checks the dtypes of
+                # its inputs, so give it the inputs it was traced with.
+                node.args = tuple(
+                    (
+                        _cast_all_tensor_args_to_dtype(node, a, traced_dtypes[a])
+                        if isinstance(a, torch.fx.Node) and a in traced_dtypes
+                        else a
+                    )
+                    for a in node.args
+                )
                 continue
             if node.target == operator.getitem:
                 # Follow the retyped list, so users of this element cast it correctly.
