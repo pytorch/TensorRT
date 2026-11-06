@@ -1893,16 +1893,22 @@ TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) 
     ASSERT_TRUE(graph->is_captured());
   };
   ASSERT_NO_FATAL_FAILURE(record_then_destroy());
-  // The fourth of these takes the place of the destroyed context's graph.
-  for (GreenStream& each : green) {
-    for (int i = 0; i < 2; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, each.stream));
-      EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  {
+    CudaCalls calls;
+    // The fourth of these takes the place of the destroyed context's graph.
+    for (GreenStream& each : green) {
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, each.stream));
+        EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+      }
     }
+    EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>({cudaSuccess}));
   }
   ASSERT_NO_FATAL_FAILURE(record_then_destroy());
+  CudaCalls calls;
   graph.reset();
   EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>(4, cudaSuccess));
 }
 
 // Failed recordings in a green context say nothing about the caller's other context.
