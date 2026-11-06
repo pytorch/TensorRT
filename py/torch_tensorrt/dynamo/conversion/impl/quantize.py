@@ -571,7 +571,7 @@ def dequantize_affine_float8(
     name: str,
     input_tensor: Union[torch.Tensor, TRTTensor],
     scale: Union[np.ndarray, torch.Tensor, TRTTensor],
-    output_dtype: torch.dtype,
+    output_dtype: torch.dtype = torch.bfloat16,
 ) -> TRTTensor:
     """Map TorchAO dequantize_affine_float8_non_decomposed to IDequantizeLayer."""
     input_trt = get_trt_tensor(ctx, input_tensor, f"{name}_input")

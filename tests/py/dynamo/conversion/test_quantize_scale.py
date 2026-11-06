@@ -81,6 +81,17 @@ class TestQuantizeScale(TestCase):
         finally:
             torch.set_default_dtype(default_dtype)
 
+    def test_fp8_dequantize_keeps_its_default_output_dtype(self):
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(network, CompilationSettings())
+        x = network.add_input("x", trt.fp8, (4,))
+        out = impl.quantize.dequantize_affine_float8(
+            ctx, torch.ops.aten.mul.Tensor, None, "dq", x, torch.tensor(0.5)
+        )
+        self.assertEqual(out.dtype, trt.bfloat16)
+
 
 if __name__ == "__main__":
     run_tests()
