@@ -1257,6 +1257,28 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
 }
 
 // A non-blocking stream on a green context.
+// Green contexts need a driver and a GPU that support them. Tests that need one skip where creation is
+// refused, as the multi-GPU tests skip without a second device.
+bool green_contexts_supported(int device = 0) {
+  const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
+  const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
+  const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
+  const auto destroy = driver_entry<PFN_cuGreenCtxDestroy_v12040>("cuGreenCtxDestroy", 12040);
+  if (get_resource == nullptr || generate_desc == nullptr || create_green == nullptr || destroy == nullptr) {
+    return false;
+  }
+  CUdevResource resource{};
+  CUdevResourceDesc descriptor{};
+  CUgreenCtx context = nullptr;
+  if (get_resource(device, &resource, CU_DEV_RESOURCE_TYPE_SM) != CUDA_SUCCESS ||
+      generate_desc(&descriptor, &resource, 1) != CUDA_SUCCESS ||
+      create_green(&context, descriptor, device, CU_GREEN_CTX_DEFAULT_STREAM) != CUDA_SUCCESS) {
+    cudaGetLastError();
+    return false;
+  }
+  return destroy(context) == CUDA_SUCCESS;
+}
+
 struct GreenStream {
   ~GreenStream() {
     if (stream) {
@@ -1327,6 +1349,9 @@ std::vector<CUcontext> kernel_contexts(cudaGraph_t graph) {
 // Graph nodes run in the context they were recorded in, so a green context stream records its own
 // graph there, and its replays stay on the green context's SMs. The plain stream's graph is kept.
 TEST_F(ExecutionGraphReplayTest, GreenContextStreamRecordsInItsOwnContext) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
@@ -1379,6 +1404,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph)
   if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count < 2) {
     GTEST_SKIP() << "Requires two CUDA devices for a green context on another device";
   }
+  if (!green_contexts_supported(1)) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   for (int i = 0; i < 2; ++i) {
@@ -1404,6 +1432,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph)
 // A plain stream while a green context is current takes the ordinary path, since a capture stream made in
 // the current context would be green, and the engine keeps the graph it has.
 TEST_F(ExecutionGraphReplayTest, PlainStreamWithAGreenContextCurrentKeepsTheGraph) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx", 12040);
@@ -1532,6 +1563,9 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
 
 // Each green context keeps a graph, so bursts from two of them record once in each.
 TEST_F(ExecutionGraphReplayTest, BurstsFromTwoGreenContextsReplayOnBoth) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream first, second;
   ASSERT_NO_FATAL_FAILURE(first.create());
   ASSERT_NO_FATAL_FAILURE(second.create());
@@ -1556,6 +1590,9 @@ TEST_F(ExecutionGraphReplayTest, BurstsFromTwoGreenContextsReplayOnBoth) {
 
 // Beyond 4 green contexts, the one called longest ago gives up its graph to the new one.
 TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheOldest) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green[5];
   for (GreenStream& each : green) {
     ASSERT_NO_FATAL_FAILURE(each.create());
@@ -1580,6 +1617,9 @@ TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheOldest) {
 // A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
 // once a caller destroyed that context.
 TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   LoadedGraphEngine graph;
@@ -1597,6 +1637,9 @@ TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
 
 // Releasing a graph whose green context is gone, on eviction or on engine destruction, leaves no CUDA error behind.
 TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green[4];
   for (GreenStream& each : green) {
     ASSERT_NO_FATAL_FAILURE(each.create());
@@ -1628,6 +1671,9 @@ TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) 
 
 // Failed recordings in a green context say nothing about the caller's other context.
 TEST_F(ExecutionGraphReplayTest, FailedGreenRecordingsLeaveThePlainStreamReplaying) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   LoadedGraphEngine plain, graph;
@@ -1703,6 +1749,9 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
 // A pool growth has to drop every graph recorded on the old buffer, whichever stream the next call uses,
 // including graphs recorded in a green context.
 TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamShapes) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto small_blob = build_scratch_blob(8, 32);
