@@ -156,15 +156,11 @@ void fall_back(const char* reason, cudaError_t error) {
   cudaGetLastError();
 }
 
-// TensorRT requires a green context to outlive the graphs recorded in it, but a caller that re-partitions its SMs
-// may destroy one first. Releasing that graph then fails, and the error must not reach the caller's next CUDA call,
-// which may be another context's execute().
+// A failed release must not leave its error for the caller's next CUDA call, which may be another context's
+// execute().
 void released(cudaError_t error) {
   if (error != cudaSuccess) {
-    ET_LOG(
-        Info,
-        "TensorRTBackend: releasing a CUDA graph failed (%s); its green context was likely destroyed before the engine",
-        cudaGetErrorString(error));
+    ET_LOG(Error, "TensorRTBackend: releasing a CUDA graph failed (%s)", cudaGetErrorString(error));
     cudaGetLastError();
   }
 }
