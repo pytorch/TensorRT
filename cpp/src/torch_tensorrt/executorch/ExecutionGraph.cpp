@@ -458,7 +458,8 @@ Error ExecutionGraph::enqueue_in(
       return error;
     }
     warmed_up_ = true;
-    if (stream_green == nullptr) {
+    // The graph's buffers stay in the engine's context, so a call from another one must not move it.
+    if (stream_green == nullptr && !other_context) {
       engine_context_ = stream_context;
     }
   }
