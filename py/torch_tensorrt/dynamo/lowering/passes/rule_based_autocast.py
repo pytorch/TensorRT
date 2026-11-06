@@ -15,12 +15,24 @@ from .pass_utils import clean_up_graph_after_modifications
 
 logger = logging.getLogger(__name__)
 
+# Ops such as index, embedding and gather need these arguments as integers.
+_INDEX_ARGUMENTS = ("index", "indices")
+
 
 def is_tensor_node(n: torch.fx.Node) -> bool:
     val = n.meta.get("val", None)
     if hasattr(val, "dtype"):
         return True
     return False
+
+
+def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
+    tensors = [
+        v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(
+        t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
+    )
 
 
 def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
@@ -130,6 +142,29 @@ def rule_based_autocast(
         else:
             return arg
 
+    def _cast_tensor_args_to_dtype(node: torch.fx.Node, dtype: torch.dtype) -> None:
+        names = (
+            [a.name for a in node.target._schema.arguments]
+            if isinstance(node.target, torch._ops.OpOverload)
+            else []
+        )
+        node.args = tuple(
+            (
+                arg
+                if i < len(names) and names[i] in _INDEX_ARGUMENTS
+                else _cast_all_tensor_args_to_dtype(node, arg, dtype)
+            )
+            for i, arg in enumerate(node.args)
+        )
+        node.kwargs = {
+            k: (
+                v
+                if k in _INDEX_ARGUMENTS
+                else _cast_all_tensor_args_to_dtype(node, v, dtype)
+            )
+            for k, v in node.kwargs.items()
+        }
+
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
             if node.target == torch.ops.higher_order.wrap_with_autocast:
@@ -144,24 +179,18 @@ def rule_based_autocast(
                 # A factory op such as torch.zeros has no inputs to cast, so its
                 # output keeps the dtype it was created with.
                 continue
+            if _has_only_integer_outputs(node):
+                # An integer op such as ids % k must still make integers, for
+                # example when its result is used as an index.
+                continue
 
             if node.name in low_precision_nodes:
-                node.args = _cast_all_tensor_args_to_dtype(
-                    node, node.args, autocast_low_precision_type
-                )
-                node.kwargs = _cast_all_tensor_args_to_dtype(
-                    node, node.kwargs, autocast_low_precision_type
-                )
+                _cast_tensor_args_to_dtype(node, autocast_low_precision_type)
                 node.meta["val"] = _retype_tensors(
                     node.meta["val"], autocast_low_precision_type
                 )
             elif node.name in high_precision_nodes:
-                node.args = _cast_all_tensor_args_to_dtype(
-                    node, node.args, autocast_high_precision_type
-                )
-                node.kwargs = _cast_all_tensor_args_to_dtype(
-                    node, node.kwargs, autocast_high_precision_type
-                )
+                _cast_tensor_args_to_dtype(node, autocast_high_precision_type)
                 node.meta["val"] = _retype_tensors(
                     node.meta["val"], autocast_high_precision_type
                 )

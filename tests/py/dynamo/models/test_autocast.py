@@ -722,3 +722,127 @@ def test_autocast_factory_ops_keep_their_dtype(factory):
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("calibrate", [True, False], ids=["calib", "no_calib"])
+@pytest.mark.parametrize(
+    "lookup",
+    [
+        lambda m, x, ids: m.table[ids],
+        lambda m, x, ids: m.embedding(ids),
+        lambda m, x, ids: m.weight[ids],
+        lambda m, x, ids: m.table[ids % 10],
+        lambda m, x, ids: torch.gather(x, 1, ids[:, None].expand(-1, 16) % 16),
+    ],
+    ids=["buffer", "embedding", "parameter", "integer_op", "gather"],
+)
+def test_autocast_keeps_integer_indices(lookup, calibrate):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("table", torch.randn(100, 16))
+            self.embedding = nn.Embedding(100, 16)
+            self.weight = nn.Parameter(torch.randn(100, 16))
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x, ids):
+            return self.linear(x + lookup(self, x, ids))
+
+    model = Model().cuda().eval()
+    inputs = (torch.randn(4, 16, device="cuda"), torch.tensor([3, 1, 4, 1]).cuda())
+    settings = {}
+    if calibrate:
+        settings["autocast_calibration_dataloader"] = torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        **settings,
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "to_float",
+    [
+        lambda ids: ids / 16,
+        lambda ids: ids * 0.5,
+        lambda ids: torch.sin(ids * 0.1),
+        lambda ids: (1.0 - ids % 2) * -1e4,
+        lambda ids: ids.float().square(),
+    ],
+    ids=["div", "mul", "sin", "mask_bias", "float_square"],
+)
+def test_autocast_integers_that_become_floats(to_float):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(32, 16)
+
+        def forward(self, x, ids):
+            y = to_float(ids)
+            return self.linear(torch.cat([x + y, y], dim=-1))
+
+    model = Model().cuda().eval()
+    inputs = (
+        torch.randn(4, 16, device="cuda"),
+        torch.randint(0, 400, (4, 16), device="cuda"),
+    )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    ref = model(*inputs)
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), ref, rtol=5e-2, atol=5e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_attention_with_integer_mask():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.qkv = nn.Linear(16, 48)
+            self.out = nn.Linear(16, 16)
+
+        def forward(self, x, mask):
+            q, k, v = self.qkv(x).chunk(3, dim=-1)
+            bias = (1.0 - mask[:, None, :].to(x.dtype)) * -10000.0
+            scores = q @ k.transpose(-1, -2) / 4.0 + bias
+            return self.out(scores.softmax(dim=-1) @ v)
+
+    model = Model().cuda().eval()
+    mask = torch.ones(2, 8, dtype=torch.int64, device="cuda")
+    mask[:, 6:] = 0
+    inputs = (torch.randn(2, 8, 16, device="cuda"), mask)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
