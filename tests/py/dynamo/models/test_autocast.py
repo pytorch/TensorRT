@@ -1122,3 +1122,31 @@ def test_autocast_keeps_the_dtype_an_op_is_given(given):
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_tiny_constants_nonzero():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(16, 8, 3, padding=1)
+
+        def forward(self, x):
+            # F.normalize divides by max(norm, 1e-12), and 1e-12 rounds to 0 in float16.
+            return self.conv(nn.functional.normalize(x, dim=1))
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 16, 16, 16, device="cuda")
+    x[..., :4] = 0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)

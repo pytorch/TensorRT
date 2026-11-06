@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import math
 import operator
 from typing import Any
 
@@ -63,6 +64,34 @@ def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
         lambda t: t.to(target_dtype) if t.is_floating_point() else t,
         val,
     )
+
+
+def _keep_tiny_constants_nonzero(
+    node: torch.fx.Node, target_dtype: torch.dtype
+) -> None:
+    # A scalar such as the eps=1e-12 that F.normalize passes to clamp_min becomes
+    # a constant of the input's type. In float16 it rounds to 0, and then
+    # x / max(norm, eps) gives 0 / 0 for a zero vector, so use the smallest
+    # nonzero value of the type instead, as ModelOpt AutoCast does. A float
+    # argument, such as the eps of layer_norm, is not a tensor constant.
+    if not isinstance(node.target, torch._ops.OpOverload):
+        return
+    schema = {a.name: a for a in node.target._schema.arguments}
+    finfo = torch.finfo(target_dtype)
+    smallest = finfo.tiny * finfo.eps
+
+    def keep(name: str, v: Any) -> Any:
+        if (
+            isinstance(v, float)
+            and 0 < abs(v) < smallest
+            and str(schema[name].type) not in ("float", "float?")
+        ):
+            return math.copysign(smallest, v)
+        return v
+
+    names = list(schema)
+    node.args = tuple(keep(names[i], v) for i, v in enumerate(node.args))
+    node.kwargs = {k: keep(k, v) for k, v in node.kwargs.items()}
 
 
 def rule_based_autocast(
@@ -240,6 +269,8 @@ def rule_based_autocast(
             else:
                 continue
             _cast_tensor_args_to_dtype(node, target_dtype)
+            if target_dtype == autocast_low_precision_type:
+                _keep_tiny_constants_nonzero(node, target_dtype)
             if any(
                 getattr(n.meta.get("val"), "dtype", None) == target_dtype
                 for n in node.all_input_nodes
