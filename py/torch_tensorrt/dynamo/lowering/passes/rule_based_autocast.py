@@ -15,8 +15,8 @@ from .pass_utils import clean_up_graph_after_modifications
 
 logger = logging.getLogger(__name__)
 
-# Ops such as index, embedding and gather need these arguments as integers.
-_INDEX_ARGUMENTS = ("index", "indices")
+# Ops such as index, embedding, gather and embedding_bag need these arguments as integers.
+_INDEX_ARGUMENTS = ("index", "indices", "offsets")
 
 
 def is_tensor_node(n: torch.fx.Node) -> bool:
@@ -33,6 +33,16 @@ def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
     return bool(tensors) and not any(
         t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
     )
+
+
+def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
+    tensors = [
+        v
+        for m in (n, *n.all_input_nodes)
+        for v in pytree.tree_leaves(m.meta.get("val"))
+        if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
 
 
 def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
@@ -182,6 +192,10 @@ def rule_based_autocast(
             if _has_only_integer_outputs(node):
                 # An integer op such as ids % k must still make integers, for
                 # example when its result is used as an index.
+                continue
+            if _has_no_floating_point_tensors(node):
+                # A comparison such as ids != pad_id must compare the integers
+                # themselves; float16 rounds ids above 2048.
                 continue
 
             if node.name in low_precision_nodes:

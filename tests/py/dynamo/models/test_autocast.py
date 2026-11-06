@@ -868,6 +868,61 @@ def test_autocast_integers_that_become_floats(to_float):
 
 @pytest.mark.unit
 @pytest.mark.critical
+def test_autocast_keeps_integer_comparisons_exact():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+
+        def forward(self, x, ids):
+            # float16 rounds ids above 2048 and makes ids above 65504 inf.
+            keep = (ids != 128001).unsqueeze(-1)
+            return self.linear(x) * keep
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 6, 8, device="cuda")
+    ids = torch.tensor([[5, 2049, 70000, 128001, 128002, 130000]], device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x, ids)),
+        arg_inputs=[x, ids],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(
+        trt_model(x, ids).float(), model(x, ids), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_embedding_bag_offsets():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bag = nn.EmbeddingBag(5000, 8, mode="sum")
+
+        def forward(self, ids, offsets):
+            return self.bag(ids, offsets)
+
+    model = Model().cuda().eval()
+    ids = torch.randint(0, 5000, (3000,), device="cuda")
+    # float16 rounds the offset 2501 to 2500, which moves an id to another bag.
+    offsets = torch.tensor([0, 2501], device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (ids, offsets)),
+        arg_inputs=[ids, offsets],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(
+        trt_model(ids, offsets).float(), model(ids, offsets), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_attention_with_integer_mask():
     class Model(nn.Module):
         def __init__(self):
