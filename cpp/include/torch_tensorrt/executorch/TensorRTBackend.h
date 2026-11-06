@@ -105,12 +105,14 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * current and a graph recorded in the engine's own context replays on it. On
  * other buffers than that graph's, the engine records again in its own context,
  * on buffers of its own; when that recording cannot go ahead, the call fails and
- * the engine keeps the graph of its own calls. Buffers allocated for such a
- * call belong to that context, which must outlive the engine. An engine on the
- * shared activation scratch pool fails on a stream of another regular context
- * before it runs, since the pool's completion event belongs to the engine's
- * context. Other streams take the ordinary path, and the graphs are kept unless
- * the scratch buffer, the shapes, or the optimization profile changed.
+ * the engine keeps the graph of its own calls, unless the call brought new
+ * shapes. Buffers allocated for such a call belong to that context, which must
+ * outlive the engine. An engine on the shared activation scratch pool fails on a
+ * stream of another regular context, since the pool's completion event belongs
+ * to the engine's context; such a call can still grow the pool in its context,
+ * which must then outlive the engine. Other streams take the ordinary path, and
+ * the graphs are kept unless the scratch buffer, the shapes, or the optimization
+ * profile changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 

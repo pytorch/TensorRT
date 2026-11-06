@@ -606,12 +606,16 @@ Some calls never replay:
   ones the graph was recorded on, the engine records again in its own context, on buffers of its
   own, and copies the inputs in and the outputs out until its shapes or its profile change. When
   that recording cannot go ahead (the engine's own context has not run the shapes yet, or the
-  recording fails), the call fails with an error that says why, and the engine's own calls keep
-  their graph. Buffers the delegate allocates for such a call, to copy an input or output it cannot
-  use in place, belong to that context, so that context must outlive the engine.
+  recording fails), the call fails with an error that says why. The engine's own calls keep their
+  graph, unless that call brought new shapes, which drop it. Buffers the delegate allocates for such
+  a call, to copy an input or output it cannot use in place, belong to that context, so that context
+  must outlive the engine.
 * An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
   at all, with or without replay: the scratch's completion event belongs to the engine's context,
-  so such a call fails before it runs, and the engine keeps its graphs.
+  so such a call fails. Before it fails, it still sets its input shapes and claims the shared
+  scratch. So new shapes drop the engine's graph, and a call that needs more scratch grows the pool
+  while that context is current, which that context must then outlive. Keep such calls in the
+  engine's context.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.
