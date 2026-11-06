@@ -1330,7 +1330,7 @@ TEST_F(ExecutionGraphReplayTest, PlainStreamWithAGreenContextCurrentKeepsTheGrap
 }
 
 // TensorRT cannot run an engine on a stream of another regular context, but a graph recorded in the
-// engine's own context replays there, and a recording tried there leaves the engine's context recording.
+// engine's own context replays there, and other buffers make the engine record again in its own context.
 TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
   const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
   const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
@@ -1356,17 +1356,12 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
   ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
-  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 0, streams_[0]));
-  // The next call would record, and TensorRT cannot run here.
-  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
-  EXPECT_NE(graph.run(inputs_[0], outputs_[0], 2, 8, other_stream), Error::Ok);
-  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
   {
     CudaCalls calls;
     for (int i = 0; i < 2; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 1, streams_[0]));
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
     }
-    EXPECT_EQ(calls.captures.size(), 1u) << "the engine's own context should record again after the failed recording";
+    EXPECT_EQ(calls.captures.size(), 1u);
     ASSERT_TRUE(graph.is_captured());
   }
   const size_t count = 16;
@@ -1392,11 +1387,31 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
     EXPECT_TRUE(calls.captures.empty());
     EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, other_stream));
   }
+  // Other buffers record again in the engine's own context, on buffers of the graph's own, and replay
+  // here, as the release did, and the engine's own context keeps replaying.
+  ASSERT_EQ(cudaMemcpy(inputs_[1], input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_EQ(cudaMemsetAsync(outputs_[1], 0xff, count * sizeof(float), other_stream), cudaSuccess);
+      ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::Ok);
+      ASSERT_EQ(
+          cudaMemcpyAsync(actual.data(), outputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost, other_stream),
+          cudaSuccess);
+      ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+      for (size_t j = 0; j < count; ++j) {
+        ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+    EXPECT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, other_stream));
+  }
   EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
   ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
   CudaCalls back;
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
   EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
 
 // Each green context keeps a graph, so bursts from two of them record once in each.

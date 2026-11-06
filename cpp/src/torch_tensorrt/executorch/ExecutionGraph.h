@@ -86,6 +86,8 @@ class ExecutionGraph {
   cudaStream_t capture_stream_ = nullptr;
   // The context capture_stream_ was created in.
   CUcontext capture_context_ = nullptr;
+  // The regular context a plain warm-up ran in, where TensorRT can run this engine.
+  CUcontext engine_context_ = nullptr;
   // The green context of this graph, or none. It is told apart by its id, since a destroyed one's
   // handle can be handed out again; the handle only creates capture_stream_.
   CUgreenCtx capture_green_ = nullptr;

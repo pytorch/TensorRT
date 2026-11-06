@@ -92,6 +92,36 @@ cudaError_t create_capture_stream(CUgreenCtx green, cudaStream_t& stream) {
   return cudaSuccess;
 }
 
+// Makes `context` current on this thread until the end of the scope, when `needed`.
+class ContextScope {
+ public:
+  ContextScope(CUcontext context, bool needed) {
+    if (!needed) {
+      ok_ = true;
+      return;
+    }
+    static const auto push = driver_entry<PFN_cuCtxPushCurrent_v4000>("cuCtxPushCurrent");
+    pushed_ = push != nullptr && push(context) == CUDA_SUCCESS;
+    ok_ = pushed_;
+  }
+  ~ContextScope() {
+    static const auto pop = driver_entry<PFN_cuCtxPopCurrent_v4000>("cuCtxPopCurrent");
+    CUcontext popped = nullptr;
+    if (pushed_ && pop != nullptr) {
+      pop(&popped);
+    }
+  }
+  ContextScope(const ContextScope&) = delete;
+  ContextScope& operator=(const ContextScope&) = delete;
+  bool ok() const {
+    return ok_;
+  }
+
+ private:
+  bool ok_ = false;
+  bool pushed_ = false;
+};
+
 const std::string& binding_name(const EngineHandle& handle, size_t index) {
   return index < handle.num_inputs ? handle.input_binding_names[index]
                                    : handle.output_binding_names[index - handle.num_inputs];
@@ -260,12 +290,19 @@ Error ExecutionGraph::enqueue_in(
     capture_green_ = stream_green;
     capture_green_id_ = stream_green_id;
   }
+  // A plain graph and its buffers live in the context TensorRT ran the engine in, so a stream of
+  // another regular context, where TensorRT cannot run, still replays it.
+  const CUcontext record_context =
+      capture_green_ == nullptr && engine_context_ != nullptr ? engine_context_ : stream_context;
+  const bool other_context = record_context != stream_context;
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
   // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
-  // sets, would record on every call, so the second move switches to buffers this graph owns.
-  if (!staged_ && graph_exec_ != nullptr && addresses != recorded_) {
+  // sets, would record on every call, so the second move switches to buffers this graph owns. A
+  // caller in another context switches at once, since its buffers may not be usable in the context
+  // the graph runs in.
+  if (!staged_ && addresses != recorded_ && (graph_exec_ != nullptr || other_context)) {
     drop_graph();
-    staged_ = ++moves_ > 1;
+    staged_ = ++moves_ > 1 || other_context;
   }
   if (staged_) {
     buffers_.resize(count, nullptr);
@@ -274,19 +311,31 @@ Error ExecutionGraph::enqueue_in(
       // TensorRT refuses a null address even for an empty tensor.
       const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
       if (capacities_[i] < bytes) {
-        reset_graph();
+        // A caller in another context cannot run a warm-up there, and warmed_up_ already says whether
+        // the engine ran these shapes in its own context.
+        if (other_context) {
+          drop_graph();
+        } else {
+          reset_graph();
+        }
         // Doubling keeps shapes that grow a little at a time from allocating at every growth.
         const size_t capacity = std::max(bytes, capacities_[i] * 2);
         void* buffer = nullptr;
-        const auto allocation = cudaMalloc(&buffer, capacity);
+        cudaError_t allocation = cudaErrorDeviceUninitialized;
+        {
+          ContextScope scope(record_context, other_context);
+          if (scope.ok()) {
+            allocation = cudaMalloc(&buffer, capacity);
+            if (allocation == cudaSuccess && buffers_[i] != nullptr) {
+              retire(buffers_[i], stream);
+            }
+          }
+        }
         if (allocation != cudaSuccess) {
           fall_back("buffer allocation failed", allocation);
           capture_failed_ = true;
           release_buffers(stream);
           return enqueue_plain(context, stream);
-        }
-        if (buffers_[i] != nullptr) {
-          retire(buffers_[i], stream);
         }
         buffers_[i] = buffer;
         capacities_[i] = capacity;
@@ -323,38 +372,43 @@ Error ExecutionGraph::enqueue_in(
   }
   if (capture_lock.owns_lock()) {
     cudaGraph_t graph = nullptr;
-    cudaError_t error = cudaSuccess;
-    // A graph keeps replaying on a stream of another regular context, where TensorRT itself cannot
-    // run, but records only on a capture stream of the current context.
-    if (capture_stream_ != nullptr && capture_context_ != stream_context) {
-      released(cudaStreamDestroy(capture_stream_));
-      capture_stream_ = nullptr;
-    }
-    if (capture_stream_ == nullptr) {
-      error = create_capture_stream(capture_green_, capture_stream_);
-      if (error != cudaSuccess) {
-        capture_stream_ = nullptr;
-      }
-      capture_context_ = stream_context;
-    }
+    cudaError_t error = cudaErrorDeviceUninitialized;
     bool enqueued = true;
-    // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
-    if (error == cudaSuccess) {
-      error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
+    {
+      // The launch below runs on the caller's stream, in whichever context it belongs to.
+      ContextScope scope(record_context, other_context);
+      if (scope.ok()) {
+        error = cudaSuccess;
+        if (capture_stream_ != nullptr && capture_context_ != record_context) {
+          released(cudaStreamDestroy(capture_stream_));
+          capture_stream_ = nullptr;
+        }
+        if (capture_stream_ == nullptr) {
+          error = create_capture_stream(capture_green_, capture_stream_);
+          if (error != cudaSuccess) {
+            capture_stream_ = nullptr;
+          }
+          capture_context_ = record_context;
+        }
+      }
+      // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
       if (error == cudaSuccess) {
-        enqueued = context.enqueueV3(capture_stream_);
-        error = cudaStreamEndCapture(capture_stream_, &graph);
+        error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
+        if (error == cudaSuccess) {
+          enqueued = context.enqueueV3(capture_stream_);
+          error = cudaStreamEndCapture(capture_stream_, &graph);
+        }
       }
-    }
-    capture_lock.unlock();
-    if (error == cudaSuccess && enqueued) {
-      error = cudaGraphInstantiate(&graph_exec_, graph, nullptr, nullptr, 0);
-      if (error != cudaSuccess) {
-        graph_exec_ = nullptr;
+      capture_lock.unlock();
+      if (error == cudaSuccess && enqueued) {
+        error = cudaGraphInstantiate(&graph_exec_, graph, nullptr, nullptr, 0);
+        if (error != cudaSuccess) {
+          graph_exec_ = nullptr;
+        }
       }
-    }
-    if (graph != nullptr) {
-      cudaGraphDestroy(graph);
+      if (graph != nullptr) {
+        cudaGraphDestroy(graph);
+      }
     }
     if (error != cudaSuccess || !enqueued) {
       if (enqueued) {
@@ -397,6 +451,9 @@ Error ExecutionGraph::enqueue_in(
       return error;
     }
     warmed_up_ = true;
+    if (capture_green_ == nullptr) {
+      engine_context_ = stream_context;
+    }
   }
   if (staged_) {
     for (size_t i = handle.num_inputs; i < count; ++i) {
