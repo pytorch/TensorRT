@@ -69,10 +69,10 @@ def rule_based_autocast(
     autocast_excluded_ops = settings.autocast_excluded_ops
     autocast_max_output_threshold = settings.autocast_max_output_threshold
     autocast_max_depth_of_reduction = settings.autocast_max_depth_of_reduction
-    reference_data: dict[str, torch.Tensor] = (
-        settings.autocast_intermediate_node_outputs
+    # pre_export_lowering sets this on the settings; a caller that skips it has none.
+    reference_data: dict[str, torch.Tensor] = vars(settings).pop(
+        "autocast_intermediate_node_outputs", {}
     )
-    del settings.autocast_intermediate_node_outputs
     recorded_nodes = settings._autocast_calibrated_high_precision_nodes
     replay_rule = None
     if not reference_data and recorded_nodes is not None:

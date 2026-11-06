@@ -547,6 +547,24 @@ def test_autocast_depth_of_reduction_reads_a_recorded_convolution_weight():
 
 
 @pytest.mark.unit
+def test_rule_based_autocast_runs_without_traced_outputs():
+    from torch_tensorrt.dynamo.lowering.passes.rule_based_autocast import (
+        rule_based_autocast,
+    )
+
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.relu(x) * 2.0
+
+    gm = torch.export.export(Model(), (torch.randn(4, 8),)).graph_module
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    gm = rule_based_autocast(gm, settings)
+    assert torch.ops.aten.to.dtype in [n.target for n in gm.graph.nodes]
+
+
+@pytest.mark.unit
 def test_autocast_calibration_ignores_indices_at_the_op_feeding_topk():
     class Model(nn.Module):
         def __init__(self):
