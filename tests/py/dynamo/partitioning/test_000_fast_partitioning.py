@@ -268,6 +268,33 @@ class TestFastPartitioning(TestCase):
                     cnt += 1
             self.assertEqual(cnt, trt_mod_cnt)
 
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_offload_keeps_returned_buffer_on_device(self, _, use_fast_partitioner):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("b", torch.randn(4))
+
+            def forward(self, x):
+                # The output reads b as is, so b stays a get_attr in the root graph.
+                return torch.relu(x) * 2, self.b
+
+        model = Model().eval().cuda()
+        x = torch.randn(2, 4, device="cuda")
+        expected = model(x)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            use_fast_partitioner=use_fast_partitioner,
+            offload_module_to_cpu=True,
+        )
+        self.assertIn(
+            "b", {n.target for n in trt_mod.graph.nodes if n.op == "get_attr"}
+        )
+        # assert_close also checks that each output is on the same device as eager.
+        torch.testing.assert_close(trt_mod(x), expected)
+
 
 if __name__ == "__main__":
     run_tests()
