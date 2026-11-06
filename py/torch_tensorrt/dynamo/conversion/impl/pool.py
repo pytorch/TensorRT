@@ -433,8 +433,16 @@ def adaptive_max_poolNd(
         )
 
     # The max over a box is the max over each of its axes in turn, so pool one axis at a time.
-    for i, out_size in enumerate(output_size):
-        dim = len(input.shape) - spatial_rank + i
+    # Axes that shrink go first, so an axis that grows does not multiply the size of an
+    # intermediate that another axis then reduces.
+    first_spatial = len(input.shape) - spatial_rank
+    order = sorted(
+        range(spatial_rank),
+        key=lambda i: output_size[i] >= input.shape[first_spatial + i],
+    )
+    for i in order:
+        out_size = output_size[i]
+        dim = first_spatial + i
         in_size = input.shape[dim]
         if in_size == out_size:
             continue

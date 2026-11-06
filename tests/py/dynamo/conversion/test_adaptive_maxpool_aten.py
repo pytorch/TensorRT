@@ -36,6 +36,7 @@ class TestAdaptiveMaxPoolConverter(DispatchTestCase):
             ("one_more_than_divisible", (2, 3, 15, 8), (7, 7), torch.float),
             ("long_not_divisible", (1, 1, 1, 300002), (1, 3), torch.float),
             ("window_over_pooling_limit", (1, 1, 1, 100000), (1, 1), torch.float),
+            ("grow_one_axis_shrink_other", (1, 1, 1, 65536), (65536, 1), torch.float),
         ]
     )
     def test_adaptive_max_pool2d(self, _, input_shape, output_size, dtype):
