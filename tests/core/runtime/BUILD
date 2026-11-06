@@ -53,10 +53,15 @@ cc_test(
     ],
 )
 
+runtime_test(
+    name = "test_global_profiling",
+)
+
 test_suite(
     name = "runtime_tests",
     tests = [
         ":test_cudagraph_failure_cleanup",
+        ":test_global_profiling",
         ":test_multi_device_safe_mode",
     ],
 )
