@@ -9,7 +9,10 @@ import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering.passes import complex_decomposition_adapter
+from torch_tensorrt.dynamo.lowering.passes import (
+    complex_decomposition_adapter,
+    constant_folding,
+)
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
 
@@ -155,29 +158,32 @@ class TestConstantFolding(TestCase):
             with self.subTest(disable_tf32=disable_tf32):
                 conv.fp32_precision = matmul.fp32_precision = "tf32"
                 try:
-                    gm = constant_fold(
-                        torch.export.export(model, (example_input,)).module(),
-                        CompilationSettings(disable_tf32=disable_tf32),
-                    )
+                    with mock.patch.object(
+                        constant_folding,
+                        "_ieee_float32",
+                        wraps=constant_folding._ieee_float32,
+                    ) as ieee_float32:
+                        gm = constant_fold(
+                            torch.export.export(model, (example_input,)).module(),
+                            CompilationSettings(disable_tf32=disable_tf32),
+                        )
+                    # With TF32 allowed, folding keeps the caller's settings.
+                    self.assertEqual(ieee_float32.called, disable_tf32)
                     self.assertEqual(
                         (conv.fp32_precision, matmul.fp32_precision), ("tf32", "tf32")
                     )
                 finally:
                     conv.fp32_precision, matmul.fp32_precision = saved
+                if not disable_tf32:
+                    continue
                 folded = {
                     tuple(p.shape): p
                     for n, p in gm.named_parameters()
                     if n.startswith("_frozen_param")
                 }
                 for expected in (expected_conv, expected_matmul):
-                    error = (
-                        (folded[tuple(expected.shape)].double() - expected).abs().max()
-                    )
-                    # With TF32 allowed, the folded values keep the TF32 rounding the engine uses.
-                    if disable_tf32:
-                        self.assertLess(error.item(), 1e-5)
-                    else:
-                        self.assertGreater(error.item(), 1e-5)
+                    error = (folded[tuple(expected.shape)].double() - expected).abs()
+                    self.assertLess(error.max().item(), 1e-5)
 
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
