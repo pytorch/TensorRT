@@ -3,6 +3,7 @@
 
 import contextlib
 import logging
+import threading
 from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
 import torch
@@ -180,29 +181,35 @@ def constant_fold(
     return gm
 
 
+# Two folds that overlap in time would otherwise restore each other's TF32 flags.
+_TF32_FLAGS_LOCK = threading.Lock()
+
+
 @contextlib.contextmanager
 def _ieee_float32() -> Iterator[None]:
     """A folded value is baked into the engine as it was computed, so with disable_tf32
     compute it in full float32. PyTorch lets cuDNN convolutions use TF32 by default, which
-    disable_tf32 does not reach."""
+    disable_tf32 does not reach. The flags are process-wide, so other threads also run
+    without TF32 while a fold holds them."""
     matmul = torch.backends.cuda.matmul
-    if hasattr(matmul, "fp32_precision"):
-        conv = torch.backends.cudnn.conv
-        saved = conv.fp32_precision, matmul.fp32_precision
-        conv.fp32_precision = matmul.fp32_precision = "ieee"
-        try:
-            yield
-        finally:
-            conv.fp32_precision, matmul.fp32_precision = saved
-    else:
-        # PyTorch before 2.9, as on the JetPack build, has only these flags.
-        cudnn = torch.backends.cudnn
-        saved = cudnn.allow_tf32, matmul.allow_tf32
-        cudnn.allow_tf32 = matmul.allow_tf32 = False
-        try:
-            yield
-        finally:
-            cudnn.allow_tf32, matmul.allow_tf32 = saved
+    with _TF32_FLAGS_LOCK:
+        if hasattr(matmul, "fp32_precision"):
+            conv = torch.backends.cudnn.conv
+            saved = conv.fp32_precision, matmul.fp32_precision
+            conv.fp32_precision = matmul.fp32_precision = "ieee"
+            try:
+                yield
+            finally:
+                conv.fp32_precision, matmul.fp32_precision = saved
+        else:
+            # PyTorch before 2.9, as on the JetPack build, has only these flags.
+            cudnn = torch.backends.cudnn
+            saved = cudnn.allow_tf32, matmul.allow_tf32
+            cudnn.allow_tf32 = matmul.allow_tf32 = False
+            try:
+                yield
+            finally:
+                cudnn.allow_tf32, matmul.allow_tf32 = saved
 
 
 def replace_node_with_constant(

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+import threading
 import types
 import unittest
 from unittest import mock
@@ -197,6 +198,39 @@ class TestConstantFolding(TestCase):
             with constant_folding._ieee_float32():
                 self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (False, False))
         self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (True, True))
+
+    def test_overlapping_float32_folds_wait_for_each_other(self):
+        conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
+        saved = conv.fp32_precision, matmul.fp32_precision
+        inside, release = threading.Event(), threading.Event()
+
+        def first():
+            with constant_folding._ieee_float32():
+                inside.set()
+                release.wait(10)
+
+        def second():
+            with constant_folding._ieee_float32():
+                pass
+
+        threads = [threading.Thread(target=first), threading.Thread(target=second)]
+        conv.fp32_precision = matmul.fp32_precision = "tf32"
+        try:
+            threads[0].start()
+            inside.wait(10)
+            threads[1].start()
+            threads[1].join(0.5)
+            # The second fold must not start while the first one holds the flags.
+            self.assertTrue(threads[1].is_alive())
+            release.set()
+            for t in threads:
+                t.join(10)
+            self.assertEqual(
+                (conv.fp32_precision, matmul.fp32_precision), ("tf32", "tf32")
+            )
+        finally:
+            release.set()
+            conv.fp32_precision, matmul.fp32_precision = saved
 
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
