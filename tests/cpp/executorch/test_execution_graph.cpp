@@ -1749,7 +1749,7 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
     EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, other_stream));
   }
   // Other buffers record again in the engine's own context, on buffers of the graph's own, and replay
-  // here, as the release did, and the engine's own context keeps replaying.
+  // here, as the release did. The engine's own context keeps replaying, through those buffers.
   ASSERT_EQ(cudaMemcpy(inputs_[1], input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
   {
     CudaCalls calls;
@@ -1774,6 +1774,11 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
   EXPECT_TRUE(back.captures.empty());
   EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  // Until its shapes or its profile change, each of those calls copies its input in and its output out.
+  CudaCalls copied;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(copied.memcpy_calls, 2u);
+  EXPECT_EQ(copied.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
 
 // The driver often gives a new green context the handle of one just destroyed. The old graph lived in the
