@@ -135,6 +135,21 @@ class TestAddConverter(DispatchTestCase):
             model(*inputs).cpu(), torch.tensor([-56.0, 56.0, -16.0, 10.0])
         )
 
+    def test_add_python_int_to_int8_warns(self):
+        class add(nn.Module):
+            def forward(self, x):
+                return (x.to(torch.int8) + 100).to(torch.float32)
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        with self.assertLogs(
+            "torch_tensorrt.dynamo.conversion.impl.elementwise.base", level="WARNING"
+        ) as logs:
+            torch_tensorrt.dynamo.compile(
+                torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+            )
+        self.assertTrue(any("does not wrap around" in line for line in logs.output))
+
 
 if __name__ == "__main__":
     run_tests()

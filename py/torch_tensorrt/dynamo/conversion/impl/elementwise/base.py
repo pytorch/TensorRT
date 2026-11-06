@@ -132,11 +132,13 @@ def convert_binary_elementwise(
         )
         return _fold_constants(op_type, lhs_val, rhs_val)
 
-    # TensorRT takes an INT8 constant only as quantized data, so int8 constants become
-    # int32 ones, and an int8 result made from one does not wrap around as in PyTorch.
+    # TensorRT takes an INT8 constant only as quantized data, so int8 constants (and
+    # Python ints next to an int8 tensor) become int32 ones, and an int8 result made
+    # from one does not wrap around as in PyTorch.
     output = getattr(ctx.current_node, "meta", {}).get("val")
     if getattr(output, "dtype", None) == torch.int8 and any(
-        isinstance(v, torch.Tensor) and v.dtype == torch.int8
+        (isinstance(v, torch.Tensor) and v.dtype == torch.int8)
+        or (isinstance(v, int) and not isinstance(v, bool))
         for v in (lhs_val, rhs_val)
     ):
         logger.warning(
