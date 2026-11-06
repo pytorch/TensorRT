@@ -105,12 +105,12 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         self.assertEqual(before, after)
 
     def test_leaves_a_slice_read_by_as_strided_alone(self):
-        # Lowering turns unfold into as_strided with the strides of the padded tensor.
-        class PadSliceUnfold(torch.nn.Module):
+        # unfold(1, 4, 2)'s windows, read through the padded tensor's strides.
+        class PadSliceAsStrided(torch.nn.Module):
             def forward(self, x):
-                return F.pad(x, (3, 0))[..., :8].unfold(1, 4, 2)
+                return F.pad(x, (3, 0))[..., :8].as_strided((2, 3, 4), (11, 2, 1))
 
-        module, x = PadSliceUnfold(), torch.randn(2, 8)
+        module, x = PadSliceAsStrided(), torch.randn(2, 8)
         gm = (
             torch.export.export(module, (x,))
             .run_decompositions(get_decompositions(False))
