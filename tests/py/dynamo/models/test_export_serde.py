@@ -197,6 +197,41 @@ def test_no_compile(ir, tmpdir):
 
 
 @pytest.mark.unit
+def test_complex_intermediate_single_output(tmpdir):
+    """
+    A model whose complex tensors are all intermediates (a rotary embedding) compiles
+    to a module whose single output is a bare graph Node rather than a 1-tuple. Saving
+    it must still work, and the reloaded program must return the tensor itself.
+    """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
+    class Rotary(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            angles = torch.outer(torch.arange(16.0), torch.arange(4.0))
+            self.register_buffer("freqs", torch.polar(torch.ones_like(angles), angles))
+
+        def forward(self, x):
+            x_complex = torch.view_as_complex(x.reshape(*x.shape[:-1], -1, 2))
+            return torch.view_as_real(x_complex * self.freqs).flatten(-2)
+
+    model = Rotary().eval().cuda()
+    input = torch.randn(2, 16, 8).cuda()
+    trt_module = torchtrt.dynamo.compile(
+        torch.export.export(model, (input,)),
+        arg_inputs=[input],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+    torchtrt.save(trt_module, trt_ep_path, arg_inputs=[input], retrace=False)
+
+    deser_output = torchtrt.load(trt_ep_path).module()(input)
+    assertions.assertIsInstance(deser_output, torch.Tensor)
+    torch.testing.assert_close(deser_output, model(input), rtol=1e-5, atol=1e-5)
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 def test_hybrid_relu_fallback(ir, tmpdir):
     """
