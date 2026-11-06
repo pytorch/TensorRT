@@ -1547,6 +1547,28 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
     EXPECT_EQ(calls.captures.size(), 1u);
     EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, other_stream));
   }
+  // A caller in the other context usually allocates its buffers there. They are copied in and out of
+  // the graph's buffers, which belong to the engine's context, on the caller's stream.
+  void* owned_input = nullptr;
+  void* owned_output = nullptr;
+  ASSERT_EQ(cudaMalloc(&owned_input, count * sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&owned_output, count * sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMemcpy(owned_input, input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  {
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(owned_input, owned_output, 2, 8, other_stream), Error::Ok);
+    ASSERT_EQ(
+        cudaMemcpyAsync(actual.data(), owned_output, count * sizeof(float), cudaMemcpyDeviceToHost, other_stream),
+        cudaSuccess);
+    ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    for (size_t j = 0; j < count; ++j) {
+      ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+    }
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, other_stream));
+  }
+  EXPECT_EQ(cudaFree(owned_input), cudaSuccess);
+  EXPECT_EQ(cudaFree(owned_output), cudaSuccess);
   EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
   // The graph and the buffers it switched to belong to the engine's context, so they outlive the other one.
   restore.reset();
