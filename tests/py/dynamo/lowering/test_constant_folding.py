@@ -160,6 +160,41 @@ class TestConstantFolding(TestCase):
                     op,
                 )
 
+    def test_aliased_permute_into_dequantize_is_installed(self):
+        try:
+            import torchao  # noqa: F401
+
+            dequantize_affine = torch.ops.torchao.dequantize_affine.default
+        except (ImportError, AttributeError):
+            self.skipTest("torchao required")
+
+        class Fp8WeightOnly(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(
+                    torch.randn(1025, 1024).to(torch.float8_e4m3fn),
+                    requires_grad=False,
+                )
+                self.scale = torch.nn.Parameter(
+                    torch.ones(1, 1025), requires_grad=False
+                )
+
+            def forward(self, x):
+                weight = dequantize_affine(
+                    self.weight.permute(1, 0),
+                    [1024, 1],
+                    self.scale,
+                    None,
+                    torch.float8_e4m3fn,
+                    output_dtype=torch.float32,
+                )
+                return x @ weight
+
+        gm = self._export_and_fold(Fp8WeightOnly(), torch.randn(2, 1024))
+        targets = [node.target for node in gm.graph.nodes]
+        self.assertNotIn(torch.ops.aten.permute.default, targets)
+        self.assertIn(dequantize_affine, targets)
+
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
     def test_aliased_view_models_compile_end_to_end(self):
         for model, example_input in (

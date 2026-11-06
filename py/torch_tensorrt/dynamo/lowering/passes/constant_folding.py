@@ -117,9 +117,12 @@ def constant_fold(
     # Repeats of an op share the tensor folded first, so install it only once.
     installed: Dict[int, torch.fx.Node] = {}
     for node, constant in cf.node_replacements.items():
+        # TensorRT only accepts a quantized constant directly in front of a
+        # DQ layer, so a permute feeding a dequantize must still be folded.
         if (
             isinstance(constant, torch.Tensor)
             and node.target in _SAFE_ALIASED_FOLD_SKIP_OPS
+            and not any(user.target in cf.quantization_ops for user in node.users)
         ):
             nbytes = int(constant.numel() * constant.element_size())
             if nbytes > _MAX_CONSTANT_FOLD_BYTES and _tensor_reuses_module_storage(
