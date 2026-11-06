@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -96,6 +97,32 @@ class TestAddConverter(DispatchTestCase):
         self.run_test(
             add(),
             inputs,
+            rtol=0,
+            atol=0,
+        )
+
+    def test_add_int8_buffer_computes_in_int32(self):
+        # Casting the int32 constant back to int8 can send the TensorRT builder into a
+        # very long search, so an int8 sum that overflows does not wrap around as in PyTorch.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.tensor([100, -100, 120, 5], dtype=torch.int8)
+                )
+
+            def forward(self, x):
+                total = torch.ops.aten.add.Tensor(self.offsets, x.to(torch.int8))
+                return total.to(torch.float32)
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs).cpu(),
+            torch.tensor([200.0, -200.0, 240.0, 10.0]),
             rtol=0,
             atol=0,
         )
