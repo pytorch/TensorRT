@@ -158,6 +158,24 @@ def _dim(
     return impl.shape.shape(ctx, target, source_ir, name, tensor, index)
 
 
+def _static_heads(ctx, tensor: TRTTensor, arg_index: int) -> int:
+    """Head count (dim 1) of an SDPA operand: from TensorRT if it knows it, else from the
+    exported graph, else -1.
+
+    TensorRT folds the shape arithmetic of a sliced KV cache and keeps its static head count, but
+    the remote builder's client-side shape inference reports every dim of such a slice as unknown.
+    The exported graph still has the static count, and GQA needs it to fold the query heads.
+    """
+    heads = tensor.shape[1]
+    if heads >= 0:
+        return heads
+    try:
+        meta_heads = ctx.current_node.args[arg_index].meta["val"].shape[1]
+    except (AttributeError, IndexError, KeyError, TypeError):
+        return -1
+    return meta_heads if isinstance(meta_heads, int) else -1
+
+
 @torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
     torch.nn.functional.scaled_dot_product_attention,
     enabled=True,
@@ -199,9 +217,11 @@ def scaled_dot_product_attention(
     #   [B, Hq, L, D] -> [B, Hkv, groups * L, D]
     # Row ``g * L + l`` of KV head ``j`` is query head ``j * groups + g`` at position ``l`` (the
     # same head -> KV head mapping as ``repeat_kv``). The causal bias is tiled ``groups`` times.
-    num_q_heads, num_kv_heads = query.shape[1], key.shape[1]
+    num_q_heads = _static_heads(ctx, query, 0)
+    num_kv_heads = _static_heads(ctx, key, 1)
+    value_heads = _static_heads(ctx, value, 2)
     groups: Union[int, TRTTensor] = 1
-    if num_q_heads < 0 and num_kv_heads > 0 and value.shape[1] == num_kv_heads:
+    if num_q_heads < 0 and num_kv_heads > 0 and value_heads == num_kv_heads:
         # TensorRT lost the (static) query head count, e.g. through a broadcast against a dynamic
         # shaped RoPE table. Recover it as a shape tensor; the group count is then dynamic too.
         num_q_heads = _dim(ctx, target, source_ir, name + "_q_heads", query, 1)
@@ -212,11 +232,11 @@ def scaled_dot_product_attention(
         if (
             num_kv_heads <= 0
             or num_q_heads % num_kv_heads != 0
-            or value.shape[1] != num_kv_heads
+            or value_heads != num_kv_heads
         ):
             raise ValueError(
-                f"Unsupported GQA head counts: query={num_q_heads}, key={key.shape[1]}, "
-                f"value={value.shape[1]}"
+                f"Unsupported GQA head counts: query={num_q_heads}, key={num_kv_heads}, "
+                f"value={value_heads}"
             )
         groups = num_q_heads // num_kv_heads
     dynamic_groups = not isinstance(groups, int)
