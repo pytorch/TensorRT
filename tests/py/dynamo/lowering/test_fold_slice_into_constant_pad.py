@@ -107,6 +107,43 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         self.assertIn(SLICE, _targets(gm))
         torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
 
+    @parameterized.expand(
+        [
+            ("pad", PAD),
+            ("slice", SLICE),
+            ("slice_by_name", "torch.ops.aten.slice.Tensor"),
+        ]
+    )
+    def test_leaves_ops_kept_in_pytorch_alone(self, _, op):
+        x = torch.randn(2, 8)
+        ep = torch.export.export(PadThenSlice((3, 0), -1, None, 8), (x,))
+        gm = ep.run_decompositions().graph_module
+        before = _targets(gm)
+        gm = fold_slice_into_constant_pad(
+            gm, CompilationSettings(torch_executed_ops={op})
+        )
+        self.assertIn(SLICE, before)
+        self.assertEqual(before, _targets(gm))
+
+    @parameterized.expand([("kept_in_pytorch", True), ("converted", False)])
+    def test_pad_module_kept_in_pytorch(self, _, keep):
+        class PadModuleThenSlice(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.pad = torch.nn.ConstantPad1d((3, 0), 0.0)
+
+            def forward(self, x):
+                return self.pad(x)[..., :8]
+
+        x = torch.randn(2, 8)
+        ep = torch.export.export(PadModuleThenSlice(), (x,))
+        gm = ep.run_decompositions().graph_module
+        modules = ["torch.nn.modules.padding.ConstantPad1d"] if keep else []
+        gm = fold_slice_into_constant_pad(
+            gm, CompilationSettings(torch_executed_modules=modules)
+        )
+        self.assertEqual(SLICE in _targets(gm), keep)
+
     def test_leaves_symbolic_amounts_alone(self):
         class SymbolicPad(torch.nn.Module):
             def forward(self, x, y):

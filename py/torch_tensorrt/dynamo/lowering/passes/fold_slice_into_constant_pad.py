@@ -17,9 +17,11 @@ import operator
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +53,16 @@ def fold_slice_into_constant_pad(
 
     Only when every amount is a plain int, the slice has step 1 and static
     bounds on a dim that the pad pads, keeps at least one element of the pad's
-    input, the pad has no other user, and no as_strided reads the slice.
+    input, the pad has no other user, and no as_strided reads the slice. Pads and
+    slices that torch_executed_ops or torch_executed_modules keep in PyTorch are
+    left as they are.
     """
-    del settings
+    excluded = settings.torch_executed_ops
+    if any(
+        op in excluded or ConverterRegistry.qualified_name_or_str(op) in excluded
+        for op in (torch.ops.aten.constant_pad_nd.default, torch.ops.aten.slice.Tensor)
+    ):
+        return gm
     folded = 0
 
     for node in list(gm.graph.nodes):
@@ -69,6 +78,12 @@ def fold_slice_into_constant_pad(
             or pad_node.target != torch.ops.aten.constant_pad_nd.default
             or pad_node.kwargs
             or len(pad_node.users) != 1
+        ):
+            continue
+        # The fold must not move work across a module boundary the user asked for.
+        if any(
+            node_in_torch_executed_module(n, settings.torch_executed_modules)
+            for n in (pad_node, node)
         ):
             continue
         # The slice views the padded tensor. The folded pad has a smaller storage of its
