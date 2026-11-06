@@ -294,14 +294,40 @@ Error ExecutionGraph::enqueue_in(
   const bool other_context = record_context != stream_context;
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
   // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
-  // sets, would record on every call, so the second move switches to buffers this graph owns. A
-  // caller in another context switches at once, since its buffers may not be usable in the context
-  // the graph runs in.
-  if (!staged_ && addresses != recorded_ && (graph_exec_ != nullptr || other_context)) {
+  // sets, would record on every call, so the second move switches to buffers this graph owns.
+  if (!other_context && !staged_ && addresses != recorded_ && graph_exec_ != nullptr) {
     drop_graph();
-    staged_ = ++moves_ > 1 || other_context;
+    staged_ = ++moves_ > 1;
   }
-  if (staged_) {
+  // TensorRT cannot run on a stream of another regular context, so a call from one that no graph
+  // serves records one in the engine's context, on buffers this graph owns. Until that recording can
+  // go ahead the call fails, and the graph and the failure count of the engine's own calls stay.
+  const bool records_for_other_context =
+      other_context && (graph_exec_ == nullptr || (!staged_ && addresses != recorded_));
+  const bool own_buffers = staged_ || records_for_other_context;
+  // A pooled caller holds its device's pool lock, so waiting here for a load, a destroy, or another
+  // engine's recording on any device would stall every pooled engine on this device. It records on a
+  // later call instead.
+  std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
+  if (records_for_other_context) {
+    const char* reason = nullptr;
+    if (!warmed_up_) {
+      reason = "the engine has not run these shapes in its own context yet";
+    } else if (scratch == nullptr) {
+      capture_lock.lock();
+    } else if (!capture_lock.try_lock()) {
+      reason = "another engine is being loaded, destroyed or recorded";
+    }
+    if (reason != nullptr) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: a call on a stream of another regular CUDA context needs a CUDA graph "
+          "recorded in the engine's context, and none can be recorded now: %s",
+          reason);
+      return Error::InvalidState;
+    }
+  }
+  if (own_buffers) {
     buffers_.resize(count, nullptr);
     capacities_.resize(count, 0);
     for (size_t i = 0; i < count; ++i) {
@@ -309,11 +335,11 @@ Error ExecutionGraph::enqueue_in(
       const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
       if (capacities_[i] < bytes) {
         // A caller in another context cannot run a warm-up there, and warmed_up_ already says whether
-        // the engine ran these shapes in its own context.
-        if (other_context) {
-          drop_graph();
-        } else {
+        // the engine ran these shapes in its own context. A graph on the caller's buffers stays valid.
+        if (!other_context) {
           reset_graph();
+        } else if (staged_) {
+          drop_graph();
         }
         // Doubling keeps shapes that grow a little at a time from allocating at every growth.
         const size_t capacity = std::max(bytes, capacities_[i] * 2);
@@ -329,6 +355,15 @@ Error ExecutionGraph::enqueue_in(
           }
         }
         if (allocation != cudaSuccess) {
+          if (records_for_other_context) {
+            ET_LOG(
+                Error,
+                "TensorRTBackend::execute: allocating buffers for a call on a stream of another regular CUDA "
+                "context failed (%s)",
+                cudaGetErrorString(allocation));
+            cudaGetLastError();
+            return Error::MemoryAllocationFailed;
+          }
           fall_back("buffer allocation failed", allocation);
           capture_failed_ = true;
           release_buffers(stream);
@@ -356,11 +391,7 @@ Error ExecutionGraph::enqueue_in(
     }
   }
 
-  // A pooled caller holds its device's pool lock, so waiting here for a load, a destroy, or another
-  // engine's recording on any device would stall every pooled engine on this device. It records on a
-  // later call instead.
-  std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
-  if (warmed_up_ && graph_exec_ == nullptr) {
+  if (!capture_lock.owns_lock() && warmed_up_ && graph_exec_ == nullptr) {
     if (scratch == nullptr) {
       capture_lock.lock();
     } else {
@@ -369,6 +400,7 @@ Error ExecutionGraph::enqueue_in(
   }
   if (capture_lock.owns_lock()) {
     cudaGraph_t graph = nullptr;
+    cudaGraphExec_t exec = nullptr;
     cudaError_t error = cudaErrorDeviceUninitialized;
     bool enqueued = true;
     {
@@ -391,9 +423,9 @@ Error ExecutionGraph::enqueue_in(
       }
       capture_lock.unlock();
       if (error == cudaSuccess && enqueued) {
-        error = cudaGraphInstantiate(&graph_exec_, graph, nullptr, nullptr, 0);
+        error = cudaGraphInstantiate(&exec, graph, nullptr, nullptr, 0);
         if (error != cudaSuccess) {
-          graph_exec_ = nullptr;
+          exec = nullptr;
         }
       }
       if (graph != nullptr) {
@@ -401,7 +433,14 @@ Error ExecutionGraph::enqueue_in(
       }
     }
     if (error != cudaSuccess || !enqueued) {
-      if (enqueued) {
+      if (records_for_other_context) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: recording a CUDA graph for a call on a stream of another regular CUDA "
+            "context failed (%s); the engine keeps the graph of its own calls",
+            enqueued ? cudaGetErrorString(error) : "TensorRT refused the enqueue");
+        cudaGetLastError();
+      } else if (enqueued) {
         fall_back("capture failed", error);
       } else {
         ET_LOG(
@@ -416,19 +455,26 @@ Error ExecutionGraph::enqueue_in(
           return Error::InvalidState;
         }
       }
+      if (records_for_other_context) {
+        return Error::InvalidState;
+      }
       if (++failed_captures_ == kMaxCaptureAttempts) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: CUDA graph recording failed %d times; this engine's calls from this %scontext "
-            "use enqueueV3 until its input shapes or profile change. Their outputs are not affected.",
+            "TensorRTBackend::execute: CUDA graph recording failed %d times; until its input shapes or profile "
+            "change, this engine runs its calls from %s with enqueueV3%s",
             kMaxCaptureAttempts,
-            capture_green_ != nullptr ? "green " : "");
+            capture_green_ != nullptr ? "this green context" : "plain streams",
+            capture_green_ != nullptr ? "" : ", and calls from another regular CUDA context fail");
         capture_failed_ = true;
         release_buffers(stream);
       }
       return enqueue_plain(context, stream);
     }
-    recorded_ = staged_ ? buffers_ : addresses;
+    drop_graph();
+    graph_exec_ = exec;
+    staged_ = own_buffers;
+    recorded_ = own_buffers ? buffers_ : addresses;
   }
   if (graph_exec_ != nullptr) {
     const auto error = cuda_error(cudaGraphLaunch(graph_exec_, stream), "launch");

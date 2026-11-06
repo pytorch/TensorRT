@@ -605,7 +605,10 @@ Some calls never replay:
   context other than the one the engine was loaded in, except that, while that context is current, a
   graph recorded in the engine's own context replays on it. When that caller's buffers are not the
   ones the graph was recorded on, the engine records again in its own context, on buffers of its
-  own, and copies the inputs in and the outputs out until its shapes or its profile change.
+  own, and copies the inputs in and the outputs out until its shapes or its profile change. When
+  that recording cannot go ahead (the shared activation scratch is busy, the engine has not run the
+  shapes in its own context yet, or the recording fails), the call fails with an error that says
+  why, and the engine's own calls keep their graph.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.
