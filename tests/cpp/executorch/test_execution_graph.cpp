@@ -1985,6 +1985,73 @@ TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextFailsAndKeep
   }
 }
 
+// The refusal comes before the call claims the shared scratch, so a pool that would have to grow for
+// it stays as it was, in the context that made it.
+TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextLeavesThePoolAlone) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+  const SizesType rows = 8;
+  const SizesType cols = 32;
+  const auto blob = build_scratch_blob(rows, cols);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(blob), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    const int engine_device = engine.handle()->device_id;
+    const size_t count = static_cast<size_t>(rows) * cols;
+    const std::vector<float> ones(count, 1.0f);
+    std::vector<float> actual(count);
+    ASSERT_EQ(cudaMemcpy(inputs_[0], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    // An empty pool would have to grow for the next call.
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    ASSERT_EQ(shared_scratch_capacity_for_testing(engine_device), 0u);
+
+    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+    cudaStream_t other_stream = nullptr;
+    ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+    EXPECT_NE(engine.run(inputs_[0], outputs_[1], rows, cols, other_stream), Error::Ok);
+    EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+    EXPECT_EQ(shared_scratch_capacity_for_testing(engine_device), 0u);
+
+    // The engine's own context grows the pool itself and keeps working.
+    ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    for (float value : actual) {
+      ASSERT_FLOAT_EQ(value, 1.0f / rows);
+    }
+    EXPECT_GT(shared_scratch_capacity_for_testing(engine_device), 0u);
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
 // The driver often gives a new green context the handle of one just destroyed. The old graph lived in the
 // destroyed context, so the new one must record its own.
 TEST_F(ExecutionGraphReplayTest, AGreenContextOnADestroyedOnesHandleRecordsAgain) {

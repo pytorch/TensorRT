@@ -192,6 +192,14 @@ Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream) {
   return Error::InvalidState;
 }
 
+bool ExecutionGraph::serves_another_regular_context(cudaStream_t stream) const {
+  CUcontext context = nullptr;
+  CUgreenCtx green = nullptr;
+  unsigned long long green_id = 0;
+  return engine_context_ != nullptr && recording_context(stream, context, green, green_id) && green == nullptr &&
+      context != engine_context_;
+}
+
 ExecutionGraph::~ExecutionGraph() {
   reset_graph();
   for (void* buffer : buffers_) {
@@ -300,16 +308,6 @@ Error ExecutionGraph::enqueue_in(
   const CUcontext record_context =
       stream_green == nullptr && engine_context_ != nullptr ? engine_context_ : stream_context;
   const bool other_context = record_context != stream_context;
-  // The shared scratch's completion event belongs to the engine's context, so such a call would fail
-  // after its work was submitted, and a recording made for it would cost the engine's own calls their
-  // graph.
-  if (other_context && scratch != nullptr) {
-    ET_LOG(
-        Error,
-        "TensorRTBackend::execute: an engine on the shared activation scratch cannot run on a stream of "
-        "another regular CUDA context");
-    return Error::InvalidState;
-  }
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
   // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
   // sets, would record on every call, so the second move switches to buffers this graph owns.
@@ -326,7 +324,7 @@ Error ExecutionGraph::enqueue_in(
   const bool own_buffers = staged_ || records_for_other_context;
   std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
   if (records_for_other_context) {
-    // Pooled calls never get here: the check above refuses a pooled call from another regular context first.
+    // Pooled calls never get here: execute() refuses a pooled call from another regular context first.
     if (!warmed_up_) {
       ET_LOG(
           Error,
