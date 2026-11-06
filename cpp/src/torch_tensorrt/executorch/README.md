@@ -291,7 +291,8 @@ input and output, for each graph, and every call copies its inputs in and its ou
 engine with few kernels, or with large inputs and outputs, these copies can cost more than they
 save. A change of shapes or profile starts the count again. So a caller that moves its buffers on
 every call records up to 3 times for each set of shapes in each graph, once more if the shared
-scratch grows in between, and never replays if its shapes also change every 4 calls or fewer.
+scratch grows in between. Its first replay for a set of shapes comes on the 5th call, or on the 6th
+when the engine's own buffers have to grow first.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
