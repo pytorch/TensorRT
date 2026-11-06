@@ -502,15 +502,15 @@ def test_autocast_calibration_names_torch_cond_as_unsupported():
             self.linear = nn.Linear(16, 16)
 
         def forward(self, x):
-            # Values above the float16 range keep the multiply in float32.
-            y = x * 1e5
-            return torch.cond(y.sum() > 0, lambda t: self.linear(t), lambda t: -t, (y,))
+            y = self.linear(x)
+            # Only inside the branch do the values leave the float16 range.
+            return torch.cond(
+                y.sum() > -1e9, lambda t: t * 1e5 / 1e5, lambda t: -t, (y,)
+            )
 
     model = Model().cuda().eval()
     x = torch.randn(4, 16, device="cuda")
-    with pytest.raises(
-        RuntimeError, match="does not support the branches of torch.cond"
-    ):
+    with pytest.raises(RuntimeError, match="does not support models with torch.cond"):
         torch_tensorrt.dynamo.compile(
             torch.export.export(model, (x,)),
             arg_inputs=[x],

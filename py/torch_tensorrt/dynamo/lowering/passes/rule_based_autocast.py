@@ -154,9 +154,7 @@ def rule_based_autocast(
             raise RuntimeError(
                 "Autocast cannot reuse the precisions it chose with calibration data, "
                 f"because these nodes are not in the graph: {sorted(missing)}. "
-                "Calibration covers only the main graph and does not support the "
-                "branches of torch.cond yet. For a model without torch.cond, compile "
-                "again with autocast_calibration_dataloader."
+                "Compile the model again with autocast_calibration_dataloader."
             )
         replay_rule = NodeNameSetRule(recorded_nodes)
     elif not reference_data:
