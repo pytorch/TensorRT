@@ -464,14 +464,15 @@ def test_autocast_warns_without_calibration_dataloader(caplog):
 )
 def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     class MaskedScores(nn.Module):
-        def __init__(self):
+        def __init__(self, fill):
             super(MaskedScores, self).__init__()
             self.linear = nn.Linear(16, 16)
+            self.fill = nn.Parameter(torch.tensor(fill))
 
         def forward(self, x, mask):
-            # -1e9 is out of the float16 range, so the calibration data keeps
-            # these nodes in float32.
-            return torch.softmax(self.linear(x) + (1.0 - mask) * -1e9, dim=-1)
+            # A -1e9 fill is out of the float16 range, so the calibration data
+            # keeps these nodes in float32.
+            return torch.softmax(self.linear(x) + (1.0 - mask) * self.fill, dim=-1)
 
     inputs = (
         torch.randn((2, 8, 16), dtype=torch.float32, device="cuda"),
@@ -482,8 +483,9 @@ def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     calibration_dataloader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(batch, batch_mask), batch_size=2
     )
+    model = MaskedScores(-1e9).cuda().eval()
     trt_autocast_mod = torch_tensorrt.dynamo.compile(
-        torch.export.export(MaskedScores().cuda().eval(), inputs),
+        torch.export.export(model, inputs),
         arg_inputs=inputs,
         min_block_size=1,
         enable_autocast=True,
@@ -502,12 +504,22 @@ def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     metadata = base64.b64decode(encoded)
     assert len(metadata) < batch.nbytes
     assert batch[0, 0, :16].cpu().numpy().tobytes() not in metadata
-    assert engine.settings.autocast_calibration_dataloader is not None
 
-    # Refit of the loaded program must pick the precisions the engine was built with.
+    # Refit cannot change the engine's precisions. An in-memory refit with weights
+    # that calibration would treat differently must keep the recorded choice, and
+    # so must refit after save and load.
+    small_fill = MaskedScores(-1.0).cuda().eval()
+    small_fill.load_state_dict(model.state_dict() | {"fill": torch.tensor(-1.0)})
+    refitted = torch_tensorrt.dynamo.refit_module_weights(
+        trt_autocast_mod, torch.export.export(small_fill, inputs), arg_inputs=inputs
+    )
+    assert torch.allclose(
+        refitted(*inputs).to(torch.float32), small_fill(*inputs), atol=1e-3, rtol=1e-3
+    ), "In-memory refit does not match PyTorch!"
+
     path = tmp_path / "model.ep"
-    torch_tensorrt.save(trt_autocast_mod, path, arg_inputs=list(inputs))
-    new_model = MaskedScores().cuda().eval()
+    torch_tensorrt.save(refitted, path, arg_inputs=list(inputs))
+    new_model = MaskedScores(-1e9).cuda().eval()
     refitted = torch_tensorrt.dynamo.refit_module_weights(
         torch_tensorrt.load(path),
         torch.export.export(new_model, inputs),

@@ -317,6 +317,11 @@ class CompilationSettings:
         )
 
         state = self.__dict__.copy()
+        # Pickles and copies (saved programs, the engine cache, each engine's own
+        # settings) leave out the calibration data. Refit then reuses the recorded
+        # precisions instead of deciding again from new weights.
+        state["autocast_calibration_dataloader"] = None
+        state.pop("autocast_intermediate_node_outputs", None)
         state["torch_executed_ops"] = {
             op if isinstance(op, str) else ConverterRegistry.qualified_name_or_str(op)
             for op in state["torch_executed_ops"]
