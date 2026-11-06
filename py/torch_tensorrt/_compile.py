@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import gc
 import importlib
 import inspect
 import logging
@@ -1581,7 +1582,7 @@ def _with_tensorrt_alignment(backend_config: Any) -> Any:
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
     try:
-        from torch_tensorrt.executorch import (
+        from torch_tensorrt.executorch import (  # noqa: F401
             check_zero_copy_kv,
             export,
             zero_copy_backend_config,
@@ -1593,6 +1594,21 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
+    try:
+        _lower_and_write_executorch(exp_program, file_path, **kwargs)
+    finally:
+        _release_lowering_caches(exp_program)
+
+
+def _lower_and_write_executorch(
+    exp_program: Any, file_path: str, **kwargs: Any
+) -> None:
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
     for option in ("partitioners", "compile_specs"):
@@ -1654,6 +1670,51 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
         etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
         executorch_program.get_etrecord().save(etrecord_path)
+
+
+def _release_lowering_caches(exp_program: Any) -> None:
+    """Drop the cache entries that point at the lowered program once it is written, also when the save
+    failed.
+
+    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's
+    dispatch cache keys entries on the ``executorch_call_delegate`` arguments: in the class-wide
+    cache, or with symbolic shapes in the ShapeEnv of ``exp_program``'s fake mode, which the
+    compiled module keeps. They keep the lowered modules, and with them every serialized engine,
+    alive after save() returns, so each saved program stays resident until the process exits.
+    Clearing them frees nothing still in use; they refill on demand. The program is a web of
+    reference cycles (graph and nodes), so it is collected here rather than at some
+    later automatic collection, which can land in the middle of the next save. The freed
+    heap goes back to the system, which is what a Jetson shares with the GPU.
+    """
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from torch_tensorrt.dynamo.utils import trim_host_heap
+
+    # TODO: remove once ExecuTorch bounds or scopes the is_same_node memo (an unbounded lru_cache on FX
+    # nodes, exir/backend/utils.py), and PyTorch stops keying the negative cache entry it stores for
+    # executorch_call_delegate (registered skip_cache=True) on the lowered module itself.
+    try:
+        from executorch.exir.backend.utils import is_same_node
+
+        is_same_node.cache_clear()
+    except (ImportError, AttributeError):
+        logger.debug("ExecuTorch's is_same_node cache is gone; nothing to clear")
+    FakeTensorMode.cache_clear()
+    # The save may have failed on its arguments, so don't assume a program: an error here would hide that.
+    nodes = getattr(getattr(exp_program, "graph", None), "nodes", ())
+    shape_envs = {
+        id(env): env
+        for node in nodes
+        if (
+            env := getattr(
+                getattr(node.meta.get("val"), "fake_mode", None), "shape_env", None
+            )
+        )
+        is not None
+    }
+    for env in shape_envs.values():
+        getattr(env, "fake_tensor_cache", {}).clear()
+    gc.collect()
+    trim_host_heap()
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
