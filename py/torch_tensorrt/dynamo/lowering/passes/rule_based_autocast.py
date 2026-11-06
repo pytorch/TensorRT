@@ -46,8 +46,13 @@ def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
 
 
 def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
-    # Ops like chunk, split and unbind produce a list of tensors.
-    return pytree.tree_map_only(torch.Tensor, lambda t: t.to(target_dtype), val)
+    # Ops like chunk, split and unbind produce a list of tensors. A comparison
+    # still makes bool, and topk still makes integer indices.
+    return pytree.tree_map_only(
+        torch.Tensor,
+        lambda t: t.to(target_dtype) if t.is_floating_point() else t,
+        val,
+    )
 
 
 def rule_based_autocast(
@@ -128,7 +133,8 @@ def rule_based_autocast(
         if isinstance(arg, torch.fx.Node) and is_tensor_node(arg):
             val = arg.meta.get("val", None)
             if isinstance(val, torch.Tensor):
-                if val.dtype == dtype:
+                # A mask such as the condition of torch.where must stay bool.
+                if val.dtype == dtype or val.dtype == torch.bool:
                     return arg
                 else:
                     with gm.graph.inserting_before(node):
@@ -199,15 +205,18 @@ def rule_based_autocast(
                 continue
 
             if node.name in low_precision_nodes:
-                _cast_tensor_args_to_dtype(node, autocast_low_precision_type)
-                node.meta["val"] = _retype_tensors(
-                    node.meta["val"], autocast_low_precision_type
-                )
+                target_dtype = autocast_low_precision_type
             elif node.name in high_precision_nodes:
-                _cast_tensor_args_to_dtype(node, autocast_high_precision_type)
-                node.meta["val"] = _retype_tensors(
-                    node.meta["val"], autocast_high_precision_type
-                )
+                target_dtype = autocast_high_precision_type
+            else:
+                continue
+            _cast_tensor_args_to_dtype(node, target_dtype)
+            if any(
+                getattr(n.meta.get("val"), "dtype", None) == target_dtype
+                for n in node.all_input_nodes
+            ):
+                # With only bool inputs, mask * 0.5 still makes float32.
+                node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

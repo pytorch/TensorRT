@@ -971,3 +971,87 @@ def test_autocast_attention_with_integer_mask():
     torch.testing.assert_close(
         trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
     )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("calibrate", [True, False], ids=["calib", "no_calib"])
+def test_autocast_combines_masks_from_topk(calibrate):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 4)
+
+        def forward(self, x):
+            values, indices = (x * 2).topk(8, dim=-1)
+            keep = (indices > 3001) & (values > 0)
+            return self.linear(torch.where(keep, values, 0.0))
+
+    def batch():
+        # Distinct values that float16 holds exactly, so topk picks the same ones.
+        return (
+            torch.stack([torch.randperm(4096) for _ in range(4)]).cuda() - 2048
+        ) / 2048
+
+    model = Model().cuda().eval()
+    batches = [(batch(),), (batch(),)]
+    settings = {}
+    if calibrate:
+        settings["autocast_calibration_dataloader"] = torch.utils.data.DataLoader(
+            batches, batch_size=None
+        )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, batches[0]),
+        arg_inputs=list(batches[0]),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        **settings,
+    )
+    for x in batches:
+        torch.testing.assert_close(
+            trt_model(*x).float(), model(*x), rtol=1e-2, atol=1e-2
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "masked",
+    [
+        lambda x, mask: torch.where(
+            ~torch.zeros(x.shape, dtype=torch.bool, device=x.device), x, 0.0
+        ),
+        lambda x, mask: x.masked_fill(mask, 0.0),
+        lambda x, mask: torch.where(mask, x, -x),
+        lambda x, mask: x + mask * -2.0,
+        lambda x, mask: x * torch.where(x > 0, 1.0, 0.5),
+    ],
+    ids=["factory_mask", "masked_fill", "where", "mask_times_scalar", "comparison"],
+)
+def test_autocast_keeps_bool_tensors_bool(masked):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+            self.conv = nn.Conv1d(1, 4, 3, padding=1)
+
+        def forward(self, x, mask):
+            y = masked(self.linear(x), mask)
+            return self.conv(y[:, None, :])
+
+    model = Model().cuda().eval()
+    inputs = (torch.randn(4, 16, device="cuda"), torch.rand(4, 16, device="cuda") > 0.5)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
