@@ -381,7 +381,6 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_excluded_ops",
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
-    "autocast_calibration_dataloader",
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",
