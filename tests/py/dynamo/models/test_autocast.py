@@ -431,6 +431,71 @@ def test_autocast_ops_with_list_outputs(split):
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize(
+    "split",
+    [
+        lambda y: torch.chunk(y, 2, dim=-1),
+        lambda y: torch.split(y, 16, dim=-1),
+        lambda y: torch.unbind(y.view(4, 2, 16), dim=1),
+    ],
+    ids=["chunk", "split", "unbind"],
+)
+def test_autocast_calibration_checks_values_through_list_outputs(split):
+    class Model(nn.Module):
+        def forward(self, x):
+            # The multiply feeding the list op and the one reading its elements
+            # both overflow float16.
+            y = x * 300.0
+            a, b = split(y * y)
+            return a * b / 8.1e9
+
+    model = Model().cuda().eval()
+    x = torch.ones(4, 32, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x), model(x))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "indices",
+    [
+        lambda y: torch.max(y, dim=-1)[1],
+        lambda y: torch.topk(y, 2, dim=-1).indices,
+    ],
+    ids=["max", "topk"],
+)
+def test_autocast_calibration_keeps_large_indices_exact(indices):
+    class Model(nn.Module):
+        def forward(self, x):
+            # Indices above 2048 cannot be stored exactly in float16.
+            return indices(x * 2.0) + 1
+
+    model = Model().cuda().eval()
+    x = torch.randn(256, 4096, device="cuda") * 1000.0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x), model(x))
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_warns_without_calibration_dataloader(caplog):
     class LargeIntermediateModel(nn.Module):
         def forward(self, x):

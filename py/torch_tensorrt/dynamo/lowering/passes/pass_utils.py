@@ -176,14 +176,23 @@ def trace_intermediate_node_outputs(
         def run_node(self, n: torch.fx.Node) -> Any:
             out = super().run_node(n)
             if n.op == "call_function" and n.target not in excluded_ops:
-                if not isinstance(out, torch.Tensor):
+                value = out
+                if (
+                    isinstance(out, (list, tuple))
+                    and out
+                    and all(isinstance(t, torch.Tensor) for t in out)
+                ):
+                    # Ops like chunk, split and unbind return a list. Its values are
+                    # recorded too, so the range rule sees them at the op feeding it.
+                    value = torch.cat([t.flatten() for t in out])
+                if not isinstance(value, torch.Tensor):
                     return out
                 if n.name in intermediate_node_outputs:
                     intermediate_node_outputs[n.name] = torch.cat(
-                        [intermediate_node_outputs[n.name], out], dim=0
+                        [intermediate_node_outputs[n.name], value], dim=0
                     )
                 else:
-                    intermediate_node_outputs[n.name] = out
+                    intermediate_node_outputs[n.name] = value
             return out
 
     if calibration_dataloader is not None:

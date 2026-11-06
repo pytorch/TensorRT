@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-import operator
 from typing import Any, Callable, List, Optional, Sequence, Union
 
 import torch
@@ -270,7 +269,7 @@ def pre_export_lowering(
         settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
             ep.module(),
             settings.autocast_calibration_dataloader,
-            [torch.ops.higher_order.wrap_with_autocast, operator.getitem],
+            [torch.ops.higher_order.wrap_with_autocast],
         )
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
