@@ -296,6 +296,9 @@ when the engine's own buffers have to grow first.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
+Kernels that TensorRT runs on auxiliary streams it creates itself are the exception: they can run
+outside the green context, on any SM. Build the engine with `max_aux_streams=0` to keep all of its
+kernels on the green context's SMs.
 An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
 caller that uses both, or up to 4 green contexts in turn, replays on each. A fifth green context
 takes the place of the one called longest ago, and a green context whose graph was replaced starts
