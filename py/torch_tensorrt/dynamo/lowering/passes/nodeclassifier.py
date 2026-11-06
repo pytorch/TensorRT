@@ -230,7 +230,7 @@ class DepthOfReductionRule(NodeRuleBase):
             if weight_shape is None:
                 return False
             in_channels = weight_shape[1]
-            kernel_volume = torch.prod(weight_shape[2:])
+            kernel_volume = weight_shape[2:].numel()
             self.reduction_depth = in_channels * kernel_volume
         elif node.target in [
             torch.ops.aten.matmul,

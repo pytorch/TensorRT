@@ -522,6 +522,31 @@ def test_autocast_calibration_joins_0_dim_values_across_batches():
 
 
 @pytest.mark.unit
+def test_autocast_depth_of_reduction_reads_a_recorded_convolution_weight():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weights = nn.Parameter(torch.randn(2, 8, 4, 3, 3))
+
+        def forward(self, x):
+            # unbind makes the weight a recorded value instead of a parameter.
+            return nn.functional.conv2d(torch.relu(x), self.weights.unbind(0)[0])
+
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_depth_of_reduction=8,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    # 4 input channels times a 3x3 kernel is a reduction depth of 36.
+    assert "conv2d" in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
 def test_autocast_calibration_ignores_indices_at_the_op_feeding_topk():
     class Model(nn.Module):
         def __init__(self):
