@@ -44,6 +44,7 @@ struct CudaCalls {
   std::vector<cudaStream_t> captures;
   std::vector<cudaStream_t> launches;
   std::vector<cudaStream_t> retirements;
+  std::vector<cudaStream_t> destroyed_streams;
   std::function<void(cudaStream_t)> during_capture;
   std::function<void(cudaGraph_t)> after_capture;
   std::function<void(cudaStream_t)> after_launch;

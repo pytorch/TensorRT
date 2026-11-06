@@ -1577,6 +1577,24 @@ TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheOldest) {
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>({green[0].stream, green[1].stream}));
 }
 
+// A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
+// once a caller destroyed that context.
+TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (cudaStream_t stream : {streams_[0], green.stream}) {
+    CudaCalls calls;
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, stream), Error::Ok);
+    }
+    ASSERT_TRUE(graph.is_captured());
+    ASSERT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.destroyed_streams, calls.captures);
+  }
+}
+
 // Releasing a graph whose green context is gone, on eviction or on engine destruction, leaves no CUDA error behind.
 TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) {
   GreenStream green[4];
