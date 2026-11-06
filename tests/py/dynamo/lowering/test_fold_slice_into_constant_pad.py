@@ -76,6 +76,9 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
             ("dim_padded_by_zero", PadThenSlice((2, 0, 0, 0), 2, 1, 5)),
             ("strided", PadThenSlice((3, 0), -1, 0, 8, step=2)),
             ("empty", PadThenSlice((3, 0), -1, 5, 5)),
+            # The slice keeps none of the input, which a negative amount cannot express.
+            ("inside_the_padding", PadThenSlice((6, 0), -1, 0, 2)),
+            ("shift_past_the_width", PadThenSlice((10, 0), -1, None, 8)),
             ("pad_has_other_users", PadThenSlice((3, 0), -1, None, 8, keep_pad=True)),
             ("reflect", PadThenSlice((3, 0, 0, 0), -1, None, 8, mode="reflect")),
             ("replicate", PadThenSlice((3, 0, 0, 0), -1, None, 8, mode="replicate")),

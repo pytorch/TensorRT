@@ -29,8 +29,8 @@ def fold_slice_into_constant_pad(
     """Rewrite slice(constant_pad_nd(x, pad)) into constant_pad_nd(x, pad').
 
     Only when every amount is a plain int, the slice has step 1 and static
-    bounds on a dim that the pad pads, keeps at least one element, and the pad
-    has no other user.
+    bounds on a dim that the pad pads, keeps at least one element of the pad's
+    input, and the pad has no other user.
     """
     del settings
     folded = 0
@@ -77,7 +77,10 @@ def fold_slice_into_constant_pad(
         end = size if end is None else end
         start = min(max(start + size if start < 0 else start, 0), size)
         end = min(max(end + size if end < 0 else end, 0), size)
-        if end <= start:
+        # A negative amount crops the pad's input, so the slice must keep at least one
+        # element of it. A slice that lies only in the padding stays as it is.
+        before, after = pad[2 * pair], pad[2 * pair + 1]
+        if min(end, size - max(after, 0)) <= max(start, max(before, 0)):
             continue
 
         pad[2 * pair] -= start
