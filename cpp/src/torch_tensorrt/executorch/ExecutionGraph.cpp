@@ -334,11 +334,9 @@ Error ExecutionGraph::enqueue_in(
       // TensorRT refuses a null address even for an empty tensor.
       const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
       if (capacities_[i] < bytes) {
-        // A caller in another context cannot run a warm-up there, and warmed_up_ already says whether
-        // the engine ran these shapes in its own context. A graph on the caller's buffers stays valid.
-        if (!other_context) {
-          reset_graph();
-        } else if (staged_) {
+        // New buffers need no warm-up, since warmed_up_ already says whether the engine ran these shapes
+        // in its own context, and a graph on the caller's buffers stays valid.
+        if (staged_) {
           drop_graph();
         }
         // Doubling keeps shapes that grow a little at a time from allocating at every growth.

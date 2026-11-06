@@ -581,8 +581,7 @@ change a second time for the same input shapes, the engine records on GPU buffer
 copies the inputs in and the outputs out on every call. With few kernels, or with large inputs and
 outputs, those copies can cost more than the launches they save. A change of input shapes or
 profile starts this over, so buffers that move on every call cost up to 3 recordings for each set
-of shapes in each graph, and first replay on the 5th call with those shapes, or on the 6th when the
-engine's own buffers have to grow first.
+of shapes in each graph, and first replay on the 5th call with those shapes.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded there, and its replays stay on the green context's SMs. Kernels
