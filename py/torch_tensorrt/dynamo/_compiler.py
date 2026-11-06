@@ -31,6 +31,13 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._weight_release import (
+    WeightReleaser,
+    building,
+    drop_released_weights,
+    parameter_storages,
+    weight_storages,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -74,6 +81,7 @@ from torch_tensorrt.dynamo.utils import (
     parse_graph_io,
     pin_torch_executed_state,
     prepare_inputs,
+    release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
     validate_optimization_profiles,
@@ -539,6 +547,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    release_weights_after_build: bool = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -652,6 +661,11 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
+            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
+            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
+            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
+            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -871,6 +885,7 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "release_weights_after_build": release_weights_after_build,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1339,6 +1354,14 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
+    if settings.strip_engine_weights and not settings.immutable_weights:
+        logger.warning(
+            "release_weights_after_build releases the source weights; engines built with "
+            "strip_engine_weights must be refit from a freshly loaded checkpoint."
+        )
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1494,13 +1517,27 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        return convert_module(
-            gm,
-            convert_inputs,
-            settings=settings,
-            name="_run_on_acc_0",
-            engine_cache=engine_cache,
-        )
+        single_releaser = None
+        single_weights: Dict[int, torch.UntypedStorage] = {}
+        if settings.release_weights_after_build:
+            _warn_if_refit_source_released(settings)
+            single_releaser = WeightReleaser([gm])
+            if single_releaser.release_unread(parameter_storages(gm)):
+                release_host_and_device_memory()
+            single_weights = weight_storages(gm)
+        with building(single_releaser, "_run_on_acc_0"):
+            single_module = convert_module(
+                gm,
+                convert_inputs,
+                settings=settings,
+                name="_run_on_acc_0",
+                engine_cache=engine_cache,
+            )
+        if single_releaser is not None and single_releaser.built(
+            single_weights, "_run_on_acc_0"
+        ):
+            release_host_and_device_memory()
+        return single_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1619,6 +1656,22 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
+    weight_releaser = None
+    if settings.release_weights_after_build and not settings.dryrun:
+        _warn_if_refit_source_released(settings)
+        # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
+        weight_releaser = WeightReleaser(
+            [partitioned_module]
+            + [
+                sub
+                for _, sub in partitioned_module.named_children()
+                if isinstance(sub, torch.fx.GraphModule)
+            ]
+        )
+        # The lowered module still holds weights no partition reads (for example a model head the
+        # traced function never calls); nothing needs them once partitioning is done.
+        weight_releaser.release_unread(parameter_storages(gm))
+
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
     # the ones they still read.
@@ -1721,15 +1774,24 @@ def compile_module(
         torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
+            # Collected before conversion, which deletes the submodule's frozen parameters.
+            submodule_weights = (
+                weight_storages(submodule) if weight_releaser is not None else {}
             )
+            with building(weight_releaser, name):
+                trt_module = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
 
             trt_modules[name] = trt_module
+            if weight_releaser is not None and weight_releaser.built(
+                submodule_weights, name
+            ):
+                release_host_and_device_memory()
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
@@ -1776,6 +1838,8 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+    if weight_releaser is not None:
+        drop_released_weights(partitioned_module)
 
     # compile() offloaded gm before this call, so the state that runs in PyTorch must go
     # back to the device: the PyTorch nodes the global partitioner leaves in this graph,
