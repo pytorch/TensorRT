@@ -56,8 +56,8 @@ def fold_slice_into_constant_pad(
 
     Only when every amount is a plain int, the slice has step 1 and static
     bounds on a dim that the pad pads, keeps at least one element of the pad's
-    input, the pad has no other user, and no as_strided or torch.cond reads the
-    slice. Pads and slices that torch_executed_ops or torch_executed_modules keep
+    input, does not remove all of the padding, the pad has no other user, and no
+    as_strided or torch.cond reads the slice. Pads and slices that torch_executed_ops or torch_executed_modules keep
     in PyTorch are left as they are.
     """
     excluded = settings.torch_executed_ops
@@ -128,6 +128,10 @@ def fold_slice_into_constant_pad(
 
         pad[2 * pair] -= start
         pad[2 * pair + 1] -= size - end
+        # The slice removes exactly the padding. TensorRT fails to build an all-zero
+        # pad that an elementwise layer follows, so keep the pair as it is.
+        if not any(pad):
+            continue
         fill = pad_node.args[2] if len(pad_node.args) > 2 else 0
 
         with gm.graph.inserting_before(node):

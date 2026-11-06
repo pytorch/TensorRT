@@ -67,7 +67,7 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
     @parameterized.expand(
         [
             ("fill_value", PadThenSlice((3, 0), -1, None, 8, value=5.0)),
-            ("negative_start", PadThenSlice((3, 0), -1, -8, None)),
+            ("negative_start", PadThenSlice((3, 0), -1, -9, None)),
         ]
     )
     def test_folds_keep_the_fill_and_a_negative_start(self, _, module):
@@ -93,6 +93,9 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
             # The slice keeps none of the input, which a negative amount cannot express.
             ("inside_the_padding", PadThenSlice((6, 0), -1, 0, 2)),
             ("shift_past_the_width", PadThenSlice((10, 0), -1, None, 8)),
+            # The slice removes exactly the padding, which would leave an all-zero pad.
+            ("removes_the_padding", PadThenSlice((3, 0), -1, 3, None)),
+            ("removes_the_padding_on_both_sides", PadThenSlice((2, 2), -1, 2, -2)),
             ("pad_has_other_users", PadThenSlice((3, 0), -1, None, 8, keep_pad=True)),
             ("reflect", PadThenSlice((3, 0, 0, 0), -1, None, 8, mode="reflect")),
             ("replicate", PadThenSlice((3, 0, 0, 0), -1, None, 8, mode="replicate")),
@@ -193,6 +196,18 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         gm = fold_slice_into_constant_pad(gm, CompilationSettings())
         self.assertIn(SLICE, before)
         self.assertEqual(before, _targets(gm))
+
+    def test_slice_that_removes_the_padding_compiles(self):
+        class Unpad(torch.nn.Module):
+            def forward(self, x):
+                return F.pad(x, (2, 2))[..., 2:-2] + 1.0
+
+        x = torch.randn(2, 4, 8).cuda()
+        module = Unpad().eval().cuda()
+        trt_module = torch_tensorrt.dynamo.compile(
+            torch.export.export(module, (x,)), arg_inputs=[x], min_block_size=1
+        )
+        torch.testing.assert_close(trt_module(x), module(x), rtol=0, atol=0)
 
     def test_stacked_shifts_compile(self):
         # Shifted copies of one tensor, stacked, as in a stereo cost volume.
