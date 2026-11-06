@@ -58,9 +58,12 @@ def _is_exact_upcast(n: torch.fx.Node, target_dtype: torch.dtype) -> bool:
     if n.target != torch.ops.aten.to.dtype or n.kwargs or len(n.args) != 2:
         return False
     src, upcast_dtype = n.args
+    val = src.meta.get("val") if isinstance(src, torch.fx.Node) else None
     return (
-        isinstance(src, torch.fx.Node)
-        and getattr(src.meta.get("val"), "dtype", None) == target_dtype
+        isinstance(val, torch.Tensor)
+        and val.dtype == target_dtype
+        # The cast of a strided slice makes a contiguous copy that a view may need.
+        and val.is_contiguous()
         and upcast_dtype in (torch.float32, torch.float64)
         and target_dtype.is_floating_point
         and torch.finfo(target_dtype).bits < torch.finfo(upcast_dtype).bits

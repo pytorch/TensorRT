@@ -1212,6 +1212,27 @@ def test_autocast_leaves_tiny_factors_alone(scale):
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize("low", [torch.float16, torch.bfloat16], ids=["fp16", "bf16"])
+def test_autocast_keeps_the_round_trip_of_a_strided_slice(low):
+    class Model(nn.Module):
+        def forward(self, x):
+            # x[::2].float() is a contiguous copy, so the view of it is allowed.
+            return x[::2].float().view(-1) * 2
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 4, device="cuda", dtype=low)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=low,
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_skips_float16_float32_float16_round_trips():
     class Model(nn.Module):
         def __init__(self):
