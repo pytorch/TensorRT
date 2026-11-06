@@ -1086,3 +1086,39 @@ def test_autocast_gives_autocast_regions_their_traced_dtypes():
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "given",
+    [
+        lambda y: y.cumsum(2, dtype=torch.float32) / 16,
+        lambda y: y + torch.arange(y.shape[2], device=y.device).to(torch.float32) / 16,
+        lambda y: nn.functional.normalize(y.float(), dim=1),
+    ],
+    ids=["cumsum_dtype", "to_dtype", "float"],
+)
+def test_autocast_keeps_the_dtype_an_op_is_given(given):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv1d(4, 4, 3, padding=1)
+            self.conv2 = nn.Conv1d(4, 4, 3, padding=1)
+
+        def forward(self, x):
+            return self.conv2(given(self.conv1(x)))
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 4, 16, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)

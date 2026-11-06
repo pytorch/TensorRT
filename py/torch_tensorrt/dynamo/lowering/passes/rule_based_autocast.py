@@ -26,6 +26,16 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     return False
 
 
+def _is_given_a_dtype(n: torch.fx.Node) -> bool:
+    if not isinstance(n.target, torch._ops.OpOverload):
+        return False
+    for i, a in enumerate(n.target._schema.arguments):
+        if a.name == "dtype":
+            given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
+            return given is not None
+    return False
+
+
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
     tensors = [
         v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
@@ -209,6 +219,10 @@ def rule_based_autocast(
             if not any(is_tensor_node(n) for n in node.all_input_nodes):
                 # A factory op such as torch.zeros has no inputs to cast, so its
                 # output keeps the dtype it was created with.
+                continue
+            if _is_given_a_dtype(node):
+                # An op such as x.float() or cumsum(dtype=torch.float32) makes the
+                # dtype it is given, whatever its inputs are.
                 continue
             if _has_only_integer_outputs(node):
                 # An integer op such as ids % k must still make integers, for
