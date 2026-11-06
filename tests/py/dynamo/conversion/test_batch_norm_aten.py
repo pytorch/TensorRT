@@ -360,6 +360,28 @@ class TestNativeBatchNormConverter(DispatchTestCase):
         self.assertEqual(norm_layer.get_input(0).dtype, compute_dtype)
         self.assertEqual(net.get_output(0).dtype, trt.float16)
 
+    def test_native_batchnorm_refittable_fp16_fold_out_of_range_warns(self):
+        # A refittable engine keeps float16 layers for float16 parameters, so a fold
+        # that overflows float16 can only be reported.
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._native_batch_norm_legit_no_training.default(
+                    x,
+                    torch.tensor([60000.0, 1.0, 1.0], dtype=torch.float16),
+                    torch.zeros(FEATURE_NUM, dtype=torch.float16),
+                    torch.zeros(FEATURE_NUM, dtype=torch.float16),
+                    torch.tensor([1e-3, 1.0, 1.0], dtype=torch.float16),
+                    0.1,
+                    1e-05,
+                )[0]
+
+        inputs = [torch.randn(2, FEATURE_NUM, 8, 8, dtype=torch.float16)]
+        with self.assertLogs(
+            "torch_tensorrt.dynamo.conversion.impl.normalization.ops", level="WARNING"
+        ) as logs:
+            self._network(BatchNorm(), inputs, immutable_weights=False)
+        self.assertTrue(any("computes inf" in line for line in logs.output))
+
     def test_native_batchnorm_legit_no_stats_fp16_input_weight_out_of_range(self):
         # A float32 weight above the float16 range on a constant channel, whose
         # normalized values are 0, so the output fits float16.

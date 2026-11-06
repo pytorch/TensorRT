@@ -259,6 +259,14 @@ def batch_norm(
                     p.dtype != input_dtype
                     for p in (weight, bias, running_mean, running_var)
                 )
+                if not normalize_in_float32 and not (
+                    input_scale.isfinite().all() and input_bias.isfinite().all()
+                ):
+                    _LOGGER.warning(
+                        f"Batch norm {name}: the folded scale or shift does not fit "
+                        f"{input_dtype}, so this refittable engine computes inf. Compile "
+                        "with immutable_weights=True, or give it float32 parameters."
+                    )
             if not normalize_in_float32:
                 # The input dtype lets a preceding convolution fuse with the scale layer.
                 adjusted_scale, adjusted_bias = input_scale, input_bias
