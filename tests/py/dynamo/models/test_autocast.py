@@ -1150,3 +1150,37 @@ def test_autocast_keeps_tiny_constants_nonzero():
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_skips_float16_float32_float16_round_trips():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv1d(4, 4, 3, padding=1)
+            self.conv2 = nn.Conv1d(4, 4, 3, padding=1)
+
+        def forward(self, x):
+            return self.conv2(self.conv1(x).float() * 2)
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 4, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    gm = pre_export_lowering(torch.export.export(model, (x,)), settings).graph_module
+    casts = [n for n in gm.graph.nodes if n.target == torch.ops.aten.to.dtype]
+    assert not any(n.args[0] in casts for n in casts), gm.code
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
