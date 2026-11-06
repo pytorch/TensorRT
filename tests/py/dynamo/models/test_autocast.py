@@ -495,6 +495,33 @@ def test_autocast_calibration_keeps_large_indices_exact(indices):
 
 
 @pytest.mark.unit
+def test_autocast_calibration_joins_0_dim_values_across_batches():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.affine = nn.Parameter(torch.tensor([2.0, 0.5]))
+
+        def forward(self, x):
+            # unbind of a 1-D tensor and sum give 0-dim values.
+            scale, shift = self.affine.unbind(0)
+            return x * scale + shift + x / x.sum()
+
+    model = Model().cuda().eval()
+    x = torch.rand(4, 16, device="cuda") + 1.0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,), (x * 2.0,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
 def test_autocast_calibration_ignores_indices_at_the_op_feeding_topk():
     class Model(nn.Module):
         def __init__(self):

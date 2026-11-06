@@ -164,10 +164,10 @@ def trace_intermediate_node_outputs(
     Args:
         gm (torch.fx.GraphModule): The graph module to trace the intermediate node outputs of.
         calibration_dataloader (torch.utils.data.DataLoader): The dataloader to use for tracing.
-        excluded_ops (Set[torch.fx.node.Target]): The set of ATen ops that should be excluded from the trace. For example, `{torch.ops.higher_order.wrap_with_autocast, operator.getitem}`. Default is an empty set.
+        excluded_ops (Set[torch.fx.node.Target]): The set of ATen ops that should be excluded from the trace. For example, `{torch.ops.higher_order.wrap_with_autocast}`. Default is an empty set.
 
     Returns:
-        Dict[str, torch.Tensor]: A dictionary of intermediate node outputs. The key is the node name and the value is the tensor.
+        Dict[str, torch.Tensor]: A dictionary of intermediate node outputs. The key is the node name and the value is its output, joined across batches along the first dim. A list output is one flat tensor of its floating-point values, and a 0-dim output has one element per batch.
     """
 
     intermediate_node_outputs: Dict[str, torch.Tensor] = {}
@@ -187,6 +187,9 @@ def trace_intermediate_node_outputs(
                     value = torch.cat(floats) if floats else None
                 if not isinstance(value, torch.Tensor):
                     return out
+                # Batches are joined along the first dim, which a 0-dim value lacks.
+                if value.dim() == 0:
+                    value = value.reshape(1)
                 if n.name in intermediate_node_outputs:
                     intermediate_node_outputs[n.name] = torch.cat(
                         [intermediate_node_outputs[n.name], value], dim=0
