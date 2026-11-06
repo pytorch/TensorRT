@@ -720,6 +720,50 @@ TEST_F(ExecutionGraphReplayTest, OutputOnlyMovesWriteTheNewOutput) {
   EXPECT_TRUE(graph.is_captured());
 }
 
+// A column-major input and an input off a 256-byte boundary go through the engine's own copy of the
+// input, so a replay must read that copy, refreshed on every call, and not the caller's buffer.
+TEST_F(ExecutionGraphReplayTest, ReplaysCopyNonRowMajorAndUnalignedDeviceInputs) {
+  for (bool column_major : {true, false}) {
+    SCOPED_TRACE(column_major ? "column-major" : "unaligned");
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    float* const data = static_cast<float*>(inputs_[1]) + (column_major ? 0 : 1);
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      SCOPED_TRACE(i);
+      std::vector<float> expected(16), storage(16);
+      for (int r = 0; r < 2; ++r) {
+        for (int c = 0; c < 8; ++c) {
+          const float value = static_cast<float>(i * 16 + r * 8 + c);
+          storage[column_major ? r + c * 2 : r * 8 + c] = value;
+          expected[r * 8 + c] = value * 2.0f + 1.0f;
+        }
+      }
+      ASSERT_EQ(cudaMemcpy(data, storage.data(), sizeof(float) * storage.size(), cudaMemcpyHostToDevice), cudaSuccess);
+      ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+      SizesType input_sizes[] = {2, 8};
+      SizesType output_sizes[] = {2, 8};
+      DimOrderType dim_order[] = {1, 0};
+      StridesType strides[] = {1, 2};
+      TensorImpl column_major_impl(ScalarType::Float, 2, input_sizes, data, dim_order, strides);
+      TensorImpl row_major_impl(ScalarType::Float, 2, input_sizes, data);
+      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0]);
+      EValue input_value{Tensor(column_major ? &column_major_impl : &row_major_impl)};
+      EValue output_value{Tensor(&output_impl)};
+      EValue* args[] = {&input_value, &output_value};
+      ASSERT_EQ(graph.run({args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      std::vector<float> output(16);
+      ASSERT_EQ(
+          cudaMemcpy(output.data(), outputs_[0], sizeof(float) * output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
+      EXPECT_EQ(output, expected);
+      EXPECT_NE(graph.handle()->exec_ctx->getTensorAddress("input_0"), data);
+    }
+    EXPECT_TRUE(graph.is_captured());
+    EXPECT_FALSE(calls.launches.empty());
+  }
+}
+
 // With or without graphs, a call gives TensorRT a shape or an address again only when it changed. What the
 // test sets on the TensorRT context behind the delegate's back stays there exactly when the call is skipped.
 TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
