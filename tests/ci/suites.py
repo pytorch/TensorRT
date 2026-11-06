@@ -362,7 +362,7 @@ _L2: list[Suite] = [
             " and not test_update_executorch_pin"
         ),
         setup=("executorch",),
-        jobs="auto",
+        jobs="8",
         variants=("standard",),
         platforms=("linux-x86_64",),
     ),
