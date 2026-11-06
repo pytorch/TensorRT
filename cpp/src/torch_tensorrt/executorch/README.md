@@ -291,12 +291,13 @@ a later call records.
 Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
 does, and as a caller that reuses its device tensors does. When the buffers change, that call
 records again on the new ones. When they change a second time, for any shapes, the engine stops
-following them, also after its shapes or its profile change: it records on one GPU buffer of its own
-per input and output, for each graph, and every call copies its inputs in and its outputs out. For
-an engine with few kernels, or with large inputs and outputs, these copies can cost more than they
-save. So a caller that moves its buffers on every call records up to 3 times for a set of shapes in
-each graph until it has moved them twice, once more if the shared scratch grows in between. After
-that, each new set of shapes records once.
+following them, also after its shapes or its profile change: it records on one GPU buffer of its
+own per input and output, for each graph, and every call copies its inputs in and its outputs out.
+For an engine with few kernels, or with large inputs and outputs, these copies can cost more than
+they save. So a caller that moves its buffers on every call records up to 3 times for a set of
+shapes in each graph until it has moved them twice. After that, each new set of shapes records once
+and first replays on its 3rd call. Each growth of the shared scratch in between adds a call without
+a graph and then a recording.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
