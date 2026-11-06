@@ -495,6 +495,29 @@ def test_autocast_calibration_keeps_large_indices_exact(indices):
 
 
 @pytest.mark.unit
+def test_autocast_calibration_ignores_indices_at_the_op_feeding_topk():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 1024)
+
+        def forward(self, x):
+            return torch.topk(self.linear(x), 8, dim=-1).values
+
+    x = torch.randn(4, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    # topk's indices reach 1023, but they say nothing about the range of the linear layer.
+    assert "linear" not in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 def test_autocast_warns_without_calibration_dataloader(caplog):
     class LargeIntermediateModel(nn.Module):

@@ -177,14 +177,14 @@ def trace_intermediate_node_outputs(
             out = super().run_node(n)
             if n.op == "call_function" and n.target not in excluded_ops:
                 value = out
-                if (
-                    isinstance(out, (list, tuple))
-                    and out
-                    and all(isinstance(t, torch.Tensor) for t in out)
+                if isinstance(out, (list, tuple)) and all(
+                    isinstance(t, torch.Tensor) for t in out
                 ):
                     # Ops like chunk, split and unbind return a list. Its values are
                     # recorded too, so the range rule sees them at the op feeding it.
-                    value = torch.cat([t.flatten() for t in out])
+                    # Indices, like those of topk, say nothing about that op's range.
+                    floats = [t.flatten() for t in out if t.is_floating_point()]
+                    value = torch.cat(floats) if floats else None
                 if not isinstance(value, torch.Tensor):
                     return out
                 if n.name in intermediate_node_outputs:
