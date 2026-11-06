@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import logging
 import uuid
 from dataclasses import dataclass, replace
@@ -257,6 +258,7 @@ def register_region_plugin(
         capability_validator=validator,
     )
     with torch.cuda.device(input_specs[0].device):
+        func = registration.func if isinstance(registration, partial) else None
         if isinstance(registration, KernelSpec):
             declared_inputs = registration.inputs
             if declared_inputs is None:
@@ -298,7 +300,43 @@ def register_region_plugin(
                 ),
                 **common,
             )
-        else:
+        elif func is kernels.cutile_op:
+            # Without an explicit signature, use the generated-kernel array names.
+            signature = registration.keywords.get("signature") or {
+                **{f"arg{i}": spec.dtype for i, spec in enumerate(input_specs)},
+                **{f"out{i}": spec.dtype for i, spec in enumerate(output_specs)},
+            }
+            # cuTile matches the schema's and callback's input names with the
+            # kernel's input arrays, so both take their names from the signature.
+            names = list(signature)[: len(input_specs)]
+            meta_fn.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+                [
+                    inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                    for name in names
+                ]
+            )
+            arguments = ", ".join(f"Tensor {name}" for name in names)
+            registration(
+                op_name,
+                signature=signature,
+                **{**common, "schema": f"({arguments}) -> {returns}"},
+            )
+        elif func is kernels.ptx_op:
+            from torch_tensorrt.kernels._common import check_aot_dtypes
+
+            # Generated CUDA already validated and compiled this pointer ABI.
+            # Keep the engine binding guard when using the precompiled funnel.
+            registration(
+                op_name,
+                aot_fn=check_aot_dtypes(
+                    op_name,
+                    registration.keywords["aot_fn"],
+                    [boundary.dtype for boundary in input_specs],
+                    [boundary.dtype for boundary in output_specs],
+                ),
+                **common,
+            )
+        elif func is kernels.triton_op:
             # fused_kernel defaults grid to None because a CUDA KernelSpec omits it.
             if not callable(registration.keywords.get("grid")):
                 raise RegionError(
@@ -312,5 +350,11 @@ def register_region_plugin(
                 op_name,
                 signature=signature,
                 **common,
+            )
+        else:
+            raise RegionError(
+                f"Plugin region {region_id!r} registration must be a KernelSpec or "
+                "a functools.partial of kernels.triton_op, kernels.cutile_op, or "
+                f"kernels.ptx_op; got {registration!r:.200}"
             )
     return getattr(getattr(torch.ops, namespace), name).default

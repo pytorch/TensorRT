@@ -29,3 +29,4 @@ understanding the system architecture, and managing resources.
    contributors/autocast
    contributors/export_serialization
    contributors/inplace_operations
+   contributors/agentic_region_kernel_generation

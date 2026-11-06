@@ -90,7 +90,11 @@ def validate_region_settings(
     if not records:
         return True
     conflicts = []
-    torch_region = next((r for r in records if r.route == "torch"), None)
+    # A dry run shows a generated kernel region as its reference body, which a
+    # real compilation would place in TensorRT; it is not a PyTorch region.
+    torch_region = next(
+        (r for r in records if r.route == "torch" and r.plugin_key < 0), None
+    )
     if getattr(settings, "require_full_compilation", False) and torch_region:
         conflicts.append(
             f"require_full_compilation=True (region {torch_region.id!r} must run "

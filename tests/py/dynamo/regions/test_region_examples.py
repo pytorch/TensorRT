@@ -3,6 +3,7 @@
 
 """Keep public region examples executable; API edge cases live separately."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -40,3 +41,25 @@ def test_region_example(script, success):
         pytest.skip("TensorRT QDP plugin support is required")
     output = run_python(ROOT / "examples" / "dynamo" / script, cwd=ROOT, timeout=180)
     assert success in output
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
+@pytest.mark.skipif(os.name != "posix", reason="Kernel generation requires POSIX")
+def test_agentic_region_example_runs_with_an_offline_provider(tmp_path, monkeypatch):
+    pytest.importorskip("triton")
+    if not torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
+        pytest.skip("TensorRT QDP plugin support is required")
+    root = Path(__file__).resolve().parents[4]
+    # The example and its provider subprocesses import the adapter by name.
+    path = [str(Path(__file__).resolve().parent), os.environ.get("PYTHONPATH", "")]
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(filter(None, path)))
+    output = run_python(
+        root / "examples" / "dynamo" / "agentic_region_kernel_generation.py",
+        "--provider",
+        "_example_kernel_provider:author",
+        "--cache-dir",
+        tmp_path,
+        cwd=root,
+        timeout=300,
+    )
+    assert "matches PyTorch on fresh and nonfinite inputs" in output

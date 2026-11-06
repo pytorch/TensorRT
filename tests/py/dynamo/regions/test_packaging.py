@@ -19,7 +19,8 @@ def test_python_only_wheel_includes_region_modules():
         if isinstance(node, ast.Assign)
         and len(node.targets) == 1
         and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id in {"dynamo_packages", "dynamo_package_dir"}
+        and node.targets[0].id
+        in {"dynamo_packages", "dynamo_package_dir", "package_data"}
     }
     distribution = Distribution(
         {
@@ -28,15 +29,29 @@ def test_python_only_wheel_includes_region_modules():
                 package: str(root / directory)
                 for package, directory in declarations["dynamo_package_dir"].items()
             },
+            "package_data": declarations["package_data"],
         }
     )
     distribution.script_name = str(setup)
     command = build_py(distribution)
     command.ensure_finalized()
     selected = {Path(path).resolve() for path in command.get_source_files()}
+    selected.update(
+        Path(source, name).resolve()
+        for _, source, _, names in command.data_files
+        for name in names
+    )
+    package = root / "py/torch_tensorrt"
+    directories = (
+        "region",
+        "dynamo/region_compilation",
+        "dynamo/region_compilation/_generation",
+    )
     required = {
-        path
-        for directory in ("region", "dynamo/region_compilation")
-        for path in (root / "py/torch_tensorrt" / directory).glob("*.py")
+        path for directory in directories for path in (package / directory).glob("*.py")
     }
+    # Kernel generation briefs the agent with the packaged kernel-author skill.
+    required.update(
+        (package / "dynamo/region_compilation/_generation/skills").rglob("*.md")
+    )
     assert required <= selected, f"Python-only wheel omits {required - selected}"
