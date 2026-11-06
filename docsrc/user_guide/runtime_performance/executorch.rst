@@ -590,8 +590,9 @@ the green context, on any SM. Compile with ``max_aux_streams=0`` to keep all of 
 context's SMs. An engine keeps such a graph for up to 4 green contexts, and one for plain streams,
 so a caller that uses both replays on each. A fifth green context takes the place of the one called
 longest ago, and a replaced one starts over with a warm-up call, so one call on each of more than 4
-green contexts in turn never replays. TensorRT requires a green context to outlive the graphs recorded in it, so
-destroy the engine before its green contexts.
+green contexts in turn never replays. A green context may be destroyed before the engine: the engine
+never replays that context's graph again, and only frees it when its place is taken or the engine is
+destroyed.
 
 Some calls never replay:
 

@@ -99,8 +99,8 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * creates itself can still run outside the green context; an engine built with
  * max_aux_streams=0 has none. Up to 4 green contexts keep a graph each, until the
  * engine is destroyed or a newer green context takes the place of the one
- * called longest ago. TensorRT requires a green context to outlive the graphs
- * recorded in it, so destroy the engine first. A stream of another device
+ * called longest ago. A green context may be destroyed first: its graph is then
+ * only freed, never replayed. A stream of another device
  * fails, and so does one of another regular context, unless that context is
  * current and a graph recorded in the engine's own context replays on it. On
  * other buffers than that graph's, the engine records again in its own context,
