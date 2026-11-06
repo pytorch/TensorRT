@@ -168,7 +168,9 @@ need only a few copy calls: about 0.25 ms for a 640x480 float32 image on an A100
 matrix needs one call per row: about 6 ms for 1024x1024. From host memory the copy is much slower,
 tens of milliseconds or more for an image, so export such an input in row-major order where you can.
 An input that the engine updates in place must be row-major, or the call fails with
-`Error::InvalidArgument`.
+`Error::InvalidArgument`. The delegate reads the layout from the dim order, so a tensor built by hand
+that is not row-major must carry its dim order as well as its strides; one with strides but no dim
+order is read as row-major. Tensors from an ExecuTorch program always carry both.
 
 ### CUDA streams
 
