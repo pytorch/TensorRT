@@ -95,7 +95,10 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * streams in the current ordinary context can replay, as can a call with no
  * caller stream. A green context stream of the engine's device records and
  * replays in its own context while no regular context other than the device's
- * primary one is current. Up to 4 green contexts keep a graph each, until the
+ * primary one is current. Kernels on auxiliary streams that TensorRT creates
+ * stay in the green context with TensorRT 11.4 and newer, and can run outside it
+ * with TensorRT 11.1 and older; an engine built with max_aux_streams=0 has none.
+ * Up to 4 green contexts keep a graph each, until the
  * engine is destroyed or a newer green context takes the place of the one
  * called longest ago. TensorRT requires a green context to outlive the graphs
  * recorded in it, so destroy the engine first. A stream of another device

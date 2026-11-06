@@ -586,12 +586,14 @@ of shapes records once and first replays on its 3rd call. Each growth of the sha
 scratch in between adds one recording and moves the first replay later.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
-graph of their own, recorded there, and its replays stay on the green context's SMs. An engine
-keeps such a graph for up to 4 green contexts, and one for plain streams, so a caller that uses
-both replays on each, as long as every caller passes the same input shapes: a call with other
-shapes starts every graph over. A fifth green context takes the place of the one called longest ago, and a
-replaced one starts over with a warm-up call, so one call on each of more than 4 green contexts in
-turn never replays. TensorRT requires a green context to outlive the graphs recorded in it, so
+graph of their own, recorded there, and its replays stay on the green context's SMs. Kernels that
+TensorRT runs on auxiliary streams it creates itself stay there too with TensorRT 11.4 and newer.
+TensorRT 11.1 and older create those streams outside the green context, so their kernels can run on
+any SM; with those versions, compile with ``max_aux_streams=0`` to keep all of them on the green
+context's SMs. An engine keeps such a graph for up to 4 green contexts, and one for plain streams,
+so a caller that uses both replays on each. A fifth green context takes the place of the one called
+longest ago, and a replaced one starts over with a warm-up call, so one call on each of more than 4
+green contexts in turn never replays. TensorRT requires a green context to outlive the graphs recorded in it, so
 destroy the engine before its green contexts.
 
 Some calls never replay:

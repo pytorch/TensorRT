@@ -301,6 +301,11 @@ a graph and then a recording.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
+Kernels that TensorRT runs on auxiliary streams it creates itself stay in the green context with
+TensorRT 11.4 and newer, which creates those streams in the green context of the stream it is given.
+TensorRT 11.1 and older create them outside it, so their kernels can run on any SM. With those
+versions, build the engine with `max_aux_streams=0` to keep all of its kernels on the green
+context's SMs.
 An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
 caller that uses both, or up to 4 green contexts in turn, replays on each. These graphs share one
 record of the engine's input shapes, so they replay only while every caller passes the same shapes:
