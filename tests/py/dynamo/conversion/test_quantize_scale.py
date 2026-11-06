@@ -40,6 +40,30 @@ class TestQuantizeScale(TestCase):
         (div,) = [l for l in network(True)[1] if l.type == trt.LayerType.ELEMENTWISE]
         self.assertEqual(div.get_input(0).dtype, trt.float32)
 
+    def test_fp8_zero_amax_gives_a_scale_of_one_over_448(self):
+        # An FP8 scale of 0 zeroes the input or gives NaN, so an amax of 0 means 1.
+        def network(amax_from_input):
+            network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+                1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+            )
+            ctx = ConversionContext(network, CompilationSettings())
+            x = network.add_input("x", trt.float32, (4,))
+            amax = torch.tensor(0.0)
+            if amax_from_input:
+                amax = network.add_input("amax", trt.float32, ())
+            impl.quantize.quantize(
+                ctx, torch.ops.aten.mul.Tensor, None, "q", x, amax, 8, 4
+            )
+            # ctx keeps the constant weights alive.
+            return ctx, [network.get_layer(i) for i in range(network.num_layers)]
+
+        ctx, layers = network(False)
+        (scale,) = [l for l in layers if l.name == "q_scale"]
+        scale.__class__ = trt.IConstantLayer
+        torch.testing.assert_close(scale.weights.item(), 1 / 448, rtol=1e-6, atol=0)
+        layers = network(True)[1]
+        self.assertTrue(any(l.type == trt.LayerType.SELECT for l in layers))
+
     def test_fp8_run_time_amax_with_float64_default_dtype(self):
         # TensorRT has no float64, so the constants must not follow the default dtype.
         network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
