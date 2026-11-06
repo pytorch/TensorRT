@@ -30,6 +30,31 @@ from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 _LOGGER = logging.getLogger(__name__)
 
 
+def _input_made_by(
+    node: Optional[torch.fx.Node], target: Target
+) -> Optional[torch.fx.Node]:
+    """The first input of ``node``, if an op ``target`` makes it."""
+    arg = node.args[0] if node is not None and node.args else None
+    return arg if isinstance(arg, torch.fx.Node) and arg.target == target else None
+
+
+def _is_low_precision_norm(node: Optional[torch.fx.Node]) -> bool:
+    """Whether the first input of ``node`` is sum(pow(x.to(dtype), 2)) with ``x``
+    float16 or bfloat16. PyTorch computes the vector norm of such a tensor as the power
+    of 0.5 of this sum, with dtype float32."""
+    total = _input_made_by(node, torch.ops.aten.sum.dim_IntList)
+    square = _input_made_by(total, torch.ops.aten.pow.Tensor_Scalar)
+    cast = _input_made_by(square, torch.ops.aten._to_copy.default)
+    if square is None or cast is None or square.args[1] != 2:
+        return False
+    source = cast.args[0]
+    value = source.meta.get("val") if isinstance(source, torch.fx.Node) else None
+    return isinstance(value, torch.Tensor) and value.dtype in (
+        torch.float16,
+        torch.bfloat16,
+    )
+
+
 def trunc_div(
     ctx: ConversionContext,
     target: Target,
@@ -617,6 +642,21 @@ def pow(
             trt.ElementWiseOperation.PROD,
             lhs_val,
             lhs_val,
+        )
+    # PyTorch computes pow(x, 0.5) with sqrt, so a SQRT matches it for -inf and -0.0,
+    # where a general POW does not. It is also faster. The root of the vector norm of a
+    # float16 or bfloat16 tensor, which PyTorch sums in float32, keeps the POW: its sum
+    # never sees -inf or -0.0, and TensorRT 11.4 can plan more memory for such roots as
+    # a SQRT.
+    if (
+        isinstance(lhs_val, TRTTensor)
+        and isinstance(rhs_val, (int, float))
+        and rhs_val == 0.5
+        and lhs_val.dtype in (trt.float32, trt.float16, trt.bfloat16)
+        and not _is_low_precision_norm(ctx.current_node)
+    ):
+        return convert_unary(
+            ctx, target, source_ir, name, trt.UnaryOperation.SQRT, lhs_val
         )
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
