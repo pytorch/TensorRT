@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 import copy
+import dataclasses
 import logging
 import pickle
 from typing import Any, Dict, List, Optional, Tuple
@@ -282,7 +283,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else Device._current_device()
         )
         metadata = {
-            "settings": self.settings,
+            # Leave out the calibration data, so the engine metadata does not carry
+            # the user's inputs.
+            "settings": dataclasses.replace(
+                self.settings, autocast_calibration_dataloader=None
+            ),
             "inout_symexprs": self.symbolic_shape_expressions,
             "num_user_outputs": self.num_user_outputs,
             "pytorch_plugin_ops": self.pytorch_plugin_ops,

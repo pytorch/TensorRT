@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 from dataclasses import dataclass, field
-from typing import Any, Collection, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, FrozenSet, List, Optional, Set, Tuple, Union
 
 import tensorrt as trt
 import torch
@@ -97,6 +97,20 @@ def _normalize_disabled_constant_fold_exclusions(
     return normalized
 
 
+def _autocast_op_names(ops: Optional[Collection[Target]]) -> Set[str]:
+    # Autocast matches ops by name, and op objects cannot be pickled into the
+    # engine metadata.
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+        ConverterRegistry,
+    )
+
+    if ops is None:
+        return set()
+    if isinstance(ops, str):
+        ops = (ops,)
+    return {ConverterRegistry.qualified_name_or_str(op) for op in ops}
+
+
 @dataclass
 class CompilationSettings:
     """Compilation settings for Torch-TensorRT Dynamo Paths
@@ -151,8 +165,8 @@ class CompilationSettings:
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
         autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
-        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
-        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
+        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
+        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
@@ -244,6 +258,11 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    # Set by autocast, not by users: the nodes it kept in high precision using the
+    # calibration data. Saved in place of the data so refit can reuse the choice.
+    _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
+        default=None, repr=False
+    )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
@@ -282,6 +301,7 @@ class CompilationSettings:
                 'attn_bias_is_causal must be True, False or "proven", got '
                 f"{self.attn_bias_is_causal!r}"
             )
+        self.autocast_excluded_ops = _autocast_op_names(self.autocast_excluded_ops)
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -310,6 +330,9 @@ class CompilationSettings:
                 state.get("disabled_constant_fold_exclusions", ())
             )
         )
+        state["autocast_excluded_ops"] = _autocast_op_names(
+            state.get("autocast_excluded_ops", ())
+        )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
         state.setdefault("fallback_pytorch_plugin_ops", FALLBACK_PYTORCH_PLUGIN_OPS)
         state.setdefault("collapse_high_rank_permutes", COLLAPSE_HIGH_RANK_PERMUTES)
@@ -328,6 +351,7 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
 

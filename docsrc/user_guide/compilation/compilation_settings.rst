@@ -171,6 +171,7 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
         autocast_low_precision_type=torch.float16,
         autocast_excluded_ops={torch.ops.aten.softmax.int},
         autocast_max_output_threshold=1024.0,
+        autocast_calibration_dataloader=calibration_dataloader,
     )
 
 .. list-table::
@@ -202,17 +203,19 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
      - ``512.0``
      - Nodes whose outputs exceed this absolute value are kept in FP32. Guards against
        overflow in activations with large dynamic range (e.g., unnormalized logits).
+       Needs ``autocast_calibration_dataloader``; without it this rule is skipped.
    * - ``autocast_max_depth_of_reduction``
      - ``None`` (∞)
      - Maximum reduction depth allowed in low precision. Reduction depth measures how
        many reduction operations (sum, mean, etc.) feed into a node. Nodes with higher
        depth are kept in FP32 to prevent error accumulation. ``None`` means no limit.
+       Needs ``autocast_calibration_dataloader``; without it this rule is skipped.
    * - ``autocast_calibration_dataloader``
      - ``None``
      - A ``torch.utils.data.DataLoader`` used to calibrate output statistics (e.g.,
-       absolute max values) for each node. When provided, the autocast pass runs the
-       model on calibration data to make per-node precision decisions based on
-       observed ranges rather than static thresholds.
+       absolute max values) for each node. The autocast pass runs the model on this
+       data to check ``autocast_max_output_threshold`` and
+       ``autocast_max_depth_of_reduction``. Without it, both rules are skipped.
 
 ----
 
