@@ -355,13 +355,6 @@ class TestEngineCache(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
-    @unittest.skipIf(
-        not importlib.util.find_spec("torchvision"), "torchvision not installed"
-    )
-    @unittest.skipIf(
-        not torch_trt.ENABLED_FEATURES.refit,
-        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
-    )
     def test_cache_hit_with_a_calibration_dataloader(self):
         model = torch.nn.Sequential(torch.nn.Linear(16, 16), torch.nn.ReLU())
         model = model.eval().to("cuda")
@@ -390,6 +383,13 @@ class TestEngineCache(TestCase):
         assertions.assertEqual(list(custom_engine_cache.hashes.values()), [1])
         torch.testing.assert_close(outputs[1], outputs[0])
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_dynamo_compile_change_input_shape(self):
         """Runs compilation 3 times, the cache should miss each time"""
         model = models.resnet18(pretrained=True).eval().to("cuda")
