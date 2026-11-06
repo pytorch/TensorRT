@@ -741,6 +741,43 @@ TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 4, streams_[0]));
 }
 
+// ExecuTorch has no check for strides alone that is safe in debug builds, so a tensor with strides but no
+// dim order is read as row-major, with or without replay.
+TEST_F(ExecutionGraphReplayTest, StridesWithoutADimOrderAreReadAsRowMajor) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  std::vector<float> storage(16);
+  for (size_t i = 0; i < storage.size(); ++i) {
+    storage[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(
+      cudaMemcpy(inputs_[0], storage.data(), sizeof(float) * storage.size(), cudaMemcpyHostToDevice), cudaSuccess);
+  for (LoadedGraphEngine* engine : {&plain, &graph}) {
+    for (int i = 0; i < 3; ++i) {
+      SCOPED_TRACE(i);
+      SizesType input_sizes[] = {2, 8};
+      SizesType output_sizes[] = {2, 8};
+      // Column-major, which would be read in another order if the strides counted.
+      StridesType input_strides[] = {1, 2};
+      TensorImpl input_impl(ScalarType::Float, 2, input_sizes, inputs_[0], nullptr, input_strides);
+      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0]);
+      EValue input_value{Tensor(&input_impl)};
+      EValue output_value{Tensor(&output_impl)};
+      EValue* args[] = {&input_value, &output_value};
+      ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+      ASSERT_EQ(engine->run({args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      std::vector<float> output(storage.size());
+      ASSERT_EQ(
+          cudaMemcpy(output.data(), outputs_[0], sizeof(float) * output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t j = 0; j < output.size(); ++j) {
+        ASSERT_FLOAT_EQ(output[j], storage[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+  }
+  EXPECT_TRUE(graph.is_captured());
+}
+
 // 16 floats of host memory at a chosen offset from a 256-byte boundary. Where the GPU reads host memory
 // through the host page tables, an aligned host buffer is bound as it is, while an unaligned one always
 // goes through the delegate's own device buffer, so the offset decides which path a test takes.
