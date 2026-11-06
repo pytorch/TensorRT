@@ -37,7 +37,10 @@ def _reaches_storage_reader(node: torch.fx.Node) -> bool:
     users = list(node.users)
     while users:
         user = users.pop()
-        if user.target in _STORAGE_READERS:
+        # A branch of torch.cond (a higher-order op) can address the operand's storage too.
+        if user.target in _STORAGE_READERS or isinstance(
+            user.target, torch._ops.HigherOrderOperator
+        ):
             return True
         if user.target is operator.getitem or (
             isinstance(user.target, torch._ops.OpOverload) and user.target.is_view
@@ -53,9 +56,9 @@ def fold_slice_into_constant_pad(
 
     Only when every amount is a plain int, the slice has step 1 and static
     bounds on a dim that the pad pads, keeps at least one element of the pad's
-    input, the pad has no other user, and no as_strided reads the slice. Pads and
-    slices that torch_executed_ops or torch_executed_modules keep in PyTorch are
-    left as they are.
+    input, the pad has no other user, and no as_strided or torch.cond reads the
+    slice. Pads and slices that torch_executed_ops or torch_executed_modules keep
+    in PyTorch are left as they are.
     """
     excluded = settings.torch_executed_ops
     if any(

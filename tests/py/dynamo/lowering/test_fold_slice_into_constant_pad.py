@@ -121,6 +121,27 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         self.assertIn(SLICE, _targets(gm))
         torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
 
+    def test_leaves_a_slice_passed_to_torch_cond_alone(self):
+        # A branch reads three rows through the padded tensor's strides.
+        class PadSliceCond(torch.nn.Module):
+            def forward(self, x):
+                return torch.cond(
+                    x.sum() > 0,
+                    lambda t: t.as_strided((3, 8), (8, 1)) * 2,
+                    lambda t: t.as_strided((3, 8), (8, 1)) + 1,
+                    (F.pad(x, (0, 0, 1, 0))[:2],),
+                )
+
+        module, x = PadSliceCond(), torch.randn(2, 8)
+        gm = (
+            torch.export.export(module, (x,))
+            .run_decompositions(get_decompositions(False))
+            .graph_module
+        )
+        gm = fold_slice_into_constant_pad(gm, CompilationSettings())
+        self.assertIn(SLICE, _targets(gm))
+        torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
+
     @parameterized.expand(
         [
             ("pad", PAD),
