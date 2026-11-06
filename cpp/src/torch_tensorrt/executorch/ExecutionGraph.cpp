@@ -26,7 +26,7 @@ std::shared_mutex& cuda_graph_capture_mutex() {
 namespace {
 constexpr int kMaxCaptureAttempts = 3;
 // Green contexts with a graph of their own per engine. An engine is rarely shared by more SM
-// partitions than this, and each graph holds a capture stream and possibly buffers.
+// partitions than this, and each graph may hold buffers of its own.
 constexpr size_t kMaxGreenGraphs = 4;
 
 template <typename Function>
@@ -142,14 +142,13 @@ void fall_back(const char* reason, cudaError_t error) {
 }
 
 // TensorRT requires a green context to outlive the graphs recorded in it, but a caller that re-partitions its SMs
-// may destroy one first. Releasing that graph or its stream then fails, and the error must not reach the caller's
-// next CUDA call, which may be another context's execute().
+// may destroy one first. Releasing that graph then fails, and the error must not reach the caller's next CUDA call,
+// which may be another context's execute().
 void released(cudaError_t error) {
   if (error != cudaSuccess) {
     ET_LOG(
         Info,
-        "TensorRTBackend: releasing a CUDA graph or its capture stream failed (%s); its green context was likely "
-        "destroyed before the engine",
+        "TensorRTBackend: releasing a CUDA graph failed (%s); its green context was likely destroyed before the engine",
         cudaGetErrorString(error));
     cudaGetLastError();
   }
@@ -388,7 +387,7 @@ Error ExecutionGraph::enqueue_in(
         }
         // The graph does not need its stream, and a stream kept in a green context could not be freed
         // once that context is destroyed.
-        released(cudaStreamDestroy(capture_stream));
+        (void)cuda_error(cudaStreamDestroy(capture_stream), "capture stream destroy");
       }
       capture_lock.unlock();
       if (error == cudaSuccess && enqueued) {

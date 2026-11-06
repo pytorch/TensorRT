@@ -95,8 +95,8 @@ class ExecutionGraph {
   bool warmed_up_ = false;
   bool capture_failed_ = false;
   // A graph recorded on the caller's addresses replays with no copies while they stay put. Once they
-  // have moved twice for one set of shapes, the graph is recorded on buffers_ instead, and every
-  // call copies its inputs in and its outputs out.
+  // have moved twice for one set of shapes, or a call from another regular context brings other ones,
+  // the graph is recorded on buffers_ instead, and every call copies its inputs in and its outputs out.
   bool staged_ = false;
   // The graphs of green context calls, by green context id, most recently called first. This one
   // serves plain contexts.
