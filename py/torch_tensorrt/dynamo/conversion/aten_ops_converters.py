@@ -4303,13 +4303,27 @@ def aten_ops_adaptive_max_poolNd(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input, output_size = args[0], args[1]
+    spatial_rank = len(output_size)
+    # The bins come from the static spatial sizes the validator checked. TensorRT can
+    # still see -1 for a size it cannot infer, such as a crop with a dynamic start.
+    if any(size == -1 for size in input.shape[-spatial_rank:]):
+        spatial_size = ctx.current_node.args[0].meta["val"].shape[-spatial_rank:]
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - spatial_rank) + list(spatial_size),
+        )
     output = impl.pool.adaptive_max_poolNd(
         ctx,
         target,
         source_ir=SourceIR.ATEN,
         name=name,
-        input=args[0],
-        output_size=args[1],
+        input=input,
+        output_size=output_size,
     )
     return output, None
 

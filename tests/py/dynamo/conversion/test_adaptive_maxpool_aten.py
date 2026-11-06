@@ -158,6 +158,32 @@ class TestAdaptiveMaxPoolEndToEnd(TestCase):
         self.assertEqual(engine_count, 1)
         torch.testing.assert_close(trt_mod(*inputs), model(*inputs))
 
+    def test_static_crop_of_a_dynamic_input(self):
+        # The crop is 8x8, but its start depends on the input size, so TensorRT cannot
+        # infer the crop size.
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                h, w = x.shape[-2:]
+                x = x.narrow(2, h - 8, 8).narrow(3, w - 8, 8)
+                return torch.nn.functional.adaptive_max_pool2d(x, (3, 3))
+
+        model = Model().eval().cuda()
+        trt_mod = torch_tensorrt.compile(
+            model,
+            ir="dynamo",
+            inputs=[
+                Input(
+                    min_shape=(1, 2, 9, 9),
+                    opt_shape=(1, 2, 12, 12),
+                    max_shape=(1, 2, 32, 32),
+                )
+            ],
+            min_block_size=1,
+        )
+        for size in (9, 12, 20, 32):
+            x = torch.randn(1, 2, size, size).cuda()
+            torch.testing.assert_close(trt_mod(x), model(x))
+
 
 if __name__ == "__main__":
     run_tests()
