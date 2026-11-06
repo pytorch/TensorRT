@@ -1,6 +1,7 @@
 import logging
 from typing import Any, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
@@ -44,9 +45,15 @@ class TRTSubgraphInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     self._cur_node_name,
                     n.target,
                 )
-            return super().run_node(n)
+            result = super().run_node(n)
         finally:
             self.ctx.current_node = prev
+        # Branch math on a Python float computes in float32 too (see impl.elementwise.base).
+        if isinstance(result, trt.ITensor) and isinstance(
+            n.meta.get("val"), (float, torch.SymFloat)
+        ):
+            self.ctx.python_floats.add(result)
+        return result
 
     get_attr = TRTInterpreter.get_attr
     call_function = TRTInterpreter.call_function

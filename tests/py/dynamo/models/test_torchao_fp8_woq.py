@@ -17,6 +17,17 @@ def _has_fp8_gpu() -> bool:
     return major >= 9
 
 
+def _has_mslk() -> bool:
+    # TorchAO's Int4Tensor.from_hp raises "Requires mslk >= 1.0.0" when this import
+    # fails; it does not check the version. A Python-only MSLK install
+    # (MSLK_PYTHON_ONLY=1) reports 0.0.0 but provides it, so test the import itself.
+    try:
+        from mslk.quantize.shuffle import int4_row_quantize_zp  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
 def _promote_float8_woq(model: torch.nn.Module) -> torch.nn.Module:
     from torchao.quantization import dequantize_affine
     from torchao.quantization.quantize_.workflows import Float8Tensor
@@ -177,6 +188,7 @@ def test_linear_fp8_static():
     "TorchAO INT4 dependencies require Triton, which is unavailable",
 )
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+@unittest.skipIf(not _has_mslk(), "TorchAO INT4 requires mslk >= 1.0.0")
 def test_linear_int4_woq():
     import sys
     from pathlib import Path

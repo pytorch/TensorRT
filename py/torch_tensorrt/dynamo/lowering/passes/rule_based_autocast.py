@@ -6,10 +6,11 @@ import operator
 from typing import Any
 
 import torch
+import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-from .nodeclassifier import NodeClassifier
+from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import clean_up_graph_after_modifications
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,11 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
+
+
+def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
+    # Ops like chunk, split and unbind produce a list of tensors.
+    return pytree.tree_map_only(torch.Tensor, lambda t: t.to(target_dtype), val)
 
 
 def rule_based_autocast(
@@ -45,6 +51,29 @@ def rule_based_autocast(
         settings.autocast_intermediate_node_outputs
     )
     del settings.autocast_intermediate_node_outputs
+    recorded_nodes = settings._autocast_calibrated_high_precision_nodes
+    replay_rule = None
+    if not reference_data and recorded_nodes is not None:
+        missing = recorded_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions it chose with calibration data, "
+                f"because these nodes are not in the graph: {sorted(missing)}. "
+                "Compile the model again with autocast_calibration_dataloader."
+            )
+        replay_rule = NodeNameSetRule(recorded_nodes)
+    elif not reference_data:
+        skipped, needs = "autocast_max_output_threshold is", "it needs"
+        if autocast_max_depth_of_reduction is not None:
+            skipped = (
+                "autocast_max_output_threshold and autocast_max_depth_of_reduction are"
+            )
+            needs = "they need"
+        logger.warning(
+            f"{skipped} not applied, because {needs} reference values from "
+            "autocast_calibration_dataloader and none was given. Nodes with large "
+            f"values may then run in {autocast_low_precision_type}."
+        )
 
     node_classifier = NodeClassifier(
         gm.graph.nodes,
@@ -52,8 +81,14 @@ def rule_based_autocast(
         excluded_ops=autocast_excluded_ops,
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
+        custom_rule=replay_rule,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(reference_data)
+    if reference_data:
+        # A saved program drops the calibration data, so refit reuses this.
+        settings._autocast_calibrated_high_precision_nodes = frozenset(
+            high_precision_nodes
+        )
 
     def _cast_all_tensor_args_to_dtype(
         node: torch.fx.Node, arg: Any, dtype: torch.dtype
@@ -97,10 +132,13 @@ def rule_based_autocast(
 
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
-            if (
-                node.target == torch.ops.higher_order.wrap_with_autocast
-                or node.target == operator.getitem
-            ):
+            if node.target == torch.ops.higher_order.wrap_with_autocast:
+                continue
+            if node.target == operator.getitem:
+                # Follow the retyped list, so users of this element cast it correctly.
+                src, idx = node.args
+                if isinstance(src.meta.get("val"), (list, tuple)):
+                    node.meta["val"] = src.meta["val"][idx]
                 continue
 
             if node.name in low_precision_nodes:
@@ -110,7 +148,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_low_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_low_precision_type)
+                node.meta["val"] = _retype_tensors(
+                    node.meta["val"], autocast_low_precision_type
+                )
             elif node.name in high_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(
                     node, node.args, autocast_high_precision_type
@@ -118,7 +158,9 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_high_precision_type
                 )
-                node.meta["val"] = node.meta["val"].to(autocast_high_precision_type)
+                node.meta["val"] = _retype_tensors(
+                    node.meta["val"], autocast_high_precision_type
+                )
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

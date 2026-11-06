@@ -16,6 +16,12 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${TORCH_TENSORRT_SOURCE_DIR}/cmake/Modules")
 find_package(TensorRT REQUIRED)
+if(NOT TARGET TensorRT::nvinfer_plugin)
+  message(FATAL_ERROR
+    "The TensorRT delegate requires TensorRT's plugin library (nvinfer_plugin), which was "
+    "not found. Set TensorRT_ROOT to a TensorRT installation that includes it, or "
+    "TensorRT_nvinfer_plugin_LIBRARY to the library.")
+endif()
 find_package(CUDAToolkit 12.5 REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -74,6 +80,7 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
   executorch::extension_cuda
   CUDA::cudart
   TensorRT::nvinfer
+  TensorRT::nvinfer_plugin
   Threads::Threads)
 
 # Build to the standard ExecuTorch's own exported configuration asks for. The delegate is compiled

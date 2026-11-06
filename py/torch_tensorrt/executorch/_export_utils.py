@@ -131,18 +131,48 @@ def validate_engine_info(
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
+        SERIALIZED_METADATA_IDX,
+        TorchTensorRTModule,
     )
 
+    node_suffix = f" for node '{node_name}'" if node_name else ""
     if (
         len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
         and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
     ):
-        node_suffix = f" for node '{node_name}'" if node_name else ""
         raise RuntimeError(
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
         ) from cause
+    serialized_metadata = (
+        engine_info[SERIALIZED_METADATA_IDX]
+        if len(engine_info) > SERIALIZED_METADATA_IDX
+        else ""
+    )
+    metadata = (
+        TorchTensorRTModule.decode_metadata(serialized_metadata)
+        if serialized_metadata
+        else {}
+    )
+    plugin_ops = metadata.get("pytorch_plugin_ops")
+    # Dynamo compilation always writes metadata, so only an engine built another way lacks
+    # it and is passed through as before. One with metadata but no mark may hold plugins.
+    if metadata and plugin_ops is None:
+        raise RuntimeError(
+            f"ExecuTorch export cannot check the TensorRT engine{node_suffix}: it does "
+            "not record whether the engine uses TensorRT plugins that run PyTorch. It "
+            "was saved by an older Torch-TensorRT, or wrapped in TorchTensorRTModule "
+            "without pytorch_plugin_ops. Compile the model again, or pass "
+            "pytorch_plugin_ops ([] for an engine without such plugins)."
+        )
+    if plugin_ops:
+        raise RuntimeError(
+            f"ExecuTorch export does not support the TensorRT engine{node_suffix}: it "
+            f"runs {', '.join(plugin_ops)} with TensorRT plugins that run PyTorch, and "
+            "the ExecuTorch TensorRT runtime does not load PyTorch. Compile with "
+            "fallback_pytorch_plugin_ops=True to keep those operators out of TensorRT."
+        )
 
 
 def _schema_name(node: Any) -> str:

@@ -47,6 +47,7 @@ class ConversionContext:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+        pytorch_plugin_ops: Operators converted with TensorRT plugins whose kernels run PyTorch, so the engine only runs in a process with PyTorch
         weight_refit_map: Dictionary mapping weight names to their corresponding np.array
         cpu_weights_reference_holder: Dictionary mapping weight names to their corresponding torch.Tensor
         current_node: The FX node currently being converted, used by converters that need access to graph-level metadata (e.g. annotations set by lowering passes)
@@ -57,6 +58,7 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
+    pytorch_plugin_ops: set[str] = field(default_factory=set)
     requires_native_multidevice: bool = False
     requires_aliased_plugin_io: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
@@ -75,6 +77,9 @@ class ConversionContext:
         default_factory=dict
     )
     current_node: Optional[torch.fx.Node] = field(default=None)
+    # Outputs of nodes whose value is a Python float, such as a quotient of sizes or a
+    # value computed from one (see impl.elementwise.base).
+    python_floats: set[TRTTensor] = field(default_factory=set)
     # Aliased outputs registered by converters during conversion.
     # ``TRTInterpreter`` is responsible for ensuring each output_tensor that
     # isn't already a user output is added to the network outputs, and for

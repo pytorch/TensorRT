@@ -342,6 +342,8 @@ def _convert_auto_functionalized(
     ctx.requires_native_multidevice |= resolved.info.get(
         "requires_native_multidevice", False
     )
+    if resolved.info.get("requires_pytorch_plugin", False):
+        ctx.pytorch_plugin_ops.add(DYNAMO_CONVERTERS.qualified_name_or_str(op))
     if resolved.calling_convention is CallingConvention.LEGACY:
         result = resolved.converter(ctx.net, op, tuple(op_args), {}, name)
     else:

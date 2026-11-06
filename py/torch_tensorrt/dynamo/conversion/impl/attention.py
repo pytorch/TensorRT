@@ -336,7 +336,14 @@ def scaled_dot_product_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
         )
     else:
-        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        # At the query's rank the multiply broadcasts. Expanded to the query's shape, a constant
+        # scale is not folded into the attention by TensorRT-RTX, which then rounds the query.
+        scale = prepend_ones(
+            ctx,
+            get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype),
+            f"{name}_scale_prepend_ones",
+            len(query.shape) - 1,
+        )
         scaled_query = impl.elementwise.mul(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
@@ -459,7 +466,14 @@ def scaled_dot_product_efficient_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
         )
     else:
-        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        # At the query's rank the multiply broadcasts. Expanded to the query's shape, a constant
+        # scale is not folded into the attention by TensorRT-RTX, which then rounds the query.
+        scale = prepend_ones(
+            ctx,
+            get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype),
+            f"{name}_scale_prepend_ones",
+            len(query.shape) - 1,
+        )
         scaled_query = impl.elementwise.mul(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )

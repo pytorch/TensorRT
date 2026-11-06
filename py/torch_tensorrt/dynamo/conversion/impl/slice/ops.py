@@ -337,7 +337,7 @@ def expand(
             stride.append(int(i == o))
         elif isinstance(i, int) and i != DYNAMIC_DIM and isinstance(o, TRTTensor):
             stride.append(0)
-        elif i == DYNAMIC_DIM and isinstance(o, int) and o != DYNAMIC_DIM:
+        elif i == DYNAMIC_DIM and (isinstance(o, TRTTensor) or o != DYNAMIC_DIM):
             # A runtime dim is either 1, and broadcasts, or already the target size.
             size = get_shape(
                 ctx, target, source_ir, f"{name}_stride_dim{k}", input_t, k

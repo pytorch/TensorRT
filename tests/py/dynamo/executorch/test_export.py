@@ -4,6 +4,7 @@
 import base64
 import gc
 import importlib
+import pickle
 import sys
 import types
 import weakref
@@ -117,7 +118,9 @@ class _EngineState:
         self.info[INPUT_BINDING_NAMES_IDX] = "x"
         self.info[OUTPUT_BINDING_NAMES_IDX] = "output0"
         self.info[HW_COMPATIBLE_IDX] = "0"
-        self.info[SERIALIZED_METADATA_IDX] = "engine-metadata"
+        self.info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+            pickle.dumps({"name": "engine-metadata", "pytorch_plugin_ops": []})
+        ).decode("utf-8")
         self.info[TARGET_PLATFORM_IDX] = "linux_x86_64"
         self.info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(int(requires_output_allocator))
         self.info[RESOURCE_ALLOCATION_STRATEGY_IDX] = "1"
@@ -910,6 +913,130 @@ def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
     # An output shape that depends on the data still needs an output allocator.
     with pytest.raises(RuntimeError, match="output allocator"):
         save(MaskedRows())
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_an_engine_saved_without_the_plugin_mark_is_refused(tmp_path):
+    """An engine saved before pytorch_plugin_ops existed may still hold ScatterAdd."""
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    (engine_module,) = [
+        module
+        for module in compiled.modules()
+        if isinstance(module, TorchTensorRTModule)
+    ]
+    state = engine_module.get_extra_state()
+    engine_info = list(state[1])
+    metadata = TorchTensorRTModule.decode_metadata(engine_info[SERIALIZED_METADATA_IDX])
+    del metadata["pytorch_plugin_ops"]
+    engine_info[SERIALIZED_METADATA_IDX] = engine_module.encode_metadata(metadata)
+    engine_module.set_extra_state((state[0], engine_info, *state[2:]))
+    assert engine_module.pytorch_plugin_ops is None
+
+    with pytest.raises(RuntimeError, match="older Torch-TensorRT"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "older.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_a_hand_wrapped_engine_needs_its_plugin_list(tmp_path):
+    """TorchTensorRTModule without pytorch_plugin_ops cannot tell whether the engine needs PyTorch."""
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    ((name, engine_module),) = [
+        (name, module)
+        for name, module in compiled.named_children()
+        if isinstance(module, TorchTensorRTModule)
+    ]
+
+    def wrap(**plugin_ops):
+        setattr(
+            compiled,
+            name,
+            TorchTensorRTModule(
+                engine_module.serialized_engine,
+                input_binding_names=engine_module.input_binding_names,
+                output_binding_names=engine_module.output_binding_names,
+                settings=engine_module.settings,
+                symbolic_shape_expressions=engine_module.symbolic_shape_expressions,
+                **plugin_ops,
+            ),
+        )
+
+    wrap()
+    with pytest.raises(RuntimeError, match="without pytorch_plugin_ops"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "unknown.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+    wrap(pytorch_plugin_ops=[])
+    torch_tensorrt.save(
+        compiled,
+        str(tmp_path / "plugin_free.pte"),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+    assert b"TensorRTBackend" in (tmp_path / "plugin_free.pte").read_bytes()
+
+
+@pytest.mark.unit
+def test_program_without_inputs_exports_a_pte(tmp_path):
+    """With no user inputs, lift() has only the TensorRT engine to turn into an input."""
+
+    class Noise(torch.nn.Module):
+        def forward(self):
+            # The random draw stays in PyTorch, so the engine gets its result as input.
+            return torch.randn(50, 32, device="cuda") * 2 + 1
+
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(Noise().eval(), ()), arg_inputs=(), min_block_size=1
+    )
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+    output = tmp_path / "noise.pte"
+
+    torch_tensorrt.save(
+        compiled, str(output), output_format="executorch", retrace=False
+    )
+
+    assert b"TensorRTBackend" in output.read_bytes()
 
 
 @pytest.mark.unit

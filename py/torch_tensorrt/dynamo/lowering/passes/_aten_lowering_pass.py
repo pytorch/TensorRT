@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
+from .collapse_high_rank_permutes import collapse_high_rank_permutes
 from .complex_decomposition_adapter import (
     complex_decomposition_adapter as _complex_decomposition_adapter_pass,
 )
@@ -91,6 +92,7 @@ post_lowering_pass_list = [
     decompose_unsupported_attention,
     annotate_fp8_sdpa,
     decompose_dynamic_slice_scatter,
+    collapse_high_rank_permutes,
 ]
 
 if not is_tegra_platform():

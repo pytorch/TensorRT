@@ -414,11 +414,18 @@ class TestScaledDotProductAttention(DispatchTestCase):
             )
         self.run_test_with_dynamic_shape(SDPA(), input_specs, output_dtypes=[dtype])
 
-    def test_sdpa_default_scale_bf16(self):
+    @parameterized.expand(["sdpa", "efficient"])
+    def test_sdpa_default_scale_bf16(self, op):
         skip_if_trt_rtx_turing(self, "bfloat16")
 
         class SDPA(nn.Module):
             def forward(self, query, key, value):
+                if op == "efficient":
+                    return (
+                        torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                            query, key, value, None, False
+                        )[0]
+                    )
                 return torch.ops.aten.scaled_dot_product_attention.default(
                     query, key, value
                 )

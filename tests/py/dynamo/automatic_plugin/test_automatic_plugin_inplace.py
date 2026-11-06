@@ -86,6 +86,10 @@ class TestInplacePlugin(unittest.TestCase):
             1,
             f"Expected at least one TRT engine submodule, got graph:\n{compiled.graph}",
         )
+        self.assertIn(
+            "torch.ops.torchtrt_ex.add_one_inplace.default",
+            engine_submodules[0].pytorch_plugin_ops,
+        )
 
         trt_out = compiled(trt_input)
         torch.testing.assert_close(trt_out, expected_post, rtol=1e-5, atol=1e-5)
