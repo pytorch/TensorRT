@@ -694,6 +694,32 @@ TEST_F(ExecutionGraphReplayTest, MovedAddressesRecordAgainOnceThenCopyThroughOwn
   EXPECT_EQ(replay.launches.size(), 1u);
 }
 
+// The output moves while the input stays put. Replaying on the recorded output would leave the new one unwritten.
+TEST_F(ExecutionGraphReplayTest, OutputOnlyMovesWriteTheNewOutput) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  std::vector<float> input(16);
+  for (size_t i = 0; i < input.size(); ++i) {
+    input[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), sizeof(float) * input.size(), cudaMemcpyHostToDevice), cudaSuccess);
+  const int slots[] = {0, 0, 1, 0, 1, 0, 1, 0};
+  for (int i = 0; i < 8; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_EQ(cudaMemsetAsync(outputs_[slots[i]], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[slots[i]], 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    std::vector<float> output(input.size());
+    ASSERT_EQ(
+        cudaMemcpy(output.data(), outputs_[slots[i]], sizeof(float) * output.size(), cudaMemcpyDeviceToHost),
+        cudaSuccess);
+    for (size_t j = 0; j < output.size(); ++j) {
+      ASSERT_FLOAT_EQ(output[j], input[j] * 2.0f + 1.0f) << "element " << j;
+    }
+  }
+  EXPECT_TRUE(graph.is_captured());
+}
+
 // With or without graphs, a call gives TensorRT a shape or an address again only when it changed. What the
 // test sets on the TensorRT context behind the delegate's back stays there exactly when the call is skipped.
 TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
