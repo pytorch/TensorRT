@@ -244,7 +244,10 @@ def batch_norm(
                 eps,
             )
             input_scale = adjusted_scale.to(input_dtype)
-            input_bias = adjusted_bias.to(input_dtype)
+            # Rounded separately, scale and shift no longer cancel at a large running mean.
+            input_bias = (bias.float() - running_mean.float() * input_scale.float()).to(
+                input_dtype
+            )
             if fixed_weights:
                 normalize_in_float32 = not (
                     input_scale.isfinite().all() and input_bias.isfinite().all()

@@ -433,6 +433,28 @@ class TestNativeBatchNormConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_native_batchnorm_legit_no_training_fp16_fold_cancels_at_the_mean(self):
+        # The float16 scale is 2, so the shift must be -1921. Rounding the float32
+        # shift -1921.7 on its own gives -1922, which moves every output by 1.
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._native_batch_norm_legit_no_training.default(
+                    x,
+                    torch.tensor([4.71875, 1.0, 1.0], dtype=torch.float16),
+                    torch.zeros(FEATURE_NUM, dtype=torch.float16),
+                    torch.tensor([960.5, 0.0, 0.0], dtype=torch.float16),
+                    torch.tensor([5.5625, 1.0, 1.0], dtype=torch.float16),
+                    0.1,
+                    1e-05,
+                )[0]
+
+        running_mean = torch.tensor([960.5, 0.0, 0.0]).view(1, FEATURE_NUM, 1, 1)
+        inputs = [(running_mean + torch.randn(2, FEATURE_NUM, 8, 8)).half()]
+        self.run_test(
+            BatchNorm(),
+            inputs,
+        )
+
     def test_native_batchnorm1d_with_dynamic_shape(self):
         class BatchNorm(torch.nn.Module):
             def forward(self, x):
