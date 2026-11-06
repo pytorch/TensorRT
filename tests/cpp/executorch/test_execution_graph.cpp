@@ -1612,9 +1612,10 @@ TEST_F(ExecutionGraphReplayTest, FailedRecordingsFromAnotherRegularContextLeaveT
   EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
 }
 
-// A pooled call from another regular context does not wait for the capture lock. While another thread
-// holds it, the call fails, and the engine's own context keeps replaying its graph.
-TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextWithoutTheCaptureLockKeepsTheOwnGraph) {
+// The shared scratch's completion event belongs to the engine's context, so a pooled engine refuses a
+// stream of another regular context before it runs, whether or not another thread holds the capture
+// lock, and the engine's own calls keep replaying their graph with no copies.
+TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextFailsAndKeepsTheOwnGraph) {
   const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
   const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
   const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
@@ -1633,61 +1634,78 @@ TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextWithoutTheCa
     set_current(primary);
     destroy_context(other);
   });
-  cudaStream_t other_stream = nullptr;
-  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
   ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
 
   const SizesType rows = 8;
   const SizesType cols = 32;
   const auto blob = build_scratch_blob(rows, cols);
   ASSERT_FALSE(blob.empty());
-  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
   BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
   ASSERT_EQ(set_options({options, 2}), Error::Ok);
-  {
-    LoadedGraphEngine engine;
-    ASSERT_EQ(engine.load(blob), Error::Ok);
-    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
-    const size_t count = static_cast<size_t>(rows) * cols;
-    const std::vector<float> ones(count, 1.0f);
-    std::vector<float> actual(count);
-    for (int slot = 0; slot < 2; ++slot) {
-      ASSERT_EQ(cudaMemcpy(inputs_[slot], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
-    }
-    for (int i = 0; i < 2; ++i) {
-      ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
-    }
-    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
-    ASSERT_TRUE(engine.is_captured());
+  for (bool hold_lock : {false, true}) {
+    SCOPED_TRACE(hold_lock ? "capture lock held" : "capture lock free");
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    {
+      LoadedGraphEngine engine;
+      ASSERT_EQ(engine.load(blob), Error::Ok);
+      ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+      const size_t count = static_cast<size_t>(rows) * cols;
+      const std::vector<float> ones(count, 1.0f);
+      std::vector<float> actual(count);
+      for (int slot = 0; slot < 2; ++slot) {
+        ASSERT_EQ(cudaMemcpy(inputs_[slot], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+      }
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+      }
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      ASSERT_TRUE(engine.is_captured());
 
-    // Holds the capture lock the way a load does while the call below runs.
-    std::promise<void> held;
-    std::promise<void> done;
-    std::thread holder([&] {
-      const std::shared_lock<std::shared_mutex> lock(cuda_graph_capture_mutex());
-      held.set_value();
-      done.get_future().wait();
-    });
-    held.get_future().wait();
-    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
-    const Error error = engine.run(inputs_[1], outputs_[1], rows, cols, other_stream);
-    EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
-    done.set_value();
-    holder.join();
-    EXPECT_NE(error, Error::Ok);
-    EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
-    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+      // Holds the capture lock the way a load does while the call below runs.
+      std::promise<void> held;
+      std::promise<void> done;
+      std::thread holder;
+      if (hold_lock) {
+        holder = std::thread([&] {
+          const std::shared_lock<std::shared_mutex> lock(cuda_graph_capture_mutex());
+          held.set_value();
+          done.get_future().wait();
+        });
+        held.get_future().wait();
+      }
+      ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+      cudaStream_t other_stream = nullptr;
+      ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+      Error error = Error::Ok;
+      {
+        CudaCalls calls;
+        error = engine.run(inputs_[1], outputs_[1], rows, cols, other_stream);
+        EXPECT_TRUE(calls.captures.empty());
+        EXPECT_TRUE(calls.launches.empty());
+      }
+      EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+      EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+      if (hold_lock) {
+        done.set_value();
+        holder.join();
+      }
+      EXPECT_NE(error, Error::Ok);
+      ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
 
-    CudaCalls back;
-    ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
-    ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-    for (float value : actual) {
-      ASSERT_FLOAT_EQ(value, 1.0f / rows);
+      {
+        CudaCalls back;
+        ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+        EXPECT_TRUE(back.captures.empty());
+        EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+        EXPECT_EQ(back.memcpy_calls, 0u);
+      }
+      ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (float value : actual) {
+        ASSERT_FLOAT_EQ(value, 1.0f / rows);
+      }
     }
-    EXPECT_TRUE(back.captures.empty());
-    EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+    EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
   }
-  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
 // Each green context keeps a graph, so bursts from two of them record once in each.
