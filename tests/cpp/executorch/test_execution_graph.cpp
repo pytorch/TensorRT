@@ -1517,7 +1517,8 @@ TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
     EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, other_stream));
   }
   EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
-  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  // The graph and the buffers it switched to belong to the engine's context, so they outlive the other one.
+  restore.reset();
   CudaCalls back;
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
   EXPECT_TRUE(back.captures.empty());
