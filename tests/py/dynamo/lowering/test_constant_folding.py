@@ -188,16 +188,35 @@ class TestConstantFolding(TestCase):
                     self.assertLess(error.max().item(), 1e-5)
 
     def test_float32_folding_works_without_fp32_precision(self):
-        # PyTorch before 2.9 has only the allow_tf32 flags.
+        # As before PyTorch 2.9: no fp32_precision flags, and matmul.allow_tf32 reads True for
+        # both "high" and "medium" and sets "high".
+        state = {"matmul": "medium"}
+
+        class LegacyMatmul:
+            @property
+            def allow_tf32(self):
+                return state["matmul"] != "highest"
+
+            @allow_tf32.setter
+            def allow_tf32(self, value):
+                state["matmul"] = "high" if value else "highest"
+
         cudnn = types.SimpleNamespace(allow_tf32=True)
-        matmul = types.SimpleNamespace(allow_tf32=True)
         with (
             mock.patch.object(torch.backends, "cudnn", cudnn),
-            mock.patch.object(torch.backends.cuda, "matmul", matmul),
+            mock.patch.object(torch.backends.cuda, "matmul", LegacyMatmul()),
+            mock.patch.object(
+                torch, "get_float32_matmul_precision", lambda: state["matmul"]
+            ),
+            mock.patch.object(
+                torch, "set_float32_matmul_precision", lambda p: state.update(matmul=p)
+            ),
         ):
             with constant_folding._ieee_float32():
-                self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (False, False))
-        self.assertEqual((cudnn.allow_tf32, matmul.allow_tf32), (True, True))
+                self.assertEqual(
+                    (cudnn.allow_tf32, state["matmul"]), (False, "highest")
+                )
+        self.assertEqual((cudnn.allow_tf32, state["matmul"]), (True, "medium"))
 
     def test_overlapping_float32_folds_wait_for_each_other(self):
         conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul

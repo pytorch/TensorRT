@@ -202,14 +202,18 @@ def _ieee_float32() -> Iterator[None]:
             finally:
                 conv.fp32_precision, matmul.fp32_precision = saved
         else:
-            # PyTorch before 2.9, as on the JetPack build, has only these flags.
+            # PyTorch before 2.9, as on the JetPack build, has only these flags. The matmul one is
+            # kept by name: allow_tf32 reads True for both "high" and "medium".
             cudnn = torch.backends.cudnn
-            saved = cudnn.allow_tf32, matmul.allow_tf32
-            cudnn.allow_tf32 = matmul.allow_tf32 = False
+            saved_conv = cudnn.allow_tf32
+            saved_matmul = torch.get_float32_matmul_precision()
+            cudnn.allow_tf32 = False
+            torch.set_float32_matmul_precision("highest")
             try:
                 yield
             finally:
-                cudnn.allow_tf32, matmul.allow_tf32 = saved
+                cudnn.allow_tf32 = saved_conv
+                torch.set_float32_matmul_precision(saved_matmul)
 
 
 def replace_node_with_constant(
