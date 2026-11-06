@@ -572,14 +572,17 @@ With none of them set, replay is off.
 
 A replay reads and writes the buffers it was recorded on. Keep each input and output in the same
 device buffer from call to call, as the memory planning of ``torch_tensorrt.save()`` does, and
-replays copy nothing. Host buffers, except on GPUs that read host memory directly, buffers off a
-256-byte boundary, inputs not in row-major order, and an output that shares memory with an input are
-still copied on every call. When the buffers change, that call records again on the new ones. When
-they change a second time, for any input shapes, the engine records on GPU buffers of its own and
-copies the inputs in and the outputs out on every call, also after the shapes or the profile change.
-With few kernels, or with large inputs and outputs, those copies can cost more than the launches
-they save. So buffers that move on every call cost up to 3 recordings for a set of shapes in each
-graph until they have moved twice. After that, each new set of shapes records once.
+replays copy nothing. With the recipe in `Keep inputs and outputs on the GPU`_, memory planning
+does not own them: from Python pass ``clone_outputs=False``, or from C++ give each output once with
+``Module::set_output``, and reuse the same input tensors. These are still copied on every call:
+host buffers (unless the GPU reads host memory directly), buffers off a 256-byte boundary,
+non-row-major inputs, and an output that shares memory with an input. When the buffers change, that
+call records again on the new ones. When they change a second time, for any input shapes, the engine
+records on GPU buffers of its own and copies the inputs in and the outputs out on every call, also
+after the shapes or the profile change. With few kernels, or with large inputs and outputs, those
+copies can cost more than the launches they save. So buffers that move on every call cost up to 3
+recordings for a set of shapes in each graph until they have moved twice. After that, each new set
+of shapes records once.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded there, and its replays stay on the green context's SMs. An engine
@@ -598,8 +601,8 @@ Some calls never replay:
 * An engine whose input shapes change on every call never replays.
 * An engine with aliased outputs, a GPU without stream-ordered memory, and a driver older than
   CUDA 12.5 never replay. They take the ordinary path.
-* A green context stream while another regular context is current, and a plain stream while a
-  green context is current, take the ordinary path.
+* A green context stream while a regular context other than its device's primary one is current,
+  and a plain stream while a green context is current, take the ordinary path.
 * A stream of another device fails, with or without replay. So does a stream of a regular CUDA
   context other than the one the engine was loaded in, except that, while the stream's own context is
   current, the engine's own graph replays on it. When that caller's buffers are not the
@@ -614,7 +617,7 @@ shared buffer grows.
     While a graph is being recorded, no other thread may create or destroy a TensorRT engine or
     execution context outside this delegate, or call a whole device sync such as
     ``cudaDeviceSynchronize()`` or ``torch.cuda.synchronize()``. Loading a program with ExecuTorch's
-    CUDA backend can make such a sync too. Recording happens again after every shape or buffer
+    CUDA backend can make such a sync too. Recording can happen again after a shape or buffer
     change, so loading everything first does not remove the risk. Leave replay off when other
     threads may do any of these things.
 
