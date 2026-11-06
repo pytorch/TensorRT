@@ -124,6 +124,61 @@ class TestConstantFolding(TestCase):
                 self.assertEqual(len(frozen), 3)
                 torch.testing.assert_close(gm(example_input), model(example_input))
 
+    @unittest.skipIf(
+        not torch.cuda.is_available() or torch.cuda.get_device_capability() < (8, 0),
+        "TF32 needs an Ampere or newer GPU",
+    )
+    def test_float32_folds_follow_disable_tf32(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("position", torch.randn(1, 64, 32, 32))
+                self.proj = torch.nn.Conv2d(64, 96, 1)
+                self.register_buffer("table", torch.randn(32, 64))
+                self.register_buffer("mix", torch.randn(64, 32))
+
+            def forward(self, x):
+                return x + self.proj(self.position) + self.table @ self.mix
+
+        torch.manual_seed(0)
+        model = Model().cuda().eval()
+        example_input = torch.randn(1, 96, 32, 32, device="cuda")
+        expected_conv = torch.nn.functional.conv2d(
+            model.position.double(),
+            model.proj.weight.double(),
+            model.proj.bias.double(),
+        )
+        expected_matmul = model.table.double() @ model.mix.double()
+        conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
+        saved = conv.fp32_precision, matmul.fp32_precision
+        for disable_tf32 in (True, False):
+            with self.subTest(disable_tf32=disable_tf32):
+                conv.fp32_precision = matmul.fp32_precision = "tf32"
+                try:
+                    gm = constant_fold(
+                        torch.export.export(model, (example_input,)).module(),
+                        CompilationSettings(disable_tf32=disable_tf32),
+                    )
+                    self.assertEqual(
+                        (conv.fp32_precision, matmul.fp32_precision), ("tf32", "tf32")
+                    )
+                finally:
+                    conv.fp32_precision, matmul.fp32_precision = saved
+                folded = {
+                    tuple(p.shape): p
+                    for n, p in gm.named_parameters()
+                    if n.startswith("_frozen_param")
+                }
+                for expected in (expected_conv, expected_matmul):
+                    error = (
+                        (folded[tuple(expected.shape)].double() - expected).abs().max()
+                    )
+                    # With TF32 allowed, the folded values keep the TF32 rounding the engine uses.
+                    if disable_tf32:
+                        self.assertLess(error.item(), 1e-5)
+                    else:
+                        self.assertGreater(error.item(), 1e-5)
+
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
         self.assertIn(

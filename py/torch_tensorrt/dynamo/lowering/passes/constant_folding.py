@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import contextlib
 import logging
-from typing import Any, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -109,7 +110,9 @@ def constant_fold(
         else _TorchTensorRTConstantFolder
     )
     cf = folder(gm, skip_constructors=False)
-    cf.run()
+    # With TF32 allowed, TensorRT computes in TF32 too, so folding keeps the caller's settings.
+    with _ieee_float32() if settings.disable_tf32 else contextlib.nullcontext():
+        cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
@@ -175,6 +178,20 @@ def constant_fold(
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
     return gm
+
+
+@contextlib.contextmanager
+def _ieee_float32() -> Iterator[None]:
+    """A folded value is baked into the engine as it was computed, so with disable_tf32
+    compute it in full float32. PyTorch lets cuDNN convolutions use TF32 by default, which
+    disable_tf32 does not reach."""
+    conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
+    saved = conv.fp32_precision, matmul.fp32_precision
+    conv.fp32_precision = matmul.fp32_precision = "ieee"
+    try:
+        yield
+    finally:
+        conv.fp32_precision, matmul.fp32_precision = saved
 
 
 def replace_node_with_constant(
