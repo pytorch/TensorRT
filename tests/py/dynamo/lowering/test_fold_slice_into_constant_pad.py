@@ -19,13 +19,15 @@ SLICE = torch.ops.aten.slice.Tensor
 
 
 class PadThenSlice(torch.nn.Module):
-    def __init__(self, pad, dim, start, end, step=1, mode="constant", keep_pad=False):
+    def __init__(
+        self, pad, dim, start, end, step=1, mode="constant", keep_pad=False, value=None
+    ):
         super().__init__()
         self.pad, self.dim, self.start, self.end, self.step = pad, dim, start, end, step
-        self.mode, self.keep_pad = mode, keep_pad
+        self.mode, self.keep_pad, self.value = mode, keep_pad, value
 
     def forward(self, x):
-        padded = F.pad(x, self.pad, mode=self.mode)
+        padded = F.pad(x, self.pad, mode=self.mode, value=self.value)
         index = [slice(None)] * x.dim()
         index[self.dim] = slice(self.start, self.end, self.step)
         out = padded[tuple(index)]
@@ -60,6 +62,18 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         gm, _, targets = _lower(module, x)
         self.assertNotIn(SLICE, targets)
         self.assertEqual(targets.count(PAD), 1)
+        torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("fill_value", PadThenSlice((3, 0), -1, None, 8, value=5.0)),
+            ("negative_start", PadThenSlice((3, 0), -1, -8, None)),
+        ]
+    )
+    def test_folds_keep_the_fill_and_a_negative_start(self, _, module):
+        x = torch.randn(2, 8)
+        gm, _, targets = _lower(module, x)
+        self.assertNotIn(SLICE, targets)
         torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
 
     def test_runs_in_post_lowering(self):
