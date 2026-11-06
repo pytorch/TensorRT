@@ -197,8 +197,6 @@ def _inline_traced_decomp(
                 new_args = torch.fx.node.map_arg(n.args, lambda x: env[x])
                 new_kwargs = torch.fx.node.map_arg(n.kwargs, lambda x: env[x])
                 new_n = gm.graph.call_function(n.target, new_args, new_kwargs)
-                if "val" in n.meta:
-                    new_n.meta["val"] = n.meta["val"]
                 env[n] = new_n
             elif n.op == "output":
                 output = torch.fx.node.map_arg(n.args[0], lambda x: env[x])
@@ -206,6 +204,15 @@ def _inline_traced_decomp(
                 raise RuntimeError(
                     f"Unexpected op {n.op} while inlining attention decomposition"
                 )
+
+            if n.op in ("get_attr", "call_function"):
+                # Keep each replacement's own shape/dtype metadata, while
+                # attributing it to the original module for fallback selection
+                # and diagnostics. The standalone trace has no module context.
+                env[n].meta.update(n.meta)
+                for key in ("nn_module_stack", "stack_trace", "source_fn_stack"):
+                    if key in node.meta:
+                        env[n].meta[key] = node.meta[key]
 
     assert output is not None
     if isinstance(output, tuple):
@@ -252,6 +259,9 @@ def decompose_unsupported_attention(
         if not attention_capability_validator(node, settings) or _torch_executed(
             node, settings
         ):
+            continue
+        # An attention in a torch_executed_modules module runs in PyTorch as well.
+        if node_in_torch_executed_module(node, settings.torch_executed_modules):
             continue
 
         if node.target in _ATTENTION_FALLBACKS:

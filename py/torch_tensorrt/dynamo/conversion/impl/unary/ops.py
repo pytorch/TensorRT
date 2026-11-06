@@ -10,6 +10,7 @@ import torch_tensorrt.dynamo.conversion.impl as impl
 from tensorrt import DataType as TRTDataType
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -597,10 +598,29 @@ def scalar_tensor(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    scalar: Union[int, float, bool],
+    scalar: Union[int, float, bool, TRTTensor],
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType]] = None,
 ) -> TRTTensor:
-    tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype)
+    # Like PyTorch, return a rank-0 tensor that is float32 unless dtype says otherwise.
+    # A rank-1 result would not match the FX metadata across an engine boundary.
+    dtype = torch.float32 if dtype is None else dtype
+    if isinstance(scalar, TRTTensor):
+        # A SymInt arrives as the int32, length-1 output of sym_size. TensorRT has no
+        # float64, and allows uint8 only on network inputs and outputs, where the
+        # output cast of an engine output restores it.
+        tensor = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_rank0", scalar, ()
+        )
+        cast_dtype = _enums.dtype._from(dtype)
+        if cast_dtype == _enums.dtype.f64:
+            cast_dtype = _enums.dtype.f32
+        elif cast_dtype == _enums.dtype.u8:
+            cast_dtype = _enums.dtype.i32
+        tensor = cast_trt_tensor(
+            ctx, tensor, cast_dtype, f"{name}_cast", target, source_ir
+        )
+    else:
+        tensor = get_trt_tensor(ctx, scalar, f"{name}_scalar_tensor", dtype, min_rank=0)
     identity_layer = ctx.net.add_identity(tensor)
     set_layer_name(identity_layer, target, name, source_ir)
     return identity_layer.get_output(0)

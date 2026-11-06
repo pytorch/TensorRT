@@ -1777,9 +1777,10 @@ def compile_module(
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
-    # compile() offloaded gm before this call. The global partitioner leaves the PyTorch
-    # nodes in this graph, so the state they read must go back to the device.
-    if settings.offload_module_to_cpu and not settings.use_fast_partitioner:
+    # compile() offloaded gm before this call, so the state that runs in PyTorch must go
+    # back to the device: the PyTorch nodes the global partitioner leaves in this graph,
+    # and with either partitioner, a parameter or buffer that the graph returns as is.
+    if settings.offload_module_to_cpu:
         pin_torch_executed_state(partitioned_module, to_torch_device(settings.device))
 
     # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
