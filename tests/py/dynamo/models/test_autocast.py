@@ -495,6 +495,35 @@ def test_autocast_calibration_keeps_large_indices_exact(indices):
 
 
 @pytest.mark.unit
+def test_autocast_calibration_names_torch_cond_as_unsupported():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x):
+            # Values above the float16 range keep the multiply in float32.
+            y = x * 1e5
+            return torch.cond(y.sum() > 0, lambda t: self.linear(t), lambda t: -t, (y,))
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    with pytest.raises(
+        RuntimeError, match="does not support the branches of torch.cond"
+    ):
+        torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+            autocast_calibration_dataloader=torch.utils.data.DataLoader(
+                [(x,)], batch_size=None
+            ),
+        )
+
+
+@pytest.mark.unit
 def test_autocast_calibration_joins_0_dim_values_across_batches():
     class Model(nn.Module):
         def __init__(self):
