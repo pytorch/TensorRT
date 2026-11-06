@@ -45,9 +45,10 @@ struct EngineHandle {
   std::vector<void*> cached_output_ptrs;
   std::vector<size_t> cached_output_sizes;
   // What exec_ctx holds, so execute() skips the TensorRT call when a shape or an address is the one it
-  // already gave. Each such call costs around a microsecond, and most callers pass the same ones every
-  // time. An unknown shape has nbDims -1 and an unknown address is null. Only this delegate may set
-  // shapes, addresses or the profile on exec_ctx, or these go stale.
+  // already gave. Setting an unchanged input shape still costs about half a microsecond, and an address
+  // or inferShapes tens of nanoseconds, and most callers pass the same ones every time. An unknown shape
+  // has nbDims -1 and an unknown address is null. Only this delegate may set shapes, addresses or the
+  // profile on exec_ctx, or these go stale.
   std::vector<nvinfer1::Dims> bound_input_dims;
   std::vector<void*> bound_addresses;
   // Changes whenever exec_ctx's input shapes or optimization profile may have changed, so a recorded
