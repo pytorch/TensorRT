@@ -33,6 +33,7 @@ from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F401
 from .fold_shared_kv_attention import fold_shared_kv_attention
+from .fold_slice_into_constant_pad import fold_slice_into_constant_pad
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -83,6 +84,7 @@ post_lowering_pass_list = [
     reset_folded_constructors,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
+    fold_slice_into_constant_pad,
     fuse_pad_into_convolution,
     # One cleanup cycle for non-conflicting node repairs.
     batch_cheap_fx_cleanups,
