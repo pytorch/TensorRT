@@ -1264,6 +1264,122 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
         _assert_one_shared_runtime(source, header)
 
 
+# The TensorRT calls that change what an execution context holds, and the one EngineHandle helper
+# allowed to make each. Nothing may set an input tensor address the old way.
+_CONTEXT_SETTER = re.compile(
+    r"(?:->|\.)\s*(setTensorAddress|setInputTensorAddress|setInputShape|setOptimizationProfileAsync)\s*\("
+)
+_CONTEXT_SETTER_HELPERS = {
+    "setTensorAddress": "bool EngineHandle::bind_address(",
+    "setInputShape": "bool EngineHandle::bind_input_shape(",
+    "setOptimizationProfileAsync": "bool EngineHandle::switch_profile(",
+}
+
+
+def _delegate_sources() -> dict:
+    return {
+        path.relative_to(_ROOT).as_posix(): path.read_text(encoding="utf-8")
+        for directory in (
+            "cpp/src/torch_tensorrt/executorch",
+            "cpp/include/torch_tensorrt/executorch",
+        )
+        for path in sorted((_ROOT / directory).rglob("*"))
+        if path.suffix in (".cpp", ".h")
+    }
+
+
+def _assert_context_setters_stay_in_their_helpers(sources: dict) -> None:
+    code = {name: _code_only(source) for name, source in sources.items()}
+    helpers = {}
+    for name, text in code.items():
+        for setter, signature in _CONTEXT_SETTER_HELPERS.items():
+            if signature in text:
+                start = text.index(signature)
+                end = start + len(_definition_body(text, signature))
+                helpers[setter] = (name, start, end)
+    assert helpers.keys() == _CONTEXT_SETTER_HELPERS.keys(), "a binding helper is gone"
+    for setter, (name, start, end) in helpers.items():
+        assert any(
+            match.group(1) == setter
+            for match in _CONTEXT_SETTER.finditer(code[name][start:end])
+        ), f"{_CONTEXT_SETTER_HELPERS[setter]} no longer calls {setter}"
+    for name, text in code.items():
+        for match in _CONTEXT_SETTER.finditer(text):
+            helper = helpers.get(match.group(1))
+            assert (
+                helper is not None
+                and helper[0] == name
+                and helper[1] <= match.start() < helper[2]
+            ), f"{name} calls {match.group(1)} outside its EngineHandle helper"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        None,
+        "address-set-in-execute",
+        "shape-set-in-the-graph",
+        "profile-set-in-a-header",
+        "old-input-address-call",
+        "helper-renamed",
+    ],
+)
+@pytest.mark.unit
+def test_context_setters_go_through_the_binding_cache(mutation) -> None:
+    """EngineHandle skips setTensorAddress and setInputShape when the execution context already holds
+    the value, and a recorded CUDA graph learns that shapes or the profile changed only from the shape
+    epoch its helpers bump. One direct call anywhere else in the delegate leaves both stale: the cache
+    then skips a call TensorRT needs, and a graph replays kernels recorded for other shapes, with no
+    error.
+
+    This reads the code, not a running backend, with comments stripped first so a comment cannot
+    stand in for a call. Each mutation below must turn the reading red.
+    """
+    sources = _delegate_sources()
+    backend = "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
+
+    def insert_into(name: str, signature: str, statement: str) -> None:
+        source = sources[name]
+        body = source.index("{", source.index(signature)) + 1
+        sources[name] = source[:body] + f"\n  {statement}" + source[body:]
+
+    if mutation is None:
+        _assert_context_setters_stay_in_their_helpers(sources)
+        return
+    if mutation == "address-set-in-execute":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setTensorAddress("input_0", nullptr);',
+        )
+    elif mutation == "shape-set-in-the-graph":
+        insert_into(
+            "cpp/src/torch_tensorrt/executorch/ExecutionGraph.cpp",
+            "Error ExecutionGraph::enqueue_in(",
+            'handle.exec_ctx->setInputShape("input_0", nvinfer1::Dims{});',
+        )
+    elif mutation == "profile-set-in-a-header":
+        header = "cpp/src/torch_tensorrt/executorch/EngineHandle.h"
+        sources[header] += (
+            "\ninline bool first_profile(nvinfer1::IExecutionContext& context) {\n"
+            "  return context.setOptimizationProfileAsync(0, nullptr);\n}\n"
+        )
+    elif mutation == "old-input-address-call":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setInputTensorAddress("input_0", nullptr);',
+        )
+    else:
+        original = "bool EngineHandle::switch_profile("
+        assert original in sources[backend]
+        sources[backend] = sources[backend].replace(
+            original, "bool EngineHandle::select_profile("
+        )
+    with pytest.raises(AssertionError):
+        _assert_context_setters_stay_in_their_helpers(sources)
+
+
 @pytest.mark.parametrize("plugin", [False, True])
 @pytest.mark.parametrize(
     "project",
