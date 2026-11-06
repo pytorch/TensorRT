@@ -19,6 +19,23 @@ logger = logging.getLogger(__name__)
 # Ops such as index, embedding, gather and embedding_bag need these arguments as integers.
 _INDEX_ARGUMENTS = ("index", "indices", "offsets")
 
+# Arguments where a scalar is added to a tensor or bounds it, as an epsilon is.
+# The eps of layer_norm and batch_norm is a float attribute, not a constant.
+_EPSILON_ARGUMENTS: dict[Any, tuple[str, ...]] = {
+    torch.ops.aten.add.Tensor: ("other",),
+    torch.ops.aten.add.Scalar: ("other",),
+    torch.ops.aten.sub.Tensor: ("other",),
+    torch.ops.aten.sub.Scalar: ("other",),
+    torch.ops.aten.rsub.Tensor: ("other",),
+    torch.ops.aten.rsub.Scalar: ("other",),
+    torch.ops.aten.clamp.default: ("min", "max"),
+    torch.ops.aten.clamp.Tensor: ("min", "max"),
+    torch.ops.aten.clamp_min.default: ("min",),
+    torch.ops.aten.clamp_min.Tensor: ("min",),
+    torch.ops.aten.clamp_max.default: ("max",),
+    torch.ops.aten.clamp_max.Tensor: ("max",),
+}
+
 
 def is_tensor_node(n: torch.fx.Node) -> bool:
     val = n.meta.get("val", None)
@@ -82,29 +99,28 @@ def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
 def _keep_tiny_constants_nonzero(
     node: torch.fx.Node, target_dtype: torch.dtype
 ) -> None:
-    # A scalar such as the eps=1e-12 that F.normalize passes to clamp_min becomes
+    # An epsilon such as the 1e-12 that F.normalize passes to clamp_min becomes
     # a constant of the input's type. In float16 it rounds to 0, and then
     # x / max(norm, eps) gives 0 / 0 for a zero vector, so use the smallest
-    # nonzero value of the type instead, as ModelOpt AutoCast does. A float
-    # argument, such as the eps of layer_norm, is not a tensor constant.
-    if not isinstance(node.target, torch._ops.OpOverload):
+    # nonzero value of the type instead, as ModelOpt AutoCast does. Only where a
+    # scalar is added or is a bound: x * 1e-12 must still round to 0.
+    names = _EPSILON_ARGUMENTS.get(node.target)
+    if not names or not isinstance(node.target, torch._ops.OpOverload):
         return
-    schema = {a.name: a for a in node.target._schema.arguments}
+    schema = [a.name for a in node.target._schema.arguments]
     finfo = torch.finfo(target_dtype)
     smallest = finfo.tiny * finfo.eps
 
-    def keep(name: str, v: Any) -> Any:
-        if (
-            isinstance(v, float)
-            and 0 < abs(v) < smallest
-            and str(schema[name].type) not in ("float", "float?")
-        ):
+    def keep(v: Any) -> Any:
+        if isinstance(v, float) and 0 < abs(v) < smallest:
             return math.copysign(smallest, v)
         return v
 
-    names = list(schema)
-    node.args = tuple(keep(names[i], v) for i, v in enumerate(node.args))
-    node.kwargs = {k: keep(k, v) for k, v in node.kwargs.items()}
+    node.args = tuple(
+        keep(v) if i < len(schema) and schema[i] in names else v
+        for i, v in enumerate(node.args)
+    )
+    node.kwargs = {k: keep(v) if k in names else v for k, v in node.kwargs.items()}
 
 
 def rule_based_autocast(

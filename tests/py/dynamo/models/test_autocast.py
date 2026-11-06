@@ -1183,6 +1183,35 @@ def test_autocast_keeps_tiny_constants_nonzero():
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize(
+    "scale",
+    [lambda y: y * 1e-12, lambda y: y / 1e12],
+    ids=["mul", "div"],
+)
+def test_autocast_leaves_tiny_factors_alone(scale):
+    class Model(nn.Module):
+        def forward(self, x):
+            return scale(x + 1.0)
+
+    model = Model().cuda().eval()
+    # Below the default output threshold of 512, so the scaling runs in float16.
+    x = torch.rand(4, 16, device="cuda") * 400 + 100
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    # In float16 the result is 0, as in eager; it must not become x * 6e-8.
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=0, atol=1e-6)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_skips_float16_float32_float16_round_trips():
     class Model(nn.Module):
         def __init__(self):
