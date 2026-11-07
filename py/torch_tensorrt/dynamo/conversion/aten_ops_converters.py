@@ -1942,11 +1942,27 @@ def aten_ops_index_put_accumulate(
     )
 
 
+def index_put_0d_mask_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """PyTorch ignores a 0-d mask next to other indices. The converter does not, so
+    leave that case to PyTorch."""
+    indices = [index for index in node.args[1] if index is not None]
+    if len(indices) < 2:
+        return True
+    for index in indices:
+        val = getattr(index, "meta", {}).get("val")
+        if val is not None and val.dtype == torch.bool and val.dim() == 0:
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=lambda node, settings: (
         index_dtype_validator(node, settings)
         and index_nonbool_validator(node, settings)
+        and index_put_0d_mask_validator(node, settings)
         and not args_bounds_check(node.args, 3, False)
     ),
     supports_dynamic_shapes=True,
