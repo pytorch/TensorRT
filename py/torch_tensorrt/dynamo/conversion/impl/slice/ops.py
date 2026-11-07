@@ -509,6 +509,11 @@ def cumsum(
     dim: int,
     dtype: Optional[torch.dtype] = None,
 ) -> TRTTensor:
+    if len(input.shape) == 0:
+        # Neither path takes a 0-d input, so sum it as shape (1,) and drop that dim again.
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+        result = cumsum(ctx, target, source_ir, name, input, 0, dtype)
+        return impl.shuffle.reshape(ctx, target, source_ir, f"{name}_0d", result, ())
     if not is_tensorrt_version_supported("10.8.0"):
         # No cumulative layer before this version, so build it out of a loop.
         return _cumsum_with_loop(ctx, target, source_ir, name, input, dim, dtype)
