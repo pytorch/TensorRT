@@ -602,6 +602,11 @@ destroyed or a newer green context takes its place. With TensorRT 11.4 and newer
 auxiliary streams needs this order even with replay off, since TensorRT makes those streams in the
 green context.
 
+An engine loaded while a green context is current is created in the device's primary context, which
+it keeps until it is destroyed, so that green context may be destroyed first if the engine never
+runs on its streams. This needs a CUDA 12.5 or newer driver. With an older one, the engine is
+created in that green context.
+
 Some calls never replay:
 
 * An engine whose input shapes change on every call never replays.
@@ -612,13 +617,14 @@ Some calls never replay:
 * A stream of another device fails, with or without replay. So does a stream of a regular CUDA
   context other than the one the engine was loaded in, except that, while the stream's own context is
   current, the engine's own graph replays on it. When that caller's buffers are not the
-  ones the graph was recorded on, the engine records again in its own context, on buffers of its
-  own, and copies the inputs in and the outputs out until its shapes or its profile change. When
-  that recording cannot go ahead (the engine's own context has not run the shapes yet, or the
-  recording fails), the call fails with an error that says why. The engine's own calls keep their
-  graph, unless that call brought new shapes, which drop it. Buffers the delegate allocates for such
-  a call, to copy an input or output it cannot use in place, belong to that context, so that context
-  must outlive the engine.
+  ones the graph was recorded on, and the graph is not already on buffers of its own, the engine
+  records again in its own context, on buffers of its own, and from then on every call of the engine
+  that replays on a plain stream, its own included, copies the inputs in and the outputs out until
+  its shapes or its profile change. When that recording cannot go ahead (the engine's own context
+  has not run the shapes yet, or the recording fails), the call fails with an error that says why.
+  The engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
+  buffers the delegate keeps for such a call are allocated in the engine's context, so that other
+  context may be destroyed first.
 * An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
   at all, with or without replay: the scratch's completion event belongs to the engine's context.
   With replay on, once the engine has run in its own context, such a call made while that other

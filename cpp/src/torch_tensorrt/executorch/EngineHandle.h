@@ -17,6 +17,7 @@
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 
 #include <NvInfer.h>
+#include <cuda.h>
 
 #include <cstdint>
 #include <memory>
@@ -78,6 +79,13 @@ struct EngineHandle {
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
+  // The regular CUDA context current when exec_ctx was created. It owns the engine and the buffers execute()
+  // keeps across calls; a call on a green context stream still runs in that green context. With a driver older
+  // than CUDA 12.5, a green context current at load is recorded here instead.
+  CUcontext context = nullptr;
+  // The device's primary context, retained when a green context was current at load, so that context is
+  // the one current while the engine and exec_ctx are created. Released when this handle is destroyed.
+  CUcontext retained_primary = nullptr;
   // Whether this device can reach pageable host memory through shared host page tables, which is the
   // question the uses of this flag ask. A discrete card answers no: it can reach pageable memory, but
   // only by faulting pages in one at a time, so it takes the staged-copy path instead.

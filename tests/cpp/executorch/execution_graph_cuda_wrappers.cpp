@@ -7,7 +7,6 @@
 
 #include <cudaTypedefs.h>
 
-#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <thread>
@@ -17,6 +16,8 @@ namespace executorch_backend {
 namespace testing {
 
 thread_local CudaCalls* active_calls = nullptr;
+std::atomic<int> primary_context_retains{0};
+std::atomic<int> primary_context_releases{0};
 
 namespace {
 PFN_cuCtxGetId_v12000 real_context_id = nullptr;
@@ -38,11 +39,29 @@ CUresult slow_from_green(CUcontext* context, CUgreenCtx green) {
   return result;
 }
 std::atomic<unsigned long long> context_id_offset{0};
+PFN_cuDevicePrimaryCtxRetain_v7000 real_retain = nullptr;
+PFN_cuDevicePrimaryCtxRelease_v11000 real_release = nullptr;
 
 CUresult renewable_context_id(CUcontext context, unsigned long long* id) {
   const CUresult result = real_context_id(context, id);
   if (result == CUDA_SUCCESS) {
     *id += context_id_offset.load();
+  }
+  return result;
+}
+
+CUresult counting_retain(CUcontext* context, CUdevice device) {
+  const CUresult result = real_retain(context, device);
+  if (result == CUDA_SUCCESS) {
+    ++primary_context_retains;
+  }
+  return result;
+}
+
+CUresult counting_release(CUdevice device) {
+  const CUresult result = real_release(device);
+  if (result == CUDA_SUCCESS) {
+    ++primary_context_releases;
   }
   return result;
 }
@@ -126,6 +145,12 @@ cudaError_t __wrap_cudaGetDriverEntryPointByVersion(
   } else if (std::strcmp(name, "cuCtxGetId") == 0) {
     real_context_id = reinterpret_cast<PFN_cuCtxGetId_v12000>(*entry);
     *entry = reinterpret_cast<void*>(&renewable_context_id);
+  } else if (std::strcmp(name, "cuDevicePrimaryCtxRetain") == 0) {
+    real_retain = reinterpret_cast<PFN_cuDevicePrimaryCtxRetain_v7000>(*entry);
+    *entry = reinterpret_cast<void*>(&counting_retain);
+  } else if (std::strcmp(name, "cuDevicePrimaryCtxRelease") == 0) {
+    real_release = reinterpret_cast<PFN_cuDevicePrimaryCtxRelease_v11000>(*entry);
+    *entry = reinterpret_cast<void*>(&counting_release);
   }
   return result;
 }

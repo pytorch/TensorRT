@@ -6,7 +6,6 @@
 #include "torch_tensorrt/executorch/ExecutionGraph.h"
 #include "EngineHandle.h"
 
-#include <cudaTypedefs.h>
 #include <executorch/runtime/platform/log.h>
 
 #include <algorithm>
@@ -37,22 +36,12 @@ std::mutex& green_context_mutex() {
   return *mutex;
 }
 
-template <typename Function>
-Function driver_entry(const char* name) {
-  void* entry = nullptr;
-  if (cudaGetDriverEntryPointByVersion(name, &entry, 12050, cudaEnableDefault) != cudaSuccess || entry == nullptr) {
-    cudaGetLastError();
-    return nullptr;
-  }
-  return reinterpret_cast<Function>(entry);
-}
-
 // Finds the context `stream` runs its work in, and whether a graph can serve it: the stream's green
 // context, or else the context current on this thread. Graph nodes keep the context they were
 // recorded in, not that of the stream that launches them, so a green context's graph is recorded in
 // that green context. enqueue_in picks the context a plain graph is recorded in.
 bool recording_context(cudaStream_t stream, CUcontext& context, CUgreenCtx& green, unsigned long long& green_id) {
-  static const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx");
+  static const auto get_context = driver_entry_point<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
   if (get_context == nullptr) {
     // Logging can wait for a lock held by another caller, so it must not hold the initialization guard.
     static std::atomic_flag logged = ATOMIC_FLAG_INIT;
@@ -76,8 +65,8 @@ bool recording_context(cudaStream_t stream, CUcontext& context, CUgreenCtx& gree
     return current_green == nullptr;
   }
   // A destroyed green context's handle can be handed out again, but its id never is.
-  static const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx");
-  static const auto context_id = driver_entry<PFN_cuCtxGetId_v12000>("cuCtxGetId");
+  static const auto from_green = driver_entry_point<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx", 12040);
+  static const auto context_id = driver_entry_point<PFN_cuCtxGetId_v12000>("cuCtxGetId", 12000);
   if (from_green == nullptr || context_id == nullptr) {
     return false;
   }
@@ -90,7 +79,8 @@ cudaError_t create_capture_stream(CUgreenCtx green, cudaStream_t& stream) {
   if (green == nullptr) {
     return cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
   }
-  static const auto create_stream = driver_entry<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate");
+  static const auto create_stream =
+      driver_entry_point<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate", 12050);
   if (create_stream == nullptr) {
     return cudaErrorNotSupported;
   }
@@ -106,36 +96,6 @@ cudaError_t create_capture_stream(CUgreenCtx green, cudaStream_t& stream) {
   stream = created;
   return cudaSuccess;
 }
-
-// Makes `context` current on this thread until the end of the scope, when `needed`.
-class ContextScope {
- public:
-  ContextScope(CUcontext context, bool needed) {
-    if (!needed) {
-      ok_ = true;
-      return;
-    }
-    static const auto push = driver_entry<PFN_cuCtxPushCurrent_v4000>("cuCtxPushCurrent");
-    pushed_ = push != nullptr && push(context) == CUDA_SUCCESS;
-    ok_ = pushed_;
-  }
-  ~ContextScope() {
-    static const auto pop = driver_entry<PFN_cuCtxPopCurrent_v4000>("cuCtxPopCurrent");
-    CUcontext popped = nullptr;
-    if (pushed_ && pop != nullptr) {
-      pop(&popped);
-    }
-  }
-  ContextScope(const ContextScope&) = delete;
-  ContextScope& operator=(const ContextScope&) = delete;
-  bool ok() const {
-    return ok_;
-  }
-
- private:
-  bool ok_ = false;
-  bool pushed_ = false;
-};
 
 const std::string& binding_name(const EngineHandle& handle, size_t index) {
   return index < handle.num_inputs ? handle.input_binding_names[index]

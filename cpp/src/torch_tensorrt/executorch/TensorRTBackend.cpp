@@ -278,6 +278,15 @@ EngineHandle::~EngineHandle() {
   exec_ctx.reset();
   engine.reset();
   // The runtime is shared and outlives this handle, so there is nothing to release for it.
+  if (retained_primary != nullptr) {
+    static const auto get_device = driver_entry_point<PFN_cuDeviceGet_v2000>("cuDeviceGet", 2000);
+    static const auto release =
+        driver_entry_point<PFN_cuDevicePrimaryCtxRelease_v11000>("cuDevicePrimaryCtxRelease", 11000);
+    CUdevice device = 0;
+    if (get_device != nullptr && release != nullptr && get_device(&device, device_id) == CUDA_SUCCESS) {
+      release(device);
+    }
+  }
 }
 
 namespace {
@@ -639,6 +648,10 @@ Error initialize_engine_io(EngineHandle& handle) {
   if (handle.exec_ctx == nullptr) {
     return report_load_error("create TensorRT execution context");
   }
+  static const auto get_current = driver_entry_point<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  if (get_current == nullptr || get_current(&handle.context) != CUDA_SUCCESS) {
+    handle.context = nullptr;
+  }
 
   if (handle.shared_scratch) {
     // Gated so a handle loaded with the option off pays no TensorRT call for a
@@ -794,6 +807,27 @@ constexpr uintptr_t kTensorAddressAlignment = 256;
 
 bool is_tensor_address_aligned(const void* ptr) {
   return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
+}
+
+// Grows one of the buffers execute() keeps across calls to at least `bytes`. It is allocated in the
+// engine's context: one allocated while a call from another regular context had that context current
+// would go away with that context and leave the engine's later calls copying into freed memory.
+cudaError_t grow_kept_buffer(const EngineHandle& engine, void*& buffer, size_t& capacity, size_t bytes) {
+  ContextScope scope(engine.context, engine.context != nullptr);
+  if (!scope.ok()) {
+    return cudaErrorDeviceUninitialized;
+  }
+  if (buffer != nullptr) {
+    cudaFree(buffer);
+  }
+  const cudaError_t error = cudaMalloc(&buffer, bytes);
+  if (error != cudaSuccess) {
+    buffer = nullptr;
+    capacity = 0;
+    return error;
+  }
+  capacity = bytes;
+  return cudaSuccess;
 }
 
 // Size-1 dims are skipped, since they move no element, and a tensor built without strides is row-major.
@@ -1200,6 +1234,10 @@ Error refuse_pooled_call_on_a_capturing_stream(cudaStream_t stream, int device_i
 // what a call installs on its context is its own requirement, not whatever the
 // pool grew to for someone else.
 //
+// What the pool makes is made in `context`, the engine's: the thread's current
+// context may be a green context or another regular context, which the caller
+// may destroy first.
+//
 // `need` is a real request and never zero -- execute() substitutes
 // kMinPooledScratchBytes for a zero before calling, so that the size the pool
 // guarantees and the size the context is told it owns are one figure and not two.
@@ -1209,12 +1247,19 @@ Error refuse_pooled_call_on_a_capturing_stream(cudaStream_t stream, int device_i
 // but Relaxed, and a growth's disposal of the buffer it replaces under every mode
 // but Relaxed as well.
 //
-// Must be called with `device_id` already current: cudaEventCreateWithFlags and
-// cudaMalloc both act on the *current* device and nothing in here sets it.
-Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need, cudaStream_t stream, void*& out_ptr) {
+// Must be called with `device_id` already current when `context` is null:
+// everything the pool makes is otherwise made with `context` pushed.
+Error claim_shared_scratch(
+    SharedScratchClaim& claim,
+    int device_id,
+    CUcontext context,
+    size_t need,
+    cudaStream_t stream,
+    void*& out_ptr) {
   SharedScratchDevice& dev = claim.hold(device_id);
 
-  const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, []() -> cudaEvent_t {
+  const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, [context]() -> cudaEvent_t {
+    ContextScope scope(context, context != nullptr);
     cudaEvent_t event = nullptr;
     // Blocking-sync so the host yields instead of busy-spinning. The only host
     // wait ever made on this event is the one a growth's disposal makes in
@@ -1222,7 +1267,8 @@ Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need
     // would burn a core for that time and be no faster. Nothing on a call that
     // does not grow the pool waits on it from the host, and the flag costs
     // nothing there.
-    if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming | cudaEventBlockingSync) != cudaSuccess) {
+    if (!scope.ok() ||
+        cudaEventCreateWithFlags(&event, cudaEventDisableTiming | cudaEventBlockingSync) != cudaSuccess) {
       // The pool's own failure, cleared where it is made: the caller is told by
       // the return, and leaving it pending would surface it under the name of
       // whatever this thread calls next.
@@ -1255,9 +1301,10 @@ Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need
   void* const buffer = shared_scratch_get_or_grow(
       dev,
       need,
-      [&claim, first_buffer](size_t bytes) -> void* {
+      [&claim, first_buffer, context](size_t bytes) -> void* {
+        ContextScope scope(context, context != nullptr);
         void* p = nullptr;
-        if (cudaMalloc(&p, bytes) != cudaSuccess) {
+        if (!scope.ok() || cudaMalloc(&p, bytes) != cudaSuccess) {
           cudaGetLastError();
           return nullptr;
         }
@@ -1280,13 +1327,14 @@ Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need
   // created and not waited on, and only a growth that displaced a buffer creates
   // one at all.
   if (retired.buffer != nullptr) {
-    const cudaStream_t disposal_stream = shared_scratch_disposal_stream(dev, [device_id]() -> cudaStream_t {
+    const cudaStream_t disposal_stream = shared_scratch_disposal_stream(dev, [device_id, context]() -> cudaStream_t {
+      ContextScope scope(context, context != nullptr);
       cudaStream_t stream_for_disposals = nullptr;
       // Non-blocking, so a free queued here is not ordered against the legacy
       // default stream: the disposal waits for the enqueue that used the buffer
       // and for nothing else, and the legacy stream would add whatever any other
       // library on this device happens to have queued on it.
-      if (cudaStreamCreateWithFlags(&stream_for_disposals, cudaStreamNonBlocking) != cudaSuccess) {
+      if (!scope.ok() || cudaStreamCreateWithFlags(&stream_for_disposals, cudaStreamNonBlocking) != cudaSuccess) {
         // The pool's own failure, cleared where it is made: the disposal falls
         // back to a device-wide free and says so, and leaving this pending would
         // surface it under the name of whatever this thread calls next.
@@ -1389,6 +1437,34 @@ Result<DelegateHandle*> TensorRTBackend::init(
   if (!device_guard.ok()) {
     ET_LOG(Error, "TensorRTBackend::init: cannot select device %d", handle->device_id);
     return Error::InvalidProgram;
+  }
+  // TensorRT destroys the engine and its execution context in the context that was current when it
+  // created them, and a green context current here may be destroyed first when the engine never runs on
+  // its streams. So while one is current they are created in the device's primary context instead. Calls
+  // still run in the context of the stream they are given. A driver older than CUDA 12.5 cannot tell that a
+  // green context is current, so there they are created in it.
+  static const auto get_stream_context = driver_entry_point<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  CUcontext null_stream_context = nullptr;
+  CUgreenCtx current_green = nullptr;
+  if (get_stream_context != nullptr &&
+      get_stream_context(nullptr, &null_stream_context, &current_green) == CUDA_SUCCESS && current_green != nullptr) {
+    static const auto get_device = driver_entry_point<PFN_cuDeviceGet_v2000>("cuDeviceGet", 2000);
+    static const auto retain = driver_entry_point<PFN_cuDevicePrimaryCtxRetain_v7000>("cuDevicePrimaryCtxRetain", 7000);
+    CUdevice device = 0;
+    if (get_device == nullptr || retain == nullptr || get_device(&device, handle->device_id) != CUDA_SUCCESS ||
+        retain(&handle->retained_primary, device) != CUDA_SUCCESS) {
+      handle->retained_primary = nullptr;
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: a green context is current, and the primary context of device %d, where the engine is created instead, could not be retained",
+          handle->device_id);
+      return Error::InvalidState;
+    }
+  }
+  ContextScope load_scope(handle->retained_primary, handle->retained_primary != nullptr);
+  if (!load_scope.ok()) {
+    ET_LOG(Error, "TensorRTBackend::init: could not make the primary context of device %d current", handle->device_id);
+    return Error::InvalidState;
   }
 
   // Whether this device can reach pageable host memory at all. Speed is the query below.
@@ -2057,12 +2133,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     void* bind_ptr = nullptr;
     if (et_in.nbytes() == 0) {
-      if (engine->cached_input_sizes[i] == 0) {
-        cuda_err = cudaMalloc(&engine->cached_input_ptrs[i], 1);
-        if (cuda_err != cudaSuccess) {
-          return Error::MemoryAllocationFailed;
-        }
-        engine->cached_input_sizes[i] = 1;
+      if (engine->cached_input_sizes[i] == 0 &&
+          grow_kept_buffer(*engine, engine->cached_input_ptrs[i], engine->cached_input_sizes[i], 1) != cudaSuccess) {
+        return Error::MemoryAllocationFailed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
     } else if (device_reachable && row_major && is_tensor_address_aligned(et_in.const_data_ptr())) {
@@ -2079,17 +2152,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             name.c_str());
       }
       const size_t needed = et_in.nbytes();
-      if (needed > engine->cached_input_sizes[i]) {
-        if (engine->cached_input_ptrs[i] != nullptr) {
-          cudaFree(engine->cached_input_ptrs[i]);
-        }
-        cuda_err = cudaMalloc(&engine->cached_input_ptrs[i], needed);
-        if (cuda_err != cudaSuccess) {
-          engine->cached_input_ptrs[i] = nullptr;
-          engine->cached_input_sizes[i] = 0;
-          return Error::MemoryAllocationFailed;
-        }
-        engine->cached_input_sizes[i] = needed;
+      if (needed > engine->cached_input_sizes[i] &&
+          grow_kept_buffer(*engine, engine->cached_input_ptrs[i], engine->cached_input_sizes[i], needed) !=
+              cudaSuccess) {
+        return Error::MemoryAllocationFailed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
       cuda_err = row_major ? cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream)
@@ -2302,12 +2368,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     const bool device_reachable =
         et_out.nbytes() > 0 && (engine->pageable_host_access || output_placement.cuda_accessible);
     if (et_out.nbytes() == 0) {
-      if (engine->cached_output_sizes[o] == 0) {
-        cuda_err = cudaMalloc(&engine->cached_output_ptrs[o], 1);
-        if (cuda_err != cudaSuccess) {
-          return Error::MemoryAllocationFailed;
-        }
-        engine->cached_output_sizes[o] = 1;
+      if (engine->cached_output_sizes[o] == 0 &&
+          grow_kept_buffer(*engine, engine->cached_output_ptrs[o], engine->cached_output_sizes[o], 1) != cudaSuccess) {
+        return Error::MemoryAllocationFailed;
       }
       bind_ptr = engine->cached_output_ptrs[o];
     } else if (
@@ -2319,17 +2382,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         report_unaligned(name, et_out.const_data_ptr());
       }
       const size_t needed = et_out.nbytes();
-      if (needed > engine->cached_output_sizes[o]) {
-        if (engine->cached_output_ptrs[o] != nullptr) {
-          cudaFree(engine->cached_output_ptrs[o]);
-        }
-        cuda_err = cudaMalloc(&engine->cached_output_ptrs[o], needed);
-        if (cuda_err != cudaSuccess) {
-          engine->cached_output_ptrs[o] = nullptr;
-          engine->cached_output_sizes[o] = 0;
-          return Error::MemoryAllocationFailed;
-        }
-        engine->cached_output_sizes[o] = needed;
+      if (needed > engine->cached_output_sizes[o] &&
+          grow_kept_buffer(*engine, engine->cached_output_ptrs[o], engine->cached_output_sizes[o], needed) !=
+              cudaSuccess) {
+        return Error::MemoryAllocationFailed;
       }
       bind_ptr = engine->cached_output_ptrs[o];
       outputs_needing_copy.push_back({arg_i, bind_ptr});
@@ -2397,7 +2453,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // or enqueueV3 refuses it.
     const size_t scratch_bytes = need == 0 ? kMinPooledScratchBytes : need;
     const Error scratch_err =
-        claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, scratch_buffer);
+        claim_shared_scratch(scratch_claim, engine->device_id, engine->context, scratch_bytes, stream, scratch_buffer);
     if (scratch_err != Error::Ok) {
       return scratch_err;
     }

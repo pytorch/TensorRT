@@ -7,6 +7,7 @@
 
 #include <cuda_runtime.h>
 
+#include <atomic>
 #include <functional>
 #include <vector>
 
@@ -20,6 +21,10 @@ struct CudaCall {
   CudaCallKind kind;
   cudaStream_t stream;
 };
+
+// The delegate looks up each driver entry point once per process, so these count calls on every thread.
+extern std::atomic<int> primary_context_retains;
+extern std::atomic<int> primary_context_releases;
 
 // While alive, cuCtxGetId reports a new id for every context under its old handle, as for a new context the
 // driver gives a destroyed one's handle.

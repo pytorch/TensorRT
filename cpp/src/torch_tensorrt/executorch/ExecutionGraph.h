@@ -6,7 +6,7 @@
 #pragma once
 
 #include <NvInfer.h>
-#include <cuda.h>
+#include <cudaTypedefs.h>
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
@@ -19,6 +19,49 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 
 struct EngineHandle;
+
+// The driver function `name` at `cuda_version`, which selects its ABI, so pass the version in the name
+// of Function, for example PFN_cuStreamGetCtx_v12050 and 12050. Null when the driver lacks it.
+template <typename Function>
+Function driver_entry_point(const char* name, int cuda_version) {
+  void* entry = nullptr;
+  if (cudaGetDriverEntryPointByVersion(name, &entry, cuda_version, cudaEnableDefault) != cudaSuccess ||
+      entry == nullptr) {
+    cudaGetLastError();
+    return nullptr;
+  }
+  return reinterpret_cast<Function>(entry);
+}
+
+// Makes `context` current on this thread until the end of the scope, when `needed`.
+class ContextScope {
+ public:
+  ContextScope(CUcontext context, bool needed) {
+    if (!needed) {
+      ok_ = true;
+      return;
+    }
+    static const auto push = driver_entry_point<PFN_cuCtxPushCurrent_v4000>("cuCtxPushCurrent", 4000);
+    pushed_ = push != nullptr && push(context) == CUDA_SUCCESS;
+    ok_ = pushed_;
+  }
+  ~ContextScope() {
+    static const auto pop = driver_entry_point<PFN_cuCtxPopCurrent_v4000>("cuCtxPopCurrent", 4000);
+    CUcontext popped = nullptr;
+    if (pushed_ && pop != nullptr) {
+      pop(&popped);
+    }
+  }
+  ContextScope(const ContextScope&) = delete;
+  ContextScope& operator=(const ContextScope&) = delete;
+  bool ok() const {
+    return ok_;
+  }
+
+ private:
+  bool ok_ = false;
+  bool pushed_ = false;
+};
 
 // Loads and destruction share this lock. A recording takes it exclusively for its capture window, and a
 // call from another regular context from before it sets up the graph's own buffers.
