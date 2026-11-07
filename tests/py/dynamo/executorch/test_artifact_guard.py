@@ -1065,21 +1065,29 @@ def _definition_body(source: str, signature: str) -> str:
 
 def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     code = _code_only(source)
-    helper = "int cuda_foreign_device_of_ptr("
+    helper = "BufferPlacement placement_of("
     assert helper in code, "the helper that answers the question is gone"
     # Read the body that binds the buffers, not the whole file: a check that still exists but sits
     # somewhere execute() never reaches refuses nothing.
     execute = _definition_body(code, "Error TensorRTBackend::execute(")
+    # Both the query and the read of its answer: dropping either one refuses nothing.
     assert (
-        "const int input_device = cuda_foreign_device_of_ptr(" in execute
+        "input_placements[i] = placement_of(" in execute
+    ), "an input's device is no longer queried where it is bound"
+    assert (
+        "const int input_device = input_placements[i].foreign_device;" in execute
     ), "an input is no longer checked against the engine's device where it is bound"
     assert (
-        "const int output_device = cuda_foreign_device_of_ptr(" in execute
+        "const BufferPlacement output_placement = placement_of(" in execute
+    ), "a caller-supplied output's device is no longer queried where it is bound"
+    assert (
+        "const int output_device = output_placement.foreign_device;" in execute
     ), "a caller-supplied output is no longer checked where it is bound"
     # The aliased branch returns before reaching the ordinary output check, so it needs its own. It
     # went without one, and a buffer on a card the engine cannot reach was copied into.
     assert (
-        "const int foreign_alias_device = cuda_foreign_device_of_ptr(" in execute
+        "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;"
+        in execute
     ), "an aliased output is no longer checked, and its branch skips the ordinary check"
     # Capability asserted absent and usability asserted present: whether two cards CAN reach each
     # other answered yes on every pair measured and still faulted, while a non-null devicePointer is
@@ -1088,19 +1096,17 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
         "cudaDeviceCanAccessPeer" not in code
     ), "the capability check is back, and capability is not access"
     assert (
-        "attrs.devicePointer != nullptr" in code
+        "attrs.devicePointer == nullptr" in code
     ), "the usability check is gone, so a buffer reachable from here is refused"
-    # Read the accessibility helper's own body. cudaMemoryTypeDevice is also the foreign-device
-    # check's own token, so asserting it against the whole file says nothing about the exemption:
-    # the managed arm could go and the file would still mention the type.
-    accessible = _definition_body(code, "bool is_cuda_accessible_ptr(")
+    # Read the helper's own body, so a mention elsewhere in the file cannot stand in for it.
+    placement = _definition_body(code, helper)
     assert (
-        "attrs.type == cudaMemoryTypeManaged" in accessible
+        "attrs.type == cudaMemoryTypeManaged" in placement
     ), "the managed-memory exemption is gone"
-    foreign = _definition_body(code, "int cuda_foreign_device_of_ptr(")
     assert (
-        "attrs.type != cudaMemoryTypeDevice" in foreign
-    ), "the foreign-device helper no longer gates on the buffer being device memory"
+        "attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device"
+        in placement
+    ), "the foreign-device check no longer gates on the buffer being device memory"
 
 
 def _assert_one_shared_runtime(source: str, header: str) -> None:
@@ -1132,7 +1138,9 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
     [
         None,
         "drop-input-check",
+        "drop-input-query",
         "drop-output-check",
+        "drop-output-query",
         "drop-alias-check",
         "drop-helper",
         "drop-managed-exemption",
@@ -1159,7 +1167,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    input_check = "const int input_device = cuda_foreign_device_of_ptr("
+    input_check = "const int input_device = input_placements[i].foreign_device;"
 
     if mutation is None:
         _assert_wrong_device_buffers_are_refused(source)
@@ -1173,7 +1181,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         ), "mutation input-check-outside-execute has nothing to move"
         assert availability in source
         source = source.replace(input_check, "", 1).replace(
-            availability, availability + f"\n  {input_check}nullptr, 0);", 1
+            availability, availability + f"\n  {input_check}", 1
         )
     elif mutation == "peer-capability-back":
         # The one reading that asserts absence, so the only mutation that can pin it is one that
@@ -1189,9 +1197,11 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         # commented line already reads as absent.
         removed = {
             "drop-input-check": input_check,
-            "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
-            "drop-alias-check": "const int foreign_alias_device = cuda_foreign_device_of_ptr(",
-            "drop-helper": "int cuda_foreign_device_of_ptr(",
+            "drop-input-query": "input_placements[i] = placement_of(",
+            "drop-output-query": "const BufferPlacement output_placement = placement_of(",
+            "drop-output-check": "const int output_device = output_placement.foreign_device;",
+            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;",
+            "drop-helper": "BufferPlacement placement_of(",
             "drop-managed-exemption": " || attrs.type == cudaMemoryTypeManaged",
         }[mutation]
         assert removed in source, f"mutation {mutation} has nothing to remove"
@@ -1252,6 +1262,137 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
         source = source.replace(original, "//" + original)
     with pytest.raises(AssertionError):
         _assert_one_shared_runtime(source, header)
+
+
+# The TensorRT calls that change what an execution context holds, and the one EngineHandle helper
+# allowed to make each. Nothing may set an input or output tensor address the old way.
+_CONTEXT_SETTER = re.compile(
+    r"(?:->|\.)\s*(setTensorAddress|setInputTensorAddress|setOutputTensorAddress|setOutputAllocator"
+    r"|setInputShape|setOptimizationProfileAsync)\s*\("
+)
+_CONTEXT_SETTER_HELPERS = {
+    "setTensorAddress": "bool EngineHandle::bind_address(",
+    "setInputShape": "bool EngineHandle::bind_input_shape(",
+    "setOptimizationProfileAsync": "bool EngineHandle::switch_profile(",
+}
+
+
+def _delegate_sources() -> dict:
+    return {
+        path.relative_to(_ROOT).as_posix(): path.read_text(encoding="utf-8")
+        for directory in (
+            "cpp/src/torch_tensorrt/executorch",
+            "cpp/include/torch_tensorrt/executorch",
+        )
+        for path in sorted((_ROOT / directory).rglob("*"))
+        if path.suffix in (".cpp", ".h")
+    }
+
+
+def _assert_context_setters_stay_in_their_helpers(sources: dict) -> None:
+    code = {name: _code_only(source) for name, source in sources.items()}
+    helpers = {}
+    for name, text in code.items():
+        for setter, signature in _CONTEXT_SETTER_HELPERS.items():
+            if signature in text:
+                start = text.index(signature)
+                end = start + len(_definition_body(text, signature))
+                helpers[setter] = (name, start, end)
+    assert helpers.keys() == _CONTEXT_SETTER_HELPERS.keys(), "a binding helper is gone"
+    for setter, (name, start, end) in helpers.items():
+        assert any(
+            match.group(1) == setter
+            for match in _CONTEXT_SETTER.finditer(code[name][start:end])
+        ), f"{_CONTEXT_SETTER_HELPERS[setter]} no longer calls {setter}"
+    for name, text in code.items():
+        for match in _CONTEXT_SETTER.finditer(text):
+            helper = helpers.get(match.group(1))
+            assert (
+                helper is not None
+                and helper[0] == name
+                and helper[1] <= match.start() < helper[2]
+            ), f"{name} calls {match.group(1)} outside its EngineHandle helper"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        None,
+        "address-set-in-execute",
+        "shape-set-in-the-graph",
+        "profile-set-in-a-header",
+        "old-input-address-call",
+        "old-output-address-call",
+        "output-allocator-call",
+        "helper-renamed",
+    ],
+)
+@pytest.mark.unit
+def test_context_setters_go_through_the_binding_cache(mutation) -> None:
+    """EngineHandle skips setTensorAddress and setInputShape when the execution context already holds
+    the value, and a recorded CUDA graph learns that shapes or the profile changed only from the shape
+    epoch its helpers bump. One direct call anywhere else in the delegate leaves both stale: the cache
+    then skips a call TensorRT needs, and a graph replays kernels recorded for other shapes, with no
+    error.
+
+    This reads the code, not a running backend, with comments stripped first so a comment cannot
+    stand in for a call. Each mutation below must turn the reading red.
+    """
+    sources = _delegate_sources()
+    backend = "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
+
+    def insert_into(name: str, signature: str, statement: str) -> None:
+        source = sources[name]
+        body = source.index("{", source.index(signature)) + 1
+        sources[name] = source[:body] + f"\n  {statement}" + source[body:]
+
+    if mutation is None:
+        _assert_context_setters_stay_in_their_helpers(sources)
+        return
+    if mutation == "address-set-in-execute":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setTensorAddress("input_0", nullptr);',
+        )
+    elif mutation == "shape-set-in-the-graph":
+        insert_into(
+            "cpp/src/torch_tensorrt/executorch/ExecutionGraph.cpp",
+            "Error ExecutionGraph::enqueue_in(",
+            'handle.exec_ctx->setInputShape("input_0", nvinfer1::Dims{});',
+        )
+    elif mutation == "profile-set-in-a-header":
+        header = "cpp/src/torch_tensorrt/executorch/EngineHandle.h"
+        sources[header] += (
+            "\ninline bool first_profile(nvinfer1::IExecutionContext& context) {\n"
+            "  return context.setOptimizationProfileAsync(0, nullptr);\n}\n"
+        )
+    elif mutation == "old-input-address-call":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setInputTensorAddress("input_0", nullptr);',
+        )
+    elif mutation == "old-output-address-call":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setOutputTensorAddress("output_0", nullptr);',
+        )
+    elif mutation == "output-allocator-call":
+        insert_into(
+            backend,
+            "Error TensorRTBackend::execute(",
+            'ctx->setOutputAllocator("output_0", nullptr);',
+        )
+    else:
+        original = "bool EngineHandle::switch_profile("
+        assert original in sources[backend]
+        sources[backend] = sources[backend].replace(
+            original, "bool EngineHandle::select_profile("
+        )
+    with pytest.raises(AssertionError):
+        _assert_context_setters_stay_in_their_helpers(sources)
 
 
 @pytest.mark.parametrize("plugin", [False, True])

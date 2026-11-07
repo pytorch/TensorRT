@@ -91,12 +91,29 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * compile spec value, or the key twice, fails the load. Engines with aliased
  * outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5
  * keep ordinary enqueueV3. An engine on the shared activation scratch pool drops
- * its recorded graph whenever the pool hands it a different buffer, and pays the
- * same stable I/O buffers and copies as any other replaying engine. Caller
+ * its recorded graph whenever the pool hands it a different buffer. Caller
  * streams in the current ordinary context can replay, as can a call with no
- * caller stream. Green context and other context streams take the plain path,
- * and the graph is kept unless the scratch buffer, the shapes, or the
- * optimization profile changed.
+ * caller stream. A green context stream of the engine's device records and
+ * replays in its own context while no regular context other than the device's
+ * primary one is current. Kernels that TensorRT runs on auxiliary streams it
+ * creates itself can still run outside the green context; an engine built with
+ * max_aux_streams=0 has none. Up to 4 green contexts keep a graph each, until the
+ * engine is destroyed or a newer green context takes the place of the one
+ * called longest ago. A green context may be destroyed first: its graph is then
+ * only freed, never replayed. A stream of another device
+ * fails, and so does one of another regular context, unless that context is
+ * current and a graph recorded in the engine's own context replays on it. On
+ * other buffers than that graph's, the engine records again in its own context,
+ * on buffers of its own; when that recording cannot go ahead, the call fails and
+ * the engine keeps the graph of its own calls, unless the call brought new
+ * shapes. Buffers allocated for such a call belong to that context, which must
+ * outlive the engine. An engine on the shared activation scratch pool fails on a
+ * stream of another regular context, since the pool's completion event belongs
+ * to the engine's context; once the engine has run in its own context, such a
+ * call made while that context is current fails before it sets its shapes or
+ * claims the pool. Other streams take the
+ * ordinary path, and the graphs are kept unless the scratch buffer, the shapes,
+ * or the optimization profile changed.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 

@@ -168,7 +168,9 @@ need only a few copy calls: about 0.25 ms for a 640x480 float32 image on an A100
 matrix needs one call per row: about 6 ms for 1024x1024. From host memory the copy is much slower,
 tens of milliseconds or more for an image, so export such an input in row-major order where you can.
 An input that the engine updates in place must be row-major, or the call fails with
-`Error::InvalidArgument`.
+`Error::InvalidArgument`. The delegate reads the layout from the dim order, so a tensor built by hand
+that is not row-major must carry its dim order as well as its strides; one with strides but no dim
+order is read as row-major. Tensors from an ExecuTorch program always carry both.
 
 ### CUDA streams
 
@@ -276,23 +278,67 @@ loaded. The first match wins:
 4. The process option, which is off if it was never set.
 
 How it runs: the first call with a set of input shapes runs normally, the second records the graph
-and launches it, and later calls replay it. With the shared activation scratch on, a call does not
-wait while another engine loads, is destroyed or records. It runs normally, and a later call
-records. Each engine keeps one GPU buffer per input and output, and every call through the graph
-copies the inputs in and the outputs out. For an engine with few kernels, or with large inputs and
-outputs, these copies can cost more than they save.
+on the buffers of that call's inputs and outputs and launches it, and later calls with the same
+buffers replay it with no copies of its own. A buffer the delegate copies without replay, such as
+host memory on a GPU that does not read host memory directly, pinned or not, memory not aligned to
+256 bytes, or an input not in row-major order, is still copied. With the shared activation scratch
+on, a call does not wait while another engine loads, is destroyed or records. It runs normally, and
+a later call records. A stream of another regular CUDA context is the exception (see below).
+
+Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
+does, and as a caller that reuses its device tensors does. When the buffers change, that call
+records again on the new ones. When they change a second time for the same shapes, the engine stops
+following them until its shapes or its profile change: it records on one GPU buffer of its own per
+input and output, for each graph, and every call copies its inputs in and its outputs out. For an
+engine with few kernels, or with large inputs and outputs, these copies can cost more than they
+save. A change of shapes or profile starts the count again. So a caller that moves its buffers on
+every call records up to 3 times for each set of shapes in each graph, once more if the shared
+scratch grows in between. Its first replay for a set of shapes comes on the 5th call.
+
+A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
+graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
+Kernels that TensorRT runs on auxiliary streams it creates itself are the exception: they can run
+outside the green context, on any SM. Build the engine with `max_aux_streams=0` to keep all of its
+kernels on the green context's SMs.
+An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
+caller that uses both, or up to 4 green contexts in turn, replays on each. A fifth green context
+takes the place of the one called longest ago, and a green context whose graph was replaced starts
+over: a warm-up call, then a recording on its next call. So a caller that makes one call on each of
+more than 4 green contexts in turn never replays. Each green graph holds any buffers it records on
+until the engine is destroyed or its place is taken. A caller may destroy a green context before the
+engine, for example to split the SMs another way. CUDA detaches that context's streams, and each
+green context has an id of its own, so the engine never replays that graph again: it only frees it,
+when its place is taken or the engine is destroyed. The stream a graph is recorded on is destroyed
+right after the recording, so it is not kept in the green context.
 
 Some calls do not replay:
 
-- A change of input shapes, or of the optimization profile, records again. So does a growth of the
-  shared activation scratch below. A loop that changes shape or profile on every call never
-  replays, and still pays the copies.
+- A change of input shapes, or of the optimization profile, records again on the caller's buffers.
+  A growth of the shared activation scratch below records again on the same buffers as before. A
+  loop that changes shape or profile on every call never replays.
 - An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
   12.5 never replays. The delegate logs the reason.
-- A call on a green context stream, or on a stream from another CUDA context, takes the ordinary
-  path. The recorded graph is kept for the next call that can replay it.
+- A green context stream while a regular context other than its device's primary one is current,
+  and a plain stream while a green context is current, take the ordinary path, and the recorded
+  graphs are kept.
+- A stream on another device fails, with or without replay. So does a stream from a regular CUDA
+  context other than the one the engine was loaded in, except that, while that context is current, a
+  graph recorded in the engine's own context replays on it. When that caller's buffers are not the
+  ones the graph was recorded on, the engine records again in its own context, on buffers of its
+  own, and copies the inputs in and the outputs out until its shapes or its profile change. When
+  that recording cannot go ahead (the engine's own context has not run the shapes yet, or the
+  recording fails), the call fails with an error that says why. The engine's own calls keep their
+  graph, unless that call brought new shapes, which drop it. Buffers the delegate allocates for such
+  a call, to copy an input or output it cannot use in place, belong to that context, so that context
+  must outlive the engine.
+- An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
+  at all, with or without replay: the scratch's completion event belongs to the engine's context.
+  With replay on, once the engine has run in its own context, such a call made while that other
+  context is current fails before it sets its shapes or claims the shared scratch, and the engine
+  keeps its graphs. With replay off, or with no context current, the call is not refused up front.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
-  ordinary path until its shapes or its profile change.
+  ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
+  that gives up its place to a newer green context starts over.
 
 Engines on the shared activation scratch replay too.
 
@@ -331,7 +377,11 @@ Set it before you load the methods that should use the pool. What it costs:
 
 - **No parallelism between pooled calls on one device.** The delegate holds a per-device lock from
   claiming the buffer until the work is queued and marked. Two pooled calls can be submitted from
-  two threads, on one stream or two, but they never run at the same time on the device.
+  two threads, on one stream or two, but they never run at the same time on the device. Each call's
+  stream waits for the call before it on a small flag in GPU memory that the pool owns, not on a
+  CUDA event: NVIDIA drivers 580 and 595 were seen to drop a stream's wait on an event while
+  another thread used the same stream. A GPU without 64-bit stream memory operations waits on the
+  host instead, and the delegate logs that once per GPU.
 - **A pooled call waits for the pooled call before it.** Do not hold back the work of one pooled
   call, for example with a host function on its stream, until a later pooled call returns. The
   later call then never returns.
@@ -342,17 +392,17 @@ Set it before you load the methods that should use the pool. What it costs:
 - **No `cudaDeviceReset()`.** The pool keeps its buffer, an event and a stream for the life of the
   process. Do not reset a device that ran a pooled engine.
 
-With `use_cuda_graphs` on as well, each replaying engine still keeps its own buffers for its inputs
-and outputs.
+With `use_cuda_graphs` on as well, an engine that copies through buffers of its own, as described
+above, keeps them apart from the pool.
 
 #### Capturing a call into a CUDA graph is not supported
 
 A pooled call whose stream is being captured fails with `Error::NotSupported`. The handoff from one
-pooled call to the next waits on an event recorded outside the capture, and that wait fails with
-`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. A growth of
-the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or thread-local capture.
-Without the refusal, you would learn of it only when `cudaStreamEndCapture` returns
-`cudaErrorStreamCaptureInvalidated`.
+pooled call to the next waits on the pool's flag and then writes it. A capture records both into
+the graph, so a replay would write an old value to the flag, and every later pooled call on that
+GPU would wait forever. Nothing reports that. A growth of the buffer adds a `cudaMalloc` and a
+host wait, which invalidate a global or thread-local capture, and you would learn of it only when
+`cudaStreamEndCapture` returns `cudaErrorStreamCaptureInvalidated`.
 
 - The check runs before anything in the call that could break the capture.
 - If the query fails for another reason, such as an earlier fault on the device, the call fails

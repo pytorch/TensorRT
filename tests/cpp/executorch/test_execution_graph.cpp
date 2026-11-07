@@ -23,6 +23,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <future>
@@ -507,6 +508,27 @@ class ExecutionGraphTest : public ::testing::Test {
     }
   }
 
+  // Alternates the two slots until the graph gives up following the caller's addresses: a warm-up,
+  // a recording on slot 0, a recording on slot 1 when they move, a warm-up on the graph's own buffers
+  // when they move again, and a recording on those buffers.
+  void stage(LoadedGraphEngine& plain, LoadedGraphEngine& graph, SizesType rows, SizesType cols, cudaStream_t stream) {
+    const int slots[] = {0, 0, 1, 0, 1};
+    for (int i = 0; i < 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slots[i], rows, cols, i, stream));
+    }
+    ASSERT_TRUE(graph.is_captured());
+    ASSERT_NE(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  }
+
+  void stage_default(LoadedGraphEngine& graph, SizesType rows, SizesType cols) {
+    const int slots[] = {0, 0, 1, 0, 1};
+    for (int i = 0; i < 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare_default(graph, slots[i], rows, cols, i));
+    }
+    ASSERT_TRUE(graph.is_captured());
+    ASSERT_NE(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  }
+
   static std::vector<uint8_t> blob_;
   static std::vector<uint8_t> alias_blob_;
   static std::vector<uint8_t> kv_blob_;
@@ -622,59 +644,256 @@ TEST_F(ExecutionGraphReplayTest, ExplicitProcessRefusalPreventsSavedReplay) {
   EXPECT_TRUE(calls.launches.empty());
 }
 
-TEST_F(ExecutionGraphReplayTest, CapturesSecondCallAndReplaysChangedAddressesAndValues) {
+TEST_F(ExecutionGraphReplayTest, CapturesSecondCallAndReplaysOnTheCallerAddresses) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   CudaCalls calls;
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 1, streams_[0]));
   EXPECT_TRUE(calls.launches.empty());
   EXPECT_FALSE(graph.is_captured());
-  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 1, streams_[0]));
-  ASSERT_TRUE(graph.is_captured());
-  const void* stable_input = graph.handle()->exec_ctx->getTensorAddress("input_0");
-  const void* stable_output = graph.handle()->exec_ctx->getTensorAddress("output_0");
-  for (int i = 0; i < 6; ++i) {
+  for (int i = 0; i < 7; ++i) {
     SCOPED_TRACE(i);
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, (i + 1) % 2, 2, 8, i + 2, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, streams_[0]));
     ASSERT_TRUE(graph.is_captured());
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), stable_input);
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), stable_output);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[0]);
   }
   ASSERT_EQ(calls.captures.size(), 1u);
   EXPECT_NE(calls.captures.front(), streams_[0]);
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(7, streams_[0]));
+  EXPECT_EQ(calls.malloc_calls, 0u);
+  // Replay copies nothing: the only copies here are compare()'s own uploads, one per call.
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 0u);
+  EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
+
+// One move records again on the new addresses. A second move switches to the graph's own buffers,
+// which every later call copies through, so a caller alternating two sets of buffers still replays.
+TEST_F(ExecutionGraphReplayTest, MovedAddressesRecordAgainOnceThenCopyThroughOwnBuffers) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  const int slots[] = {0, 0, 1, 0, 1, 0, 1, 0};
+  const bool captured[] = {false, true, true, true, true, true, true, true};
+  CudaCalls calls;
+  for (int i = 0; i < 8; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slots[i], 2, 8, i, streams_[0]));
+    EXPECT_EQ(graph.is_captured(), captured[i]);
+    const bool staged = i >= 3;
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0") == inputs_[slots[i]], !staged);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0") == outputs_[slots[i]], !staged);
+  }
+  EXPECT_EQ(calls.captures.size(), 3u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(7, streams_[0]));
+  EXPECT_EQ(calls.malloc_calls, 2u);
+  // Each staged replay copies its input in and its output out.
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 2u);
+  EXPECT_EQ(replay.launches.size(), 1u);
+}
+
+// The output moves while the input stays put. Replaying on the recorded output would leave the new one unwritten.
+TEST_F(ExecutionGraphReplayTest, OutputOnlyMovesWriteTheNewOutput) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  std::vector<float> input(16);
+  for (size_t i = 0; i < input.size(); ++i) {
+    input[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), sizeof(float) * input.size(), cudaMemcpyHostToDevice), cudaSuccess);
+  const int slots[] = {0, 0, 1, 0, 1, 0, 1, 0};
+  for (int i = 0; i < 8; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_EQ(cudaMemsetAsync(outputs_[slots[i]], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[slots[i]], 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    std::vector<float> output(input.size());
+    ASSERT_EQ(
+        cudaMemcpy(output.data(), outputs_[slots[i]], sizeof(float) * output.size(), cudaMemcpyDeviceToHost),
+        cudaSuccess);
+    for (size_t j = 0; j < output.size(); ++j) {
+      ASSERT_FLOAT_EQ(output[j], input[j] * 2.0f + 1.0f) << "element " << j;
+    }
+  }
+  EXPECT_TRUE(graph.is_captured());
+}
+
+// A column-major input and an input off a 256-byte boundary go through the engine's own copy of the
+// input, so a replay must read that copy, refreshed on every call, and not the caller's buffer.
+TEST_F(ExecutionGraphReplayTest, ReplaysCopyNonRowMajorAndUnalignedDeviceInputs) {
+  for (bool column_major : {true, false}) {
+    SCOPED_TRACE(column_major ? "column-major" : "unaligned");
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    float* const data = static_cast<float*>(inputs_[1]) + (column_major ? 0 : 1);
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      SCOPED_TRACE(i);
+      std::vector<float> expected(16), storage(16);
+      for (int r = 0; r < 2; ++r) {
+        for (int c = 0; c < 8; ++c) {
+          const float value = static_cast<float>(i * 16 + r * 8 + c);
+          storage[column_major ? r + c * 2 : r * 8 + c] = value;
+          expected[r * 8 + c] = value * 2.0f + 1.0f;
+        }
+      }
+      ASSERT_EQ(cudaMemcpy(data, storage.data(), sizeof(float) * storage.size(), cudaMemcpyHostToDevice), cudaSuccess);
+      ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+      SizesType input_sizes[] = {2, 8};
+      SizesType output_sizes[] = {2, 8};
+      DimOrderType dim_order[] = {1, 0};
+      StridesType strides[] = {1, 2};
+      TensorImpl column_major_impl(ScalarType::Float, 2, input_sizes, data, dim_order, strides);
+      TensorImpl row_major_impl(ScalarType::Float, 2, input_sizes, data);
+      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0]);
+      EValue input_value{Tensor(column_major ? &column_major_impl : &row_major_impl)};
+      EValue output_value{Tensor(&output_impl)};
+      EValue* args[] = {&input_value, &output_value};
+      ASSERT_EQ(graph.run({args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      std::vector<float> output(16);
+      ASSERT_EQ(
+          cudaMemcpy(output.data(), outputs_[0], sizeof(float) * output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
+      EXPECT_EQ(output, expected);
+      EXPECT_NE(graph.handle()->exec_ctx->getTensorAddress("input_0"), data);
+    }
+    EXPECT_TRUE(graph.is_captured());
+    EXPECT_FALSE(calls.launches.empty());
+  }
+}
+
+// With or without graphs, a call gives TensorRT a shape or an address again only when it changed. What the
+// test sets on the TensorRT context behind the delegate's back stays there exactly when the call is skipped.
+TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  for (LoadedGraphEngine* engine : {&plain, &graph}) {
+    nvinfer1::IExecutionContext& context = *engine->handle()->exec_ctx;
+    // compare() gives the plain engine its own output buffer.
+    void* const output = engine == &plain ? reference_output_ : outputs_[0];
+    // As many elements as 2x8, so the output tensor takes the shape the context reports.
+    ASSERT_TRUE(context.setInputShape("input_0", nvinfer1::Dims2{4, 4}));
+    ASSERT_TRUE(context.setTensorAddress("input_0", inputs_[1]));
+    ASSERT_TRUE(context.setTensorAddress("output_0", outputs_[1]));
+    SizesType input_sizes[] = {2, 8};
+    SizesType output_sizes[] = {2, 8};
+    DimOrderType dim_order[] = {0, 1};
+    StridesType input_strides[] = {8, 1};
+    StridesType output_strides[] = {8, 1};
+    TensorImpl input_impl(
+        ScalarType::Float, 2, input_sizes, inputs_[0], dim_order, input_strides, TensorShapeDynamism::DYNAMIC_BOUND);
+    TensorImpl output_impl(
+        ScalarType::Float, 2, output_sizes, output, dim_order, output_strides, TensorShapeDynamism::DYNAMIC_BOUND);
+    EValue input_value{Tensor(&input_impl)};
+    EValue output_value{Tensor(&output_impl)};
+    EValue* args[] = {&input_value, &output_value};
+    ASSERT_EQ(engine->run({args, 2}, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    const nvinfer1::Dims shape = context.getTensorShape("input_0");
+    EXPECT_EQ(shape.nbDims, 2);
+    EXPECT_EQ(shape.d[0], 4);
+    EXPECT_EQ(shape.d[1], 4);
+    EXPECT_EQ(context.getTensorAddress("input_0"), inputs_[1]);
+    EXPECT_EQ(context.getTensorAddress("output_0"), outputs_[1]);
+    // Back to what the delegate holds, so the calls below run as usual.
+    ASSERT_TRUE(context.setInputShape("input_0", nvinfer1::Dims2{2, 8}));
+    ASSERT_TRUE(context.setTensorAddress("input_0", inputs_[0]));
+    ASSERT_TRUE(context.setTensorAddress("output_0", output));
+  }
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 2, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 4, 4, 3, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 4, streams_[0]));
+}
+
+// ExecuTorch has no check for strides alone that is safe in debug builds, so a tensor with strides but no
+// dim order is read as row-major, with or without replay.
+TEST_F(ExecutionGraphReplayTest, StridesWithoutADimOrderAreReadAsRowMajor) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  std::vector<float> storage(16);
+  for (size_t i = 0; i < storage.size(); ++i) {
+    storage[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(
+      cudaMemcpy(inputs_[0], storage.data(), sizeof(float) * storage.size(), cudaMemcpyHostToDevice), cudaSuccess);
+  for (LoadedGraphEngine* engine : {&plain, &graph}) {
+    for (int i = 0; i < 3; ++i) {
+      SCOPED_TRACE(i);
+      SizesType input_sizes[] = {2, 8};
+      SizesType output_sizes[] = {2, 8};
+      // Column-major, which would be read in another order if the strides counted.
+      StridesType input_strides[] = {1, 2};
+      TensorImpl input_impl(ScalarType::Float, 2, input_sizes, inputs_[0], nullptr, input_strides);
+      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0]);
+      EValue input_value{Tensor(&input_impl)};
+      EValue output_value{Tensor(&output_impl)};
+      EValue* args[] = {&input_value, &output_value};
+      ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+      ASSERT_EQ(engine->run({args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      std::vector<float> output(storage.size());
+      ASSERT_EQ(
+          cudaMemcpy(output.data(), outputs_[0], sizeof(float) * output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t j = 0; j < output.size(); ++j) {
+        ASSERT_FLOAT_EQ(output[j], storage[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+  }
+  EXPECT_TRUE(graph.is_captured());
+}
+
+// 16 floats of host memory at a chosen offset from a 256-byte boundary. Where the GPU reads host memory
+// through the host page tables, an aligned host buffer is bound as it is, while an unaligned one always
+// goes through the delegate's own device buffer, so the offset decides which path a test takes.
+struct HostFloats {
+  explicit HostFloats(size_t offset_bytes)
+      : base(static_cast<float*>(std::aligned_alloc(256, 512))), data(base + offset_bytes / sizeof(float)) {}
+  ~HostFloats() {
+    std::free(base);
+  }
+  HostFloats(const HostFloats&) = delete;
+  HostFloats& operator=(const HostFloats&) = delete;
+
+  float* base;
+  float* data;
+};
 
 TEST_F(ExecutionGraphReplayTest, NoCallerStreamReplaysHostPointers) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
-  std::vector<float> inputs[2] = {std::vector<float>(16), std::vector<float>(16)};
-  std::vector<float> outputs[2] = {std::vector<float>(16), std::vector<float>(16)};
+  // Bound as it is where the GPU reads host memory, and copied through the delegate's own device buffer
+  // elsewhere.
+  const bool direct = graph.handle()->pageable_host_access;
+  HostFloats input(0), output(0);
   std::vector<float> expected(16);
-  ASSERT_NE(inputs[0].data(), inputs[1].data());
-  ASSERT_NE(outputs[0].data(), outputs[1].data());
   size_t launches = 0;
   size_t captures = 0;
   for (int i = 0; i < 6; ++i) {
     SCOPED_TRACE(i);
-    const int slot = i < 3 ? 0 : i % 2;
     for (size_t j = 0; j < 16; ++j) {
-      inputs[slot][j] = static_cast<float>(i * 16 + j);
-      outputs[slot][j] = -1000.0f;
+      input.data[j] = static_cast<float>(i * 16 + j);
+      output.data[j] = -1000.0f;
     }
     ASSERT_FALSE(getCallerStream().has_value());
-    ASSERT_EQ(plain.run(inputs[slot].data(), expected.data(), 2, 8), Error::Ok);
+    ASSERT_EQ(plain.run(input.data, expected.data(), 2, 8), Error::Ok);
     CudaCalls calls;
-    ASSERT_EQ(graph.run(inputs[slot].data(), outputs[slot].data(), 2, 8), Error::Ok);
+    ASSERT_EQ(graph.run(input.data, output.data, 2, 8), Error::Ok);
     EXPECT_FALSE(getCallerStream().has_value());
-    EXPECT_EQ(outputs[slot], expected);
     for (size_t j = 0; j < 16; ++j) {
-      EXPECT_FLOAT_EQ(outputs[slot][j], inputs[slot][j] * 2.0f + 1.0f);
+      EXPECT_FLOAT_EQ(output.data[j], expected[j]);
+      EXPECT_FLOAT_EQ(output.data[j], input.data[j] * 2.0f + 1.0f);
     }
     ASSERT_FALSE(calls.operations.empty());
     EXPECT_EQ(calls.operations.back().stream, cudaStreamPerThread);
     EXPECT_EQ(graph.is_captured(), i >= 1);
-    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(i == 0 ? 0 : 1, cudaStreamPerThread));
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0") == input.data, direct);
     captures += calls.captures.size();
     launches += calls.launches.size();
   }
@@ -685,24 +904,16 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamReplaysHostPointers) {
 TEST_F(ExecutionGraphReplayTest, NoCallerStreamReplaysDevicePointers) {
   LoadedGraphEngine graph;
   ASSERT_NO_FATAL_FAILURE(load_graph(graph));
-  const void* stable_input = nullptr;
-  const void* stable_output = nullptr;
   size_t launches = 0;
   size_t captures = 0;
   for (int i = 0; i < 6; ++i) {
     SCOPED_TRACE(i);
     CudaCalls calls;
-    ASSERT_NO_FATAL_FAILURE(compare_default(graph, i < 3 ? 0 : i % 2, 2, 8, i));
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
     ASSERT_FALSE(calls.operations.empty());
     EXPECT_EQ(calls.operations.back().stream, cudaStreamPerThread);
-    if (i == 0) {
-      stable_input = graph.handle()->exec_ctx->getTensorAddress("input_0");
-      stable_output = graph.handle()->exec_ctx->getTensorAddress("output_0");
-      EXPECT_NE(stable_input, inputs_[0]);
-      EXPECT_NE(stable_output, outputs_[0]);
-    }
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), stable_input);
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), stable_output);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[0]);
     EXPECT_EQ(graph.is_captured(), i >= 1);
     EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(i == 0 ? 0 : 1, cudaStreamPerThread));
     captures += calls.captures.size();
@@ -772,10 +983,12 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamAllocationFailureFallsBackAndSupp
       LoadedGraphEngine graph;
       ASSERT_NO_FATAL_FAILURE(load_graph(graph));
       if (growth) {
-        for (int i = 0; i < 2; ++i) {
-          ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
-        }
-        ASSERT_TRUE(graph.is_captured());
+        ASSERT_NO_FATAL_FAILURE(stage_default(graph, 2, 8));
+      }
+      // A warm-up, a recording and the first move. The second move, which allocates the buffers, is the
+      // first call of the loop after this one.
+      for (int slot : {0, 0, 1}) {
+        ASSERT_NO_FATAL_FAILURE(compare_default(graph, slot, 8, 32, slot));
       }
       CudaCalls calls;
       calls.fail_malloc_call = failed_allocation;
@@ -809,14 +1022,14 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamCaptureFailureFallsBackAndRecover
     }
     ASSERT_EQ(calls.captures.size(), 3u);
     EXPECT_TRUE(calls.launches.empty());
-    EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, cudaStreamPerThread));
+    EXPECT_TRUE(calls.retirements.empty());
     EXPECT_EQ(calls.malloc_calls, 0u);
     EXPECT_EQ(calls.free_calls, 0u);
   }
   CudaCalls recovery;
   // The new shape re-arms replay: warm-up, then capture and launch, then replays.
   for (int i = 0; i < 4; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare_default(graph, i % 2, 4, 4, i + 6));
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 4, 4, i + 6));
   }
   ASSERT_EQ(recovery.captures.size(), 1u);
   EXPECT_EQ(recovery.launches, std::vector<cudaStream_t>(3, cudaStreamPerThread));
@@ -834,7 +1047,7 @@ TEST_F(ExecutionGraphReplayTest, AFailedRecordingIsRetriedOnTheNextCall) {
     EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
   }
   for (int i = 0; i < 3; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i + 4, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 4, streams_[0]));
     EXPECT_TRUE(graph.is_captured());
   }
   EXPECT_EQ(calls.captures.size(), 3u);
@@ -854,24 +1067,26 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
   for (size_t i = 0; i < input.size(); ++i) {
     input[i] = static_cast<float>(i) - 3.0f;
   }
-  ASSERT_EQ(cudaMemcpy(inputs_[1], input.data(), 64, cudaMemcpyHostToDevice), cudaSuccess);
-  ASSERT_EQ(cudaMemset(outputs_[1], 0xff, kMaxBytes), cudaSuccess);
-  size_t mallocs = 0, launches = 0;
+  ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), 64, cudaMemcpyHostToDevice), cudaSuccess);
+  ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
+  size_t mallocs = 0, launches = 0, captures = 0;
   Error result = Error::Internal;
   // No CUDA call may run on this thread before execute, so it starts with no current context.
   std::thread fresh([&] {
     CudaCalls calls;
-    result = graph.run(inputs_[1], outputs_[1], 2, 8);
+    result = graph.run(inputs_[0], outputs_[0], 2, 8);
+    captures = calls.captures.size();
     mallocs = calls.malloc_calls;
     launches = calls.launches.size();
   });
   fresh.join();
   EXPECT_EQ(result, Error::Ok);
   EXPECT_EQ(mallocs, 0u);
+  EXPECT_EQ(captures, 0u);
   EXPECT_EQ(launches, 1u);
   EXPECT_TRUE(graph.is_captured());
   std::vector<float> output(16);
-  ASSERT_EQ(cudaMemcpy(output.data(), outputs_[1], 64, cudaMemcpyDeviceToHost), cudaSuccess);
+  ASSERT_EQ(cudaMemcpy(output.data(), outputs_[0], 64, cudaMemcpyDeviceToHost), cudaSuccess);
   for (size_t i = 0; i < output.size(); ++i) {
     EXPECT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f);
   }
@@ -880,10 +1095,7 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
 TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {
   auto graph = std::make_unique<LoadedGraphEngine>();
   ASSERT_NO_FATAL_FAILURE(load_graph(*graph));
-  for (int i = 0; i < 2; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare_default(*graph, 0, 2, 8, i));
-  }
-  ASSERT_TRUE(graph->is_captured());
+  ASSERT_NO_FATAL_FAILURE(stage_default(*graph, 2, 8));
   CudaCalls calls;
   graph.reset();
   EXPECT_EQ(calls.free_calls, 2u);
@@ -910,7 +1122,7 @@ TEST_F(ExecutionGraphReplayTest, EnqueueRefusedDuringCaptureFallsBackWithFreshOu
   }
   CudaCalls recovery;
   for (int i = 0; i < 3; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 4, 4, i + 6, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 4, 4, i + 6, streams_[0]));
   }
   EXPECT_EQ(recovery.captures.size(), 1u);
   EXPECT_EQ(recovery.launches, std::vector<cudaStream_t>(2, streams_[0]));
@@ -1018,7 +1230,7 @@ TEST_F(ExecutionGraphReplayTest, StreamChangesKeepTheGraph) {
   CudaCalls calls;
   int seed = 2;
   for (cudaStream_t stream : {streams_[0], streams_[1], streams_[0], streams_[1]}) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, seed % 2, 2, 8, seed, stream));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed, stream));
     ++seed;
     ASSERT_TRUE(graph.is_captured());
   }
@@ -1035,7 +1247,7 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
     ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
     CudaCalls calls;
     for (int i = 0; i < 6; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, stream));
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, stream));
       EXPECT_EQ(graph.is_captured(), i >= 1);
     }
     ASSERT_EQ(calls.captures.size(), 1u);
@@ -1045,7 +1257,29 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
   EXPECT_EQ(cudaStreamDestroy(blocking), cudaSuccess);
 }
 
-// A non-blocking stream on a green context, which the graph path does not replay on.
+// Green contexts need a driver and a GPU that support them. Tests that need one skip where creation is
+// refused, as the multi-GPU tests skip without a second device.
+bool green_contexts_supported(int device = 0) {
+  const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
+  const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
+  const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
+  const auto destroy = driver_entry<PFN_cuGreenCtxDestroy_v12040>("cuGreenCtxDestroy", 12040);
+  if (get_resource == nullptr || generate_desc == nullptr || create_green == nullptr || destroy == nullptr) {
+    return false;
+  }
+  CUdevResource resource{};
+  CUdevResourceDesc descriptor{};
+  CUgreenCtx context = nullptr;
+  if (get_resource(device, &resource, CU_DEV_RESOURCE_TYPE_SM) != CUDA_SUCCESS ||
+      generate_desc(&descriptor, &resource, 1) != CUDA_SUCCESS ||
+      create_green(&context, descriptor, device, CU_GREEN_CTX_DEFAULT_STREAM) != CUDA_SUCCESS) {
+    cudaGetLastError();
+    return false;
+  }
+  return destroy(context) == CUDA_SUCCESS;
+}
+
+// A non-blocking stream on a green context.
 struct GreenStream {
   ~GreenStream() {
     if (stream) {
@@ -1056,7 +1290,7 @@ struct GreenStream {
     }
   }
 
-  void create() {
+  void create(int device = 0) {
     const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
     const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
     const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
@@ -1071,9 +1305,9 @@ struct GreenStream {
     ASSERT_NE(get_context, nullptr);
     CUdevResource resource{};
     CUdevResourceDesc descriptor{};
-    ASSERT_EQ(get_resource(0, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
+    ASSERT_EQ(get_resource(device, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
     ASSERT_EQ(generate_desc(&descriptor, &resource, 1), CUDA_SUCCESS);
-    ASSERT_EQ(create_green(&context, descriptor, 0, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
+    ASSERT_EQ(create_green(&context, descriptor, device, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
     ASSERT_EQ(create_stream(&stream, context, CU_STREAM_NON_BLOCKING, 0), CUDA_SUCCESS);
     CUcontext owner = nullptr;
     CUgreenCtx observed_green = nullptr;
@@ -1090,31 +1324,623 @@ struct GreenStream {
   PFN_cuGreenCtxDestroy_v12040 destroy = nullptr;
 };
 
-TEST_F(ExecutionGraphReplayTest, GreenContextStreamRunsPlainAndKeepsTheGraph) {
+// The context of each kernel node in a recorded graph, which is where that kernel runs on replay.
+std::vector<CUcontext> kernel_contexts(cudaGraph_t graph) {
+  const auto get_params = driver_entry<PFN_cuGraphKernelNodeGetParams_v12000>("cuGraphKernelNodeGetParams", 12000);
+  if (get_params == nullptr) {
+    ADD_FAILURE() << "cuGraphKernelNodeGetParams is missing";
+    return {};
+  }
+  size_t count = 0;
+  EXPECT_EQ(cudaGraphGetNodes(graph, nullptr, &count), cudaSuccess);
+  std::vector<cudaGraphNode_t> nodes(count);
+  EXPECT_EQ(cudaGraphGetNodes(graph, nodes.data(), &count), cudaSuccess);
+  std::vector<CUcontext> contexts;
+  for (cudaGraphNode_t node : nodes) {
+    cudaGraphNodeType type{};
+    if (cudaGraphNodeGetType(node, &type) == cudaSuccess && type == cudaGraphNodeTypeKernel) {
+      CUDA_KERNEL_NODE_PARAMS params{};
+      EXPECT_EQ(get_params(reinterpret_cast<CUgraphNode>(node), &params), CUDA_SUCCESS);
+      contexts.push_back(params.ctx);
+    }
+  }
+  return contexts;
+}
+
+// Graph nodes run in the context they were recorded in, so a green context stream records its own
+// graph there, and its replays stay on the green context's SMs. The plain stream's graph is kept.
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamRecordsInItsOwnContext) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
+  const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx", 12040);
+  ASSERT_NE(get_context, nullptr);
+  ASSERT_NE(from_green, nullptr);
+  CUcontext green_context = nullptr;
+  ASSERT_EQ(from_green(&green_context, green.context), CUDA_SUCCESS);
 
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   for (int i = 0; i < 2; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
   }
   ASSERT_TRUE(graph.is_captured());
-  CudaCalls calls;
-  for (int i = 0; i < 5; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, green.stream));
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
+  CUcontext owner = nullptr;
+  CUgreenCtx capture_green = nullptr;
+  {
+    CudaCalls calls;
+    std::vector<CUcontext> contexts;
+    // The capture stream is destroyed right after the recording, so it is asked about before that.
+    calls.after_capture = [&](cudaGraph_t recorded) {
+      contexts = kernel_contexts(recorded);
+      EXPECT_EQ(get_context(calls.captures.back(), &owner, &capture_green), CUDA_SUCCESS);
+    };
+    for (int i = 0; i < 5; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, green.stream));
+      EXPECT_EQ(graph.is_captured(), i >= 1);
+    }
+    ASSERT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(capture_green, green.context) << "the graph for the green stream was recorded outside its context";
+    ASSERT_FALSE(contexts.empty());
+    EXPECT_EQ(contexts, std::vector<CUcontext>(contexts.size(), green_context)) << "a kernel would run outside it";
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, green.stream));
+    EXPECT_EQ(calls.malloc_calls, 0u);
+  }
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
     EXPECT_TRUE(graph.is_captured());
   }
-  EXPECT_EQ(calls.malloc_calls, 0u);
-  EXPECT_TRUE(calls.retirements.empty());
-  EXPECT_TRUE(calls.captures.empty());
-  EXPECT_TRUE(calls.launches.empty());
-  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 9, streams_[0]));
-  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 3, green.stream));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>({streams_[0], streams_[0], streams_[0], green.stream}));
+}
+// A green context stream on another device than the engine's takes the ordinary path, which refuses it
+// as it refuses any stream there, and the engine keeps replaying on its own device.
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamOnAnotherDeviceKeepsTheGraph) {
+  int device_count = 0;
+  if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count < 2) {
+    GTEST_SKIP() << "Requires two CUDA devices for a green context on another device";
+  }
+  if (!green_contexts_supported(1)) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  GreenStream other;
+  ASSERT_NO_FATAL_FAILURE(other.create(1));
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      EXPECT_NE(graph.run(inputs_[0], outputs_[0], 2, 8, other.stream), Error::Ok);
+    }
+    EXPECT_TRUE(calls.captures.empty());
+  }
+  EXPECT_TRUE(graph.is_captured());
+  CudaCalls back;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
 
+// A plain stream while a green context is current takes the ordinary path, since a capture stream made in
+// the current context would be green, and the engine keeps the graph it has.
+TEST_F(ExecutionGraphReplayTest, PlainStreamWithAGreenContextCurrentKeepsTheGraph) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  const auto from_green = driver_entry<PFN_cuCtxFromGreenCtx_v12040>("cuCtxFromGreenCtx", 12040);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(from_green, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  CUcontext primary = nullptr;
+  CUcontext green_context = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(from_green(&green_context, green.context), CUDA_SUCCESS);
+  {
+    // Puts the primary context back even when an assertion below returns early.
+    std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) { set_current(primary); });
+    CudaCalls calls;
+    ASSERT_EQ(set_current(green_context), CUDA_SUCCESS);
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, streams_[0]));
+    }
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  CudaCalls back;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// TensorRT cannot run an engine on a stream of another regular context, but a graph recorded in the
+// engine's own context replays there, and other buffers make the engine record again in its own context.
+TEST_F(ExecutionGraphReplayTest, StreamOfAnotherRegularContextReplaysTheGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  // Puts the primary context back and destroys the other one even when an assertion returns early.
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+    }
+    EXPECT_EQ(calls.captures.size(), 1u);
+    ASSERT_TRUE(graph.is_captured());
+  }
+  const size_t count = 16;
+  std::vector<float> input(count), actual(count);
+  for (size_t i = 0; i < count; ++i) {
+    input[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, count * sizeof(float), other_stream), cudaSuccess);
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, other_stream), Error::Ok);
+      ASSERT_EQ(
+          cudaMemcpyAsync(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost, other_stream),
+          cudaSuccess);
+      ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+      for (size_t j = 0; j < count; ++j) {
+        ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, other_stream));
+  }
+  // Other buffers record again in the engine's own context, on buffers of the graph's own, and replay
+  // here, as the release did. The engine's own context keeps replaying, through those buffers.
+  ASSERT_EQ(cudaMemcpy(inputs_[1], input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  {
+    CudaCalls calls;
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_EQ(cudaMemsetAsync(outputs_[1], 0xff, count * sizeof(float), other_stream), cudaSuccess);
+      ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::Ok);
+      ASSERT_EQ(
+          cudaMemcpyAsync(actual.data(), outputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost, other_stream),
+          cudaSuccess);
+      ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+      for (size_t j = 0; j < count; ++j) {
+        ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+    EXPECT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(4, other_stream));
+  }
+  // A caller in the other context usually allocates its buffers there. They are copied in and out of
+  // the graph's buffers, which belong to the engine's context, on the caller's stream.
+  void* owned_input = nullptr;
+  void* owned_output = nullptr;
+  ASSERT_EQ(cudaMalloc(&owned_input, count * sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&owned_output, count * sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMemcpy(owned_input, input.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  {
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(owned_input, owned_output, 2, 8, other_stream), Error::Ok);
+    ASSERT_EQ(
+        cudaMemcpyAsync(actual.data(), owned_output, count * sizeof(float), cudaMemcpyDeviceToHost, other_stream),
+        cudaSuccess);
+    ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    for (size_t j = 0; j < count; ++j) {
+      ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+    }
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, other_stream));
+  }
+  EXPECT_EQ(cudaFree(owned_input), cudaSuccess);
+  EXPECT_EQ(cudaFree(owned_output), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  // The graph and the buffers it switched to belong to the engine's context, so they outlive the other one.
+  restore.reset();
+  CudaCalls back;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 5, streams_[0]));
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  // Until its shapes or its profile change, each of those calls copies its input in and its output out.
+  CudaCalls copied;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(copied.memcpy_calls, 2u);
+  EXPECT_EQ(copied.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// A call from another regular context that cannot record fails, and the engine's own context keeps its
+// graph and keeps replaying it.
+TEST_F(ExecutionGraphReplayTest, FailedRecordingsFromAnotherRegularContextLeaveTheOwnGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    calls.fail_captures = 3;
+    for (int i = 0; i < 3; ++i) {
+      EXPECT_NE(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::Ok);
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  restore.reset();
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, streams_[0]));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
+}
+
+// The shared scratch's completion event belongs to the engine's context, so a pooled engine refuses a
+// stream of another regular context before it runs, whether or not another thread holds the capture
+// lock, and the engine's own calls keep replaying their graph with no copies.
+TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextFailsAndKeepsTheOwnGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+  const SizesType rows = 8;
+  const SizesType cols = 32;
+  const auto blob = build_scratch_blob(rows, cols);
+  ASSERT_FALSE(blob.empty());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  for (bool hold_lock : {false, true}) {
+    SCOPED_TRACE(hold_lock ? "capture lock held" : "capture lock free");
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    {
+      LoadedGraphEngine engine;
+      ASSERT_EQ(engine.load(blob), Error::Ok);
+      ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+      const size_t count = static_cast<size_t>(rows) * cols;
+      const std::vector<float> ones(count, 1.0f);
+      std::vector<float> actual(count);
+      for (int slot = 0; slot < 2; ++slot) {
+        ASSERT_EQ(cudaMemcpy(inputs_[slot], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+      }
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+      }
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      ASSERT_TRUE(engine.is_captured());
+
+      // Holds the capture lock the way a load does while the call below runs.
+      std::promise<void> held;
+      std::promise<void> done;
+      std::thread holder;
+      if (hold_lock) {
+        holder = std::thread([&] {
+          const std::shared_lock<std::shared_mutex> lock(cuda_graph_capture_mutex());
+          held.set_value();
+          done.get_future().wait();
+        });
+        held.get_future().wait();
+      }
+      ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+      cudaStream_t other_stream = nullptr;
+      ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+      Error error = Error::Ok;
+      {
+        CudaCalls calls;
+        error = engine.run(inputs_[1], outputs_[1], rows, cols, other_stream);
+        EXPECT_TRUE(calls.captures.empty());
+        EXPECT_TRUE(calls.launches.empty());
+      }
+      EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+      EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+      if (hold_lock) {
+        done.set_value();
+        holder.join();
+      }
+      EXPECT_EQ(error, Error::InvalidState);
+      ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+      {
+        CudaCalls back;
+        ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+        EXPECT_TRUE(back.captures.empty());
+        EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+        EXPECT_EQ(back.memcpy_calls, 0u);
+      }
+      ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (float value : actual) {
+        ASSERT_FLOAT_EQ(value, 1.0f / rows);
+      }
+    }
+    EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+  }
+}
+
+// The refusal comes before the call claims the shared scratch, so a pool that would have to grow for
+// it stays as it was, in the context that made it.
+TEST_F(ExecutionGraphReplayTest, PooledCallFromAnotherRegularContextLeavesThePoolAlone) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+
+  const SizesType rows = 8;
+  const SizesType cols = 32;
+  const auto blob = build_scratch_blob(rows, cols);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(blob), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    const int engine_device = engine.handle()->device_id;
+    const size_t count = static_cast<size_t>(rows) * cols;
+    const std::vector<float> ones(count, 1.0f);
+    std::vector<float> actual(count);
+    ASSERT_EQ(cudaMemcpy(inputs_[0], ones.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    // An empty pool would have to grow for the next call.
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    ASSERT_EQ(shared_scratch_capacity_for_testing(engine_device), 0u);
+
+    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+    cudaStream_t other_stream = nullptr;
+    ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+    EXPECT_EQ(engine.run(inputs_[0], outputs_[1], rows, cols, other_stream), Error::InvalidState);
+    EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+    EXPECT_EQ(shared_scratch_capacity_for_testing(engine_device), 0u);
+
+    // The engine's own context grows the pool itself and keeps working.
+    ASSERT_EQ(engine.run(inputs_[0], outputs_[0], rows, cols, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    for (float value : actual) {
+      ASSERT_FLOAT_EQ(value, 1.0f / rows);
+    }
+    EXPECT_GT(shared_scratch_capacity_for_testing(engine_device), 0u);
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// Each green context keeps a graph, so bursts from two of them record once in each.
+TEST_F(ExecutionGraphReplayTest, BurstsFromTwoGreenContextsReplayOnBoth) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream first, second;
+  ASSERT_NO_FATAL_FAILURE(first.create());
+  ASSERT_NO_FATAL_FAILURE(second.create());
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  int seed = 0;
+  for (int round = 0; round < 3; ++round) {
+    for (cudaStream_t stream : {first.stream, second.stream}) {
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, stream));
+      }
+    }
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  std::vector<cudaStream_t> expected = {first.stream, second.stream};
+  for (int round = 1; round < 3; ++round) {
+    expected.insert(expected.end(), {first.stream, first.stream, second.stream, second.stream});
+  }
+  EXPECT_EQ(calls.launches, expected);
+}
+
+// Beyond 4 green contexts, the one called longest ago gives up its graph to the new one.
+TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheOldest) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green[5];
+  for (GreenStream& each : green) {
+    ASSERT_NO_FATAL_FAILURE(each.create());
+  }
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  int seed = 0;
+  // The first context is called again before the fifth arrives, so the second is the one called longest ago.
+  for (int index : {0, 1, 2, 3, 0, 4}) {
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, green[index].stream));
+    }
+  }
+  CudaCalls calls;
+  for (int index : {0, 1, 1}) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, green[index].stream));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u) << "the second green context should record again, the first replay";
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>({green[0].stream, green[1].stream}));
+}
+
+// A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
+// once a caller destroyed that context.
+TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (cudaStream_t stream : {streams_[0], green.stream}) {
+    CudaCalls calls;
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, stream), Error::Ok);
+    }
+    ASSERT_TRUE(graph.is_captured());
+    ASSERT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.destroyed_streams, calls.captures);
+  }
+}
+
+// Releasing a graph whose green context is gone, on eviction or on engine destruction, leaves no CUDA error behind.
+TEST_F(ExecutionGraphReplayTest, GreenContextDestroyedFirstLeavesNoErrorBehind) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green[4];
+  for (GreenStream& each : green) {
+    ASSERT_NO_FATAL_FAILURE(each.create());
+  }
+  LoadedGraphEngine plain;
+  auto graph = std::make_unique<LoadedGraphEngine>();
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, *graph));
+  int seed = 0;
+  const auto record_then_destroy = [&] {
+    auto doomed = std::make_unique<GreenStream>();
+    ASSERT_NO_FATAL_FAILURE(doomed->create());
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, doomed->stream));
+    }
+    ASSERT_TRUE(graph->is_captured());
+  };
+  ASSERT_NO_FATAL_FAILURE(record_then_destroy());
+  {
+    CudaCalls calls;
+    // The fourth of these takes the place of the destroyed context's graph.
+    for (GreenStream& each : green) {
+      for (int i = 0; i < 2; ++i) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, *graph, 0, 2, 8, seed++, each.stream));
+        EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+      }
+    }
+    EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>({cudaSuccess}));
+  }
+  ASSERT_NO_FATAL_FAILURE(record_then_destroy());
+  CudaCalls calls;
+  graph.reset();
+  EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+  EXPECT_EQ(calls.graph_exec_destroys, std::vector<cudaError_t>(4, cudaSuccess));
+}
+
+// Failed recordings in a green context say nothing about the caller's other context.
+TEST_F(ExecutionGraphReplayTest, FailedGreenRecordingsLeaveThePlainStreamReplaying) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  {
+    CudaCalls calls;
+    calls.fail_captures = 3;
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, green.stream));
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  CudaCalls back;
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 6, streams_[0]));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
+}
 // The pool frees its old buffer when a larger request grows it, so a graph recorded on that buffer
 // must not replay.
 TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
@@ -1163,9 +1989,12 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
-// A pool growth has to drop the graph whatever stream the next call uses. A green context stream
-// takes the plain path, which returns before the graph path, so it needs its own case.
+// A pool growth has to drop every graph recorded on the old buffer, whichever stream the next call uses,
+// including graphs recorded in a green context.
 TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamShapes) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
   GreenStream green;
   ASSERT_NO_FATAL_FAILURE(green.create());
   const auto small_blob = build_scratch_blob(8, 32);
@@ -1182,9 +2011,11 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamSh
     }
   };
   const std::pair<std::optional<cudaStream_t>, std::optional<cudaStream_t>> cases[] = {
-      {std::nullopt, std::nullopt}, {streams_[0], green.stream}};
+      {std::nullopt, std::nullopt}, {green.stream, green.stream}, {streams_[0], green.stream}};
   for (const auto& [record_on, after_growth_on] : cases) {
-    SCOPED_TRACE(after_growth_on.has_value() ? "green context stream" : "no caller stream");
+    SCOPED_TRACE(
+        ::testing::Message() << "record on " << static_cast<const void*>(record_on.value_or(nullptr)) << ", then "
+                             << static_cast<const void*>(after_growth_on.value_or(nullptr)));
     ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
     LoadedGraphEngine smaller, larger;
     ASSERT_EQ(smaller.load(small_blob), Error::Ok);
@@ -1202,7 +2033,9 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamSh
     {
       CudaCalls calls;
       ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, after_growth_on));
-      EXPECT_FALSE(smaller.is_captured()) << "the graph recorded on the freed buffer was kept";
+      if (after_growth_on == record_on) {
+        EXPECT_FALSE(smaller.is_captured()) << "the graph recorded on the freed buffer was kept";
+      }
       ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, record_on));
       EXPECT_EQ(calls.launches.size(), calls.captures.size()) << "a graph recorded on the freed buffer was replayed";
     }
@@ -1214,8 +2047,8 @@ TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamSh
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
-// The output copy runs after the graph launch, so when it fails the engine's work is still queued on
-// the pooled buffer. The stream has to drain before the pool's lock is released.
+// A staged replay copies its outputs out after the graph launch, so when that copy fails the engine's
+// work is still queued on the pooled buffer. The stream has to drain before the pool's lock is released.
 TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool) {
   const auto blob = build_scratch_blob(8, 32);
   ASSERT_FALSE(blob.empty());
@@ -1227,10 +2060,15 @@ TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool
     ASSERT_EQ(engine.load(blob), Error::Ok);
     ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
     std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements, -1.0f);
-    for (int i = 0; i < 2; ++i) {
-      ASSERT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Ok);
+    for (void* device_input : inputs_) {
+      ASSERT_EQ(cudaMemcpy(device_input, input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+    }
+    // Moving between the two slots twice puts the replay on the graph's own buffers.
+    for (int slot : {0, 0, 1, 0, 1}) {
+      ASSERT_EQ(engine.run(inputs_[slot], outputs_[slot], 8, 32, streams_[0]), Error::Ok);
     }
     ASSERT_TRUE(engine.is_captured());
+    ASSERT_NE(engine.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[1]);
     SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
     bool launched = false;
     std::optional<bool> held_at_drain;
@@ -1253,19 +2091,334 @@ TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool
                          return lock_free;
                        }).get();
     };
-    EXPECT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Internal);
+    EXPECT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Internal);
     calls.after_launch = nullptr;
     calls.before_synchronize = nullptr;
     ASSERT_TRUE(launched);
     ASSERT_TRUE(held_at_drain.has_value()) << "the failed call never drained its stream";
     EXPECT_TRUE(*held_at_drain) << "the pool's lock was released with the failed call's work still queued";
-    output.assign(output.size(), -1.0f);
-    ASSERT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaMemset(outputs_[1], 0xff, kMaxBytes), cudaSuccess);
+    ASSERT_EQ(engine.run(inputs_[1], outputs_[1], 8, 32, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaMemcpy(output.data(), outputs_[1], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
     for (float value : output) {
       ASSERT_FLOAT_EQ(value, 1.0f / 8);
     }
   }
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// cudaMalloc does not clear memory, and the handoff's wait compares cyclically, so the pool has to
+// clear its flag before any claimant can read it. Here the flag is made while the first claimant's
+// stream is held, from memory filled with a pattern, and is read back once that call has released the
+// pool. A clear queued on the held stream has not run yet, so the pattern is still there.
+TEST_F(ExecutionGraphTest, TheHandoffFlagIsClearedBeforeAnyClaimantCanReadIt) {
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+  {
+    // The flag outlives a reset, so it is dropped here (and leaked) to make the next claim create one.
+    std::lock_guard<std::mutex> lock(device.mu);
+    if (device.marker.host_wait_only) {
+      GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+    }
+    device.marker.flag = nullptr;
+    device.marker.sequence = 0;
+  }
+
+  struct Gate {
+    std::atomic<bool> open{false};
+  } gate;
+  ASSERT_EQ(
+      cudaLaunchHostFunc(
+          streams_[0],
+          [](void* data) {
+            // Bounded, so a case that fails before opening the gate cannot hang the stream.
+            const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!static_cast<Gate*>(data)->open.load() && std::chrono::steady_clock::now() < give_up) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          },
+          &gate),
+      cudaSuccess);
+  Error result = Error::Internal;
+  std::thread caller([&] {
+    CudaCalls calls;
+    calls.fill_allocations_with = 0x55;
+    result = engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+  });
+
+  // The call holds the pool's lock from its claim until it has queued its write to the flag.
+  void* flag = nullptr;
+  unsigned long long sequence = 0;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (flag == nullptr && std::chrono::steady_clock::now() < deadline) {
+    if (device.mu.try_lock()) {
+      if (device.marker.sequence > 0) {
+        flag = device.marker.flag;
+        sequence = device.marker.sequence;
+      }
+      device.mu.unlock();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  unsigned long long value = 0;
+  cudaStream_t read_stream = nullptr;
+  cudaError_t read_error = cudaErrorUnknown;
+  if (flag != nullptr && cudaStreamCreateWithFlags(&read_stream, cudaStreamNonBlocking) == cudaSuccess) {
+    read_error = cudaMemcpyAsync(&value, flag, sizeof(value), cudaMemcpyDeviceToHost, read_stream);
+    if (read_error == cudaSuccess) {
+      read_error = cudaStreamSynchronize(read_stream);
+    }
+    EXPECT_EQ(cudaStreamDestroy(read_stream), cudaSuccess);
+  }
+  gate.open.store(true);
+  caller.join();
+
+  // Only a claim learns that the GPU cannot wait on the flag, so a first run checks again here.
+  bool host_wait_only = false;
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    host_wait_only = device.marker.host_wait_only;
+  }
+  if (host_wait_only) {
+    EXPECT_EQ(result, Error::Ok);
+    EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  ASSERT_NE(flag, nullptr) << "the call never recorded its enqueue on the pool's flag";
+  ASSERT_EQ(read_error, cudaSuccess);
+  EXPECT_EQ(sequence, 1u);
+  EXPECT_EQ(value, 0u) << "the flag still held what its allocation left there after the call that made it had "
+                          "released the pool, so another claimant could have read that value";
+  EXPECT_EQ(result, Error::Ok);
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// Kernels for the handoff test below, as PTX so the test needs no CUDA compiler. take marks the
+// shared token as held and counts it if another holder had it, then spins for spin_ns. give hands
+// the token back and counts it if this holder no longer had it. touch adds one to a float.
+constexpr char kHandoffKernels[] = R"(
+.version 7.0
+.target sm_70
+.address_size 64
+
+.visible .entry take(.param .u64 owner, .param .u64 overlaps, .param .u32 id, .param .u64 spin_ns)
+{
+  .reg .pred %p<3>;
+  .reg .b32 %r<3>;
+  .reg .b64 %rd<7>;
+  ld.param.u64 %rd1, [owner];
+  ld.param.u64 %rd2, [overlaps];
+  ld.param.u32 %r1, [id];
+  ld.param.u64 %rd3, [spin_ns];
+  cvta.to.global.u64 %rd1, %rd1;
+  cvta.to.global.u64 %rd2, %rd2;
+  atom.global.exch.b32 %r2, [%rd1], %r1;
+  setp.eq.s32 %p1, %r2, 0;
+  @%p1 bra TAKE_SPIN;
+  red.global.add.u32 [%rd2], 1;
+TAKE_SPIN:
+  mov.u64 %rd4, %globaltimer;
+TAKE_LOOP:
+  mov.u64 %rd5, %globaltimer;
+  sub.u64 %rd6, %rd5, %rd4;
+  setp.lt.u64 %p2, %rd6, %rd3;
+  @%p2 bra TAKE_LOOP;
+  ret;
+}
+
+.visible .entry give(.param .u64 owner, .param .u64 overlaps, .param .u32 id)
+{
+  .reg .pred %p<2>;
+  .reg .b32 %r<3>;
+  .reg .b64 %rd<3>;
+  ld.param.u64 %rd1, [owner];
+  ld.param.u64 %rd2, [overlaps];
+  ld.param.u32 %r1, [id];
+  cvta.to.global.u64 %rd1, %rd1;
+  cvta.to.global.u64 %rd2, %rd2;
+  atom.global.cas.b32 %r2, [%rd1], %r1, 0;
+  setp.eq.s32 %p1, %r2, %r1;
+  @%p1 bra GIVE_DONE;
+  red.global.add.u32 [%rd2+4], 1;
+GIVE_DONE:
+  ret;
+}
+
+.visible .entry touch(.param .u64 data)
+{
+  .reg .f32 %f<3>;
+  .reg .b64 %rd<2>;
+  ld.param.u64 %rd1, [data];
+  cvta.to.global.u64 %rd1, %rd1;
+  ld.global.f32 %f1, [%rd1];
+  add.f32 %f2, %f1, 0f3F800000;
+  st.global.f32 [%rd1], %f2;
+  ret;
+}
+)";
+
+// Two pooled engines replay on two streams while a third thread shares the first stream, launching a
+// one-kernel graph and synchronizing that stream in a loop. That third thread is what made some drivers
+// (580 and 595 were seen) drop a stream's wait on the pool's handoff event, so two pooled graphs ran on
+// the shared scratch at the same time and gave wrong outputs, with no CUDA error. Each replay here
+// takes a token on the device before its graph and gives it back after, inside the window the handoff
+// orders, so any two replays that overlap are counted. With the event wait a run of this size counts
+// some on every run measured; the handoff must make it zero.
+TEST_F(ExecutionGraphReplayTest, PooledReplaysOnTwoStreamsNeverOverlapWhileAnotherThreadSharesAStream) {
+  constexpr int kReplays = 2000;
+  constexpr unsigned long long kSpinNanoseconds = 200000;
+  constexpr std::chrono::seconds kGiveUpAfter{60};
+  cudaLibrary_t library = nullptr;
+  ASSERT_EQ(cudaLibraryLoadData(&library, kHandoffKernels, nullptr, nullptr, 0, nullptr, nullptr, 0), cudaSuccess);
+  cudaKernel_t take = nullptr, give = nullptr, touch = nullptr;
+  ASSERT_EQ(cudaLibraryGetKernel(&take, library, "take"), cudaSuccess);
+  ASSERT_EQ(cudaLibraryGetKernel(&give, library, "give"), cudaSuccess);
+  ASSERT_EQ(cudaLibraryGetKernel(&touch, library, "touch"), cudaSuccess);
+  int* owner = nullptr;
+  unsigned int* overlaps = nullptr;
+  float* touched = nullptr;
+  ASSERT_EQ(cudaMalloc(&owner, sizeof(int)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&overlaps, 2 * sizeof(unsigned int)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&touched, sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(owner, 0, sizeof(int)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(overlaps, 0, 2 * sizeof(unsigned int)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(touched, 0, sizeof(float)), cudaSuccess);
+
+  // The third thread's graph: one kernel, recorded on the stream it shares.
+  cudaGraphExec_t other_work = nullptr;
+  {
+    cudaGraph_t graph = nullptr;
+    void* touch_args[] = {&touched};
+    ASSERT_EQ(cudaStreamBeginCapture(streams_[0], cudaStreamCaptureModeThreadLocal), cudaSuccess);
+    ASSERT_EQ(
+        cudaLaunchKernel(reinterpret_cast<const void*>(touch), dim3(1), dim3(1), touch_args, 0, streams_[0]),
+        cudaSuccess);
+    ASSERT_EQ(cudaStreamEndCapture(streams_[0], &graph), cudaSuccess);
+    ASSERT_EQ(cudaGraphInstantiate(&other_work, graph, 0), cudaSuccess);
+    ASSERT_EQ(cudaGraphDestroy(graph), cudaSuccess);
+  }
+
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engines[2];
+    std::vector<float> input(kMaxElements, 1.0f);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engines[i].load(blob), Error::Ok);
+      ASSERT_TRUE(engines[i].handle()->claims_pooled_scratch);
+      ASSERT_EQ(cudaMemcpy(inputs_[i], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+      for (int warm = 0; warm < 3; ++warm) {
+        ASSERT_EQ(engines[i].run(inputs_[i], outputs_[i], 8, 32, streams_[i]), Error::Ok);
+      }
+      ASSERT_TRUE(engines[i].is_captured());
+    }
+
+    std::atomic<bool> stop{false};
+    std::atomic<int> failed_runs{0};
+    size_t launches[2] = {0, 0};
+    const auto replay = [&](int id) {
+      CudaCalls calls;
+      calls.before_launch = [&](cudaStream_t stream) {
+        unsigned int holder = static_cast<unsigned int>(id + 1);
+        unsigned long long spin = kSpinNanoseconds;
+        void* args[] = {&owner, &overlaps, &holder, &spin};
+        EXPECT_EQ(
+            cudaLaunchKernel(reinterpret_cast<const void*>(take), dim3(1), dim3(1), args, 0, stream), cudaSuccess);
+      };
+      calls.after_launch = [&](cudaStream_t stream) {
+        unsigned int holder = static_cast<unsigned int>(id + 1);
+        void* args[] = {&owner, &overlaps, &holder};
+        EXPECT_EQ(
+            cudaLaunchKernel(reinterpret_cast<const void*>(give), dim3(1), dim3(1), args, 0, stream), cudaSuccess);
+      };
+      for (int i = 0; i < kReplays && !stop.load(); ++i) {
+        if (engines[id].run(inputs_[id], outputs_[id], 8, 32, streams_[id]) != Error::Ok) {
+          failed_runs.fetch_add(1);
+        }
+      }
+      launches[id] = calls.launches.size();
+    };
+    std::thread first(replay, 0);
+    std::thread second(replay, 1);
+    std::atomic<bool> replays_done{false};
+    std::thread other([&] {
+      while (!replays_done.load()) {
+        if (cudaGraphLaunch(other_work, streams_[0]) != cudaSuccess ||
+            cudaStreamSynchronize(streams_[0]) != cudaSuccess) {
+          failed_runs.fetch_add(1);
+          return;
+        }
+      }
+    });
+
+    // A handoff wait that never returns would hold both replay threads in their final synchronize. If
+    // that happens, the flag is set to the pool's sequence from here, which satisfies every wait queued
+    // so far and keeps later handoffs working, so the case fails instead of hanging. The wait compares
+    // cyclically, so a larger value would not do. If even that does not end them, the process stops.
+    auto finished = std::async(std::launch::async, [&] {
+      first.join();
+      second.join();
+    });
+    bool hung = false;
+    if (finished.wait_for(kGiveUpAfter) != std::future_status::ready) {
+      hung = true;
+      stop.store(true);
+      SharedScratchDevice& device = scratch_pool().get(engines[0].handle()->device_id);
+      void* flag = nullptr;
+      unsigned long long sequence = 0;
+      {
+        std::lock_guard<std::mutex> lock(device.mu);
+        flag = device.marker.flag;
+        sequence = device.marker.sequence;
+      }
+      if (flag != nullptr) {
+        cudaStream_t release_stream = nullptr;
+        EXPECT_EQ(cudaStreamCreateWithFlags(&release_stream, cudaStreamNonBlocking), cudaSuccess);
+        EXPECT_EQ(
+            cudaMemcpyAsync(flag, &sequence, sizeof(sequence), cudaMemcpyHostToDevice, release_stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamSynchronize(release_stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamDestroy(release_stream), cudaSuccess);
+      }
+      if (finished.wait_for(kGiveUpAfter) != std::future_status::ready) {
+        std::fprintf(stderr, "the pooled replays are still blocked after the handoff flag was released\n");
+        std::abort();
+      }
+    }
+    replays_done.store(true);
+    other.join();
+    ASSERT_FALSE(hung) << "the pooled replays did not finish within " << kGiveUpAfter.count() << " seconds";
+
+    unsigned int counted[2] = {0, 0};
+    ASSERT_EQ(cudaMemcpy(counted, overlaps, sizeof(counted), cudaMemcpyDeviceToHost), cudaSuccess);
+    EXPECT_EQ(failed_runs.load(), 0);
+    EXPECT_EQ(launches[0], static_cast<size_t>(kReplays)) << "the first engine did not replay on every call";
+    EXPECT_EQ(launches[1], static_cast<size_t>(kReplays)) << "the second engine did not replay on every call";
+    EXPECT_EQ(counted[0], 0u) << "a pooled replay started while another still held the shared scratch";
+    EXPECT_EQ(counted[1], 0u) << "a pooled replay ended after another had already taken the shared scratch";
+    std::vector<float> output(kMaxElements);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(cudaMemcpy(output.data(), outputs_[i], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+      for (float value : output) {
+        ASSERT_FLOAT_EQ(value, 1.0f / 8);
+      }
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+  EXPECT_EQ(cudaGraphExecDestroy(other_work), cudaSuccess);
+  EXPECT_EQ(cudaFree(owner), cudaSuccess);
+  EXPECT_EQ(cudaFree(overlaps), cudaSuccess);
+  EXPECT_EQ(cudaFree(touched), cudaSuccess);
+  EXPECT_EQ(cudaLibraryUnload(library), cudaSuccess);
 }
 
 // A pooled engine records while it holds its device's pool lock, so it must not wait for the capture
@@ -1363,8 +2516,11 @@ TEST_F(ExecutionGraphTest, AFailedPooledPlainCallDrainsBeforeReleasingThePool) {
     ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
     ASSERT_EQ(engine.handle()->execution_graph, nullptr);
     ASSERT_EQ(engine.handle()->device_id, 0);
-    // Run once on the engine's device, so the failing call finds the pool's buffer already there.
+    // Run once on the engine's device, so the pool has its handoff flag. Then empty the pool, so the
+    // failing call has no earlier call to wait for: a stream on another device cannot wait on the flag,
+    // and that refusal would come before the enqueue this case is about.
     ASSERT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
     cudaStream_t other = nullptr;
     ASSERT_EQ(cudaSetDevice(1), cudaSuccess);
     ASSERT_EQ(cudaStreamCreateWithFlags(&other, cudaStreamNonBlocking), cudaSuccess);
@@ -1425,6 +2581,9 @@ TEST_F(ExecutionGraphReplayTest, CaptureAllowsConcurrentLegacyStreamWork) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 1, streams_[0]));
   CudaCalls calls;
   size_t legacy_operations = 0;
+  unsigned int flags = 0;
+  // The capture stream is destroyed right after the recording, so it is asked about before that.
+  calls.after_capture = [&](cudaGraph_t) { EXPECT_EQ(cudaStreamGetFlags(calls.captures.back(), &flags), cudaSuccess); };
   calls.during_capture = [&](cudaStream_t capture_stream) {
     EXPECT_NE(capture_stream, streams_[0]);
     std::thread legacy([&] {
@@ -1442,8 +2601,6 @@ TEST_F(ExecutionGraphReplayTest, CaptureAllowsConcurrentLegacyStreamWork) {
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 2, streams_[0]));
   EXPECT_EQ(legacy_operations, 32u);
   ASSERT_EQ(calls.captures.size(), 1u);
-  unsigned int flags = 0;
-  ASSERT_EQ(cudaStreamGetFlags(calls.captures.front(), &flags), cudaSuccess);
   EXPECT_NE(flags & cudaStreamNonBlocking, 0u);
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
@@ -1495,15 +2652,14 @@ TEST_F(ExecutionGraphReplayTest, TwoGraphEnginesCaptureIndependentlyOnOneCallerS
   auto start = started.get_future();
   auto finish = finished.get_future();
   std::thread worker;
-  calls.during_capture = [&](cudaStream_t first_capture) {
-    worker = std::thread([&, first_capture] {
+  calls.during_capture = [&](cudaStream_t) {
+    worker = std::thread([&] {
       EXPECT_EQ(cudaSetDevice(0), cudaSuccess);
       started.set_value();
       CudaCalls second_calls;
       EXPECT_EQ(second.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
       EXPECT_EQ(second_calls.captures.size(), 1u);
       if (!second_calls.captures.empty()) {
-        EXPECT_NE(second_calls.captures.front(), first_capture);
         EXPECT_NE(second_calls.captures.front(), streams_[0]);
       }
       EXPECT_EQ(second_calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
@@ -1606,10 +2762,12 @@ TEST_F(ExecutionGraphReplayTest, AllocationFailureUsesCallerBindingsAndSuppresse
       LoadedGraphEngine plain, graph;
       ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
       if (growth) {
-        for (int i = 0; i < 2; ++i) {
-          ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, streams_[0]));
-        }
-        ASSERT_TRUE(graph.is_captured());
+        ASSERT_NO_FATAL_FAILURE(stage(plain, graph, 2, 8, streams_[0]));
+      }
+      // A warm-up, a recording and the first move. The second move, which allocates the buffers, is the
+      // first call of the loop after this one.
+      for (int slot : {0, 0, 1}) {
+        ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slot, 8, 32, slot, streams_[0]));
       }
       CudaCalls calls;
       calls.fail_malloc_call = failed_allocation;
@@ -1645,30 +2803,57 @@ TEST_F(ExecutionGraphReplayTest, CaptureFailureRestoresCallerBindingsAndSuppress
     EXPECT_TRUE(calls.launches.empty());
     EXPECT_EQ(calls.malloc_calls, 0u);
     EXPECT_EQ(calls.free_calls, 0u);
-    EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, streams_[0]));
+    EXPECT_TRUE(calls.retirements.empty());
   }
   CudaCalls recovery;
   for (int i = 0; i < 3; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 4, 4, i + 8, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 4, 4, i + 8, streams_[0]));
   }
   EXPECT_EQ(recovery.captures.size(), 1u);
   EXPECT_EQ(recovery.launches, std::vector<cudaStream_t>(2, streams_[0]));
 }
 
+// The same on the graph's own buffers: a failed recording there leaves the context on those buffers,
+// so the call has to bind the caller's again before it runs, and the third failure frees them.
+TEST_F(ExecutionGraphReplayTest, StagedCaptureFailureRestoresCallerBindingsAndReleasesBuffers) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  for (int i : {0, 0, 1}) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i, 2, 8, i, streams_[0]));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  {
+    CudaCalls calls;
+    calls.fail_captures = 3;
+    // The first call moves the buffers a second time and records on the graph's own buffers.
+    for (int i = 0; i < 4; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i + 3, streams_[0]));
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
+      EXPECT_FALSE(graph.is_captured());
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_TRUE(calls.launches.empty());
+    EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, streams_[0]));
+  }
+}
+
 TEST_F(ExecutionGraphReplayTest, GrowthRetiresBuffersOnTheCallerStreamWithoutCudaFree) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
-  for (int i = 0; i < 2; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(stage(plain, graph, 2, 8, streams_[0]));
+  // A new shape follows the caller's buffers again until they have moved twice.
+  for (int slot : {0, 0, 1}) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slot, 8, 32, slot, streams_[0]));
   }
   CudaCalls calls;
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 8, 32, 3, streams_[0]));
   EXPECT_EQ(calls.malloc_calls, 2u);
   EXPECT_EQ(calls.free_calls, 0u);
   EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, streams_[0]));
-  EXPECT_TRUE(calls.launches.empty());
-  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 1, 8, 32, 4, streams_[0]));
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 1, 8, 32, 4, streams_[0]));
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(2, streams_[0]));
 }
 
 TEST_F(ExecutionGraphReplayTest, GraphLaunchReturnsTheCudaError) {
@@ -1685,24 +2870,27 @@ TEST_F(ExecutionGraphReplayTest, GraphLaunchReturnsTheCudaError) {
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(2, streams_[0]));
 }
 
+// Host buffers off a 256-byte boundary always go through the delegate's own device buffers, whose
+// addresses stay put while the caller alternates two sets.
 TEST_F(ExecutionGraphReplayTest, HostBuffersStayCurrentOnReplay) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
-  std::vector<float> inputs[2] = {std::vector<float>(16), std::vector<float>(16)};
-  std::vector<float> outputs[2] = {std::vector<float>(16), std::vector<float>(16)};
+  HostFloats inputs[2] = {HostFloats(16), HostFloats(16)};
+  HostFloats outputs[2] = {HostFloats(16), HostFloats(16)};
   std::vector<float> expected(16);
   for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
     const int slot = i % 2;
     for (size_t j = 0; j < 16; ++j) {
-      inputs[slot][j] = static_cast<float>(i * 16 + j);
-      outputs[slot][j] = -1000.0f;
+      inputs[slot].data[j] = static_cast<float>(i * 16 + j);
+      outputs[slot].data[j] = -1000.0f;
     }
-    ASSERT_EQ(plain.run(inputs[slot].data(), expected.data(), 2, 8, streams_[0]), Error::Ok);
-    ASSERT_EQ(graph.run(inputs[slot].data(), outputs[slot].data(), 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(plain.run(inputs[slot].data, expected.data(), 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(graph.run(inputs[slot].data, outputs[slot].data, 2, 8, streams_[0]), Error::Ok);
     EXPECT_EQ(graph.is_captured(), i >= 1);
-    EXPECT_EQ(outputs[slot], expected);
     for (size_t j = 0; j < 16; ++j) {
-      ASSERT_FLOAT_EQ(outputs[slot][j], inputs[slot][j] * 2.0f + 1.0f);
+      EXPECT_FLOAT_EQ(outputs[slot].data[j], expected[j]);
+      ASSERT_FLOAT_EQ(outputs[slot].data[j], inputs[slot].data[j] * 2.0f + 1.0f);
     }
   }
 }

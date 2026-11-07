@@ -570,17 +570,52 @@ run time, the first of these that is set decides:
 
 With none of them set, replay is off.
 
-Replay is not free. Each engine keeps its own GPU buffer for every input and output, and every
-replayed call copies the inputs in and the outputs out. With few kernels, or with large inputs
-and outputs, those copies can cost more than the launches they save.
+A replay reads and writes the buffers it was recorded on. Keep each input and output in the same
+device buffer from call to call, as the memory planning of ``torch_tensorrt.save()`` does, and
+replays copy nothing. With the recipe in `Keep inputs and outputs on the GPU`_, memory planning
+does not own them: from Python pass ``clone_outputs=False``, or from C++ give each output once with
+``Module::set_output``, and reuse the same input tensors. Host buffers, except on GPUs that read
+host memory directly, buffers off a 256-byte boundary, and inputs not in row-major order are still
+copied on every call. When the buffers change, that call records again on the new ones. When they
+change a second time for the same input shapes, the engine records on GPU buffers of its own and
+copies the inputs in and the outputs out on every call. With few kernels, or with large inputs and
+outputs, those copies can cost more than the launches they save. A change of input shapes or
+profile starts this over, so buffers that move on every call cost up to 3 recordings for each set
+of shapes in each graph, and first replay on the 5th call with those shapes.
+
+A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
+graph of their own, recorded there, and its replays stay on the green context's SMs. Kernels
+that TensorRT runs on auxiliary streams it creates itself are the exception: they can run outside
+the green context, on any SM. Compile with ``max_aux_streams=0`` to keep all of them on the green
+context's SMs. An engine keeps such a graph for up to 4 green contexts, and one for plain streams,
+so a caller that uses both replays on each. A fifth green context takes the place of the one called
+longest ago, and a replaced one starts over with a warm-up call, so one call on each of more than 4
+green contexts in turn never replays. A green context may be destroyed before the engine: the engine
+never replays that context's graph again, and only frees it when its place is taken or the engine is
+destroyed.
 
 Some calls never replay:
 
-* An engine whose input shapes change on every call never replays, and it still pays the copies.
+* An engine whose input shapes change on every call never replays.
 * An engine with aliased outputs, a GPU without stream-ordered memory, and a driver older than
-  CUDA 12.5 never replay. They take the ordinary path, without the extra copies.
-* A call on a green context stream, or on a stream of another CUDA context, takes the ordinary
-  path for that call.
+  CUDA 12.5 never replay. They take the ordinary path.
+* A green context stream while a regular context other than its device's primary one is current,
+  and a plain stream while a green context is current, take the ordinary path.
+* A stream of another device fails, with or without replay. So does a stream of a regular CUDA
+  context other than the one the engine was loaded in, except that, while that context is current, a
+  graph recorded in the engine's own context replays on it. When that caller's buffers are not the
+  ones the graph was recorded on, the engine records again in its own context, on buffers of its
+  own, and copies the inputs in and the outputs out until its shapes or its profile change. When
+  that recording cannot go ahead (the engine's own context has not run the shapes yet, or the
+  recording fails), the call fails with an error that says why. The engine's own calls keep their
+  graph, unless that call brought new shapes, which drop it. Buffers the delegate allocates for such
+  a call, to copy an input or output it cannot use in place, belong to that context, so that context
+  must outlive the engine.
+* An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
+  at all, with or without replay: the scratch's completion event belongs to the engine's context.
+  With replay on, once the engine has run in its own context, such a call made while that other
+  context is current fails before it sets its shapes or claims the shared scratch, and the engine
+  keeps its graphs. With replay off, or with no context current, the call is not refused up front.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.
@@ -589,10 +624,12 @@ shared buffer grows.
 
     While a graph is being recorded, no other thread may create or destroy a TensorRT engine or
     execution context outside this delegate, or call a whole device sync such as
-    ``cudaDeviceSynchronize()`` or ``torch.cuda.synchronize()``. Loading a program with
-    ExecuTorch's CUDA backend can make such a sync too. Recording happens again after every shape
-    change, so loading everything first does not remove the risk. Leave replay off when other
-    threads may do any of these things.
+    ``cudaDeviceSynchronize()`` or ``torch.cuda.synchronize()``. Loading a program with ExecuTorch's
+    CUDA backend can make such a sync too. Recording can happen again after a change of shapes,
+    buffers or profile, after the shared activation scratch grows, which another engine can cause,
+    in each new or replaced green context, and on the first call from another regular CUDA context
+    with other buffers. So loading everything first does not remove the risk. Leave replay off when
+    other threads may do any of these things.
 
 Shared activation scratch
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -607,10 +644,10 @@ Set the option before you load the methods that should use the shared buffer. Me
 before it keep their own scratch.
 
 The cost is parallelism. Two calls that share the buffer never run at the same time on one
-device: the delegate takes a per-device lock from claiming the buffer to queuing the work. The
-buffer never shrinks. Do not call ``cudaDeviceReset()`` on a device that ran an engine with the
-shared buffer. Recording a call into your own CUDA graph is not supported, with or without the
-shared buffer.
+device: the delegate takes a per-device lock from claiming the buffer to queuing the work, and
+each call's stream waits for the call before it on a small flag in GPU memory. The buffer never
+shrinks. Do not call ``cudaDeviceReset()`` on a device that ran an engine with the shared buffer.
+Recording a call into your own CUDA graph is not supported, with or without the shared buffer.
 
 Shared engines
 ^^^^^^^^^^^^^^^

@@ -33,9 +33,12 @@ cudaError_t __real_cudaFree(void*);
 cudaError_t __real_cudaFreeAsync(void*, cudaStream_t);
 cudaError_t __real_cudaMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 cudaError_t __real_cudaStreamBeginCapture(cudaStream_t, cudaStreamCaptureMode);
+cudaError_t __real_cudaStreamEndCapture(cudaStream_t, cudaGraph_t*);
 cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
+cudaError_t __real_cudaStreamDestroy(cudaStream_t);
+cudaError_t __real_cudaGraphExecDestroy(cudaGraphExec_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
     void**,
@@ -75,7 +78,18 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
     *pointer = nullptr;
     return cudaErrorMemoryAllocation;
   }
-  return __real_cudaMalloc(pointer, bytes);
+  const auto result = __real_cudaMalloc(pointer, bytes);
+  if (result == cudaSuccess && active_calls && active_calls->fill_allocations_with >= 0) {
+    // On a stream of its own and waited for, so the fill is done before the caller sees the memory and
+    // waits for nothing else on the device.
+    cudaStream_t fill_stream = nullptr;
+    if (cudaStreamCreateWithFlags(&fill_stream, cudaStreamNonBlocking) == cudaSuccess) {
+      (void)cudaMemsetAsync(*pointer, active_calls->fill_allocations_with, bytes, fill_stream);
+      (void)__real_cudaStreamSynchronize(fill_stream);
+      (void)__real_cudaStreamDestroy(fill_stream);
+    }
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaFree(void* pointer) {
@@ -123,12 +137,23 @@ cudaError_t __wrap_cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCapture
   return result;
 }
 
+cudaError_t __wrap_cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t* graph) {
+  const auto result = __real_cudaStreamEndCapture(stream, graph);
+  if (result == cudaSuccess && active_calls && active_calls->after_capture) {
+    active_calls->after_capture(*graph);
+  }
+  return result;
+}
+
 cudaError_t __wrap_cudaGraphLaunch(cudaGraphExec_t graph, cudaStream_t stream) {
   if (active_calls) {
     active_calls->launches.push_back(stream);
     active_calls->operations.push_back({CudaCallKind::Launch, stream});
     if (active_calls->launch_error != cudaSuccess) {
       return active_calls->launch_error;
+    }
+    if (active_calls->before_launch) {
+      active_calls->before_launch(stream);
     }
   }
   const auto result = __real_cudaGraphLaunch(graph, stream);
@@ -146,5 +171,20 @@ cudaError_t __wrap_cudaStreamSynchronize(cudaStream_t stream) {
     }
   }
   return __real_cudaStreamSynchronize(stream);
+}
+
+cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {
+  if (active_calls) {
+    active_calls->destroyed_streams.push_back(stream);
+  }
+  return __real_cudaStreamDestroy(stream);
+}
+
+cudaError_t __wrap_cudaGraphExecDestroy(cudaGraphExec_t graph) {
+  const auto result = __real_cudaGraphExecDestroy(graph);
+  if (active_calls) {
+    active_calls->graph_exec_destroys.push_back(result);
+  }
+  return result;
 }
 }

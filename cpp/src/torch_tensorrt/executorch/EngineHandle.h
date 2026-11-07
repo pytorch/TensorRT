@@ -44,6 +44,18 @@ struct EngineHandle {
   std::vector<size_t> cached_input_sizes;
   std::vector<void*> cached_output_ptrs;
   std::vector<size_t> cached_output_sizes;
+  // What exec_ctx holds, so execute() skips the TensorRT call when a shape or an address is the one it
+  // already gave. Setting an unchanged input shape still costs about half a microsecond, and an address
+  // or inferShapes tens of nanoseconds, and most callers pass the same ones every time. An unknown shape
+  // has nbDims -1 and an unknown address is null. Only this delegate may set shapes, addresses or the
+  // profile on exec_ctx, or these go stale.
+  std::vector<nvinfer1::Dims> bound_input_dims;
+  std::vector<void*> bound_addresses;
+  // Changes whenever exec_ctx's input shapes or optimization profile may have changed, so a recorded
+  // CUDA graph can tell that the shapes it was recorded under are gone.
+  uint64_t shape_epoch = 0;
+  // Whether inferShapes has succeeded since the shapes or the profile last changed.
+  bool shapes_inferred = false;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
   // Per output binding [0..num_outputs): index into input_binding_names of the
@@ -96,6 +108,15 @@ struct EngineHandle {
   bool unaligned_io_reported = false;
   // And a program gives an input the same dim order on every call.
   bool reordered_input_reported = false;
+
+  // setTensorAddress for binding `index`, inputs then outputs, unless exec_ctx already holds `address`.
+  bool bind_address(size_t index, void* address);
+  // setInputShape for input `index`, unless exec_ctx already holds `dims`.
+  bool bind_input_shape(size_t index, const nvinfer1::Dims& dims);
+  // setOptimizationProfileAsync, after forgetting every shape and address exec_ctx holds.
+  bool switch_profile(int32_t profile, cudaStream_t stream);
+  // For when exec_ctx may hold addresses other than bound_addresses, so the next bind_address sets each.
+  void forget_bound_addresses();
 
   ~EngineHandle();
 };

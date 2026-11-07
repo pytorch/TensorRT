@@ -35,8 +35,9 @@ namespace executorch_backend {
 std::size_t shared_scratch_capacity_for_testing(int device_id);
 
 // Frees every device's buffer, destroys its handoff event and its disposal
-// stream, and clears the marker, so one test does not inherit a pool an earlier
-// one grew.
+// stream, and clears the marker's record of an enqueue, so one test does not
+// inherit a pool an earlier one grew. The marker's flag, sequence and
+// host_wait_only stay as they are; see SharedScratchMarker.
 //
 // False when a device's slot still had its lock held at the end of the pool's
 // reset deadline; that slot is left as it was. A caller should report it rather

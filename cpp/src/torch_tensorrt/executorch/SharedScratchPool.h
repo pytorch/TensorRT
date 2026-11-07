@@ -16,6 +16,7 @@
 #include <cuda_runtime.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 
@@ -23,18 +24,29 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 
 // Per-device handoff marker for the shared scratch buffer: the pool-owned CUDA
-// event that the last enqueue against the buffer was recorded on.
+// event that the last enqueue against the buffer was recorded on, and the
+// pool-owned device word that enqueue wrote its sequence number to.
 struct SharedScratchMarker {
   // Nothing in the normal path destroys this event; only the test-only reset
   // hands it to a disposer that does.
   cudaEvent_t event = nullptr;
   bool pending = false; // an enqueue against the buffer has been recorded on `event`
+  // The next claimant's stream waits for this word to reach `sequence`, rather
+  // than waiting on `event`: the driver can drop a stream-side event wait while
+  // another thread uses the same stream, and a stream memory-op wait is not
+  // dropped. Made by the first claim, and never on a device without 64-bit stream
+  // memory operations, where a claimant waits for `event` on the host instead.
+  // Nothing frees it, and the test-only reset leaves it and `sequence` alone:
+  // nothing is in flight then, and the sequence only grows.
+  void* flag = nullptr;
+  std::uint64_t sequence = 0; // what the last recorded enqueue wrote to `flag`
+  bool host_wait_only = false; // the device has no 64-bit stream memory operations
 };
 
 // What a caller about to enqueue against a device's shared scratch has to do:
-// when `needs_wait`, make its stream wait on `event` first; once the enqueue is
-// submitted, record it on `event`. `event` is null only when the slot has no
-// event and one could not be created.
+// when `needs_wait`, wait for the previous enqueue first, on the marker's flag or
+// else on `event`; once the enqueue is submitted, record it on both. `event` is
+// null only when the slot has no event and one could not be created.
 struct SharedScratchHandoff {
   cudaEvent_t event = nullptr;
   bool needs_wait = false;
@@ -144,16 +156,16 @@ inline SharedScratchPool& scratch_pool() {
 // `create_event` returns a CUDA event, or nullptr if one could not be created,
 // in which case the slot stays empty and the next call retries.
 //
-// The ordering between one enqueue and the next is carried by an event rather
-// than by the stream the previous enqueue used, because a stream handle cannot
-// carry it: synchronizing on a handle whose stream the caller has since
-// destroyed is a crash rather than an error return, CUDA recycles handle values
-// so a genuinely different stream can compare equal to the recorded one, and the
-// NULL stream is both a legal stream a caller can select and the only available
-// "no previous user" sentinel. An event names the work instead of the queue --
-// it stays valid after the stream that recorded it is destroyed, and waiting on
-// it from the stream that recorded it is already satisfied, so the common
-// single-stream case costs a host call and no device stall.
+// The ordering between one enqueue and the next is carried by the marker's event
+// and flag rather than by the stream the previous enqueue used, because a stream
+// handle cannot carry it: synchronizing on a handle whose stream the caller has
+// since destroyed is a crash rather than an error return, CUDA recycles handle
+// values so a genuinely different stream can compare equal to the recorded one,
+// and the NULL stream is both a legal stream a caller can select and the only
+// available "no previous user" sentinel. The event and the flag name the work
+// instead of the queue -- they stay valid after the stream that recorded them is
+// destroyed, and waiting on them from that stream is already satisfied, so the
+// common single-stream case costs a host call and no device stall.
 template <typename CreateEvent>
 SharedScratchHandoff shared_scratch_claim_event(SharedScratchDevice& dev, CreateEvent create_event) {
   if (dev.marker.event == nullptr) {
@@ -204,10 +216,10 @@ cudaStream_t shared_scratch_disposal_stream(SharedScratchDevice& dev, CreateStre
 // against it, so nothing is using it.
 //
 // One event covers every enqueue the buffer ever served, but only because each of
-// them claims the handoff before enqueueing -- which orders its stream after the
-// event -- and records on the event afterwards, so the latest recording completes
-// only once all the earlier ones have. An enqueue that reaches the buffer without
-// doing both is ordered against nothing here.
+// them claims the handoff before enqueueing -- which orders it after the previous
+// enqueue -- and records on the event afterwards, so the latest recording
+// completes only once all the earlier ones have. An enqueue that reaches the
+// buffer without doing both is ordered against nothing here.
 //
 // The disposal belongs outside `dev.mu`: it waits on the host for that enqueue,
 // and under the lock that wait is one an unrelated claim on this device would sit
