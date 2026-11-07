@@ -21,7 +21,7 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._offloaded_engines import (
-    keeping_offloaded_engines,
+    is_offloading_engines_to_disk,
     offload_engine,
 )
 from torch_tensorrt.dynamo.utils import (
@@ -440,7 +440,7 @@ def convert_module(
                 "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
             )
 
-    offload = keeping_offloaded_engines()
+    offload = is_offloading_engines_to_disk()
     module = TorchTensorRTModule(
         serialized_engine=(
             None if offload else serialized_interpreter_result.serialized_engine

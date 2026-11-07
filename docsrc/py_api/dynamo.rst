@@ -15,8 +15,6 @@ Functions
 
 .. autofunction:: compile
 
-.. autofunction:: compile_and_save
-
 .. autofunction:: trace
 
 .. autofunction:: export
