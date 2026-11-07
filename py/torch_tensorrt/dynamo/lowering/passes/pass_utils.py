@@ -218,7 +218,12 @@ def trace_intermediate_node_outputs(
                     # recorded too, so the range rule sees them at the op feeding it.
                     # Indices, like those of topk, say nothing about that op's range.
                     floats = [t.flatten() for t in out if t.is_floating_point()]
-                    value = torch.cat(floats) if floats else None
+                    # A list, such as that of _foreach_add, can mix devices.
+                    value = (
+                        torch.cat([t.to(floats[0].device) for t in floats])
+                        if floats
+                        else None
+                    )
                 if not isinstance(value, torch.Tensor):
                     return out
                 # Batches are joined along the first dim, which a 0-dim value lacks.
