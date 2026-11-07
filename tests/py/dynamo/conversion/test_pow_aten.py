@@ -1,11 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import tensorrt as trt
 import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
 from .harness import DispatchTestCase
 
@@ -70,6 +74,35 @@ class TestPowConverter(DispatchTestCase):
 
         inputs = [torch.randint(0, 256, (2, 3), dtype=torch.int32)]
         self.run_test(IntPow(), inputs)
+
+    @parameterized.expand(
+        [
+            ("float_square", trt.float32, 2.0, trt.ElementWiseOperation.PROD),
+            ("half_square", trt.float16, 2, trt.ElementWiseOperation.PROD),
+            ("cube", trt.float32, 3.0, trt.ElementWiseOperation.POW),
+            ("integer_square", trt.int32, 2, trt.ElementWiseOperation.POW),
+        ]
+    )
+    def test_square_is_a_product(self, _, dtype, exponent, operation):
+        # TensorRT fuses x * x, but not x ** 2, into a reduction that reads it.
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        impl.elementwise.pow(
+            ConversionContext(network),
+            torch.ops.aten.pow.Tensor_Scalar,
+            SourceIR.ATEN,
+            "pow",
+            network.add_input("x", dtype, (2, 3)),
+            exponent,
+        )
+        operations = []
+        for i in range(network.num_layers):
+            layer = network.get_layer(i)
+            if layer.type == trt.LayerType.ELEMENTWISE:
+                layer.__class__ = trt.IElementWiseLayer
+                operations.append(layer.op)
+        self.assertEqual(operations, [operation])
 
     @parameterized.expand(
         [

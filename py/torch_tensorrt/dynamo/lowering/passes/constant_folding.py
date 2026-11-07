@@ -1,8 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import contextlib
 import logging
-from typing import Any, Dict, Optional, Set, Tuple
+import threading
+from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -109,7 +111,9 @@ def constant_fold(
         else _TorchTensorRTConstantFolder
     )
     cf = folder(gm, skip_constructors=False)
-    cf.run()
+    # With TF32 allowed, TensorRT computes in TF32 too, so folding keeps the caller's settings.
+    with _ieee_float32() if settings.disable_tf32 else contextlib.nullcontext():
+        cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
@@ -175,6 +179,41 @@ def constant_fold(
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
     return gm
+
+
+# Two folds that overlap in time would otherwise restore each other's TF32 flags.
+_TF32_FLAGS_LOCK = threading.Lock()
+
+
+@contextlib.contextmanager
+def _ieee_float32() -> Iterator[None]:
+    """A folded value is baked into the engine as it was computed, so with disable_tf32
+    compute it in full float32. PyTorch lets cuDNN convolutions use TF32 by default, which
+    disable_tf32 does not reach. The flags are process-wide, so other threads also run
+    without TF32 while a fold holds them."""
+    matmul = torch.backends.cuda.matmul
+    with _TF32_FLAGS_LOCK:
+        if hasattr(matmul, "fp32_precision"):
+            conv = torch.backends.cudnn.conv
+            saved = conv.fp32_precision, matmul.fp32_precision
+            conv.fp32_precision = matmul.fp32_precision = "ieee"
+            try:
+                yield
+            finally:
+                conv.fp32_precision, matmul.fp32_precision = saved
+        else:
+            # PyTorch before 2.9, as on the JetPack build, has only these flags. The matmul one is
+            # kept by name: allow_tf32 reads True for both "high" and "medium".
+            cudnn = torch.backends.cudnn
+            saved_conv = cudnn.allow_tf32
+            saved_matmul = torch.get_float32_matmul_precision()
+            cudnn.allow_tf32 = False
+            torch.set_float32_matmul_precision("highest")
+            try:
+                yield
+            finally:
+                cudnn.allow_tf32 = saved_conv
+                torch.set_float32_matmul_precision(saved_matmul)
 
 
 def replace_node_with_constant(

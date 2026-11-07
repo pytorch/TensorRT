@@ -9,6 +9,7 @@ import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
@@ -123,6 +124,34 @@ class TestGetTrtTensor(TestCase):
         self.assertIsNot(
             get_trt_tensor(ctx, buffer[:4], "second", torch.float16), first
         )
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestDequantizeInt8Constant(TestCase):
+    def test_dequantize_int8_qdata_stays_int8_constant(self):
+        # Plain int8 constants become int32 plus a cast, which would cost memory
+        # for every quantized weight.
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(network, CompilationSettings())
+        output = impl.quantize.dequantize_affine(
+            ctx,
+            torch.ops.aten.mul.Tensor,
+            None,
+            "dequantize",
+            torch.randint(-128, 128, (8, 4), dtype=torch.int8),
+            [1, 4],
+            torch.rand(8, 1),
+            torch.float16,
+            input_dtype=torch.int8,
+        )
+
+        self.assertEqual(output.dtype, trt.float16)
+        layers = [network.get_layer(i) for i in range(network.num_layers)]
+        self.assertNotIn(trt.LayerType.CAST, [layer.type for layer in layers])
+        dequantize = next(l for l in layers if l.type == trt.LayerType.DEQUANTIZE)
+        self.assertEqual(dequantize.get_input(0).dtype, trt.int8)
 
 
 if __name__ == "__main__":
