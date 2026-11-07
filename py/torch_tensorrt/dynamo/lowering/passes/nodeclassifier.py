@@ -106,43 +106,33 @@ class DisabledOpTypes(NodeRuleBase):
 class IORangeRule(NodeRuleBase):
     """Rule for keeping nodes with out-of-range inputs/outputs in high precision."""
 
-    def __init__(self, max_output_threshold, reference_data):
+    def __init__(self, max_output_threshold, reference_magnitudes):
         """Initialize the rule.
 
         Args:
             max_output_threshold: Maximum absolute value allowed for node I/O.
-            reference_data: Reference data for checking I/O ranges.
+            reference_magnitudes: Largest absolute value of each tensor in the reference data.
         """
         self.max_output_threshold = max_output_threshold
-        self.reference_data = reference_data
-        self.output_data = None
+        self.reference_magnitudes = reference_magnitudes
+        self.output_magnitude = None
 
     def _check_inner(self, node):
         def is_io_out_of_range(node):
             tensor_name = node.name
-            if tensor_name not in self.reference_data:
+            if tensor_name not in self.reference_magnitudes:
                 logger.debug(
                     f"Node {node.name}: Tensor {tensor_name} not found in reference data. Skipping I/O range check."
                 )
                 return False
-            ref_data = self.reference_data[tensor_name]
-            # A mask's 0 and 1 cannot leave the float16 range, and abs() has no CPU
-            # kernel for bool.
-            if ref_data.dtype == torch.bool:
-                return False
-            if ref_data.numel() == 0:
-                logger.debug(
-                    f"Node {node.name}: Tensor {tensor_name} has 0 elements. Skipping I/O range check."
-                )
-                return False
-            logger.debug(
-                f"Node {node.name}: reference data: min={ref_data.min()}, max={ref_data.max()}"
-            )
-            if torch.any(torch.abs(ref_data) > self.max_output_threshold):
-                self.output_data = ref_data
+            magnitude = self.reference_magnitudes[tensor_name]
+            logger.debug(f"Node {node.name}: largest reference magnitude {magnitude}")
+            if magnitude > self.max_output_threshold:
+                self.output_magnitude = magnitude
                 return True
+            return False
 
-        if self.reference_data:
+        if self.reference_magnitudes:
             for in_node in node.all_input_nodes:
                 if is_io_out_of_range(in_node):
                     return True
@@ -153,10 +143,10 @@ class IORangeRule(NodeRuleBase):
 
     def _log_skipped(self, node, **kwargs):
         """Log information about skipped nodes with I/O range violations."""
-        if self.output_data is not None:
+        if self.output_magnitude is not None:
             logger.info(
-                f"Skipping node {node.name}: reference IO out of range: min={torch.min(self.output_data)}, "
-                f"max={torch.max(self.output_data)}, range=[{-self.max_output_threshold}, {self.max_output_threshold}]"
+                f"Skipping node {node.name}: reference IO out of range: largest magnitude "
+                f"{self.output_magnitude}, range=[{-self.max_output_threshold}, {self.max_output_threshold}]"
             )
         else:
             super()._log_skipped(node, **kwargs)
@@ -168,22 +158,27 @@ class DepthOfReductionRule(NodeRuleBase):
     Reduction ops are those that aggregate data across one or more axes, decreasing the dimensionality of the input tensor, such as convolution, gemm, etc.
     """
 
-    def __init__(self, max_depth_of_reduction, reference_data):
+    def __init__(self, max_depth_of_reduction, reference_shapes):
         """Initialize the rule.
 
         Args:
             max_depth_of_reduction: Maximum depth of reduction allowed in low precision.
-            reference_data: Reference data for checking I/O ranges.
+            reference_shapes: Largest size of each dim of each tensor in the reference data.
         """
         self.max_depth_of_reduction = max_depth_of_reduction
-        self.reference_data = reference_data
+        self.reference_shapes = reference_shapes
         self.reduction_depth = 0
 
     def _get_tensor_shape(self, tensor_name):
-        """Get tensor shape from reference data."""
-        if tensor_name in self.reference_data:
-            return self.reference_data[tensor_name].shape
-        return None
+        """Get the largest size of each dim of the tensor in the reference data."""
+        if tensor_name in self.reference_shapes and (
+            self.reference_shapes[tensor_name] is None
+        ):
+            raise ValueError(
+                f"Calibration batches give {tensor_name} outputs of different ranks, "
+                "so the depth rule cannot tell which dims it reduces."
+            )
+        return self.reference_shapes.get(tensor_name)
 
     def _log_skipped(self, node, **kwargs):
         """Log information about skipped nodes with depth of reduction violations."""
@@ -279,11 +274,12 @@ class NodeClassifier:
         self.max_output_threshold = max_output_threshold
         self.max_depth_of_reduction = max_depth_of_reduction
 
-    def _gen_block_node_rules(self, reference_data):
+    def _gen_block_node_rules(self, reference_magnitudes, reference_shapes):
         """Generate list of rules for blocking nodes from precision conversion.
 
         Args:
-            reference_data: Reference data for checking I/O ranges.
+            reference_magnitudes: Largest absolute value of each tensor in the reference data.
+            reference_shapes: Largest size of each dim of each tensor in the reference data.
 
         Returns:
             list[NodeRuleBase]: List of rules to apply.
@@ -293,15 +289,15 @@ class NodeClassifier:
             block_node_rules.append(DisabledNodeNameRegexRule(self.excluded_nodes))
         if self.excluded_ops:
             block_node_rules.append(DisabledOpTypes(self.excluded_ops))
-        if reference_data:
+        if reference_magnitudes:
             block_node_rules.append(
-                IORangeRule(self.max_output_threshold, reference_data)
+                IORangeRule(self.max_output_threshold, reference_magnitudes)
             )
         if self.max_depth_of_reduction is not None:
             block_node_rules.append(
                 DepthOfReductionRule(
                     self.max_depth_of_reduction,
-                    reference_data,
+                    reference_shapes,
                 )
             )
         if self.custom_rule:
@@ -309,17 +305,22 @@ class NodeClassifier:
         return block_node_rules
 
     def run(
-        self, ref_outputs_dict: Optional[dict[str, torch.Tensor]] = None
+        self,
+        ref_magnitudes_dict: Optional[dict[str, float]] = None,
+        ref_shapes_dict: Optional[dict[str, torch.Size]] = None,
     ) -> tuple[list[str], list[str]]:
         """Run node classification.
 
         Args:
-            ref_outputs_dict: Optional tensors' reference data.
+            ref_magnitudes_dict: Optional largest absolute value of each reference tensor.
+            ref_shapes_dict: Optional largest size of each dim of each reference tensor.
 
         Returns:
             tuple: Lists of node names (low_precision_nodes, high_precision_nodes).
         """
-        block_node_rules = self._gen_block_node_rules(ref_outputs_dict)
+        block_node_rules = self._gen_block_node_rules(
+            ref_magnitudes_dict, ref_shapes_dict or {}
+        )
         low_precision_nodes = []
         high_precision_nodes = []
         for node in self.nodes:

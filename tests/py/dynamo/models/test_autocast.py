@@ -3,7 +3,9 @@
 
 import base64
 import logging
+import operator
 import pickle
+import warnings
 
 import pytest
 import torch
@@ -11,6 +13,9 @@ import torch.nn as nn
 import torch_tensorrt
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import pre_export_lowering
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    trace_intermediate_node_outputs,
+)
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import SERIALIZED_METADATA_IDX
 
@@ -524,7 +529,7 @@ def test_autocast_names_torch_cond_as_unsupported(calibrate):
 
 
 @pytest.mark.unit
-def test_autocast_calibration_joins_0_dim_values_across_batches():
+def test_autocast_calibrates_0_dim_values_across_batches():
     class Model(nn.Module):
         def __init__(self):
             super().__init__()
@@ -548,6 +553,333 @@ def test_autocast_calibration_joins_0_dim_values_across_batches():
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_depth_rule_reads_one_calibration_batch():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = nn.Parameter(torch.randn(8, 4))
+
+        def forward(self, x):
+            # The matmul reduces over 8 values, whatever the number of batches.
+            return (x.amax(dim=(0, 1)) * 1e-3) @ self.weight
+
+    x = torch.randn(2, 3, 8, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_depth_of_reduction=10,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,), (x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    assert "matmul" not in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("long_first", [True, False], ids=["long_first", "short_first"])
+def test_autocast_depth_rule_sees_the_longest_calibration_batch(long_first):
+    class Attention(nn.Module):
+        def forward(self, q, k, v):
+            # The second matmul reduces over the sequence length.
+            return torch.softmax(q @ k.transpose(-1, -2), dim=-1) @ v
+
+    def batch(length, scale):
+        q = torch.randn(1, length, 8, device="cuda") * scale
+        return q, torch.randn(1, length, 8, device="cuda"), torch.randn_like(q)
+
+    # The short batch has the larger probabilities, the long one the deeper reduction.
+    short, long = batch(4, 3.0), batch(32, 0.01)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_depth_of_reduction=16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [long, short] if long_first else [short, long], batch_size=None
+        ),
+    )
+    length = torch.export.Dim("length", min=2, max=64)
+    exported = torch.export.export(
+        Attention().cuda().eval(),
+        short,
+        dynamic_shapes=({1: length}, {1: length}, {1: length}),
+    )
+    pre_export_lowering(exported, settings)
+    high_precision_nodes = settings._autocast_calibrated_high_precision_nodes
+    assert "matmul" not in high_precision_nodes
+    assert "matmul_1" in high_precision_nodes
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("max_depth_of_reduction", [None, 2])
+def test_autocast_calibration_of_outputs_of_different_ranks(max_depth_of_reduction):
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.squeeze(x, 1) @ torch.ones(4, 4, device=x.device)
+
+    dim = torch.export.Dim("dim", min=1, max=8)
+    batches = [
+        (torch.randn(2, 1, 4, device="cuda"),),
+        (torch.randn(2, 3, 4, device="cuda"),),
+    ]
+    exported = torch.export.export(
+        Model().eval(),
+        (torch.randn(2, 3, 4, device="cuda"),),
+        dynamic_shapes=({1: dim},),
+    )
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_depth_of_reduction=max_depth_of_reduction,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            batches, batch_size=None
+        ),
+    )
+    # squeeze gives shape (2, 4) for the first batch and (2, 3, 4) for the second, so
+    # the depth rule cannot tell which dims matmul reduces. The range rule needs no
+    # shapes.
+    if max_depth_of_reduction is None:
+        pre_export_lowering(exported, settings)
+    else:
+        with pytest.raises(ValueError, match="different ranks"):
+            pre_export_lowering(exported, settings)
+
+
+@pytest.mark.unit
+def test_autocast_calibration_measures_each_batch_as_it_runs():
+    class Model(nn.Module):
+        def forward(self, x):
+            # x.float() returns x itself, so its value is the batch tensor.
+            return x.float() * 1e-5
+
+    class RefilledBuffer(torch.utils.data.IterableDataset):
+        # A data loader can fill one buffer for every batch.
+        def __iter__(self):
+            buffer = torch.empty(4, device="cuda")
+            for value in (1e5, 1.0, 1.0):
+                buffer.fill_(value)
+                yield (buffer,)
+
+    model = Model().eval()
+    inputs = [torch.full((4,), 1e5, device="cuda")]
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, tuple(inputs)),
+        arg_inputs=inputs,
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            RefilledBuffer(), batch_size=None
+        ),
+    )
+    # In float16, the multiply would read inf for an input of 1e5.
+    torch.testing.assert_close(trt_model(*inputs), model(*inputs))
+
+
+@pytest.mark.unit
+def test_autocast_calibration_measures_a_buffer_view_before_its_update():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("cache", torch.zeros(2, 4))
+
+        def forward(self, x):
+            past = self.cache[0]
+            out = past * 2 + x
+            # Like a static cache, the buffer changes later in the same forward.
+            self.cache[0].copy_(x * 100)
+            return out
+
+    x = torch.ones(4, device="cuda")
+    magnitudes, _ = trace_intermediate_node_outputs(
+        torch.export.export(Model().cuda().eval(), (x,)).module(), [(x,)]
+    )
+    assert magnitudes["select"] == 0.0
+
+
+def _calibrate_with_a_late_rank(rank: int, store: str) -> None:
+    import time
+
+    import torch.distributed as dist
+
+    dist.init_process_group(
+        "gloo", store=dist.FileStore(store, 2), rank=rank, world_size=2
+    )
+    group = dist.group.WORLD.group_name
+
+    class Model(nn.Module):
+        def forward(self, x):
+            y = torch.ops._c10d_functional.all_reduce.default(x, "sum", group)
+            return torch.ops._c10d_functional.wait_tensor.default(y) * 1e-5
+
+    x = torch.tensor([1.0 if rank == 0 else 1e5])
+    gm = torch.export.export(Model(), (x,)).module()
+    if rank == 1:
+        # Rank 0 runs the all_reduce first and has to wait for this rank to join.
+        time.sleep(1)
+    magnitudes, _ = trace_intermediate_node_outputs(gm, [(x,)])
+    dist.destroy_process_group()
+    assert magnitudes["all_reduce"] == 100001.0, magnitudes
+
+
+@pytest.mark.unit
+def test_autocast_calibration_measures_a_collective_once_it_is_done(tmp_path):
+    torch.multiprocessing.spawn(
+        _calibrate_with_a_late_rank, args=(str(tmp_path / "store"),), nprocs=2
+    )
+
+
+@pytest.mark.unit
+def test_autocast_does_not_cast_a_collective_before_its_wait():
+    from torch_tensorrt.dynamo.lowering.passes.rule_based_autocast import (
+        rule_based_autocast,
+    )
+
+    class Model(nn.Module):
+        def forward(self, x):
+            y = torch.ops._c10d_functional.all_reduce.default(x, "sum", "0")
+            return torch.ops._c10d_functional.wait_tensor.default(y) * 2.0
+
+    gm = torch.export.export(Model(), (torch.randn(4, 8),)).graph_module
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_ops={torch.ops._c10d_functional.all_reduce.default},
+    )
+    gm = rule_based_autocast(gm, settings)
+    wait = next(
+        n
+        for n in gm.graph.nodes
+        if n.target == torch.ops._c10d_functional.wait_tensor.default
+    )
+    # The all_reduce stays in float32, and the wait must get its output uncast.
+    assert wait.args[0].target == torch.ops._c10d_functional.all_reduce.default
+
+
+@pytest.mark.unit
+def test_autocast_calibration_waits_for_the_gpu_once_per_batch():
+    # Reading each node's largest value as it runs would make the host wait for the
+    # GPU at every node of every batch.
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.relu(x @ x.T) * 2 + x.sum()
+
+    x = torch.randn(8, 8, device="cuda")
+    gm = torch.export.export(Model().eval(), (x,)).module()
+    batches = [(torch.randn(8, 8, device="cuda"),) for _ in range(3)]
+    torch.cuda.synchronize()
+    torch.cuda.set_sync_debug_mode("warn")
+    try:
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            magnitudes, _ = trace_intermediate_node_outputs(gm, batches)
+    finally:
+        torch.cuda.set_sync_debug_mode("default")
+    syncs = [str(w.message) for w in caught if "synchroniz" in str(w.message)]
+    assert len(syncs) == len(batches), syncs
+    assert magnitudes["relu"] == max(
+        float(torch.relu(b @ b.T).max()) for (b,) in batches
+    )
+
+
+@pytest.mark.unit
+def test_autocast_calibration_reads_a_batch_before_the_loader_refills_it():
+    class Model(nn.Module):
+        def forward(self, x):
+            return x.to("cuda", non_blocking=True) * 1e-5
+
+    class PinnedRefill(torch.utils.data.IterableDataset):
+        # A loader can refill one pinned buffer on the host for every batch. The copy
+        # to the GPU waits behind the work queued before it, so it reads the next
+        # batch unless calibration waits for the GPU before asking for one.
+        def __iter__(self):
+            buffer = torch.empty(4, pin_memory=True)
+            busy = torch.full((2048, 2048), 2048**-1, device="cuda")
+            for value in (1e5, 1.0, 1.0):
+                buffer.fill_(value)
+                for _ in range(10):
+                    busy = busy @ busy
+                yield (buffer,)
+
+    gm = torch.export.export(Model().eval(), (torch.empty(4, pin_memory=True),))
+    loader = torch.utils.data.DataLoader(PinnedRefill(), batch_size=None)
+    # The first run in a process can wait for the GPU while CUDA sets up, which
+    # lets the copy finish before the refill anyway.
+    for _ in range(2):
+        magnitudes, _ = trace_intermediate_node_outputs(gm.module(), loader)
+        assert magnitudes["mul"] == 1.0
+
+
+@pytest.mark.unit
+def test_autocast_calibration_counts_an_overflow_to_inf():
+    class Model(nn.Module):
+        def forward(self, x):
+            return x * 2 * 0.5
+
+    # In float16, x * 2 is the largest finite value in the first batch and inf in
+    # the second. The range rule keeps the op that reads it in high precision.
+    first, second = (
+        torch.full((4,), v, dtype=torch.float16, device="cuda")
+        for v in (32752.0, 40000.0)
+    )
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_output_threshold=65504,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(first,), (second,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().eval(), (first,)), settings)
+    assert "mul_1" in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dtype", [torch.float8_e5m2, torch.uint16], ids=["float8", "uint16"]
+)
+def test_autocast_calibrates_types_without_abs(dtype):
+    # float8_e5m2 has no nan_to_num or amax kernel, and uint16 none for abs or amax.
+    class Model(nn.Module):
+        def forward(self, x):
+            return x.to(dtype).float() * 2
+
+    x = torch.tensor([0.0, 1.0, 1024.0, 3.0], device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # 1024 is above the default threshold of 512, so the multiply stays in float32.
+    assert "mul" in settings._autocast_calibrated_high_precision_nodes
+
+
+def _quantize_float8(x):
+    scale = x.abs().amax() / 448
+    return [(x / scale).to(torch.float8_e4m3fn), scale]
+
+
+@pytest.mark.unit
+def test_autocast_calibrates_a_list_of_float8_data_and_its_scale():
+    # Calibration gives the graph each batch as one tuple.
+    graph = torch.fx.Graph()
+    x = graph.call_function(operator.getitem, (graph.placeholder("batch"), 0))
+    out = graph.call_function(_quantize_float8, (x,))
+    data, scale = (graph.call_function(operator.getitem, (out, i)) for i in (0, 1))
+    graph.output(
+        graph.call_function(torch.mul, (graph.call_method("float", (data,)), scale))
+    )
+    gm = torch.fx.GraphModule(nn.Module(), graph)
+    x = torch.tensor([1.0, -2000.0, 3.0])
+    magnitudes, _ = trace_intermediate_node_outputs(gm, [(x,)])
+    # The data reaches 448, the largest float8_e4m3fn value, and the scale is 4.5.
+    assert magnitudes["_quantize_float8"] == 448
 
 
 @pytest.mark.unit
@@ -632,6 +964,29 @@ def test_rule_based_autocast_runs_without_traced_outputs():
             return torch.relu(x) * 2.0
 
     gm = torch.export.export(Model(), (torch.randn(4, 8),)).graph_module
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    gm = rule_based_autocast(gm, settings)
+    assert torch.ops.aten.to.dtype in [n.target for n in gm.graph.nodes]
+
+
+@pytest.mark.unit
+def test_autocast_runs_without_distributed_support(monkeypatch):
+    from torch_tensorrt.dynamo.lowering.passes.rule_based_autocast import (
+        rule_based_autocast,
+    )
+
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.relu(x) * 2.0
+
+    x = torch.randn(4, 8)
+    gm = torch.export.export(Model(), (x,)).module()
+    # A PyTorch build without distributed support has no _c10d_functional ops.
+    monkeypatch.setattr(torch.distributed, "is_available", lambda: False)
+    monkeypatch.setattr(torch.ops, "_c10d_functional", object())
+    trace_intermediate_node_outputs(gm, [(x,)])
     settings = CompilationSettings(
         enable_autocast=True, autocast_low_precision_type=torch.float16
     )

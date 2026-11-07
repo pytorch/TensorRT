@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
+    _wait_tensor_op,
     clean_up_graph_after_modifications,
     tensors_maybe_written_by,
     tensors_written_by,
@@ -167,8 +168,10 @@ def rule_based_autocast(
     autocast_max_output_threshold = settings.autocast_max_output_threshold
     autocast_max_depth_of_reduction = settings.autocast_max_depth_of_reduction
     # pre_export_lowering sets this on the settings; a caller that skips it has none.
-    reference_data: dict[str, torch.Tensor] = vars(settings).pop(
-        "autocast_intermediate_node_outputs", {}
+    reference_data: dict[str, float]
+    reference_shapes: dict[str, torch.Size]
+    reference_data, reference_shapes = vars(settings).pop(
+        "autocast_calibration_trace", ({}, {})
     )
     recorded_nodes = settings._autocast_calibrated_high_precision_nodes
     replay_rule = None
@@ -202,7 +205,9 @@ def rule_based_autocast(
         max_depth_of_reduction=autocast_max_depth_of_reduction,
         custom_rule=replay_rule,
     )
-    low_precision_nodes, high_precision_nodes = node_classifier.run(reference_data)
+    low_precision_nodes, high_precision_nodes = node_classifier.run(
+        reference_data, reference_shapes
+    )
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(
@@ -304,6 +309,7 @@ def rule_based_autocast(
             ):
                 kept.update(nodes)
     owners = {n for n in kept if not _returns_its_input(n) and n in traced_dtypes}
+    wait_tensor = _wait_tensor_op()
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
             if node in kept and node not in owners:
@@ -346,6 +352,13 @@ def rule_based_autocast(
                 src, idx = node.args
                 if isinstance(src.meta.get("val"), (list, tuple)):
                     node.meta["val"] = src.meta["val"][idx]
+                continue
+            if node.target == wait_tensor:
+                # A cast before the wait would read the output of a collective before
+                # the collective has written it, so the wait keeps its input's type.
+                src = node.args[0]
+                if isinstance(src.meta.get("val"), torch.Tensor):
+                    node.meta["val"] = src.meta["val"]
                 continue
             if not any(is_tensor_node(n) for n in node.all_input_nodes):
                 # A factory op such as torch.zeros has no inputs to cast, so its

@@ -312,7 +312,7 @@ def pre_export_lowering(
                 "operand of torch.cond, integers included, to the low precision type, and "
                 "calibration records values only in the main graph."
             )
-        settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
+        settings.autocast_calibration_trace = trace_intermediate_node_outputs(
             ep.module(),
             settings.autocast_calibration_dataloader,
             [torch.ops.higher_order.wrap_with_autocast],

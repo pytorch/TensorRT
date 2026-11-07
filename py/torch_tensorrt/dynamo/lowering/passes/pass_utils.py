@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
@@ -188,11 +188,36 @@ def is_node_complex(node: Any, complexNodes: Dict[str, bool]) -> bool:
     return False
 
 
+def _wait_tensor_op() -> Optional[torch._ops.OpOverload]:
+    """The op that waits for a collective. A PyTorch build without distributed support,
+    as some builds for Jetson are, has no collectives and no such op."""
+    if not torch.distributed.is_available():
+        return None
+    return torch.ops._c10d_functional.wait_tensor.default
+
+
+def _largest_magnitude(value: torch.Tensor) -> Optional[torch.Tensor]:
+    # A bool mask cannot leave the low precision range, and abs() has no CPU kernel
+    # for bool.
+    if value.dtype == torch.bool or value.numel() == 0:
+        return None
+    # By default nan_to_num turns an overflow to inf into the largest finite value.
+    try:
+        magnitude = value.abs().nan_to_num_(nan=0.0, posinf=float("inf")).amax()
+    except NotImplementedError:
+        # float8 and the wide unsigned types lack some of these kernels, and float32
+        # is close enough for a range check.
+        magnitude = value.float().abs().nan_to_num_(nan=0.0, posinf=float("inf")).amax()
+    # The result stays on the device. Reading it here would make the host wait for the
+    # GPU at every node.
+    return magnitude.double()
+
+
 def trace_intermediate_node_outputs(
     gm: torch.fx.GraphModule,
     calibration_dataloader: torch.utils.data.DataLoader,
     excluded_ops: Sequence[torch.fx.node.Target] = [],
-) -> Dict[str, torch.Tensor]:
+) -> Tuple[Dict[str, float], Dict[str, Optional[torch.Size]]]:
     """Trace the intermediate node outputs of a graph module.
 
     Args:
@@ -201,15 +226,30 @@ def trace_intermediate_node_outputs(
         excluded_ops (Set[torch.fx.node.Target]): The set of ATen ops that should be excluded from the trace. For example, `{torch.ops.higher_order.wrap_with_autocast}`. Default is an empty set.
 
     Returns:
-        Dict[str, torch.Tensor]: A dictionary of intermediate node outputs. The key is the node name and the value is its output, joined across batches along the first dim. A list output is one flat tensor of its floating-point values, and a 0-dim output has one element per batch.
+        Tuple[Dict[str, float], Dict[str, Optional[torch.Size]]]: 2 dictionaries keyed by node name. The first holds the largest absolute value of the node's output in any calibration batch, where a value that overflowed to inf counts as inf. The second holds the largest size each dim of the output had in any batch, or None when batches give outputs of different ranks. For a list output, both records are of its floating-point values joined into one 1-D tensor.
     """
 
-    intermediate_node_outputs: Dict[str, torch.Tensor] = {}
+    largest_magnitudes: Dict[str, float] = {}
+    largest_shapes: Dict[str, Optional[torch.Size]] = {}
+    batch_magnitudes: Dict[str, Optional[torch.Tensor]] = {}
+    wait_tensor = _wait_tensor_op()
 
     class IntermediateNodeTracer(torch.fx.Interpreter):  # type: ignore[misc]
         def run_node(self, n: torch.fx.Node) -> Any:
             out = super().run_node(n)
-            if n.op == "call_function" and n.target not in excluded_ops:
+            # A collective such as all_reduce returns before it has written its
+            # output, and its wait_tensor returns that output once it has. So the
+            # output is measured at the wait, for the collective too. A collective
+            # that returns a list, such as all_reduce_coalesced, has getitem users
+            # and is still measured as it returns.
+            if (
+                n.op == "call_function"
+                and n.target not in excluded_ops
+                and not any(user.target == wait_tensor for user in n.users)
+            ):
+                names = [n.name]
+                if n.target == wait_tensor and isinstance(n.args[0], torch.fx.Node):
+                    names.append(n.args[0].name)
                 value = out
                 if isinstance(out, (list, tuple)) and all(
                     isinstance(t, torch.Tensor) for t in out
@@ -218,27 +258,57 @@ def trace_intermediate_node_outputs(
                     # recorded too, so the range rule sees them at the op feeding it.
                     # Indices, like those of topk, say nothing about that op's range.
                     floats = [t.flatten() for t in out if t.is_floating_point()]
-                    # A list, such as that of _foreach_add, can mix devices.
+                    # A list, such as that of _foreach_add, can mix devices, and one
+                    # such as float8 data with its float32 scale can mix dtypes that
+                    # cat does not promote.
+                    dtype = (
+                        torch.float32 if len({t.dtype for t in floats}) > 1 else None
+                    )
                     value = (
-                        torch.cat([t.to(floats[0].device) for t in floats])
+                        torch.cat(
+                            [t.to(device=floats[0].device, dtype=dtype) for t in floats]
+                        )
                         if floats
                         else None
                     )
                 if not isinstance(value, torch.Tensor):
                     return out
-                # Batches are joined along the first dim, which a 0-dim value lacks.
-                if value.dim() == 0:
-                    value = value.reshape(1)
-                if n.name in intermediate_node_outputs:
-                    intermediate_node_outputs[n.name] = torch.cat(
-                        [intermediate_node_outputs[n.name], value], dim=0
+                # The range rule needs only the largest absolute value of any batch,
+                # and the depth rule the largest reduction, which another batch may
+                # have. The value is measured now, because a module can update a
+                # buffer in place later in the forward, as a static cache does, and an
+                # output can share that buffer.
+                magnitude = _largest_magnitude(value)
+                for name in names:
+                    batch_magnitudes[name] = magnitude
+                    shape = largest_shapes.get(name, value.shape)
+                    largest_shapes[name] = (
+                        torch.Size(map(max, shape, value.shape))
+                        if shape is not None and len(shape) == len(value.shape)
+                        else None
                     )
-                else:
-                    intermediate_node_outputs[n.name] = value
             return out
+
+    def read_batch_magnitudes() -> None:
+        names_by_device: Dict[torch.device, List[str]] = {}
+        for name, magnitude in batch_magnitudes.items():
+            if magnitude is not None:
+                names_by_device.setdefault(magnitude.device, []).append(name)
+        values: Dict[str, float] = {}
+        for names in names_by_device.values():
+            stacked = torch.stack([batch_magnitudes[name] for name in names])
+            values.update(zip(names, stacked.tolist()))
+        for name in batch_magnitudes:
+            value = values.get(name, float("-inf"))
+            largest_magnitudes[name] = max(value, largest_magnitudes.get(name, value))
+        batch_magnitudes.clear()
 
     if calibration_dataloader is not None:
         tracer = IntermediateNodeTracer(gm)
-        for batch in calibration_dataloader:
-            tracer.run(tuple(batch))
-    return intermediate_node_outputs
+        with torch.no_grad():
+            for batch in calibration_dataloader:
+                tracer.run(tuple(batch))
+                # The loader may write the next batch into the same memory without
+                # waiting for the GPU, so this batch is read before it asks for one.
+                read_batch_magnitudes()
+    return largest_magnitudes, largest_shapes

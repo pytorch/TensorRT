@@ -355,7 +355,7 @@ class CompilationSettings:
         # settings) leave out the calibration data. Refit then reuses the recorded
         # precisions instead of deciding again from new weights.
         state["autocast_calibration_dataloader"] = None
-        state.pop("autocast_intermediate_node_outputs", None)
+        state.pop("autocast_calibration_trace", None)
         state["torch_executed_ops"] = {
             op if isinstance(op, str) else ConverterRegistry.qualified_name_or_str(op)
             for op in state["torch_executed_ops"]
