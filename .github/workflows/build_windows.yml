@@ -546,7 +546,7 @@ jobs:
           cd %SRC_DIR%
           call .venv\Scripts\activate.bat
 
-          pip install --upgrade setuptools==72.1.0 build==1.2.2 wheel
+          pip install --upgrade setuptools==77.0.3 build==1.2.2 wheel
           ${{ inputs.build-command }}
       - name: Build the wheel (setup-py) Arm64
         if: ${{ inputs.build-platform == 'setup-py' && inputs.architecture == 'arm64' }}
@@ -564,7 +564,7 @@ jobs:
           cd %SRC_DIR%
           call .venv\Scripts\activate.bat
 
-          pip install --upgrade setuptools==72.1.0
+          pip install --upgrade setuptools==77.0.3
           python setup.py bdist_wheel
       - name: Run post-script
         working-directory: ${{ inputs.repository }}

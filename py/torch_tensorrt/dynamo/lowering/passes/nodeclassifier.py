@@ -126,6 +126,10 @@ class IORangeRule(NodeRuleBase):
                 )
                 return False
             ref_data = self.reference_data[tensor_name]
+            # A mask's 0 and 1 cannot leave the float16 range, and abs() has no CPU
+            # kernel for bool.
+            if ref_data.dtype == torch.bool:
+                return False
             if ref_data.numel() == 0:
                 logger.debug(
                     f"Node {node.name}: Tensor {tensor_name} has 0 elements. Skipping I/O range check."
@@ -230,7 +234,7 @@ class DepthOfReductionRule(NodeRuleBase):
             if weight_shape is None:
                 return False
             in_channels = weight_shape[1]
-            kernel_volume = torch.prod(weight_shape[2:])
+            kernel_volume = weight_shape[2:].numel()
             self.reduction_depth = in_channels * kernel_volume
         elif node.target in [
             torch.ops.aten.matmul,

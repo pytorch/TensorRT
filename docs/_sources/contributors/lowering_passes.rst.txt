@@ -173,7 +173,8 @@ cast nodes into the graph based on a set of rules:
 5. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
    ranges are measured by running the model on calibration data before applying the
    threshold check. Without a dataloader, the range and depth checks are skipped and
-   a warning is logged.
+   a warning is logged. Refit instead reuses the precisions that the dataloader chose
+   at compile time, and raises an error if one of those nodes is gone.
 
 The pass inserts explicit ``aten._to_copy`` cast nodes around qualified operations to
 reduce them to ``autocast_low_precision_type`` (FP16 or BF16).

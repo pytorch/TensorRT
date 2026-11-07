@@ -431,6 +431,216 @@ def test_autocast_ops_with_list_outputs(split):
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize(
+    "split",
+    [
+        lambda y: torch.chunk(y, 2, dim=-1),
+        lambda y: torch.split(y, 16, dim=-1),
+        lambda y: torch.unbind(y.view(4, 2, 16), dim=1),
+    ],
+    ids=["chunk", "split", "unbind"],
+)
+def test_autocast_calibration_checks_values_through_list_outputs(split):
+    class Model(nn.Module):
+        def forward(self, x):
+            # The multiply feeding the list op and the one reading its elements
+            # both overflow float16.
+            y = x * 300.0
+            a, b = split(y * y)
+            return a * b / 8.1e9
+
+    model = Model().cuda().eval()
+    x = torch.ones(4, 32, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x), model(x))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "indices",
+    [
+        lambda y: torch.max(y, dim=-1)[1],
+        lambda y: torch.topk(y, 2, dim=-1).indices,
+    ],
+    ids=["max", "topk"],
+)
+def test_autocast_calibration_keeps_large_indices_exact(indices):
+    class Model(nn.Module):
+        def forward(self, x):
+            # Indices above 2048 cannot be stored exactly in float16.
+            return indices(x * 2.0) + 1
+
+    model = Model().cuda().eval()
+    x = torch.randn(256, 4096, device="cuda") * 1000.0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x), model(x))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("calibrate", [True, False])
+def test_autocast_names_torch_cond_as_unsupported(calibrate):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x):
+            y = self.linear(x)
+            # Only inside the branch do the values leave the float16 range.
+            return torch.cond(
+                y.sum() > -1e9, lambda t: t * 1e5 / 1e5, lambda t: -t, (y,)
+            )
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    loader = torch.utils.data.DataLoader([(x,)], batch_size=None) if calibrate else None
+    with pytest.raises(RuntimeError, match="does not support models with torch.cond"):
+        torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+            autocast_calibration_dataloader=loader,
+        )
+
+
+@pytest.mark.unit
+def test_autocast_calibration_joins_0_dim_values_across_batches():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.affine = nn.Parameter(torch.tensor([2.0, 0.5]))
+
+        def forward(self, x):
+            # unbind of a 1-D tensor and sum give 0-dim values.
+            scale, shift = self.affine.unbind(0)
+            return x * scale + shift + x / x.sum()
+
+    model = Model().cuda().eval()
+    x = torch.rand(4, 16, device="cuda") + 1.0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,), (x * 2.0,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_calibrates_a_cpu_program_with_a_bool_mask():
+    class Model(nn.Module):
+        def forward(self, x, mask):
+            return x * torch.chunk(mask, 2)[0].float()
+
+    # The program and the calibration batch stay on the CPU.
+    model = Model().eval()
+    x, mask = torch.randn(4, 8), torch.rand(8, 8) > 0.5
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x, mask)),
+        arg_inputs=[x, mask],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x, mask)], batch_size=None
+        ),
+    )
+    out = trt_model(x.cuda(), mask.cuda())
+    torch.testing.assert_close(out.float().cpu(), model(x, mask), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_depth_of_reduction_reads_a_recorded_convolution_weight():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weights = nn.Parameter(torch.randn(2, 8, 4, 3, 3))
+
+        def forward(self, x):
+            # unbind makes the weight a recorded value instead of a parameter.
+            return nn.functional.conv2d(torch.relu(x), self.weights.unbind(0)[0])
+
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_max_depth_of_reduction=8,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    # 4 input channels times a 3x3 kernel is a reduction depth of 36.
+    assert "conv2d" in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
+def test_rule_based_autocast_runs_without_traced_outputs():
+    from torch_tensorrt.dynamo.lowering.passes.rule_based_autocast import (
+        rule_based_autocast,
+    )
+
+    class Model(nn.Module):
+        def forward(self, x):
+            return torch.relu(x) * 2.0
+
+    gm = torch.export.export(Model(), (torch.randn(4, 8),)).graph_module
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    gm = rule_based_autocast(gm, settings)
+    assert torch.ops.aten.to.dtype in [n.target for n in gm.graph.nodes]
+
+
+@pytest.mark.unit
+def test_autocast_calibration_ignores_indices_at_the_op_feeding_topk():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 1024)
+
+        def forward(self, x):
+            return torch.topk(self.linear(x), 8, dim=-1).values
+
+    x = torch.randn(4, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    # topk's indices reach 1023, but they say nothing about the range of the linear layer.
+    assert "linear" not in settings._autocast_calibrated_high_precision_nodes
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_warns_without_calibration_dataloader(caplog):
     class LargeIntermediateModel(nn.Module):
         def forward(self, x):
@@ -464,14 +674,15 @@ def test_autocast_warns_without_calibration_dataloader(caplog):
 )
 def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     class MaskedScores(nn.Module):
-        def __init__(self):
+        def __init__(self, fill):
             super(MaskedScores, self).__init__()
             self.linear = nn.Linear(16, 16)
+            self.fill = nn.Parameter(torch.tensor(fill))
 
         def forward(self, x, mask):
-            # -1e9 is out of the float16 range, so the calibration data keeps
-            # these nodes in float32.
-            return torch.softmax(self.linear(x) + (1.0 - mask) * -1e9, dim=-1)
+            # A -1e9 fill is out of the float16 range, so the calibration data
+            # keeps these nodes in float32.
+            return torch.softmax(self.linear(x) + (1.0 - mask) * self.fill, dim=-1)
 
     inputs = (
         torch.randn((2, 8, 16), dtype=torch.float32, device="cuda"),
@@ -482,8 +693,9 @@ def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     calibration_dataloader = torch.utils.data.DataLoader(
         torch.utils.data.TensorDataset(batch, batch_mask), batch_size=2
     )
+    model = MaskedScores(-1e9).cuda().eval()
     trt_autocast_mod = torch_tensorrt.dynamo.compile(
-        torch.export.export(MaskedScores().cuda().eval(), inputs),
+        torch.export.export(model, inputs),
         arg_inputs=inputs,
         min_block_size=1,
         enable_autocast=True,
@@ -502,12 +714,22 @@ def test_autocast_saves_calibrated_precisions_not_calibration_data(tmp_path):
     metadata = base64.b64decode(encoded)
     assert len(metadata) < batch.nbytes
     assert batch[0, 0, :16].cpu().numpy().tobytes() not in metadata
-    assert engine.settings.autocast_calibration_dataloader is not None
 
-    # Refit of the loaded program must pick the precisions the engine was built with.
+    # Refit cannot change the engine's precisions. An in-memory refit with weights
+    # that calibration would treat differently must keep the recorded choice, and
+    # so must refit after save and load.
+    small_fill = MaskedScores(-1.0).cuda().eval()
+    small_fill.load_state_dict(model.state_dict() | {"fill": torch.tensor(-1.0)})
+    refitted = torch_tensorrt.dynamo.refit_module_weights(
+        trt_autocast_mod, torch.export.export(small_fill, inputs), arg_inputs=inputs
+    )
+    assert torch.allclose(
+        refitted(*inputs).to(torch.float32), small_fill(*inputs), atol=1e-3, rtol=1e-3
+    ), "In-memory refit does not match PyTorch!"
+
     path = tmp_path / "model.ep"
-    torch_tensorrt.save(trt_autocast_mod, path, arg_inputs=list(inputs))
-    new_model = MaskedScores().cuda().eval()
+    torch_tensorrt.save(refitted, path, arg_inputs=list(inputs))
+    new_model = MaskedScores(-1e9).cuda().eval()
     refitted = torch_tensorrt.dynamo.refit_module_weights(
         torch_tensorrt.load(path),
         torch.export.export(new_model, inputs),
@@ -579,3 +801,478 @@ def test_autocast_excluded_ops_accepts_op_overloads():
     old.autocast_excluded_ops = ["torch.ops.aten.softmax.int"]
     loaded = pickle.loads(pickle.dumps(old))
     assert loaded.autocast_excluded_ops == {"torch.ops.aten.softmax.int"}
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "factory",
+    [
+        lambda x: torch.zeros(x.shape[0], 1, device=x.device),
+        lambda x: torch.ones(x.shape[0], 1, device=x.device) - 1.0,
+        lambda x: torch.full((x.shape[0], 1), 0.0, device=x.device),
+        lambda x: torch.arange(x.shape[0], dtype=torch.float32, device=x.device)[
+            :, None
+        ]
+        * 0.0,
+    ],
+    ids=["zeros", "ones", "full", "arange"],
+)
+def test_autocast_factory_ops_keep_their_dtype(factory):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 32)
+            self.norm = nn.LayerNorm(32)
+            self.conv = nn.Conv1d(1, 4, 3, padding=1)
+
+        def forward(self, x):
+            keep = 1.0 - factory(x)
+            y = self.norm(self.linear(x) * keep)
+            return self.conv(y[:, None, :] * keep[:, :, None])
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("calibrate", [True, False], ids=["calib", "no_calib"])
+@pytest.mark.parametrize(
+    "lookup",
+    [
+        lambda m, x, ids: m.table[ids],
+        lambda m, x, ids: m.embedding(ids),
+        lambda m, x, ids: m.weight[ids],
+        lambda m, x, ids: m.table[ids % 10],
+        lambda m, x, ids: torch.gather(x, 1, ids[:, None].expand(-1, 16) % 16),
+    ],
+    ids=["buffer", "embedding", "parameter", "integer_op", "gather"],
+)
+def test_autocast_keeps_integer_indices(lookup, calibrate):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("table", torch.randn(100, 16))
+            self.embedding = nn.Embedding(100, 16)
+            self.weight = nn.Parameter(torch.randn(100, 16))
+            self.linear = nn.Linear(16, 16)
+
+        def forward(self, x, ids):
+            return self.linear(x + lookup(self, x, ids))
+
+    model = Model().cuda().eval()
+    inputs = (torch.randn(4, 16, device="cuda"), torch.tensor([3, 1, 4, 1]).cuda())
+    settings = {}
+    if calibrate:
+        settings["autocast_calibration_dataloader"] = torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        **settings,
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "to_float",
+    [
+        lambda ids: ids / 16,
+        lambda ids: ids * 0.5,
+        lambda ids: torch.sin(ids * 0.1),
+        lambda ids: (1.0 - ids % 2) * -1e4,
+        lambda ids: ids.float().square(),
+    ],
+    ids=["div", "mul", "sin", "mask_bias", "float_square"],
+)
+def test_autocast_integers_that_become_floats(to_float):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(32, 16)
+
+        def forward(self, x, ids):
+            y = to_float(ids)
+            return self.linear(torch.cat([x + y, y], dim=-1))
+
+    model = Model().cuda().eval()
+    inputs = (
+        torch.randn(4, 16, device="cuda"),
+        torch.randint(0, 400, (4, 16), device="cuda"),
+    )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    ref = model(*inputs)
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), ref, rtol=5e-2, atol=5e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_integer_comparisons_exact():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+
+        def forward(self, x, ids):
+            # float16 rounds ids above 2048 and makes ids above 65504 inf.
+            keep = (ids != 128001).unsqueeze(-1)
+            return self.linear(x) * keep
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 6, 8, device="cuda")
+    ids = torch.tensor([[5, 2049, 70000, 128001, 128002, 130000]], device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x, ids)),
+        arg_inputs=[x, ids],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(
+        trt_model(x, ids).float(), model(x, ids), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_embedding_bag_offsets():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.bag = nn.EmbeddingBag(5000, 8, mode="sum")
+
+        def forward(self, ids, offsets):
+            return self.bag(ids, offsets)
+
+    model = Model().cuda().eval()
+    ids = torch.randint(0, 5000, (3000,), device="cuda")
+    # float16 rounds the offset 2501 to 2500, which moves an id to another bag.
+    offsets = torch.tensor([0, 2501], device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (ids, offsets)),
+        arg_inputs=[ids, offsets],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(
+        trt_model(ids, offsets).float(), model(ids, offsets), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_attention_with_integer_mask():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.qkv = nn.Linear(16, 48)
+            self.out = nn.Linear(16, 16)
+
+        def forward(self, x, mask):
+            q, k, v = self.qkv(x).chunk(3, dim=-1)
+            bias = (1.0 - mask[:, None, :].to(x.dtype)) * -10000.0
+            scores = q @ k.transpose(-1, -2) / 4.0 + bias
+            return self.out(scores.softmax(dim=-1) @ v)
+
+    model = Model().cuda().eval()
+    mask = torch.ones(2, 8, dtype=torch.int64, device="cuda")
+    mask[:, 6:] = 0
+    inputs = (torch.randn(2, 8, 16, device="cuda"), mask)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("calibrate", [True, False], ids=["calib", "no_calib"])
+def test_autocast_combines_masks_from_topk(calibrate):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 4)
+
+        def forward(self, x):
+            values, indices = (x * 2).topk(8, dim=-1)
+            keep = (indices > 3001) & (values > 0)
+            return self.linear(torch.where(keep, values, 0.0))
+
+    def batch():
+        # Distinct values that float16 holds exactly, so topk picks the same ones.
+        return (
+            torch.stack([torch.randperm(4096) for _ in range(4)]).cuda() - 2048
+        ) / 2048
+
+    model = Model().cuda().eval()
+    batches = [(batch(),), (batch(),)]
+    settings = {}
+    if calibrate:
+        settings["autocast_calibration_dataloader"] = torch.utils.data.DataLoader(
+            batches, batch_size=None
+        )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, batches[0]),
+        arg_inputs=list(batches[0]),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        **settings,
+    )
+    for x in batches:
+        torch.testing.assert_close(
+            trt_model(*x).float(), model(*x), rtol=1e-2, atol=1e-2
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "masked",
+    [
+        lambda x, mask: torch.where(
+            ~torch.zeros(x.shape, dtype=torch.bool, device=x.device), x, 0.0
+        ),
+        lambda x, mask: x.masked_fill(mask, 0.0),
+        lambda x, mask: torch.where(mask, x, -x),
+        lambda x, mask: x + mask * -2.0,
+        lambda x, mask: x * torch.where(x > 0, 1.0, 0.5),
+    ],
+    ids=["factory_mask", "masked_fill", "where", "mask_times_scalar", "comparison"],
+)
+def test_autocast_keeps_bool_tensors_bool(masked):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+            self.conv = nn.Conv1d(1, 4, 3, padding=1)
+
+        def forward(self, x, mask):
+            y = masked(self.linear(x), mask)
+            return self.conv(y[:, None, :])
+
+    model = Model().cuda().eval()
+    inputs = (torch.randn(4, 16, device="cuda"), torch.rand(4, 16, device="cuda") > 0.5)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        arg_inputs=list(inputs),
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [inputs], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(
+        trt_model(*inputs).float(), model(*inputs), rtol=1e-2, atol=1e-2
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_gives_autocast_regions_their_traced_dtypes():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 8, 3, padding=1)
+            self.linear = nn.Linear(64, 16)
+
+        def forward(self, x):
+            y = self.conv(x).flatten(2)
+            with torch.autocast(x.device.type, enabled=False):
+                y = nn.functional.normalize(y.float(), dim=1)
+                sim = torch.einsum("bci,bcj->bij", y, y)
+            return self.linear(sim)
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 3, 8, 8, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "given",
+    [
+        lambda y: y.cumsum(2, dtype=torch.float32) / 16,
+        lambda y: y + torch.arange(y.shape[2], device=y.device).to(torch.float32) / 16,
+        lambda y: nn.functional.normalize(y.float(), dim=1),
+    ],
+    ids=["cumsum_dtype", "to_dtype", "float"],
+)
+def test_autocast_keeps_the_dtype_an_op_is_given(given):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv1d(4, 4, 3, padding=1)
+            self.conv2 = nn.Conv1d(4, 4, 3, padding=1)
+
+        def forward(self, x):
+            return self.conv2(given(self.conv1(x)))
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 4, 16, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_tiny_constants_nonzero():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(16, 8, 3, padding=1)
+
+        def forward(self, x):
+            # F.normalize divides by max(norm, 1e-12), and 1e-12 rounds to 0 in float16.
+            return self.conv(nn.functional.normalize(x, dim=1))
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 16, 16, 16, device="cuda")
+    x[..., :4] = 0
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "scale",
+    [lambda y: y * 1e-12, lambda y: y / 1e12],
+    ids=["mul", "div"],
+)
+def test_autocast_leaves_tiny_factors_alone(scale):
+    class Model(nn.Module):
+        def forward(self, x):
+            return scale(x + 1.0)
+
+    model = Model().cuda().eval()
+    # Below the default output threshold of 512, so the scaling runs in float16.
+    x = torch.rand(4, 16, device="cuda") * 400 + 100
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    # In float16 the result is 0, as in eager; it must not become x * 6e-8.
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=0, atol=1e-6)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_autocast_keeps_the_upcast_a_view_needs(dtype):
+    class Model(nn.Module):
+        def forward(self, x):
+            # x[::2] is strided; its .float() copy is contiguous, so view(-1) works.
+            return x[::2].float().view(-1) * 2
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 4, device="cuda", dtype=dtype)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=dtype,
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_keeps_the_upcast_an_in_place_op_writes():
+    class Model(nn.Module):
+        def forward(self, x):
+            # add_ writes into the float32 copy, so x itself must stay unchanged.
+            y = x.float()
+            y.add_(1)
+            return y * 2, x * 3
+
+    model = Model().cuda().eval()
+    x = torch.tensor([1.0, 2.0], device="cuda", dtype=torch.float16)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x.clone(),)),
+        arg_inputs=[x.clone()],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    doubled, tripled = trt_model(x.clone())
+    torch.testing.assert_close(doubled.float(), torch.tensor([4.0, 6.0], device="cuda"))
+    torch.testing.assert_close(tripled.float(), torch.tensor([3.0, 6.0], device="cuda"))

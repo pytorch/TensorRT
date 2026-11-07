@@ -171,7 +171,7 @@ def aten_ops_batch_norm_legit_no_stats(
         input=args[0],
         weight=args[1],
         bias=args[2],
-        training=False,
+        training=args[3],
         momentum=args[4],
         eps=args[5],
         return_mean_rstd=True,
@@ -1179,9 +1179,10 @@ else:
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
         # dequantize_affine(input, block_size, scale, zero_point, input_dtype,
         #                   quant_min=None, quant_max=None, output_dtype=...)
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = kwargs.get("output_dtype")
         if output_dtype is None:
-            output_dtype = args[7] if len(args) > 7 else torch.float16
+            output_dtype = args[7] if len(args) > 7 else torch.float32
         input_dtype = args[4] if len(args) > 4 else None
         zero_point = kwargs.get("zero_point")
         if zero_point is None and len(args) > 3:
@@ -1247,8 +1248,9 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = (
-            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.bfloat16)
+            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.float32)
         )
         return impl.quantize.dequantize_affine_float8(
             ctx,
@@ -4250,6 +4252,80 @@ def aten_ops_adaptive_avg_poolNd(
         input=args[0],
         output_size=args[1],
     )
+
+
+def adaptive_max_pool_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Only the pooled values are converted, so the indices output must be unused.
+    if not one_user_validator(node):
+        return False
+    input_val = node.args[0].meta.get("val")
+    if input_val is None:
+        return False
+    # Without truncate_double, a float64 engine input does not match the graph.
+    if input_val.dtype == torch.float64 and not (settings and settings.truncate_double):
+        return False
+    # The pooling bins are computed from the sizes when the engine is built, and an empty
+    # output has none.
+    output_size = node.args[1]
+    spatial_size = input_val.shape[-len(output_size) :]
+    if not all(
+        isinstance(size, int) and size > 0 for size in (*spatial_size, *output_size)
+    ):
+        return False
+    # TensorRT-RTX hits an illegal memory access on an output axis larger than its input.
+    return not (
+        ENABLED_FEATURES.tensorrt_rtx
+        and any(out > size for out, size in zip(output_size, spatial_size))
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool2d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool3d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_max_poolNd(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input, output_size = args[0], args[1]
+    spatial_rank = len(output_size)
+    # The bins come from the static spatial sizes the validator checked. TensorRT can
+    # still see -1 for a size it cannot infer, such as a crop with a dynamic start.
+    if any(size == -1 for size in input.shape[-spatial_rank:]):
+        spatial_size = ctx.current_node.args[0].meta["val"].shape[-spatial_rank:]
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - spatial_rank) + list(spatial_size),
+        )
+    output = impl.pool.adaptive_max_poolNd(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=input,
+        output_size=output_size,
+    )
+    return output, None
 
 
 def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:

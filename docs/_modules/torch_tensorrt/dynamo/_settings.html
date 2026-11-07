@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=ff90bd1c"></script>
+    <script src="../../../_static/documentation_options.js?v=d985c49d"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -795,6 +795,11 @@ document.write(`
         <span class="p">)</span>
 
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c1"># Pickles and copies (saved programs, the engine cache, each engine's own</span>
+        <span class="c1"># settings) leave out the calibration data. Refit then reuses the recorded</span>
+        <span class="c1"># precisions instead of deciding again from new weights.</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"autocast_calibration_dataloader"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"autocast_intermediate_node_outputs"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">op</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span>
@@ -855,7 +860,6 @@ document.write(`
     <span class="s2">"autocast_excluded_ops"</span><span class="p">,</span>
     <span class="s2">"autocast_max_output_threshold"</span><span class="p">,</span>
     <span class="s2">"autocast_max_depth_of_reduction"</span><span class="p">,</span>
-    <span class="s2">"autocast_calibration_dataloader"</span><span class="p">,</span>
     <span class="s2">"decompose_attention"</span><span class="p">,</span>
     <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
     <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>

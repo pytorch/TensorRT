@@ -544,8 +544,11 @@ def create_constant(
         name (str): Name of the added TensorRT Constant layer.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
+            int8 is stored as int32, unless target_quantized_type is trt.DataType.INT8.
         min_rank (int): minimum rank of the constant tensor.
         target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
+            int8 values become int32 unless this is trt.DataType.INT8, because TensorRT
+            accepts an INT8 constant only in front of a dequantize layer or a plugin.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -560,6 +563,13 @@ def create_constant(
             raise ValueError(
                 "TensorRT does not support float64 (double) precision. To resolve this, please set truncate_double=True in your compilation settings and re-run the model."
             )
+        # TensorRT reads an INT8 constant as quantized data, which only a dequantize
+        # layer or a plugin may take. int32 holds every int8 value.
+        if (
+            torch_value.dtype == torch.int8
+            and target_quantized_type != trt.DataType.INT8
+        ):
+            torch_value = torch_value.to(torch.int32)
         # Rank 0 constant is required in IFillLayer inputs.
         if min_rank == 0 and isinstance(value, (int, float, bool)):
             shape = trt.Dims()
@@ -670,8 +680,11 @@ def get_trt_tensor(
             one.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
+            int8 is stored as int32, unless target_quantized_type is trt.DataType.INT8.
         min_rank (int): minimum rank of the constant tensor.
         target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
+            int8 values become int32 unless this is trt.DataType.INT8, because TensorRT
+            accepts an INT8 constant only in front of a dequantize layer or a plugin.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
