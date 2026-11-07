@@ -329,13 +329,14 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
             input_dtypes.append(inp.dtype)
         else:
             # For nodes, get metadata
-            meta = getattr(inp, "meta", {}).get("tensor_meta")
-            if meta is None:
+            meta = getattr(inp, "meta", {})
+            meta_data = meta.get("val", meta.get("tensor_meta"))
+            if meta_data is None:
                 # Can't validate without metadata, allow it
                 return True
-            shape = tuple(meta.shape)
+            shape = tuple(meta_data.shape)
             input_metas.append(shape)
-            input_dtypes.append(meta.dtype)
+            input_dtypes.append(meta_data.dtype)
 
     # Dropping an empty operand also drops it from dtype promotion, so aten_ops_cat works
     # the promoted dtype out over every operand and passes it through. TensorRT has no
@@ -3635,8 +3636,8 @@ def bitwise_type_validator(
     if node.target in tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if lhs_meta is None or rhs_meta is None:
             return False
 
@@ -3658,7 +3659,7 @@ def bitwise_type_validator(
     elif node.target in scalar_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
         if lhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, rhs_val):
@@ -3668,7 +3669,7 @@ def bitwise_type_validator(
     elif node.target in scalar_tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if rhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, lhs_val):
@@ -3779,7 +3780,7 @@ def bitwise_not_type_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     val = node.args[0]
-    val_meta = val.meta.get("tensor_meta")
+    val_meta = val.meta.get("val", val.meta.get("tensor_meta"))
 
     if val_meta is None:
         return False
@@ -4366,7 +4367,8 @@ def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -
 
 
 def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    meta_data = node.args[0].meta.get("tensor_meta")
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
     if meta_data is None:
         return False
     shape = meta_data.shape
@@ -5273,25 +5275,19 @@ def aten_ops_flip(
 def zero_diag_size_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    meta = node.args[0].meta.get("tensor_meta")
-    if meta:
-        input_shape = meta.shape
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
+    if meta_data is not None:
+        input_shape = meta_data.shape
     else:
         _LOGGER.warning(
             "Meta information of input is missing. Unable to validate diagonal size, falling back to PyTorch operation."
         )
         return False
 
-    if len(node.args) == 1:
-        offset, dim1, dim2 = 0, 0, 1
-    elif len(node.args) == 2:
-        offset, dim1, dim2 = node.args[1], 0, 1
-    else:
-        offset, dim1, dim2 = (
-            node.args[1],
-            node.args[2],
-            node.args[3],
-        )
+    offset = args_bounds_check(node.args, 1, replacement=0)
+    dim1 = args_bounds_check(node.args, 2, replacement=0)
+    dim2 = args_bounds_check(node.args, 3, replacement=1)
     num_dims = len(input_shape)
 
     # Adjust dimensions to be positive and canonicalize
