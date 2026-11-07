@@ -2654,15 +2654,17 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return mark_err;
     }
   }
-  // The enqueue is now recorded on the pool's event and flag, so the device's pool
-  // is safe to hand to the next claimant. Released here rather than at the end of the
-  // function so the rest of execute() -- the aliased reflects, the D2H copies and
-  // their synchronizations -- does not hold up another engine on this device.
-  // A device with no flag is the exception: there a dropped event wait would let the
-  // next claimant start on this call's scratch, so the claim is held until the final
+  // The enqueue is now recorded on the pool's event and flag, so the device's pool can
+  // go to the next claimant. Neither covers TensorRT's own join of an engine's auxiliary
+  // streams, which a driver can drop while another thread uses this stream (see the
+  // README note on threads that share a stream). Released here rather than at the end of
+  // the function so the rest of execute() -- the aliased reflects, the D2H copies and
+  // their synchronizations -- does not hold up another engine on this device. A device
+  // with no flag is the exception: there a dropped event wait would let the next
+  // claimant start on this call's scratch, so the claim is held until the final
   // synchronize below. The release is also where a growth disposes of the buffer it
-  // replaced, with the lock dropped, so it is made here or after that synchronize,
-  // never left to the claim's destructor on success.
+  // replaced, with the lock dropped, so it is made here or after that synchronize, never
+  // left to the claim's destructor on success.
   const bool hold_claim_until_finished = pooled_scratch && scratch_claim.device()->marker.event_wait_only;
   if (!hold_claim_until_finished && !scratch_claim.release()) {
     // The only failure it reports is its wait for the enqueue on the buffer a

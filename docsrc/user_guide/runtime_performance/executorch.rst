@@ -515,6 +515,12 @@ calls, such as creating the stream, also need the CUDA runtime library:
 * The CUDA backend refuses a caller stream for a method that uses its own CUDA graph option.
 * **Synchronize the stream before you read GPU outputs.** The TensorRT delegate always waits for
   its work to finish, but the CUDA backend can return while its work is still queued.
+* If another thread uses the same stream at the same time, for example to launch a CUDA graph and
+  synchronize the stream, compile with ``max_aux_streams=0``. NVIDIA drivers 580 and 595 were seen
+  to drop a stream's wait on an event in that case, and TensorRT joins its auxiliary streams back to
+  your stream with such a wait at the end of each call. When that wait is dropped, the call returns
+  wrong outputs with no error, and with the shared activation scratch on, the next call that shares
+  it can start while those kernels still use it. Replayed CUDA graphs are not affected.
 
 That stream can belong to a CUDA green context. A green context owns a fixed number of the GPU's SMs
 (streaming multiprocessors), so the model stays inside that part of the GPU and the rest is free for

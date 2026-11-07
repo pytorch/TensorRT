@@ -192,6 +192,15 @@ A tensor with no strides is read as row-major.
 - `execute()` always waits for the engine to finish before it returns, on any stream.
 - Calls on one delegate handle are serialized by the delegate. Destroying a handle while a call on
   it runs is not allowed.
+- If another thread uses the same stream at the same time, for example to launch a CUDA graph and
+  synchronize the stream, build the engine with `max_aux_streams=0`. NVIDIA drivers 580 and 595 were
+  seen to drop a stream's wait on an event in that case, and TensorRT joins the auxiliary streams it
+  runs kernels on back to your stream with such a wait at the end of each call. When that wait is
+  dropped, the call returns outputs computed from unfinished results, with no error. With the shared
+  activation scratch on, the next pooled call, on any stream, can also start while those kernels
+  still use the scratch: the pool's flag does not cover TensorRT's own wait. A call that replays a
+  CUDA graph is not affected, since the recording turns that wait into a dependency inside the graph.
+  An engine built with `max_aux_streams=0` has no auxiliary streams.
 
 `torch_tensorrt::executorch_backend::CudaStreamGuard` was removed in Torch-TensorRT 2.14. Use
 `CallerStreamGuard` instead; it is the same idea, shared by every CUDA delegate:
@@ -414,8 +423,9 @@ replay on or off; [CUDA graph replay](#cuda-graph-replay) has the detail. What i
   without 64-bit stream memory operations has no flag, so there the delegate holds the lock until
   the call has finished, and the next pooled call queues its work only after that.
 - **Each pooled call takes a few microseconds longer.** Where the GPU has the flag, the wait on it
-  protects every pooled call from the dropped event wait above, whether or not another thread shares
-  its stream. On an
+  protects the handoff between pooled calls from the dropped event wait above, whether or not another
+  thread shares a stream. It does not cover the wait TensorRT joins its auxiliary streams with; see
+  the note on threads that share a stream. On an
   H100 it adds about 4 microseconds per call against the event wait alone, and keeping the event
   wait beside it adds about 0.3 microseconds more.
 - **A pooled call waits for the pooled call before it.** Do not hold back the work of one pooled
