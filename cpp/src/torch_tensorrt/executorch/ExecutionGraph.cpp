@@ -258,7 +258,7 @@ Error ExecutionGraph::enqueue_in(
   // A plain graph and its buffers live in the context TensorRT ran the engine in, so a stream of
   // another regular context, where TensorRT cannot run, still replays it.
   const CUcontext record_context =
-      stream_green == nullptr && engine_context_ != nullptr ? engine_context_ : stream_context;
+      stream_green == nullptr && handle.context != nullptr ? handle.context : stream_context;
   const bool other_context = record_context != stream_context;
   // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
   // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
@@ -453,10 +453,6 @@ Error ExecutionGraph::enqueue_in(
       return error;
     }
     warmed_up_ = true;
-    // The graph's buffers stay in the engine's context, so a call from another one must not move it.
-    if (stream_green == nullptr && !other_context) {
-      engine_context_ = stream_context;
-    }
   }
   if (staged_) {
     for (size_t i = handle.num_inputs; i < count; ++i) {

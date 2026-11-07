@@ -126,8 +126,6 @@ class ExecutionGraph {
   const void* scratch_ = nullptr;
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
-  // The regular context a plain warm-up ran in, where TensorRT can run this engine.
-  CUcontext engine_context_ = nullptr;
   int failed_captures_ = 0;
   // Times the caller's addresses moved away from a recording on them, across shapes and profiles.
   int moves_ = 0;
