@@ -471,15 +471,15 @@ def softmax(
     dim: int,
     half_to_float: bool,
 ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
-    dim = get_positive_dim(dim, len(input.shape))
-
     if half_to_float:
         input = cast_trt_tensor(ctx, input, torch.float, name, target, source_ir)
 
-    if input.shape[dim] == 1:
-        # Over a single element, softmax is exp(x - x): 1, or NaN for inf and NaN
-        # inputs, as in PyTorch. This avoids a TensorRT fusion bug that gives wrong
-        # values when a softmax over a size-1 dim feeds a matmul.
+    rank = len(input.shape)
+    dim = get_positive_dim(dim, rank) if rank else 0
+    if rank == 0 or input.shape[dim] == 1:
+        # Over a single element, a 0-d input or a size-1 dim, softmax is exp(x - x): 1,
+        # or NaN for inf and NaN inputs, as in PyTorch. This avoids a TensorRT fusion bug
+        # that gives wrong values when a softmax over a size-1 dim feeds a matmul.
         diff = impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", input, input)
         return impl.unary.exp(ctx, target, source_ir, f"{name}_exp", diff)
 
