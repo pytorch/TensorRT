@@ -74,7 +74,8 @@ A wheel you build yourself does not bring the delegate. Build it as well, as the
 README shows.
 
 The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
-On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+On aarch64 the delegate needs glibc 2.35 or newer, and the Torch-TensorRT wheel glibc 2.39
+(for example Ubuntu 24.04).
 The JetPack, TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
 need a CUDA toolkit, because ExecuTorch's CUDA backend compiles the leftover operators with
 ``nvcc``.
