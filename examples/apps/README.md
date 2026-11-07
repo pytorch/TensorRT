@@ -96,6 +96,44 @@ default to 1024x1024 with 30 inference steps; for a smaller initial run, add
 `--prompt "a red panda sitting in a bamboo forest"`. `--model` also accepts a
 local Diffusers SDXL base checkpoint directory containing the FP16 variant.
 
+### Timing and comparing with PyTorch
+
+Run both backends with the same prompt, seed, resolution, and inference steps:
+
+```bash
+python examples/apps/sdxl_demo.py --compare --height 512 --width 512 --num_inference_steps 10 --runs 3 --timings_json sdxl_timings.json
+```
+
+This loads the pipeline once, benchmarks native PyTorch first, then wraps the
+same UNet with Torch-TensorRT. It saves `sdxl_pytorch.png` and
+`sdxl_tensorrt.png`. In comparison mode, `--output scene.png` changes those names
+to `scene_pytorch.png` and `scene_tensorrt.png`.
+
+Each backend reports its first generation separately, followed by `--runs`
+measured generations (default: 1). The first generation is excluded from the
+warmed mean, median, and speedup. `--warmup N` adds N more unmeasured generations
+after the first. Normal single-backend invocations also report these timings.
+
+The stage timings are synchronized wall-clock seconds:
+
+- Pipeline imports, model download/loading, GPU transfer, TensorRT import, and
+  wrapper construction are setup costs, reported separately.
+- `compile/export` measures the mutable module's compilation method, including
+  graph export, lowering, engine building, and source-model offloading.
+- Text encoding, UNet calls excluding compilation, VAE decoding, and other
+  pipeline work add up to generation time. Other work includes the scheduler,
+  latent preparation, and PIL conversion. UNet timing includes dispatch and
+  mutable-module checks as well as inference. Any first-execution engine
+  initialization or TensorRT-RTX runtime JIT is also included in UNet time,
+  rather than the separate mutable-module `compile/export` measurement.
+- Image saving is reported separately and excluded from generation time.
+
+The comparison uses the median warmed end-to-end generation time. If compilation
+occurs again in measured runs, the script flags it. Stage measurements synchronize
+CUDA at each boundary, adding some diagnostic overhead to both backends. The
+TensorRT first generation follows the PyTorch runs and shares their initialized
+CUDA context; its compile timing remains measured directly.
+
 The earlier SDXL example is in
 [`examples/dynamo/mutable_torchtrt_module_example.py`](../dynamo/mutable_torchtrt_module_example.py),
 under "Stable Diffusion with Huggingface". That tutorial additionally runs
