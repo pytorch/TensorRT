@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 param(
-    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.15.0.dev20260902%2Bcu134-cp313-cp313-win_arm64.whl",
+    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.15.0%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
     [Parameter(Mandatory = $true)] [string] $CudaRoot,
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PyTorchArtifactSha256 = "e72f2b05d062651d0ba1d44e189979f70c2faf7e879e925849f3c5716ab4319e"
+$PyTorchArtifactSha256 = "e44cdb9e89c014451dc90f3bf3c67875bbe376117facca9183e7f9973a143dad"
 $PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
 
 $ArtifactTempRoot = $env:RUNNER_TEMP

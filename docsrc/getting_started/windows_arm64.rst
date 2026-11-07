@@ -21,10 +21,10 @@ Both build types require:
 * CUDA Toolkit 13.4. The Windows x86 installation contains the
   headers and ARM64 libraries required to cross-compile for Windows ARM64.
   Native Windows ARM64 builds also use CUDA 13.4;
-* a compatible Windows ARM64 PyTorch 2.14 package containing the C++ headers
-  and libraries under ``torch\include`` and ``torch\lib``. Nightly wheels are
-  available from NVIDIA's ``nvtorch_oot_nightly`` index at
-  ``https://pypi.nvidia.com/nvtorch_oot_nightly/torch/``;
+* a compatible Windows ARM64 PyTorch 2.15.0+cu134 package containing the C++ headers
+  and libraries under ``torch\include`` and ``torch\lib``. Wheels are
+  available from NVIDIA's ``nvtorch_oot`` index at
+  ``https://pypi.nvidia.com/nvtorch_oot/torch/``;
 * Python packages required by Torch-TensorRT-RTX. The currently available
   Windows ARM64 PyTorch wheel targets CPython 3.13, so native and cross-builds
   are currently supported only with Python 3.13.
@@ -82,8 +82,8 @@ Native build on Windows ARM64
       python -m pip install --upgrade pip
       python -m pip install numpy packaging pyyaml setuptools==77.0.3 wheel fmt build
 
-      # Install the Windows ARM64 PyTorch 2.15 nightly.
-      python -m pip install --pre "torch>=2.15.0.dev,<2.16.0" --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
+      # Install the Windows ARM64 PyTorch 2.15.0+cu134 wheel.
+      python -m pip install "https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.15.0%2Bcu134-cp313-cp313-win_arm64.whl#sha256=e44cdb9e89c014451dc90f3bf3c67875bbe376117facca9183e7f9973a143dad"
 
       # build the native windows on arm TensorRT-RTX wheel
       python setup.py bdist_wheel --use-rtx
@@ -137,8 +137,8 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
 3. Prepare the ARM64 target dependencies:
 
    * ``TORCHTRT_TARGET_TORCH_ROOT`` must contain ``include`` and ``lib``
-     directories from an ARM64 PyTorch 2.14 installation. Download the ARM64
-     wheel from ``https://pypi.nvidia.com/nvtorch_oot_nightly/torch/`` and
+     directories from an ARM64 PyTorch 2.15.0+cu134 installation. Download the ARM64
+     wheel from ``https://pypi.nvidia.com/nvtorch_oot/torch/`` and
      install or extract it to create this target root.
    * ``TORCHTRT_TARGET_CUDA_ROOT`` must contain the CUDA headers and
      ``lib\arm64\cudart.lib``.
