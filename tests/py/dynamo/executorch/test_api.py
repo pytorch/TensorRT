@@ -728,6 +728,7 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
         step["run"]
         .replace("${{ inputs.repository }}", str(tmp_path))
         .replace("${{ inputs.is-jetpack }}", "false")
+        .replace("${{ inputs.python-only }}", "false")
     )
     result = subprocess.run(
         ["bash", "-c", script],

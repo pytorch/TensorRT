@@ -500,10 +500,11 @@ jobs:
                 *) echo "Unsupported delegate architecture: ${ARCH}" >&2; exit 1 ;;
               esac
               ${CONDA_RUN} python -m wheel tags --remove --platform-tag "${platform_tag}" "${abs_pkg}"
-            elif [[ "${ARCH}" == aarch64 && ${{ inputs.is-jetpack }} == false ]]; then
+            elif [[ "${ARCH}" == aarch64 && ${{ inputs.is-jetpack }} == false && ${{ inputs.python-only }} == false ]]; then
               # Built in manylinux_2_39, the SBSA wheel needs glibc 2.38 and GCC 14's libstdc++, so a
-              # manylinux_2_28 tag would let pip install it on systems where it cannot load. Builds
-              # without the runtime companion keep the conda environment's wheel 0.37, which has no tags command.
+              # manylinux_2_28 tag would let pip install it on systems where it cannot load. A Python-only
+              # wheel has no compiled code, so it keeps the manylinux_2_28 repair below. Builds without the
+              # runtime companion keep the conda environment's wheel 0.37, which has no tags command.
               ${CONDA_RUN} python -m pip install "wheel>=0.40"
               ${CONDA_RUN} python -m wheel tags --remove --platform-tag manylinux_2_39_aarch64 "${abs_pkg}"
             else
