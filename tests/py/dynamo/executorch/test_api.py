@@ -725,7 +725,10 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     repair.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    # The step installs a newer wheel package, which must not change the test environment.
+    (bin_dir / "python").write_text(
+        f'#!/bin/sh\n[ "$1 $2" = "-m pip" ] && exit 0\nexec "{sys.executable}" "$@"\n'
+    )
     (bin_dir / "python").chmod(0o755)
     build_env = tmp_path / "build-env"
     build_env.write_text("export CONDA_RUN=''\n")
