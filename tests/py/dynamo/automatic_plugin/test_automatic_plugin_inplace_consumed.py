@@ -179,10 +179,52 @@ class TestInplacePluginConsumed(unittest.TestCase):
                 torch.testing.assert_close(result, (x_base + earlier + 1) * 2)
                 torch.testing.assert_close(x_trt, x_base + earlier)
 
+    def test_pad_by_zero_keeps_its_input(self):
+        # A pad by zero changes nothing, but the plugin must not write into its input.
+        def pad(x):
+            return nn.functional.pad(x, (0, 0, 0, 0))
+
+        class GraphInput(nn.Module):
+            def forward(self, x):
+                return torch.ops.torchtrt_ex.add_one_inplace_consumed.default(pad(x))
+
+        class ReadByAnotherOp(nn.Module):
+            def forward(self, x):
+                y = x + 2
+                a = torch.ops.torchtrt_ex.add_one_inplace_consumed.default(pad(y))
+                return a * 2 + y * 3
+
+        class EngineOutput(nn.Module):
+            def forward(self, x):
+                y = x + 2
+                a = torch.ops.torchtrt_ex.add_one_inplace_consumed.default(pad(y))
+                return a * 2, y
+
+        for model in (GraphInput(), ReadByAnotherOp(), EngineOutput()):
+            with self.subTest(type(model).__name__):
+                x_base = torch.randn(64, 64, device="cuda")
+                x_trt = x_base.clone()
+                expected = model(x_base.clone())
+                compiled = torch_tensorrt.compile(
+                    model,
+                    inputs=[x_trt.clone()],
+                    ir="dynamo",
+                    min_block_size=1,
+                    immutable_weights=True,
+                    require_full_compilation=True,
+                )
+                torch.testing.assert_close(compiled(x_trt), expected)
+                torch.testing.assert_close(x_trt, x_base)
+
     def test_copy_of_a_tensor_read_elsewhere_keeps_it(self):
-        # clone hands back its input, so the plugin must not write into y, which the
-        # engine also returns.
-        copies = {"clone": lambda y: y.clone()}
+        # clone hands back its input, and so does a pad by zero, so the plugin must not
+        # write into y, which the engine also returns.
+        copies = {
+            "clone": lambda y: y.clone(),
+            "pad_by_zero_then_clone": lambda y: nn.functional.pad(
+                y, (0, 0, 0, 0)
+            ).clone(),
+        }
         for name, copy in copies.items():
             with self.subTest(name):
 

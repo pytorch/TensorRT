@@ -2,10 +2,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # type: ignore
+import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
 from .harness import DispatchTestCase
 
@@ -69,6 +73,60 @@ class TestConstantPadConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(constant_pad(), input_specs)
+
+    def test_zero_constant_pad_read_by_a_mul(self):
+        class ZeroPadThenMul(torch.nn.Module):
+            def forward(self, x):
+                return (
+                    torch.ops.aten.constant_pad_nd.default(x, [0, 0, 0, 0]) * 2.0 - 1.0
+                )
+
+        self.run_test(ZeroPadThenMul(), [torch.randn(1, 3, 8, 8)])
+
+    @parameterized.expand(
+        [
+            ("scatter", True),
+            ("cat_with_another_reader_of_the_input", True),
+            ("cat_of_pads_and_mul", True),
+            ("cat_of_pads_of_another_tensor", True),
+            ("cat_of_pads", False),
+        ]
+    )
+    def test_zero_constant_pad_keeps_its_slice_only_in_a_cat_of_pads(
+        self, reader, left_out
+    ):
+        aten = torch.ops.aten
+        graph = torch.fx.Graph()
+        x, y = graph.placeholder("x"), graph.placeholder("y")
+        pad = graph.call_function(aten.constant_pad_nd.default, (x, [0, 0, 0, 0]))
+        if reader == "scatter":
+            graph.call_function(aten.relu.default, (x,))
+            graph.call_function(aten.scatter.src, (y, 3, y, pad))
+        elif reader == "cat_with_another_reader_of_the_input":
+            relu = graph.call_function(aten.relu.default, (x,))
+            graph.call_function(aten.cat.default, ([pad, relu], 1))
+        else:
+            source = y if reader == "cat_of_pads_of_another_tensor" else x
+            shifted = graph.call_function(
+                aten.constant_pad_nd.default, (source, [1, -1, 0, 0])
+            )
+            graph.call_function(aten.cat.default, ([pad, shifted], 1))
+            if reader == "cat_of_pads_and_mul":
+                graph.call_function(aten.mul.Tensor, (pad, 2.0))
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        input = network.add_input("input", trt.float32, (1, 3, 8, 8))
+        output = impl.pad.constant_padNd(
+            ConversionContext(network, current_node=pad),
+            torch.ops.aten.constant_pad_nd.default,
+            SourceIR.ATEN,
+            "pad",
+            input,
+            (0, 0, 0, 0),
+        )
+        self.assertEqual(output is input, left_out)
+        self.assertEqual(network.num_layers == 0, left_out)
 
 
 class TestReflectionPadConverter(DispatchTestCase):
