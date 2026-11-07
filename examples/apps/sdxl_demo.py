@@ -55,7 +55,7 @@ def main(args):
         add_watermarker=False,
     ).to("cuda:0")
     pipe.unet.eval()
-    pipe.enable_vae_tiling()
+    pipe.vae.enable_tiling()
 
     if not args.pytorch:
         import torch_tensorrt
