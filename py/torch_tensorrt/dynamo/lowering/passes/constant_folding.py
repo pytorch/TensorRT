@@ -282,18 +282,11 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         # NVFP4 dequantize_nvfp4, and TorchAO MXFP4 dequantize_mxfp4 when
         # those custom ops are registered).
         self.quantization_ops: Set[torch._ops.OpOverload] = set()
-        try:
-            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
-            import modelopt.torch.quantization as mtq  # noqa: F401
-
-            assert torch.ops.tensorrt.quantize_op.default
-            assert torch.ops.tensorrt.dynamic_block_quantize_op.default
-            self.quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
-            self.quantization_ops.add(
-                torch.ops.tensorrt.dynamic_block_quantize_op.default
-            )
-        except Exception as e:
-            pass
+        # Quantized models register these ops when ModelOpt is imported.
+        for op_name in ("quantize_op", "dynamic_block_quantize_op"):
+            packet = getattr(torch.ops.tensorrt, op_name, None)
+            if packet is not None:
+                self.quantization_ops.add(packet.default)
 
         try:
             import torchao  # noqa: F401

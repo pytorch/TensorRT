@@ -8,7 +8,6 @@ import sys
 import time
 
 import gradio as gr
-import modelopt.torch.quantization as mtq
 import torch
 import torch_tensorrt
 from accelerate.hooks import remove_hook_from_module
@@ -30,6 +29,9 @@ def compile_model(
             os.path.join(os.path.dirname(__file__), "../../tools/llm/torchtrt_ext")
         )
         import register_sdpa
+
+    if args.dtype != "fp16":
+        import modelopt.torch.quantization as mtq
 
     if args.dtype == "fp4":
         ptq_config = mtq.NVFP4_DEFAULT_CFG
