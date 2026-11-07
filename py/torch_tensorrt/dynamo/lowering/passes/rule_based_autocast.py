@@ -12,7 +12,11 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from .nodeclassifier import NodeClassifier, NodeNameSetRule
-from .pass_utils import clean_up_graph_after_modifications
+from .pass_utils import (
+    clean_up_graph_after_modifications,
+    tensors_maybe_written_by,
+    tensors_written_by,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +75,39 @@ def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
         if isinstance(v, torch.Tensor)
     ]
     return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
+
+
+def _returns_its_input(n: torch.fx.Node) -> bool:
+    """Whether n returns its first input or a view of it, as select, view(dtype) and
+    fill_ do."""
+    if not isinstance(n.target, torch._ops.OpOverload):
+        return False
+    schema = n.target._schema
+    return bool(schema.arguments and schema.returns) and (
+        schema.arguments[0].alias_info is not None
+        and schema.returns[0].alias_info is not None
+    )
+
+
+def _sharing_memory(n: torch.fx.Node) -> list[torch.fx.Node]:
+    """The tensor whose memory n uses, then its views and the in-place ops on it, such
+    as add_ or _foreach_add_. A block, such as torch.no_grad, that may write into it
+    counts as an in-place op, and its outputs as views, since it can return what it
+    wrote."""
+    owner = n
+    while _returns_its_input(owner) and isinstance(owner.args[0], torch.fx.Node):
+        owner = owner.args[0]
+    nodes, i = [owner], 0
+    while i < len(nodes):
+        for user in nodes[i].users:
+            if user not in nodes and (
+                (user.args and user.args[0] is nodes[i] and _returns_its_input(user))
+                or nodes[i] in tensors_maybe_written_by(user)
+                or isinstance(nodes[i].target, torch._ops.HigherOrderOperator)
+            ):
+                nodes.append(user)
+        i += 1
+    return nodes
 
 
 def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
@@ -241,19 +278,68 @@ def rule_based_autocast(
         for n in gm.graph.nodes
         if isinstance(n.meta.get("val"), torch.Tensor)
     }
+
+    def _cast_args_to_traced_dtypes(node: torch.fx.Node) -> None:
+        node.args = tuple(
+            (
+                _cast_all_tensor_args_to_dtype(node, a, traced_dtypes[a])
+                if isinstance(a, torch.fx.Node) and a in traced_dtypes
+                else a
+            )
+            for a in node.args
+        )
+
+    # view(dtype) shares the memory of its input. When an in-place op, or a block such
+    # as torch.autocast or torch.no_grad whose body writes in place, writes into that
+    # memory, a cast copy of the input would miss the write, so the tensor that owns the
+    # memory is made in its traced dtype, and its views and in-place ops keep theirs. An
+    # in-place op such as index_copy_ gets its source in the dtype it writes, and such a
+    # block gets its inputs in the dtypes they were traced with.
+    kept: set[torch.fx.Node] = set()
+    for n in gm.graph.nodes:
+        if n.target == torch.ops.aten.view.dtype:
+            nodes = _sharing_memory(n)
+            if any(
+                m in tensors_maybe_written_by(user) for m in nodes for user in m.users
+            ):
+                kept.update(nodes)
+    owners = {n for n in kept if not _returns_its_input(n) and n in traced_dtypes}
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
-            if node.target == torch.ops.higher_order.wrap_with_autocast:
-                # The region keeps its own precision and checks the dtypes of
-                # its inputs, so give it the inputs it was traced with.
-                node.args = tuple(
-                    (
-                        _cast_all_tensor_args_to_dtype(node, a, traced_dtypes[a])
-                        if isinstance(a, torch.fx.Node) and a in traced_dtypes
-                        else a
+            if node in kept and node not in owners:
+                if isinstance(node.target, torch._ops.HigherOrderOperator):
+                    _cast_args_to_traced_dtypes(node)
+                elif node.args[0] in tensors_written_by(node):
+                    _cast_tensor_args_to_dtype(node, traced_dtypes[node])
+                elif isinstance(node.args[0], (list, tuple)):
+                    # A list writer, such as _foreach_lerp_, gets each source in the
+                    # dtype of the tensor it updates.
+                    dtypes = [traced_dtypes.get(t) for t in node.args[0]]
+                    node.args = node.args[:1] + tuple(
+                        (
+                            type(arg)(
+                                (
+                                    a
+                                    if d is None
+                                    else _cast_all_tensor_args_to_dtype(node, a, d)
+                                )
+                                for a, d in zip(arg, dtypes)
+                            )
+                            if isinstance(arg, (list, tuple))
+                            and len(arg) == len(dtypes)
+                            else arg
+                        )
+                        for arg in node.args[1:]
                     )
-                    for a in node.args
-                )
+                continue
+            if node.target in (
+                torch.ops.higher_order.wrap_with_autocast,
+                torch.ops.aten.view.dtype,
+            ):
+                # An autocast region keeps its own precision and checks the dtypes
+                # of its inputs, and view(dtype) reinterprets the bytes of its
+                # input, so give both the inputs they were traced with.
+                _cast_args_to_traced_dtypes(node)
                 continue
             if node.target == operator.getitem:
                 # Follow the retyped list, so users of this element cast it correctly.
@@ -278,7 +364,9 @@ def rule_based_autocast(
                 # themselves; float16 rounds ids above 2048.
                 continue
 
-            if node.name in low_precision_nodes:
+            if node in owners:
+                target_dtype = traced_dtypes[node]
+            elif node.name in low_precision_nodes:
                 target_dtype = autocast_low_precision_type
             elif node.name in high_precision_nodes:
                 target_dtype = autocast_high_precision_type

@@ -1178,6 +1178,29 @@ def test_autocast_keeps_the_dtype_an_op_is_given(given):
 
 @pytest.mark.unit
 @pytest.mark.critical
+def test_autocast_keeps_the_input_dtype_of_a_dtype_view():
+    class Model(nn.Module):
+        def forward(self, x):
+            return (x + 0).view(torch.int32)
+
+    model = Model().cuda().eval()
+    # Values that float16 holds exactly, so the float32 bits match eager.
+    x = torch.arange(8, dtype=torch.float32, device="cuda").reshape(2, 4)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(trt_model(x), model(x))
+    # x + 0 still runs in float16, so the view reads the bits of the rounded value.
+    y = torch.randn(2, 4, device="cuda")
+    torch.testing.assert_close(trt_model(y), y.half().float().view(torch.int32))
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_autocast_keeps_tiny_constants_nonzero():
     class Model(nn.Module):
         def __init__(self):
@@ -1276,3 +1299,82 @@ def test_autocast_keeps_the_upcast_an_in_place_op_writes():
     doubled, tripled = trt_model(x.clone())
     torch.testing.assert_close(doubled.float(), torch.tensor([4.0, 6.0], device="cuda"))
     torch.testing.assert_close(tripled.float(), torch.tensor([3.0, 6.0], device="cuda"))
+
+
+def _add_one_under_autocast(y, bits):
+    with torch.autocast(y.device.type, dtype=torch.float16):
+        y.add_(1.0)
+
+
+def _add_one_under_no_grad(y, bits):
+    with torch.no_grad():
+        y.add_(1.0)
+
+
+def _double_after_a_block(y, bits):
+    _add_one_under_autocast(y, bits)
+    y.mul_(2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "write",
+    [
+        lambda y, bits: bits.fill_(0),
+        lambda y, bits: bits[0].fill_(0x3F800000),
+        lambda y, bits: y[0].view(torch.int32).fill_(0x3F800000),
+        lambda y, bits: y.mul_(2),
+        # y[:1] * 3 runs in float16, and index_copy_, which runs in PyTorch below,
+        # needs its source in the dtype of y.
+        lambda y, bits: y.index_copy_(0, torch.tensor([1], device=y.device), y[:1] * 3),
+        # The products run in float16, and addmm_, which runs in PyTorch below, needs
+        # its matrices in the dtype of y.
+        lambda y, bits: y.addmm_(y[:, :2] * 1, y[:2] * 2),
+        _add_one_under_autocast,
+        _add_one_under_no_grad,
+        _double_after_a_block,
+        lambda y, bits: torch._foreach_add_([y], 1.0),
+        # y * 2 runs in float16, and _foreach_lerp_ needs it in the dtype of y.
+        lambda y, bits: torch._foreach_lerp_([y], [y * 2], 0.5),
+    ],
+    ids=[
+        "view",
+        "select_of_view",
+        "view_of_select",
+        "viewed_tensor",
+        "index_copy",
+        "addmm",
+        "autocast_block",
+        "no_grad_block",
+        "after_block",
+        "list",
+        "list_with_a_source",
+    ],
+)
+def test_autocast_keeps_writes_into_the_memory_of_a_dtype_view(write):
+    class Model(nn.Module):
+        def forward(self, x):
+            y = x + 0
+            bits = y.view(torch.int32)
+            # 0x3F800000 are the bits of 1.0 in float32.
+            write(y, bits)
+            return y * 2, bits + 0
+
+    model = Model().cuda().eval()
+    x = torch.arange(8, dtype=torch.float32, device="cuda").reshape(2, 4)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x.clone(),)),
+        arg_inputs=[x.clone()],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        torch_executed_ops={
+            "torch.ops.aten.index_copy.default",
+            "torch.ops.aten.addmm.default",
+        },
+    )
+    doubled, bits = trt_model(x.clone())
+    expected_doubled, expected_bits = model(x.clone())
+    torch.testing.assert_close(doubled.float(), expected_doubled)
+    torch.testing.assert_close(bits, expected_bits)

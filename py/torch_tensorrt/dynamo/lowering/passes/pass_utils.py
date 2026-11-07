@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import operator
 from typing import Any, Dict, List, Sequence
 
 import torch
@@ -116,6 +117,39 @@ def get_tensor_placeholders(
     ]
 
     return placeholders
+
+
+def tensors_written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
+    """The tensors an op writes into, such as self of add_, out of add.out and each
+    tensor of the list self of _foreach_add_."""
+    if not isinstance(node.target, torch._ops.OpOverload):
+        return []
+    written: List[Any] = []
+    for i, a in enumerate(node.target._schema.arguments):
+        if a.alias_info is not None and a.alias_info.is_write:
+            given = node.args[i] if i < len(node.args) else node.kwargs.get(a.name)
+            written += given if isinstance(given, (list, tuple)) else [given]
+    return [w for w in written if isinstance(w, torch.fx.Node)]
+
+
+def tensors_maybe_written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
+    """The tensors node can write into: those an op writes into, and every operand of
+    a higher order op, such as a torch.autocast block, whose body writes in place."""
+    if not isinstance(node.target, torch._ops.HigherOrderOperator):
+        return tensors_written_by(node)
+    bodies = [
+        operator.attrgetter(a.target)(node.graph.owning_module)
+        for a in node.args
+        if isinstance(a, torch.fx.Node) and a.op == "get_attr"
+    ]
+    if any(
+        tensors_maybe_written_by(n)
+        for body in bodies
+        if isinstance(body, torch.fx.GraphModule)
+        for n in body.graph.nodes
+    ):
+        return [a for a in node.args if isinstance(a, torch.fx.Node)]
+    return []
 
 
 def find_complex_nodes(gm: torch.fx.GraphModule) -> List[torch.fx.Node]:
