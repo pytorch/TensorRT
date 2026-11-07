@@ -1354,7 +1354,10 @@ def test_autocast_keeps_embedding_bag_offsets():
             return self.bag(ids, offsets)
 
     model = Model().cuda().eval()
-    ids = torch.randint(0, 5000, (3000,), device="cuda")
+    generator = torch.Generator(device="cuda").manual_seed(0)
+    with torch.no_grad():
+        model.bag.weight.copy_(torch.randn(5000, 8, device="cuda", generator=generator))
+    ids = torch.randint(0, 5000, (3000,), device="cuda", generator=generator)
     # float16 rounds the offset 2501 to 2500, which moves an id to another bag.
     offsets = torch.tensor([0, 2501], device="cuda")
     trt_model = torch_tensorrt.dynamo.compile(
@@ -1364,8 +1367,15 @@ def test_autocast_keeps_embedding_bag_offsets():
         enable_autocast=True,
         autocast_low_precision_type=torch.float16,
     )
+    # Autocast runs the bag in float16, which sums float16 rows in float32 and rounds the
+    # result. The float32 model differs from that by up to about 0.1 for a 2501-row bag,
+    # so compare with PyTorch in float16. An id in the wrong bag changes an element by
+    # about 1.6.
+    expected = nn.functional.embedding_bag(
+        ids, model.bag.weight.half(), offsets, mode="sum"
+    )
     torch.testing.assert_close(
-        trt_model(ids, offsets).float(), model(ids, offsets), rtol=1e-2, atol=1e-2
+        trt_model(ids, offsets), expected, rtol=2**-10, atol=2**-10
     )
 
 
