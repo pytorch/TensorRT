@@ -70,6 +70,18 @@ class TestConstantPadConverter(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(constant_pad(), input_specs)
 
+    def test_zero_constant_pad_before_elementwise(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                padded = torch.ops.aten.constant_pad_nd.default(input, (0, 0, 0, 0), 0)
+                return torch.ops.aten.mul.Tensor(padded, 2.0)
+
+        input = [torch.randn(1, 3, 8, 8)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
 
 class TestReflectionPadConverter(DispatchTestCase):
     @parameterized.expand(
