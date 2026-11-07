@@ -102,8 +102,9 @@ class TestAddConverter(DispatchTestCase):
         )
 
     def test_add_int8_buffer_computes_in_int32(self):
-        # Casting the int32 constant back to int8 can send the TensorRT builder into a
-        # very long search, so an int8 sum that overflows does not wrap around as in PyTorch.
+        # Casting the widened constant back to int8 inside the network sent the TensorRT
+        # builder into a very long search on a large model, so the sum stays int32 and an
+        # int8 sum that overflows does not wrap around as in PyTorch.
         class add(nn.Module):
             def __init__(self):
                 super().__init__()
@@ -133,6 +134,30 @@ class TestAddConverter(DispatchTestCase):
         # PyTorch wraps around in int8; the engine does not, as the warning says.
         torch.testing.assert_close(
             model(*inputs).cpu(), torch.tensor([-56.0, 56.0, -16.0, 10.0])
+        )
+
+    def test_add_int8_buffer_int8_output_wraps(self):
+        # An int8 graph output is cast back from int32 once, at the engine output, so it
+        # wraps like PyTorch.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.tensor([100, -100, 120, 5], dtype=torch.int8)
+                )
+
+            def forward(self, x):
+                return torch.ops.aten.add.Tensor(self.offsets, x.to(torch.int8))
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+        )
+        out = trt_model(*inputs)
+        self.assertEqual(out.dtype, torch.int8)
+        torch.testing.assert_close(
+            out.cpu(), torch.tensor([-56, 56, -16, 10], dtype=torch.int8)
         )
 
     def test_add_python_int_to_int8_warns(self):
