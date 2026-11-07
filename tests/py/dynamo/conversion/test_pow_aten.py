@@ -66,6 +66,23 @@ class TestPowConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_pow_scalar_to_0d_tensor_stays_0d(self):
+        """A Python scalar to the power of a 0-dim tensor must stay 0-dim, so the
+        unsqueezed value is 1-D and can be concatenated with other vectors."""
+
+        class pow(nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.pow.Scalar(2.0, torch.ops.aten.select.int(x, 0, 0))
+                return torch.ops.aten.cat.default(
+                    [x, torch.ops.aten.unsqueeze.default(y, 0)]
+                )
+
+        inputs = [torch.randn(4)]
+        self.run_test(
+            pow(),
+            inputs,
+        )
+
     def test_pow_of_integers(self):
         # A float exponent makes the power float; an integer one keeps it integer.
         class IntPow(nn.Module):
