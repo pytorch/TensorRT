@@ -21,6 +21,7 @@ from executorch.exir.backend.backend_details import (
     PreprocessResult,
 )
 from torch.export.exported_program import ExportedProgram
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
 from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
@@ -445,6 +446,44 @@ def _validate_output_binding_order(
         )
 
 
+def _validate_io_dtypes(
+    engine_node: Any, input_names: List[str], output_names: List[str]
+) -> None:
+    """Refuse an engine input or output whose program dtype TensorRT cannot bind.
+
+    The engine then binds that tensor as another type, float32 for a float64
+    input compiled without ``truncate_double``. The PyTorch runtime and the
+    native delegate refuse such a tensor when the program runs; this refuses the
+    program before it is saved. ``input_names`` is in engine binding order, the
+    order of the engine node's input list.
+    """
+    output_vals = engine_node.meta.get("val")
+    if not isinstance(output_vals, (list, tuple)):
+        output_vals = [output_vals]
+    io = [
+        ("input", name, node.meta.get("val"))
+        for name, node in zip(input_names, engine_node.args[0])
+    ] + [("output", name, val) for name, val in zip(output_names, output_vals)]
+    for kind, name, val in io:
+        if not isinstance(val, torch.Tensor):
+            continue
+        try:
+            dtype._from(val.dtype).to(tensorrt.DataType)
+        except TypeError:
+            raise ValueError(
+                f"TensorRT ExecuTorch backend: engine {kind} '{name}' is "
+                f"{val.dtype} in the program, but TensorRT has no binding type for "
+                f"{val.dtype}, so the engine was built with another type and would "
+                "misread the data."
+                + (
+                    " Compile with truncate_double=True to cast float64 to float32 "
+                    "around the engine."
+                    if val.dtype == torch.float64
+                    else ""
+                )
+            ) from None
+
+
 def _serialize_elided_output_names(names: Iterable[str]) -> bytes:
     """Encode the elided aliased-output binding names for the compile spec.
 
@@ -614,14 +653,16 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
                 )
             else:
                 engine_bytes = bytes(serialized_engine)
+        engine_input_names = _split_binding_names(
+            _get_str(engine_info, INPUT_BINDING_NAMES_IDX)
+        )
         input_names = _reorder_input_names_for_executorch(
-            edge_program,
-            engine_node,
-            _split_binding_names(_get_str(engine_info, INPUT_BINDING_NAMES_IDX)),
+            edge_program, engine_node, engine_input_names
         )
         output_names = _split_binding_names(
             _get_str(engine_info, OUTPUT_BINDING_NAMES_IDX)
         )
+        _validate_io_dtypes(engine_node, engine_input_names, output_names)
         elidable_output_names = _elided_output_names(compile_specs)
         _validate_output_binding_order(
             edge_program,
