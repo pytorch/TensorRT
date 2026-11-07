@@ -1,0 +1,9 @@
+{
+  "created_at": "2026-10-12T00:00:00Z",
+  "diagnostics": [],
+  "failure": null,
+  "job_id": "example-job",
+  "report_type": "base",
+  "schema_version": "0.1",
+  "status": "succeeded"
+}
