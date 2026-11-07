@@ -49,6 +49,7 @@
 namespace torch_tensorrt {
 namespace executorch_backend {
 
+using ::executorch::aten::ScalarType;
 using ::executorch::aten::SizesType;
 using ::executorch::backends::cuda::CudaAllocator;
 using ::executorch::runtime::ArrayRef;
@@ -414,6 +415,63 @@ nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
   return dims;
 }
 
+// The ExecuTorch type a binding of this TensorRT type reads and writes, or Undefined where ExecuTorch has none.
+ScalarType to_scalar_type(nvinfer1::DataType type) {
+  switch (type) {
+    case nvinfer1::DataType::kFLOAT:
+      return ScalarType::Float;
+    case nvinfer1::DataType::kHALF:
+      return ScalarType::Half;
+    case nvinfer1::DataType::kBF16:
+      return ScalarType::BFloat16;
+    case nvinfer1::DataType::kINT8:
+      return ScalarType::Char;
+    case nvinfer1::DataType::kUINT8:
+      return ScalarType::Byte;
+    case nvinfer1::DataType::kINT32:
+      return ScalarType::Int;
+    case nvinfer1::DataType::kINT64:
+      return ScalarType::Long;
+    case nvinfer1::DataType::kBOOL:
+      return ScalarType::Bool;
+    case nvinfer1::DataType::kFP8:
+      return ScalarType::Float8_e4m3fn;
+    default:
+      return ScalarType::Undefined;
+  }
+}
+
+// A tensor whose type differs from its binding would be read or written as the binding's type. A float64 model
+// compiled without truncate_double gives such a program: its engine binds float32.
+bool matches_binding_type(const EngineHandle& engine, size_t binding, const exec_aten::Tensor& t) {
+  const ScalarType expected = engine.binding_types[binding];
+  if (t.scalar_type() == expected) {
+    return true;
+  }
+  const bool is_input = binding < engine.num_inputs;
+  if (expected == ScalarType::Undefined) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: %s '%s' has a TensorRT type that no ExecuTorch tensor type matches, such as INT4, FP4 or E8M0",
+        is_input ? "input" : "output",
+        is_input ? engine.input_binding_names[binding].c_str()
+                 : engine.output_binding_names[binding - engine.num_inputs].c_str());
+    return false;
+  }
+  ET_LOG(
+      Error,
+      "TensorRTBackend::execute: %s '%s' is %s but the engine binds %s, so the engine would misread it.%s",
+      is_input ? "input" : "output",
+      is_input ? engine.input_binding_names[binding].c_str()
+               : engine.output_binding_names[binding - engine.num_inputs].c_str(),
+      ::executorch::runtime::toString(t.scalar_type()),
+      ::executorch::runtime::toString(expected),
+      t.scalar_type() == ScalarType::Double && expected == ScalarType::Float
+          ? " Export the model again with truncate_double=True."
+          : "");
+  return false;
+}
+
 bool infer_binding_names(
     nvinfer1::ICudaEngine* engine,
     std::vector<std::string>& inputs,
@@ -635,6 +693,12 @@ Error initialize_engine_io(EngineHandle& handle) {
         handle.num_outputs,
         engine_io_count);
     return Error::InvalidProgram;
+  }
+
+  for (const auto* names : {&handle.input_binding_names, &handle.output_binding_names}) {
+    for (const std::string& name : *names) {
+      handle.binding_types.push_back(to_scalar_type(handle.engine->getTensorDataType(name.c_str())));
+    }
   }
 
   // kSTATIC gives the context its own activation scratch; kUSER_MANAGED makes it
@@ -1930,6 +1994,16 @@ Result<DelegateHandle*> TensorRTBackend::init(
         return Error::InvalidProgram;
       }
     }
+    // An elided aliased output passes no tensor that execute() could check, so the pair is checked here.
+    if (handle->binding_types[static_cast<size_t>(ii)] !=
+        handle->binding_types[handle->num_inputs + static_cast<size_t>(oi)]) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: aliased output '%s' and input '%s' have different types",
+          ab.output.c_str(),
+          ab.input.c_str());
+      return Error::InvalidProgram;
+    }
     handle->output_aliased_input_idx[static_cast<size_t>(oi)] = ii;
     handle->input_is_alias_target[static_cast<size_t>(ii)] = true;
     ++handle->num_aliased_outputs;
@@ -2146,6 +2220,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidArgument;
     }
     exec_aten::Tensor et_in = arg->toTensor();
+    if (!matches_binding_type(*engine, i, et_in)) {
+      return Error::InvalidProgram;
+    }
     binding_bytes[i] = et_in.nbytes();
     if (et_in.nbytes() != 0) {
       const uintptr_t begin = reinterpret_cast<uintptr_t>(et_in.const_data_ptr());
@@ -2432,6 +2509,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         return Error::InvalidArgument;
       }
       exec_aten::Tensor et_alias_out = out_arg->toTensor();
+      if (!matches_binding_type(*engine, num_inputs + o, et_alias_out)) {
+        return Error::InvalidProgram;
+      }
       // nbytes() below sizes both the reflect copy and ExecuTorch's write-back, so
       // the tensor has to carry the shape TRT inferred before either of them reads it.
       nvinfer1::Dims a_dims = ctx->getTensorShape(name.c_str());
@@ -2497,6 +2577,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
+    if (!matches_binding_type(*engine, num_inputs + o, et_out)) {
+      return Error::InvalidProgram;
+    }
     // Asked separately, because an output address comes from the caller rather than the engine.
     const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id);
     const int output_device = output_placement.foreign_device;

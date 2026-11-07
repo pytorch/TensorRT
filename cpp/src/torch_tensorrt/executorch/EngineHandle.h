@@ -59,6 +59,9 @@ struct EngineHandle {
   bool shapes_inferred = false;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
+  // The ExecuTorch type of each binding, inputs then outputs, read once at init so execute() checks each
+  // tensor without a TensorRT call. Undefined where ExecuTorch has no such type, so no tensor matches it.
+  std::vector<::executorch::aten::ScalarType> binding_types;
   // Per output binding [0..num_outputs): index into input_binding_names of the
   // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
   // Built at init from the blob's aliased_io. Either way execute() binds the

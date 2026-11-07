@@ -8,6 +8,7 @@ package(default_visibility = ["//visibility:public"])
 test_suite(
     name = "executorch_backend_tests",
     tests = [
+        ":test_binding_types",
         ":test_caller_stream",
         ":test_execution_graph",
         ":test_executorch_binding_names",
@@ -20,6 +21,33 @@ test_suite(
         ":test_shared_scratch_pool",
         ":test_unaligned_io",
     ],
+)
+
+cc_test(
+    name = "test_binding_types",
+    srcs = ["test_binding_types.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 cc_test(

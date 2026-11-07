@@ -111,6 +111,12 @@ Compile with ``torch_tensorrt.dynamo.compile``, then save with ``output_format="
 
 ``save()`` writes the compiled graph as it is, so it needs no example inputs.
 
+TensorRT has no float64. Compile a float64 model with ``truncate_double=True``. Without it, the
+engine expects float32 while the program keeps float64 tensors, and every call fails with
+``Error::InvalidProgram``. An output that the program declares an alias of an input, such as an
+updated KV cache, must have that input's type, or loading the program fails with
+``Error::InvalidProgram``.
+
 :ref:`executorch_save` lists every option that ``save()`` takes for this format. It also shows
 how to put several methods in one file, and how to let the engine of a large language model (LLM)
 update its key-value (KV) cache in place.
