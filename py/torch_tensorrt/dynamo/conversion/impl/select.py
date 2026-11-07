@@ -531,13 +531,27 @@ def index_select(
     dim: int,
     index: ITensor,
 ) -> ITensor:
+    # A gather layer needs an input of rank 1 or more, and PyTorch gives a 0-d input a
+    # 0-d result.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
     # The axis parameter specifies the dimension along which to index.
     dim = get_positive_dim(dim, len(input.shape))
+    # PyTorch reads a 0-d index as one element and keeps the dim, which a 0-d gather
+    # index would drop.
+    if len(index.shape) == 0:
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (1,)
+        )
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
 
     set_layer_name(gather_layer, target, f"{name}_gather_layer_default", source_ir)
 
-    return gather_layer.get_output(0)
+    out = gather_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_0d", out, ())
+    return out
 
 
 def scatter(
@@ -550,6 +564,24 @@ def scatter(
     index: Union[ITensor, np.ndarray, torch.Tensor],
     src: Union[ITensor, int, float],
 ) -> ITensor:
+    # A scatter layer needs inputs of rank 1 or more, and PyTorch reads a 0-d input, index
+    # or source as one element.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+    if len(index.shape) == 0:
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (1,)
+        )
+    if not isinstance(src, (int, float)) and len(src.shape) == 0:
+        src = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_src_1d",
+            get_trt_tensor(ctx, src, f"{name}_src", min_rank=0),
+            (1,),
+        )
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index_shape)
@@ -595,6 +627,8 @@ def scatter(
     scatter_layer.axis = dim
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_0d", out, ())
     return out
 
 
@@ -607,15 +641,26 @@ def gather(
     dim: int,
     index: Union[ITensor, np.ndarray, torch.Tensor],
 ) -> ITensor:
-    input_shape = input.shape
-    dim = get_positive_dim(dim, len(input_shape))
     # Note: TensorRT's Gather layer supports both int32 and int64 indices
     # https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/c-api/classnvinfer1_1_1_i_gather_layer.html
     index = get_trt_tensor(ctx, index, name + "_index_tensor")
+    index_shape = tuple(index.shape)
+    # TensorRT gathers elements only from a tensor of rank 1 or more.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (-1,)
+        )
+    dim = get_positive_dim(dim, len(input.shape))
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
     gather_layer.mode = trt.GatherMode.ELEMENT
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
     out = gather_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_output", out, index_shape
+        )
     return out
 
 
@@ -1099,8 +1144,9 @@ def index_put_converter(
         ctx.current_node.args if ctx.current_node is not None else ()
     )
     _check_index_entries(node_args)
-    # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
-    # would move the values in input[indices]. Give such an index its rank in the graph.
+    # A converter that builds a 0-d tensor at rank 1 hands it on as shape (1,), and that
+    # extra dim would move the values in input[indices]. Give such an index its rank in
+    # the graph.
     graph_indices = node_args[1] if len(node_args) > 1 else None
     ranks = (
         [_rank_in_graph(index) for index in graph_indices]

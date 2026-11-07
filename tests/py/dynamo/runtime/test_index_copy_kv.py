@@ -134,6 +134,34 @@ class TestIndexCopyFallback(TestCase):
         eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, update)
         self.assertTrue(torch.allclose(out, eager))
 
+    def test_0d_input_uses_fallback(self):
+        # x[0] * 2.0 and y[0] * 3.0 are 0-d, and index_copy puts one into the other.
+        class M(torch.nn.Module):
+            def forward(self, x, index, y):
+                return torch.ops.aten.index_copy.default(
+                    x[0] * 2.0, 0, index, y[0] * 3.0
+                )
+
+        x = torch.tensor([2.0, 5.0], device="cuda")
+        index = torch.tensor([0], dtype=torch.int64, device="cuda")
+        y = torch.tensor([7.0, 1.0], device="cuda")
+
+        compiled = _compile(M().cuda(), (x, index, y))
+        torch.testing.assert_close(compiled(x, index, y), M()(x, index, y))
+
+    def test_0d_source_into_1d_input_uses_fallback(self):
+        # y[0] * 3.0 is 0-d, and index_copy puts it into one element of x.
+        class M(torch.nn.Module):
+            def forward(self, x, index, y):
+                return torch.ops.aten.index_copy.default(x * 2.0, 0, index, y[0] * 3.0)
+
+        x = torch.tensor([2.0, 5.0, 4.0], device="cuda")
+        index = torch.tensor([1], dtype=torch.int64, device="cuda")
+        y = torch.tensor([7.0, 1.0], device="cuda")
+
+        compiled = _compile(M().cuda(), (x, index, y))
+        torch.testing.assert_close(compiled(x, index, y), M()(x, index, y))
+
 
 if __name__ == "__main__":
     run_tests()

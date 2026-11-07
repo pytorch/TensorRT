@@ -53,6 +53,10 @@ class TRTSubgraphInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             n.meta.get("val"), (float, torch.SymFloat)
         ):
             self.ctx.python_floats.add(result)
+        elif isinstance(result, trt.ITensor) and isinstance(
+            n.meta.get("val"), (int, torch.SymInt)
+        ):
+            self.ctx.python_ints.add(result)
         return result
 
     get_attr = TRTInterpreter.get_attr

@@ -744,8 +744,8 @@ class TestIndexPutConverter(DispatchTestCase):
             compiled(data_3d, one_column, torch.tensor([5.0, 6.0], device="cuda"))
 
     def test_computed_0d_index_and_value(self):
-        # A converter can turn a computed 0-d tensor, such as value + 1, into a 1-D tensor
-        # of one element, a dim more than PyTorch gives it.
+        # A computed 0-d index or value, such as value + 1, must not gain a dim, or the
+        # values would move.
         class AddOne(torch.nn.Module):
             def forward(self, data, index, value):
                 return torch.ops.aten.index_put.default(data, [index], value + 1)
@@ -888,6 +888,24 @@ class TestIndexPutConverter(DispatchTestCase):
             for rows in (2, 5):
                 x = torch.arange(3.0 * rows, device="cuda").reshape(rows, 3)
                 torch.testing.assert_close(compiled(x, positive), x * 10)
+
+        # PyTorch ignores a 0-d mask next to another index, so that index_put runs there.
+        class PutAtRows(torch.nn.Module):
+            def forward(self, data, index, rows):
+                return torch.ops.aten.index_put.default(
+                    data, [index > 0, rows], torch.tensor(7.0)
+                )
+
+        rows = torch.tensor([1], device="cuda")
+        with self.subTest("PutAtRows_1"):
+            inputs = (data, positive, rows)
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(PutAtRows(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+            torch.testing.assert_close(compiled(*inputs), PutAtRows()(*inputs))
 
     def test_shapes_that_do_not_broadcast_raise(self):
         # torch.export accepts these, so the converter has to reject them as PyTorch does.

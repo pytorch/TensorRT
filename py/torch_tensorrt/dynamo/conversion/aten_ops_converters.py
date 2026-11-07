@@ -1484,13 +1484,14 @@ def gather_validator(
     """Keep cases the TensorRT gather cannot serve on the PyTorch path.
 
     Element gather needs the index and the data to have the same rank, so a scalar index
-    fails the engine build. An empty index gives the engine a zero size output binding,
-    which TensorRT refuses to enqueue, and every other output of that engine comes back
-    unwritten. A length that comes from the data, such as the output of nonzero, can be
-    zero at run time, so only an index known to be non-empty converts. An engine built for
-    a float64 input expects float32 and rejects the caller's tensor at run time unless
-    truncate_double is set, and a uint8 output fails the engine build outright. All of
-    these run correctly in PyTorch.
+    for data with dims fails the engine build. A 0-d input is reshaped to 1-D for the
+    gather, so it also takes a scalar or 1-D index. An empty index gives the engine a
+    zero size output binding, which TensorRT refuses to enqueue, and every other output
+    of that engine comes back unwritten. A length that comes from the data, such as the
+    output of nonzero, can be zero at run time, so only an index known to be non-empty
+    converts. An engine built for a float64 input expects float32 and rejects the
+    caller's tensor at run time unless truncate_double is set, and a uint8 output fails
+    the engine build outright. All of these run correctly in PyTorch.
     """
 
     def meta_of(arg: Argument) -> Any:
@@ -1509,7 +1510,12 @@ def gather_validator(
         return False
     if data_meta is None:
         return True
-    if index_meta is not None and len(index_meta.shape) != len(data_meta.shape):
+    # A 0-d input also takes a 1-D index, which repeats its one element.
+    if (
+        index_meta is not None
+        and len(index_meta.shape) != len(data_meta.shape)
+        and not (len(data_meta.shape) == 0 and len(index_meta.shape) == 1)
+    ):
         _LOGGER.debug(
             "gather needs the index and the data to have the same rank, falling back"
         )
@@ -3276,10 +3282,13 @@ def aten_ops_add(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
@@ -3294,7 +3303,7 @@ def aten_ops_add(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -3366,10 +3375,13 @@ def aten_ops_sub(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
@@ -3384,7 +3396,7 @@ def aten_ops_sub(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -4346,6 +4358,10 @@ def aten_ops_adaptive_max_poolNd(
 
 def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     k = node.args[1]
+    # For a 0-d input and k=0, PyTorch gives 0-d results, which a TopK layer cannot.
+    value = getattr(node.args[0], "meta", {}).get("val")
+    if k == 0 and isinstance(value, torch.Tensor) and value.dim() == 0:
+        return False
     return topk_sort_validator(k)
 
 

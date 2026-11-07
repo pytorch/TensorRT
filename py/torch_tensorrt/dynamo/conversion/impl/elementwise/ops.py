@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
+    python_ints_as_0d,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
@@ -53,6 +54,7 @@ def trunc_div(
     Returns:
         A TensorRT tensor represent the result of trunc divide.
     """
+    input, other = python_ints_as_0d(ctx, target, source_ir, name, input, other)
     prod_output = convert_binary_elementwise(
         ctx,
         target,
@@ -71,15 +73,17 @@ def trunc_div(
         prod_output,
     )
 
-    # Convert constant input into ITensor for UnaryOperation
+    # Convert constant input into ITensor for UnaryOperation. A scalar stays 0-d, so a 0-d
+    # tensor does not gain a dim.
     if not isinstance(input, trt.tensorrt.ITensor):
-        input = get_trt_tensor(ctx, input, f"{name}_input")
+        input = get_trt_tensor(ctx, input, f"{name}_input", min_rank=0)
     if not isinstance(other, trt.tensorrt.ITensor):
         other = get_trt_tensor(
             ctx,
             other,
             f"{name}_other",
             dtype=_enums.dtype._from(input.dtype).to(torch.dtype),
+            min_rank=0,
         )
 
     abs_input_output = convert_unary(
@@ -269,7 +273,10 @@ def atan2(
 
     trt_promoted_type = promoted_type.to(trt.DataType)
 
-    pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi", dtype=trt_promoted_type)
+    # A 0-d pi broadcasts to an input of any rank, and keeps a 0-d input 0-d.
+    pi_tensor = get_trt_tensor(
+        ctx, pi_value, f"{name}_pi", dtype=trt_promoted_type, min_rank=0
+    )
 
     if input.dtype != trt_promoted_type:
         input = cast_trt_tensor(ctx, input, trt_promoted_type, f"{name}_input_casted")
@@ -542,6 +549,7 @@ def div(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
+    lhs_val, rhs_val = python_ints_as_0d(ctx, target, source_ir, name, lhs_val, rhs_val)
     # True division of integers gives float32, as in PyTorch. With a float operand,
     # the binary elementwise promotion already picks its float type. A Python int
     # becomes a float too, since one outside the int32 range has no int32 constant.

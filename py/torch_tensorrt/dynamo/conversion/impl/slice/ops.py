@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import math
+import operator
 import sys
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -660,6 +661,9 @@ def flip(
     input: TRTTensor,
     dims: Sequence[int],
 ) -> TRTTensor:
+    # A 0-d tensor has nothing to flip.
+    if len(input.shape) == 0:
+        return input
     start_slice = []
     output_shape = list(input.shape)
     stride_slice = []
@@ -775,6 +779,45 @@ def diagonal(
     return diagonal_output
 
 
+# A graph that torch.fx.symbolic_trace makes has these for x * 2 and the like, and
+# they make a new tensor.
+_ARITHMETIC_OPERATORS = (
+    operator.add,
+    operator.sub,
+    operator.mul,
+    operator.truediv,
+    operator.floordiv,
+    operator.mod,
+    operator.pow,
+    operator.neg,
+)
+
+
+def has_storage_of_its_own(node: Any) -> bool:
+    """Whether the storage of the 0-d value of ``node`` holds that value only."""
+    # A 0-d value that a view op makes, such as x[1], is part of a larger tensor, and
+    # as_strided reads the storage of that tensor, which the converter does not have. A
+    # 0-d value that an op computes, such as x[1] * 2, has a storage of its own, and so
+    # does a view of it, such as (x[1] * 2).unsqueeze(0).squeeze(0).
+    viewed = False
+    while (
+        isinstance(node, torch.fx.Node)
+        and isinstance(node.target, torch._ops.OpOverload)
+        and any(r.alias_info is not None for r in node.target._schema.returns)
+    ):
+        node, viewed = node.args[0], True
+    if not (
+        isinstance(node, torch.fx.Node)
+        and (
+            node.target in _ARITHMETIC_OPERATORS
+            or isinstance(node.target, torch._ops.OpOverload)
+        )
+    ):
+        return False
+    value = node.meta.get("val")
+    return not viewed or (isinstance(value, torch.Tensor) and value.numel() == 1)
+
+
 def as_strided(
     ctx: ConversionContext,
     target: Target,
@@ -785,6 +828,15 @@ def as_strided(
     stride: Sequence[int],
     storage_offset: Optional[int],
 ) -> TRTTensor:
+    if len(input.shape) == 0:
+        if ctx.current_node is None or not has_storage_of_its_own(
+            ctx.current_node.args[0]
+        ):
+            raise RuntimeError(
+                f"{name}: as_strided of a 0-dim tensor is not supported, because the "
+                "tensor can be a view of a larger tensor whose storage as_strided reads."
+            )
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
     # Ensure storage_offset is an integer before passing to nested
     if storage_offset is None:
         storage_offset = 0
