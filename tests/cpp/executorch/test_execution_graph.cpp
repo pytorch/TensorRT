@@ -23,6 +23,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <future>
@@ -1515,6 +1516,18 @@ bool green_contexts_supported(int device = 0) {
   return destroy(context) == CUDA_SUCCESS;
 }
 
+// Asks the driver rather than the pool, so a pool that wrongly makes no handoff flag fails the flag tests
+// instead of skipping them.
+bool device_can_wait_on_a_flag(int ordinal = 0) {
+  const auto get_device = driver_entry<PFN_cuDeviceGet_v2000>("cuDeviceGet", 2000);
+  const auto get_attribute = driver_entry<PFN_cuDeviceGetAttribute_v2000>("cuDeviceGetAttribute", 2000);
+  CUdevice device = 0;
+  int supported = 0;
+  return get_device != nullptr && get_attribute != nullptr && get_device(&device, ordinal) == CUDA_SUCCESS &&
+      get_attribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device) == CUDA_SUCCESS &&
+      supported != 0;
+}
+
 // A non-blocking stream on a green context.
 struct GreenStream {
   ~GreenStream() {
@@ -2622,20 +2635,33 @@ TEST_F(ExecutionGraphReplayTest, APooledCallWithAnotherContextCurrentMakesThePoo
     LoadedGraphEngine engine;
     ASSERT_EQ(engine.load(blob), Error::Ok);
     ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    SharedScratchDevice& pool = scratch_pool().get(engine.handle()->device_id);
+    {
+      // The flag outlives a reset, so it is dropped here (and leaked) to make this call create one.
+      std::lock_guard<std::mutex> lock(pool.mu);
+      pool.marker.flag = nullptr;
+      pool.marker.sequence = 0;
+    }
     ASSERT_EQ(set_current(other), CUDA_SUCCESS);
     const Error first = run(engine);
     ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
     ASSERT_EQ(first, Error::Ok);
     void* buffer = nullptr;
+    void* flag = nullptr;
     {
-      SharedScratchDevice& pool = scratch_pool().get(engine.handle()->device_id);
       std::lock_guard<std::mutex> lock(pool.mu);
       buffer = pool.buffer;
+      flag = pool.marker.flag;
     }
     ASSERT_NE(buffer, nullptr);
     CUcontext owner = nullptr;
     ASSERT_EQ(get_attribute(&owner, CU_POINTER_ATTRIBUTE_CONTEXT, reinterpret_cast<CUdeviceptr>(buffer)), CUDA_SUCCESS);
     EXPECT_EQ(owner, primary) << "the pool's buffer belongs to the context that was current at the call";
+    if (device_can_wait_on_a_flag()) {
+      ASSERT_NE(flag, nullptr);
+      ASSERT_EQ(get_attribute(&owner, CU_POINTER_ATTRIBUTE_CONTEXT, reinterpret_cast<CUdeviceptr>(flag)), CUDA_SUCCESS);
+      EXPECT_EQ(owner, primary) << "the pool's flag belongs to the context that was current at the call";
+    }
     ASSERT_EQ(destroy_context(other), CUDA_SUCCESS);
     other_destroyed = true;
     EXPECT_EQ(run(engine), Error::Ok);
@@ -2973,6 +2999,345 @@ TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool
       ASSERT_FLOAT_EQ(value, 1.0f / 8);
     }
   }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// cudaMalloc does not clear memory, and the handoff's wait compares cyclically, so the pool has to
+// clear its flag before any claimant can read it. Here the flag is made while the first claimant's
+// stream is held, from memory filled with a pattern, and is read back once that call has released the
+// pool. A clear queued on the held stream has not run yet, so the pattern is still there.
+TEST_F(ExecutionGraphTest, TheHandoffFlagIsClearedBeforeAnyClaimantCanReadIt) {
+  if (!device_can_wait_on_a_flag()) {
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+  {
+    // The flag outlives a reset, so it is dropped here (and leaked) to make the next claim create one.
+    std::lock_guard<std::mutex> lock(device.mu);
+    device.marker.flag = nullptr;
+    device.marker.sequence = 0;
+  }
+
+  struct Gate {
+    std::atomic<bool> open{false};
+  } gate;
+  ASSERT_EQ(
+      cudaLaunchHostFunc(
+          streams_[0],
+          [](void* data) {
+            // Bounded, so a case that fails before opening the gate cannot hang the stream.
+            const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!static_cast<Gate*>(data)->open.load() && std::chrono::steady_clock::now() < give_up) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          },
+          &gate),
+      cudaSuccess);
+  Error result = Error::Internal;
+  bool clear_waited_for = false;
+  std::thread caller([&] {
+    CudaCalls calls;
+    calls.fill_allocations_with = 0x55;
+    result = engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+    // The clear runs on a stream of its own, which is destroyed once the host has waited for it.
+    for (const CudaCall& call : calls.operations) {
+      clear_waited_for |= call.kind == CudaCallKind::Synchronize && call.stream != streams_[0] &&
+          std::count(calls.destroyed_streams.begin(), calls.destroyed_streams.end(), call.stream) > 0;
+    }
+  });
+
+  // The call holds the pool's lock from its claim until it has queued its write to the flag.
+  void* flag = nullptr;
+  unsigned long long sequence = 0;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (flag == nullptr && std::chrono::steady_clock::now() < deadline) {
+    if (device.mu.try_lock()) {
+      if (device.marker.sequence > 0) {
+        flag = device.marker.flag;
+        sequence = device.marker.sequence;
+      }
+      device.mu.unlock();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  unsigned long long value = 0;
+  cudaStream_t read_stream = nullptr;
+  cudaError_t read_error = cudaErrorUnknown;
+  if (flag != nullptr && cudaStreamCreateWithFlags(&read_stream, cudaStreamNonBlocking) == cudaSuccess) {
+    read_error = cudaMemcpyAsync(&value, flag, sizeof(value), cudaMemcpyDeviceToHost, read_stream);
+    if (read_error == cudaSuccess) {
+      read_error = cudaStreamSynchronize(read_stream);
+    }
+    EXPECT_EQ(cudaStreamDestroy(read_stream), cudaSuccess);
+  }
+  gate.open.store(true);
+  caller.join();
+
+  ASSERT_NE(flag, nullptr) << "the call never recorded its enqueue on the pool's flag";
+  ASSERT_EQ(read_error, cudaSuccess);
+  EXPECT_TRUE(clear_waited_for) << "the host did not wait for the flag's clear, so a claimant could read it first";
+  EXPECT_EQ(sequence, 1u);
+  EXPECT_EQ(value, 0u) << "the flag still held what its allocation left there after the call that made it had "
+                          "released the pool, so another claimant could have read that value";
+  EXPECT_EQ(result, Error::Ok);
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// Puts a device's pool on the path a GPU without 64-bit stream memory operations takes, and puts it back.
+class WithoutTheHandoffFlag {
+ public:
+  explicit WithoutTheHandoffFlag(SharedScratchDevice& device) : device_(device) {
+    std::lock_guard<std::mutex> lock(device_.mu);
+    kept_flag_ = device_.marker.flag;
+    kept_event_wait_only_ = device_.marker.event_wait_only;
+    device_.marker.flag = nullptr;
+    device_.marker.event_wait_only = true;
+  }
+  ~WithoutTheHandoffFlag() {
+    std::lock_guard<std::mutex> lock(device_.mu);
+    device_.marker.flag = kept_flag_;
+    device_.marker.event_wait_only = kept_event_wait_only_;
+  }
+  WithoutTheHandoffFlag(const WithoutTheHandoffFlag&) = delete;
+  WithoutTheHandoffFlag& operator=(const WithoutTheHandoffFlag&) = delete;
+
+ private:
+  SharedScratchDevice& device_;
+  void* kept_flag_ = nullptr;
+  bool kept_event_wait_only_ = false;
+};
+
+// On a GPU without 64-bit stream memory operations the pool has no flag, so a dropped event wait could let the
+// next claimant start on the scratch while the call before it still runs. Here the pool is put on that path, the
+// earlier call is held on its stream, and the next pooled call, on another stream, has its event wait dropped:
+// the earlier call keeps the pool's lock until it has finished, so the next call cannot return before it.
+TEST_F(ExecutionGraphTest, WithoutAFlagAPooledCallHoldsThePoolUntilItHasFinished) {
+  constexpr std::chrono::milliseconds kWatchTheSecondCallFor{500};
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engines[2];
+  std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements);
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(engines[i].load(blob), Error::Ok);
+    ASSERT_TRUE(engines[i].handle()->claims_pooled_scratch);
+    ASSERT_EQ(cudaMemcpy(inputs_[i], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(cudaMemset(outputs_[i], 0xff, kMaxBytes), cudaSuccess);
+  }
+  SharedScratchDevice& device = scratch_pool().get(engines[0].handle()->device_id);
+  const WithoutTheHandoffFlag without_flag(device);
+
+  struct Gate {
+    std::atomic<bool> open{false};
+  } gate;
+  ASSERT_EQ(
+      cudaLaunchHostFunc(
+          streams_[0],
+          [](void* data) {
+            // Bounded, so a case that fails before opening the gate cannot hang the stream.
+            const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!static_cast<Gate*>(data)->open.load() && std::chrono::steady_clock::now() < give_up) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          },
+          &gate),
+      cudaSuccess);
+  Error first = Error::Internal;
+  Error second = Error::Internal;
+  // The held stream cannot finish a synchronize before the gate opens, so the first call reaches one only
+  // after it has queued its enqueue and recorded it on the pool's event.
+  std::atomic<bool> first_synchronizing{false};
+  std::thread first_caller([&] {
+    CudaCalls calls;
+    calls.before_synchronize = [&](cudaStream_t stream) {
+      if (stream == streams_[0]) {
+        first_synchronizing.store(true);
+      }
+    };
+    first = engines[0].run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+  });
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (!first_synchronizing.load() && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  const bool first_reached_its_synchronize = first_synchronizing.load();
+  std::atomic<bool> second_returned{false};
+  size_t dropped_waits = 0;
+  std::thread second_caller([&] {
+    CudaCalls calls;
+    calls.drop_stream_waits = true;
+    second = engines[1].run(inputs_[1], outputs_[1], 8, 32, streams_[1]);
+    dropped_waits = calls.dropped_stream_waits;
+    second_returned.store(true);
+  });
+  bool lock_freed_while_held = false;
+  const auto watch_until = std::chrono::steady_clock::now() + kWatchTheSecondCallFor;
+  while (std::chrono::steady_clock::now() < watch_until && !second_returned.load()) {
+    if (device.mu.try_lock()) {
+      device.mu.unlock();
+      lock_freed_while_held = true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  const bool second_returned_early = second_returned.load();
+  gate.open.store(true);
+  first_caller.join();
+  second_caller.join();
+
+  ASSERT_TRUE(first_reached_its_synchronize)
+      << "the first call had not reached a synchronize on its held stream when the second call started";
+  EXPECT_FALSE(lock_freed_while_held) << "the pool's lock was free while the call holding the scratch still ran";
+  EXPECT_FALSE(second_returned_early)
+      << "the second pooled call returned while the call before it was still held on the shared scratch";
+  EXPECT_GT(dropped_waits, 0u) << "the second call queued no event wait, so dropping one tested nothing";
+  EXPECT_EQ(first, Error::Ok);
+  EXPECT_EQ(second, Error::Ok);
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(cudaMemcpy(output.data(), outputs_[i], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+    for (float value : output) {
+      ASSERT_FLOAT_EQ(value, 1.0f / 8);
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// The flag keeps the order when the driver drops the event wait. Here the second call's cudaStreamWaitEvent
+// is dropped and the earlier pooled call is held on its stream, so only the flag can keep the second call,
+// on another stream, from finishing first.
+TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDropped) {
+  if (!device_can_wait_on_a_flag()) {
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  constexpr std::chrono::milliseconds kWatchTheSecondCallFor{500};
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engines[2];
+  std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements);
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(engines[i].load(blob), Error::Ok);
+    ASSERT_TRUE(engines[i].handle()->claims_pooled_scratch);
+    ASSERT_EQ(cudaMemcpy(inputs_[i], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(cudaMemset(outputs_[i], 0xff, kMaxBytes), cudaSuccess);
+  }
+  SharedScratchDevice& device = scratch_pool().get(engines[0].handle()->device_id);
+
+  struct Gate {
+    std::atomic<bool> open{false};
+  } gate;
+  ASSERT_EQ(
+      cudaLaunchHostFunc(
+          streams_[0],
+          [](void* data) {
+            // Bounded, so a case that fails before opening the gate cannot hang the stream.
+            const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!static_cast<Gate*>(data)->open.load() && std::chrono::steady_clock::now() < give_up) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          },
+          &gate),
+      cudaSuccess);
+  Error first = Error::Internal;
+  Error second = Error::Internal;
+  size_t dropped = 0;
+  std::thread first_caller([&] { first = engines[0].run(inputs_[0], outputs_[0], 8, 32, streams_[0]); });
+  bool first_recorded = false;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (!first_recorded && std::chrono::steady_clock::now() < deadline) {
+    if (device.mu.try_lock()) {
+      first_recorded = device.marker.pending;
+      device.mu.unlock();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  std::thread second_caller([&] {
+    CudaCalls calls;
+    calls.drop_stream_waits = true;
+    second = engines[1].run(inputs_[1], outputs_[1], 8, 32, streams_[1]);
+    dropped = calls.dropped_stream_waits;
+  });
+  bool second_stream_busy = false;
+  const auto busy_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (!second_stream_busy && std::chrono::steady_clock::now() < busy_deadline) {
+    second_stream_busy = cudaStreamQuery(streams_[1]) == cudaErrorNotReady;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  bool second_finished_early = false;
+  const auto watch_until = std::chrono::steady_clock::now() + kWatchTheSecondCallFor;
+  while (second_stream_busy && std::chrono::steady_clock::now() < watch_until) {
+    if (cudaStreamQuery(streams_[1]) == cudaSuccess) {
+      second_finished_early = true;
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  gate.open.store(true);
+  first_caller.join();
+  second_caller.join();
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    ASSERT_FALSE(device.marker.event_wait_only) << "this GPU can wait on a flag, but the pool made none";
+  }
+
+  ASSERT_TRUE(first_recorded) << "the first call never recorded its enqueue, so there was nothing to wait for";
+  ASSERT_TRUE(second_stream_busy) << "the second call never queued its work";
+  EXPECT_GT(dropped, 0u) << "the second call made no event wait to drop";
+  EXPECT_FALSE(second_finished_early)
+      << "with its event wait dropped, the second pooled call finished while the call before it was still held";
+  EXPECT_EQ(first, Error::Ok);
+  EXPECT_EQ(second, Error::Ok);
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(cudaMemcpy(output.data(), outputs_[i], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+    for (float value : output) {
+      ASSERT_FLOAT_EQ(value, 1.0f / 8);
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// The sequence moves only once its write to the flag is queued. If a failed write moved it, the next pooled
+// call would wait on the flag for a value never written.
+TEST_F(ExecutionGraphTest, AFailedFlagWriteLeavesTheSequenceAtTheFlag) {
+  if (!device_can_wait_on_a_flag()) {
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  ASSERT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
+  SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+  std::uint64_t sequence = 0;
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    ASSERT_NE(device.marker.flag, nullptr);
+    sequence = device.marker.sequence;
+  }
+  fail_flag_writes = 1;
+  EXPECT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::InvalidState);
+  EXPECT_EQ(fail_flag_writes.load(), 0) << "the call made no write to fail";
+  fail_flag_writes = 0;
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    ASSERT_EQ(device.marker.sequence, sequence) << "the next pooled call would wait for a value never written";
+  }
+  EXPECT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 

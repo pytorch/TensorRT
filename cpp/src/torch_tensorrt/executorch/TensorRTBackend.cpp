@@ -1152,6 +1152,81 @@ class SharedScratchClaim {
   bool first_buffer_ = false;
 };
 
+// The driver's 64-bit stream memory operations, which carry the pool's handoff
+// from one enqueue to the next. Null on a driver that lacks them.
+struct StreamMemoryOps {
+  PFN_cuStreamWaitValue64_v11070 wait = nullptr;
+  PFN_cuStreamWriteValue64_v11070 write = nullptr;
+};
+
+const StreamMemoryOps& stream_memory_ops() {
+  static const StreamMemoryOps ops{
+      driver_entry_point<PFN_cuStreamWaitValue64_v11070>("cuStreamWaitValue64", 11070),
+      driver_entry_point<PFN_cuStreamWriteValue64_v11070>("cuStreamWriteValue64", 11070)};
+  return ops;
+}
+
+const char* driver_error_string(CUresult result) {
+  static const auto get_string = driver_entry_point<PFN_cuGetErrorString_v6000>("cuGetErrorString", 6000);
+  const char* text = nullptr;
+  return get_string != nullptr && get_string(result, &text) == CUDA_SUCCESS && text != nullptr
+      ? text
+      : "unknown CUDA driver error";
+}
+
+bool device_has_stream_memory_ops(int device_id) {
+  static const auto get_device = driver_entry_point<PFN_cuDeviceGet_v2000>("cuDeviceGet", 2000);
+  static const auto get_attribute = driver_entry_point<PFN_cuDeviceGetAttribute_v2000>("cuDeviceGetAttribute", 2000);
+  const StreamMemoryOps& ops = stream_memory_ops();
+  CUdevice device = 0;
+  int supported = 0;
+  return ops.wait != nullptr && ops.write != nullptr && get_device != nullptr && get_attribute != nullptr &&
+      get_device(&device, device_id) == CUDA_SUCCESS &&
+      get_attribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device) == CUDA_SUCCESS &&
+      supported != 0;
+}
+
+// Allocates the pool's handoff flag in `context` on the current device and clears it before
+// any claimant can read it. cudaMalloc does not clear memory and the wait compares
+// cyclically, so a stale value could let the first wait pass early, or leave the
+// flag behind the sequence and every later pooled call waiting forever. The clear
+// runs on a stream of its own and is waited for, once per device, so no caller's
+// stream is involved.
+Error make_handoff_flag(int device_id, CUcontext context, void*& out_flag) {
+  ContextScope scope(context, context != nullptr);
+  void* flag = nullptr;
+  if (!scope.ok() || cudaMalloc(&flag, sizeof(std::uint64_t)) != cudaSuccess) {
+    cudaGetLastError();
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to allocate the shared activation scratch handoff flag on device %d",
+        device_id);
+    return Error::MemoryAllocationFailed;
+  }
+  cudaStream_t clear_stream = nullptr;
+  cudaError_t err = cudaStreamCreateWithFlags(&clear_stream, cudaStreamNonBlocking);
+  if (err == cudaSuccess) {
+    err = cudaMemsetAsync(flag, 0, sizeof(std::uint64_t), clear_stream);
+    const cudaError_t sync_err = cudaStreamSynchronize(clear_stream);
+    if (err == cudaSuccess) {
+      err = sync_err;
+    }
+    (void)cudaStreamDestroy(clear_stream);
+  }
+  if (err != cudaSuccess) {
+    (void)cudaFree(flag);
+    cudaGetLastError();
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to clear the shared activation scratch handoff flag on device %d: %s",
+        device_id,
+        cudaGetErrorString(err));
+    return Error::Internal;
+  }
+  out_flag = flag;
+  return Error::Ok;
+}
+
 // What a call needing no activation scratch is given when the pool holds nothing
 // yet. It cannot be given nothing: enqueueV3 refuses a kUSER_MANAGED context with
 // no device memory installed as soon as the engine reports needing any under some
@@ -1164,14 +1239,18 @@ constexpr size_t kMinPooledScratchBytes = 1;
 
 // Refuses a pooled call whose stream is capturing a CUDA graph.
 //
-// The handoff's event wait is on an event recorded outside the capture:
-// cudaStreamWaitEvent fails it with cudaErrorStreamCaptureIsolation and
-// invalidates the capture under every capture mode. A growth's cudaMalloc and its
-// disposal of the buffer it replaces invalidate it under every mode but
-// cudaStreamCaptureModeRelaxed, and under Relaxed run uncaptured, leaving a replay
-// pointed at a buffer the pool may since have freed. None of that fails cleanly:
-// the caller learns of it only when cudaStreamEndCapture hands back an error and a
-// null graph. Refusing names the cause instead.
+// The handoff's wait on the pool's event, recorded outside the capture, fails
+// with cudaErrorStreamCaptureIsolation and invalidates the capture under every
+// mode. Its wait on the pool's flag and its write of the flag after the enqueue
+// are recorded into the capture with no error, so a replay would write a stale
+// value, leaving the flag behind the sequence and every later pooled call on
+// the device waiting forever. A growth's cudaMalloc and its disposal of the
+// buffer it replaces invalidate the capture under every mode but
+// cudaStreamCaptureModeRelaxed, and under Relaxed run uncaptured, leaving a
+// replay pointed at a buffer the pool may since have freed. None of that fails
+// cleanly: the caller learns of it from a wrong replay, or only when
+// cudaStreamEndCapture hands back an error and a null graph. Refusing names the
+// cause instead.
 //
 // execute() calls this ahead of every CUDA call it makes that a capture cannot
 // take, not just the pool's own: the cudaFree(nullptr) that makes a context
@@ -1257,9 +1336,11 @@ Error refuse_pooled_call_from_another_context(cudaStream_t stream, const EngineH
 }
 
 // Sets out_ptr to a buffer of at least `need` bytes on `device_id`, with `stream`
-// ordered after the enqueue that last used the buffer. Returns with `claim`
-// holding the device's lock: the caller must submit its enqueue, call
-// record_shared_scratch_enqueue, and only then release the claim.
+// ordered after the enqueue that last used the buffer: by a wait on the pool's event,
+// and on its flag where the device has 64-bit stream memory operations. Returns
+// with `claim` holding the device's lock: the caller must submit its enqueue, call
+// record_shared_scratch_enqueue, and only then release the claim. On a device with
+// no flag the caller keeps the claim until the call has finished.
 //
 // The buffer's capacity is not reported, because no caller has any use for it:
 // what a call installs on its context is its own requirement, not whatever the
@@ -1274,13 +1355,16 @@ Error refuse_pooled_call_from_another_context(cudaStream_t stream, const EngineH
 // kMinPooledScratchBytes for a zero before calling, so that the size the pool
 // guarantees and the size the context is told it owns are one figure and not two.
 //
-// The caller must already have refused a capturing `stream`: the handoff's wait
-// invalidates a capture under every mode, a growth's allocation under every mode
-// but Relaxed, and a growth's disposal of the buffer it replaces under every mode
-// but Relaxed as well.
+// The caller must already have refused a capturing `stream`; see
+// refuse_pooled_call_on_a_capturing_stream for what the handoff and a growth would
+// do to the capture.
 //
 // Must be called with `device_id` already current when `context` is null:
 // everything the pool makes is otherwise made with `context` pushed.
+//
+// The first call on a device makes the handoff's flag, or learns the device cannot
+// wait on one. A flag that could not be allocated fails the call, so on a device
+// that can wait on a flag no enqueue is recorded without it.
 Error claim_shared_scratch(
     SharedScratchClaim& claim,
     int device_id,
@@ -1329,15 +1413,44 @@ Error claim_shared_scratch(
   if (dev.context_id == 0) {
     dev.context_id = context_id;
   }
+  SharedScratchMarker& marker = dev.marker;
+  if (marker.flag == nullptr && !marker.event_wait_only) {
+    if (!device_has_stream_memory_ops(device_id)) {
+      marker.event_wait_only = true;
+    } else {
+      const Error flag_err = make_handoff_flag(device_id, context, marker.flag);
+      if (flag_err != Error::Ok) {
+        return flag_err;
+      }
+    }
+  }
   if (handoff.needs_wait) {
-    const cudaError_t err = cudaStreamWaitEvent(stream, handoff.event, 0);
-    if (err != cudaSuccess) {
+    // The event wait is the dependency CUDA documents for ordering streams, and the
+    // flag wait keeps the order when the driver drops that event wait while another
+    // thread uses the same stream. Neither blocks the host, so where there is a flag
+    // the device's lock is not held while this call's GPU work runs.
+    const cudaError_t event_err = cudaStreamWaitEvent(stream, handoff.event, 0);
+    if (event_err != cudaSuccess) {
       ET_LOG(
           Error,
           "TensorRTBackend::execute: waiting for the enqueue that last used the shared activation scratch failed: %s",
-          cudaGetErrorString(err));
+          cudaGetErrorString(event_err));
       cudaGetLastError();
       return Error::InvalidState;
+    }
+    if (marker.flag != nullptr) {
+      const CUresult result = stream_memory_ops().wait(
+          reinterpret_cast<CUstream>(stream),
+          reinterpret_cast<CUdeviceptr>(marker.flag),
+          marker.sequence,
+          CU_STREAM_WAIT_VALUE_GEQ);
+      if (result != CUDA_SUCCESS) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: waiting on the shared activation scratch handoff flag failed: %s",
+            driver_error_string(result));
+        return Error::InvalidState;
+      }
     }
   }
 
@@ -1409,6 +1522,7 @@ Error claim_shared_scratch(
 // call with Error::Internal if the marker had no event, which only the test-only
 // reset clears again and that needs the lock this claim is holding.
 Error record_shared_scratch_enqueue(SharedScratchClaim& claim, cudaStream_t stream) {
+  SharedScratchMarker& marker = claim.device()->marker;
   const cudaEvent_t event = shared_scratch_mark_in_flight(*claim.device());
   const cudaError_t err = cudaEventRecord(event, stream);
   if (err != cudaSuccess) {
@@ -1418,6 +1532,25 @@ Error record_shared_scratch_enqueue(SharedScratchClaim& claim, cudaStream_t stre
         cudaGetErrorString(err));
     cudaGetLastError();
     return Error::InvalidState;
+  }
+  if (marker.flag != nullptr) {
+    // The sequence moves only once the write is queued, so a failed write leaves
+    // the next claimant waiting for a value that was written; the caller drains
+    // this enqueue before the claim is released.
+    const std::uint64_t next = marker.sequence + 1;
+    const CUresult result = stream_memory_ops().write(
+        reinterpret_cast<CUstream>(stream),
+        reinterpret_cast<CUdeviceptr>(marker.flag),
+        next,
+        CU_STREAM_WRITE_VALUE_DEFAULT);
+    if (result != CUDA_SUCCESS) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: marking the shared activation scratch enqueue on the handoff flag failed: %s",
+          driver_error_string(result));
+      return Error::InvalidState;
+    }
+    marker.sequence = next;
   }
   return Error::Ok;
 }
@@ -2514,21 +2647,24 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return enqueue_err;
   }
 
-  // Pairs with claim_shared_scratch: the next claimant waits on this event.
+  // Pairs with claim_shared_scratch: the next claimant waits for this enqueue on the pool's event and flag.
   if (pooled_scratch) {
     const Error mark_err = record_shared_scratch_enqueue(scratch_claim, stream);
     if (mark_err != Error::Ok) {
       return mark_err;
     }
   }
-  // The enqueue is now on the marker's event, so the device's pool is safe to
-  // hand to the next claimant. Released here rather than at the end of the
+  // The enqueue is now recorded on the pool's event and flag, so the device's pool
+  // is safe to hand to the next claimant. Released here rather than at the end of the
   // function so the rest of execute() -- the aliased reflects, the D2H copies and
   // their synchronizations -- does not hold up another engine on this device.
-  // The release is also where a growth disposes of the buffer it replaced, with
-  // the lock dropped; this is the only place that release is made rather than
-  // left to the claim's destructor.
-  if (!scratch_claim.release()) {
+  // A device with no flag is the exception: there a dropped event wait would let the
+  // next claimant start on this call's scratch, so the claim is held until the final
+  // synchronize below. The release is also where a growth disposes of the buffer it
+  // replaced, with the lock dropped, so it is made here or after that synchronize,
+  // never left to the claim's destructor on success.
+  const bool hold_claim_until_finished = pooled_scratch && scratch_claim.device()->marker.event_wait_only;
+  if (!hold_claim_until_finished && !scratch_claim.release()) {
     // The only failure it reports is its wait for the enqueue on the buffer a
     // growth retired, which for a wait on device work means this device is
     // already in a faulted state. drain_on_early_return, armed before the launch,
@@ -2590,6 +2726,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         "and an output address that is not writable.",
         cudaGetErrorString(cuda_err));
     return Error::Internal;
+  }
+  if (hold_claim_until_finished && !scratch_claim.release()) {
+    return Error::InvalidProgram;
   }
   if (copy_err != Error::Ok) {
     return copy_err;

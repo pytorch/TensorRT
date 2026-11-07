@@ -671,11 +671,13 @@ before it keep their own scratch. Load every method that uses it on a device in 
 CUDA context, and keep that context alive while the process uses the buffer, with replay on or off.
 `CUDA graph replay`_ has the detail.
 
-The cost is parallelism. Two calls that share the buffer never run at the same time on one
-device: the delegate takes a per-device lock from claiming the buffer to queuing the work. The
-buffer never shrinks. Do not call ``cudaDeviceReset()`` on a device that ran an engine with the
-shared buffer. Recording a call into your own CUDA graph is not supported, with or without the
-shared buffer.
+The cost is parallelism. Two calls that share the buffer never run at the same time on one device:
+the delegate takes a per-device lock from claiming the buffer to queuing the work, and each call's
+stream waits for the call before it on a CUDA event and on a small flag in GPU memory. A GPU without
+64-bit stream memory operations has no such flag, so there the delegate holds the lock until the
+call has finished. The buffer never shrinks. Do not call ``cudaDeviceReset()`` on a device that ran
+an engine with the shared buffer. Recording a call into your own CUDA graph is not supported, with
+or without the shared buffer.
 
 Shared engines
 ^^^^^^^^^^^^^^^

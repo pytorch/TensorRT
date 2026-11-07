@@ -22,9 +22,11 @@ struct CudaCall {
   cudaStream_t stream;
 };
 
-// The delegate looks up each driver entry point once per process, so these count calls on every thread.
+// The delegate looks up each driver entry point once per process, so these count and fail calls on every thread.
 extern std::atomic<int> primary_context_retains;
 extern std::atomic<int> primary_context_releases;
+// The next this many cuStreamWriteValue64 calls fail without being queued.
+extern std::atomic<int> fail_flag_writes;
 
 // While alive, cuCtxGetId reports a new id for every context under its old handle, as for a new context the
 // driver gives a destroyed one's handle.
@@ -54,6 +56,8 @@ struct CudaCalls {
 
   size_t malloc_calls = 0;
   size_t fail_malloc_call = 0;
+  // Each allocation that succeeds is filled with this byte before it is handed back, unless negative.
+  int fill_allocations_with = -1;
   size_t free_calls = 0;
   size_t memcpy_calls = 0;
   // The copy with this 1-based count fails without being queued.
@@ -65,6 +69,9 @@ struct CudaCalls {
   size_t fail_event_record_call = 0;
   // The next this many cudaEventCreateWithFlags calls fail without creating an event.
   size_t fail_event_creates = 0;
+  // Each cudaStreamWaitEvent returns success without being queued, as the driver bug the handoff flag guards against.
+  bool drop_stream_waits = false;
+  size_t dropped_stream_waits = 0;
   bool disable_memory_pools = false;
   bool disable_stream_context = false;
   size_t stream_context_queries = 0;

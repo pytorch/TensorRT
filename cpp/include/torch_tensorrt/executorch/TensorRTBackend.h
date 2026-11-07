@@ -153,9 +153,10 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
    * a caller has to know:
    *   - Calls on two such handles on one device are serialized at submission.
    *     The backend does that itself, with a per-device lock held across the
-   *     enqueue. A handle loaded with the option off keeps its own scratch, and
-   *     so does one whose engine needs no activation scratch under any shape;
-   *     neither is affected.
+   *     enqueue, and on a GPU without 64-bit stream memory operations until the
+   *     call has finished. A handle loaded with the option off keeps its own
+   *     scratch, and so does one whose engine needs no activation scratch under
+   *     any shape; neither is affected.
    *   - A call can wait on the host for pooled work submitted earlier on that
    *     device, and a call that grows the pool can wait for an unbounded amount
    *     of it. If the caller parks work that only the caller will release once

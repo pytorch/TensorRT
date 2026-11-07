@@ -80,15 +80,15 @@ class ExecutionGraph {
   ~ExecutionGraph();
 
   // Requires the engine's device and a context to be current and the handle lock to be held. The
-  // caller drains the stream before it releases that lock. addresses and binding_bytes hold one entry
-  // per binding, the inputs and then the outputs, and the context must hold those addresses on entry.
-  // scratch is the pooled activation scratch this call installed on the context, or null when it
-  // installed none. The caller holds the pool's claim until the stream is drained or the enqueue is
-  // recorded on the pool's handoff event, so the buffer stays live for the work submitted here. With
-  // scratch set, a call never waits for cuda_graph_capture_mutex(): if it is taken, recording moves
-  // to a later call. The context may hold other addresses on return. A change of input shapes or of
-  // the optimization profile is seen only through handle.shape_epoch. Returns Ok after submission,
-  // before the stream is drained.
+  // caller drains the stream before it releases that lock. addresses and binding_bytes hold one
+  // entry per binding, the inputs and then the outputs, and the context must hold those addresses
+  // on entry. scratch is the pooled activation scratch this call installed on the context, or null
+  // when it installed none. The caller holds the pool's claim until the stream is drained or the
+  // enqueue is recorded on the pool's handoff event and flag, so the buffer stays live for the work
+  // submitted here. With scratch set, a call never waits for cuda_graph_capture_mutex(): if it is
+  // taken, recording moves to a later call. The context may hold other addresses on return. A
+  // change of input shapes or of the optimization profile is seen only through handle.shape_epoch.
+  // Returns Ok after submission, before the stream is drained.
   ::executorch::runtime::Error enqueue(
       EngineHandle& handle,
       cudaStream_t stream,

@@ -407,7 +407,17 @@ replay on or off; [CUDA graph replay](#cuda-graph-replay) has the detail. What i
 
 - **No parallelism between pooled calls on one device.** The delegate holds a per-device lock from
   claiming the buffer until the work is queued and marked. Two pooled calls can be submitted from
-  two threads, on one stream or two, but they never run at the same time on the device.
+  two threads, on one stream or two, but they never run at the same time on the device. Each call's
+  stream waits for the call before it on the pool's CUDA event and also on a small flag in GPU
+  memory that the pool owns: NVIDIA drivers 580 and 595 were seen to drop a stream's wait on an
+  event while another thread used the same stream, and the wait on the flag is not dropped. A GPU
+  without 64-bit stream memory operations has no flag, so there the delegate holds the lock until
+  the call has finished, and the next pooled call queues its work only after that.
+- **Each pooled call takes a few microseconds longer.** Where the GPU has the flag, the wait on it
+  protects every pooled call from the dropped event wait above, whether or not another thread shares
+  its stream. On an
+  H100 it adds about 4 microseconds per call against the event wait alone, and keeping the event
+  wait beside it adds about 0.3 microseconds more.
 - **A pooled call waits for the pooled call before it.** Do not hold back the work of one pooled
   call, for example with a host function on its stream, until a later pooled call returns. The
   later call then never returns.
@@ -415,8 +425,8 @@ replay on or off; [CUDA graph replay](#cuda-graph-replay) has the detail. What i
   exits. Whether an engine asks for the size its current shapes need, or for the most its profile
   allows, is decided when TensorRT builds it.
 - **No CUDA graph capture.** See the capture section below.
-- **No `cudaDeviceReset()`.** The pool keeps its buffer, an event and a stream for the life of the
-  process. Do not reset a device that ran a pooled engine.
+- **No `cudaDeviceReset()`.** The pool keeps its buffer, an event, a stream and the handoff flag for
+  the life of the process. Do not reset a device that ran a pooled engine.
 
 With `use_cuda_graphs` on as well, an engine that copies through buffers of its own, as described
 above, keeps them apart from the pool.
@@ -425,10 +435,12 @@ above, keeps them apart from the pool.
 
 A pooled call whose stream is being captured fails with `Error::NotSupported`. The handoff from one
 pooled call to the next waits on an event recorded outside the capture, and that wait fails with
-`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. A growth of
-the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or thread-local capture.
-Without the refusal, you would learn of it only when `cudaStreamEndCapture` returns
-`cudaErrorStreamCaptureInvalidated`.
+`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. The handoff
+also waits on the pool's flag and then writes it. A capture records those into the graph, so a
+replay would write an old value to the flag, and every later pooled call on that GPU would wait
+forever. A growth of the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or
+thread-local capture. Without the refusal, you would learn of these only when
+`cudaStreamEndCapture` returns `cudaErrorStreamCaptureInvalidated`, or from a hang.
 
 - The check runs before anything in the call that could break the capture.
 - If the query fails for another reason, such as an earlier fault on the device, the call fails

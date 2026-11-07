@@ -18,6 +18,7 @@ namespace testing {
 thread_local CudaCalls* active_calls = nullptr;
 std::atomic<int> primary_context_retains{0};
 std::atomic<int> primary_context_releases{0};
+std::atomic<int> fail_flag_writes{0};
 
 namespace {
 PFN_cuCtxGetId_v12000 real_context_id = nullptr;
@@ -41,6 +42,7 @@ CUresult slow_from_green(CUcontext* context, CUgreenCtx green) {
 std::atomic<unsigned long long> context_id_offset{0};
 PFN_cuDevicePrimaryCtxRetain_v7000 real_retain = nullptr;
 PFN_cuDevicePrimaryCtxRelease_v11000 real_release = nullptr;
+PFN_cuStreamWriteValue64_v11070 real_write_value = nullptr;
 
 CUresult renewable_context_id(CUcontext context, unsigned long long* id) {
   const CUresult result = real_context_id(context, id);
@@ -64,6 +66,16 @@ CUresult counting_release(CUdevice device) {
     ++primary_context_releases;
   }
   return result;
+}
+
+CUresult failing_write_value(CUstream stream, CUdeviceptr address, cuuint64_t value, unsigned int flags) {
+  int pending = fail_flag_writes.load();
+  while (pending > 0) {
+    if (fail_flag_writes.compare_exchange_weak(pending, pending - 1)) {
+      return CUDA_ERROR_INVALID_VALUE;
+    }
+  }
+  return real_write_value(stream, address, value, flags);
 }
 } // namespace
 
@@ -116,6 +128,7 @@ cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
 cudaError_t __real_cudaStreamDestroy(cudaStream_t);
 cudaError_t __real_cudaEventRecord(cudaEvent_t, cudaStream_t);
 cudaError_t __real_cudaEventCreateWithFlags(cudaEvent_t*, unsigned int);
+cudaError_t __real_cudaStreamWaitEvent(cudaStream_t, cudaEvent_t, unsigned int);
 cudaError_t __real_cudaGraphExecDestroy(cudaGraphExec_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
@@ -153,6 +166,9 @@ cudaError_t __wrap_cudaGetDriverEntryPointByVersion(
   } else if (std::strcmp(name, "cuDevicePrimaryCtxRelease") == 0) {
     real_release = reinterpret_cast<PFN_cuDevicePrimaryCtxRelease_v11000>(*entry);
     *entry = reinterpret_cast<void*>(&counting_release);
+  } else if (std::strcmp(name, "cuStreamWriteValue64") == 0) {
+    real_write_value = reinterpret_cast<PFN_cuStreamWriteValue64_v11070>(*entry);
+    *entry = reinterpret_cast<void*>(&failing_write_value);
   }
   return result;
 }
@@ -173,7 +189,26 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
     *pointer = nullptr;
     return cudaErrorMemoryAllocation;
   }
-  return __real_cudaMalloc(pointer, bytes);
+  const auto result = __real_cudaMalloc(pointer, bytes);
+  if (result == cudaSuccess && active_calls && active_calls->fill_allocations_with >= 0) {
+    // On a stream of its own and waited for, so the fill is done before the caller sees the memory and
+    // waits for nothing else on the device.
+    cudaStream_t fill_stream = nullptr;
+    cudaError_t fill = cudaStreamCreateWithFlags(&fill_stream, cudaStreamNonBlocking);
+    if (fill == cudaSuccess) {
+      fill = cudaMemsetAsync(*pointer, active_calls->fill_allocations_with, bytes, fill_stream);
+      const cudaError_t synced = __real_cudaStreamSynchronize(fill_stream);
+      fill = fill == cudaSuccess ? synced : fill;
+      (void)__real_cudaStreamDestroy(fill_stream);
+    }
+    // Memory that missed its fill may already hold the bytes a test expects the code under test to write.
+    if (fill != cudaSuccess) {
+      (void)__real_cudaFree(*pointer);
+      *pointer = nullptr;
+      return fill;
+    }
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaFree(void* pointer) {
@@ -267,6 +302,14 @@ cudaError_t __wrap_cudaEventRecord(cudaEvent_t event, cudaStream_t stream) {
     return cudaErrorInvalidResourceHandle;
   }
   return __real_cudaEventRecord(event, stream);
+}
+
+cudaError_t __wrap_cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags) {
+  if (active_calls && active_calls->drop_stream_waits) {
+    ++active_calls->dropped_stream_waits;
+    return cudaSuccess;
+  }
+  return __real_cudaStreamWaitEvent(stream, event, flags);
 }
 
 cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {

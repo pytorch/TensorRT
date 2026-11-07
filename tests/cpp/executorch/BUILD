@@ -82,6 +82,7 @@ cc_test(
         "-Wl,--wrap=cudaGetDriverEntryPointByVersion",
         "-Wl,--wrap=cudaEventRecord",
         "-Wl,--wrap=cudaEventCreateWithFlags",
+        "-Wl,--wrap=cudaStreamWaitEvent",
     ],
     linkstatic = True,
     target_compatible_with = select({

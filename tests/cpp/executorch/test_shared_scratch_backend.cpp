@@ -1914,8 +1914,8 @@ TEST_F(SharedScratchBackendTest, ARefusedPooledCallLeavesTheCallersPendingCudaEr
 //
 // The first run leaves the pool holding a buffer with an enqueue recorded against
 // it, so the handoff wait the refusal protects is one the run below would really
-// have made. That wait is a cudaStreamWaitEvent on an event recorded outside the
-// capture, which invalidates it under every capture mode.
+// have made. That wait includes a cudaStreamWaitEvent on an event recorded outside
+// the capture, which invalidates it under every capture mode.
 TEST_F(SharedScratchBackendTest, APooledEngineRefusesACaptureBeforeAnythingCanInvalidateIt) {
   ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
 
@@ -2120,6 +2120,52 @@ class JoinAtScopeExit {
   std::thread t_;
 };
 
+// The driver calls are looked up through the runtime, so this target links no driver library.
+template <typename Fn>
+bool find_driver_function(const char* symbol, unsigned int version, Fn& fn) {
+  cudaDriverEntryPointQueryResult query_result = cudaDriverEntryPointSymbolNotFound;
+  const cudaError_t err = cudaGetDriverEntryPointByVersion(
+      symbol, reinterpret_cast<void**>(&fn), version, cudaEnableDefault, &query_result);
+  return err == cudaSuccess && query_result == cudaDriverEntryPointSuccess;
+}
+
+// Whether the pool hands its scratch from one pooled call to the next through its flag in GPU memory. On a
+// GPU without 64-bit stream memory operations there is no flag, and a pooled call keeps the device's pool
+// lock until it has finished, so a case that holds a call's stream must not wait on that lock meanwhile.
+bool pool_hands_over_through_a_flag(int device_id) {
+  PFN_cuDeviceGet_v2000 get_device = nullptr;
+  PFN_cuDeviceGetAttribute_v2000 get_attribute = nullptr;
+  CUdevice device = 0;
+  int supported = 0;
+  return find_driver_function("cuDeviceGet", 2000, get_device) &&
+      find_driver_function("cuDeviceGetAttribute", 2000, get_attribute) &&
+      get_device(&device, device_id) == CUDA_SUCCESS &&
+      get_attribute(&supported, CU_DEVICE_ATTRIBUTE_CAN_USE_64_BIT_STREAM_MEM_OPS, device) == CUDA_SUCCESS &&
+      supported != 0;
+}
+
+// Waits, without blocking on the pool lock, until a pooled call made on another thread has claimed the
+// device's scratch and recorded its enqueue, which a held stream keeps pending on the pool's event. Without
+// the flag the call keeps the lock from its claim until it has finished, so a held lock says it has claimed.
+bool wait_for_a_claim(int device_id) {
+  SharedScratchDevice& dev = scratch_pool().get(device_id);
+  const bool flag = pool_hands_over_through_a_flag(device_id);
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (dev.mu.try_lock()) {
+      const cudaEvent_t event = dev.marker.event;
+      dev.mu.unlock();
+      if (event != nullptr && cudaEventQuery(event) == cudaErrorNotReady) {
+        return true;
+      }
+    } else if (!flag) {
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return false;
+}
+
 // Two engines on one device share one scratch buffer, so the second engine's
 // enqueue must not start before the first one's has finished with it. The two
 // run on different streams, which is what the README permits and what the event
@@ -2150,55 +2196,56 @@ TEST_F(SharedScratchBackendTest, ASecondPooledEnqueueWaitsForTheFirstOnAnotherSt
   // blocks on the held stream comes back with an error once the watchdog opens
   // the gate, and that error on its own does not say so.
   //
-  // The first call runs on its own thread because execute() waits for its engine
-  // before returning, so on this thread it would block on the held stream and the
-  // second call would never be made. On a thread of its own it gets as far as
-  // recording its completion event and releasing the device's pool lock, then
-  // blocks in its own wait, which is exactly the state this case needs. Waiting
-  // for the pool to report a buffer is what says it claimed first: after that the
-  // pool lock orders the two, since the second call cannot take it until the first
-  // has recorded the event the handoff waits on.
   // Both calls run on threads of their own because execute() waits for its engine
   // before returning: the first would block on the held stream, and the second
-  // blocks too, since the handoff puts its stream behind the first one's enqueue.
-  // Each gets as far as recording its completion event and dropping the device's
-  // pool lock before it blocks, which is the state this case needs. Waiting for the
-  // pool to report a buffer is what says the first claimed first; after that the
-  // pool lock orders the two, since the second cannot take it until the first has
-  // recorded the event the handoff waits on.
+  // blocks too, behind the first. With the flag, each gets as far as recording its
+  // enqueue and dropping the device's pool lock before it blocks, and the second
+  // one's stream waits on the device for the first one's enqueue. Without it, the
+  // first keeps the lock until it has finished, so the second waits for that lock
+  // on the host and queues nothing until then.
+  const int device_id = first.handle()->device_id;
+  const bool flag = pool_hands_over_through_a_flag(device_id);
   Error first_error = Error::Ok;
   Error second_error = Error::Ok;
+  std::atomic<bool> second_returned{false};
   JoinAtScopeExit first_caller{std::thread([&] { first_error = first.run(first_stream); })};
-  const auto claim_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (shared_scratch_capacity_for_testing(first.handle()->device_id) == 0u &&
-         std::chrono::steady_clock::now() < claim_deadline) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  const bool first_claimed = shared_scratch_capacity_for_testing(first.handle()->device_id) > 0u;
-  JoinAtScopeExit second_caller{std::thread([&] { second_error = second.run(second_stream); })};
+  const bool first_claimed = wait_for_a_claim(device_id);
+  JoinAtScopeExit second_caller{std::thread([&] {
+    second_error = second.run(second_stream);
+    second_returned.store(true);
+  })};
 
-  // The second stream has to be seen carrying work before its completion means
-  // anything: the call that queues it runs on a thread now, so an empty stream here
-  // is a thread that has not got there yet, and cudaStreamQuery answers success for
-  // that just as it does for finished work.
   bool second_stream_became_busy = false;
-  const auto busy_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (std::chrono::steady_clock::now() < busy_deadline) {
-    if (cudaStreamQuery(second_stream) == cudaErrorNotReady) {
-      second_stream_became_busy = true;
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-
   bool second_finished_early = false;
-  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (second_stream_became_busy && std::chrono::steady_clock::now() < deadline) {
-    if (cudaStreamQuery(second_stream) == cudaSuccess) {
-      second_finished_early = true;
-      break;
+  bool second_queued_or_returned = false;
+  if (flag) {
+    // The second stream has to be seen carrying work before its completion means
+    // anything: the call that queues it runs on a thread now, so an empty stream here
+    // is a thread that has not got there yet, and cudaStreamQuery answers success for
+    // that just as it does for finished work.
+    const auto busy_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < busy_deadline) {
+      if (cudaStreamQuery(second_stream) == cudaErrorNotReady) {
+        second_stream_became_busy = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (second_stream_became_busy && std::chrono::steady_clock::now() < deadline) {
+      if (cudaStreamQuery(second_stream) == cudaSuccess) {
+        second_finished_early = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  } else {
+    const auto watch_until = std::chrono::steady_clock::now() + std::chrono::milliseconds(500);
+    while (std::chrono::steady_clock::now() < watch_until && !second_returned.load() &&
+           cudaStreamQuery(second_stream) == cudaSuccess) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    second_queued_or_returned = second_returned.load() || cudaStreamQuery(second_stream) != cudaSuccess;
   }
   const bool watchdog_opened_the_gate = gate.forced_open.load();
 
@@ -2214,8 +2261,10 @@ TEST_F(SharedScratchBackendTest, ASecondPooledEnqueueWaitsForTheFirstOnAnotherSt
       << "the watchdog had to open the gate, so nothing below was measured under the conditions it describes";
   ASSERT_TRUE(first_claimed)
       << "the first call never claimed a pooled buffer, so there is no handoff for the second to wait on";
-  ASSERT_TRUE(second_stream_became_busy)
-      << "the second call never queued anything on its stream, so its stream finishing says nothing about the handoff";
+  if (flag) {
+    ASSERT_TRUE(second_stream_became_busy)
+        << "the second call never queued anything on its stream, so its stream finishing says nothing about the handoff";
+  }
   ASSERT_EQ(first_error, Error::Ok);
   ASSERT_EQ(second_error, Error::Ok);
 
@@ -2226,6 +2275,9 @@ TEST_F(SharedScratchBackendTest, ASecondPooledEnqueueWaitsForTheFirstOnAnotherSt
 
   EXPECT_FALSE(second_finished_early)
       << "the second engine ran to completion while the first one's enqueue was still holding the shared buffer";
+  EXPECT_FALSE(second_queued_or_returned)
+      << "without the flag the second call must wait for the pool lock until the first call has finished, but it "
+         "queued work or returned while the first was still held";
 
   const std::vector<float> first_output = first.read_output();
   const std::vector<float> second_output = second.read_output();
@@ -2416,6 +2468,12 @@ TEST_F(SharedScratchBackendTest, AGrowthOnACallerStreamWaitsForTheEnqueueOnTheBu
   ASSERT_TRUE(small.handle()->shared_scratch);
   ASSERT_TRUE(big.handle()->shared_scratch);
   const int device_id = big.handle()->device_id;
+  // Sized by a drained call first, so the capacity the growth must exceed is read
+  // while nothing holds the pool lock.
+  ASSERT_EQ(small.run(held), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(held), cudaSuccess);
+  const std::size_t before = shared_scratch_capacity_for_testing(device_id);
+  ASSERT_GT(before, 0u) << "the smaller engine left the pool empty, so the larger one has nothing to retire";
   ASSERT_TRUE(small.fill_output(kSentinel));
 
   // Parked ahead of the smaller engine's enqueue, so that enqueue and the event
@@ -2426,17 +2484,12 @@ TEST_F(SharedScratchBackendTest, AGrowthOnACallerStreamWaitsForTheEnqueueOnTheBu
 
   // On its own thread: execute() waits for its engine before returning, so on this
   // thread it would block on the parked stream and the growth below would never be
-  // made. It gets as far as recording its completion event and dropping the pool
-  // lock before it blocks, which is the state the growth has to meet. The capacity
-  // read is what says it claimed, and the pool lock orders the two after that.
+  // made. Once it has claimed, the pool orders the two: the growth waits on the
+  // device for the parked enqueue, or, without the flag, for the pool lock the
+  // smaller call keeps until it has finished.
   Error small_error = Error::Ok;
   JoinAtScopeExit small_caller{std::thread([&] { small_error = small.run(held); })};
-  const auto claim_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (shared_scratch_capacity_for_testing(device_id) == 0u && std::chrono::steady_clock::now() < claim_deadline) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  const std::size_t before = shared_scratch_capacity_for_testing(device_id);
-  ASSERT_GT(before, 0u) << "the smaller engine left the pool empty, so the larger one has nothing to retire";
+  const bool small_claimed = wait_for_a_claim(device_id);
 
   // Opens the gate, without the stream synchronization GateRelease::release() also
   // makes: that one runs on this thread at scope exit, after the join below, so the
@@ -2458,6 +2511,7 @@ TEST_F(SharedScratchBackendTest, AGrowthOnACallerStreamWaitsForTheEnqueueOnTheBu
 
   gate_release.release();
   small_caller.join();
+  ASSERT_TRUE(small_claimed) << "the smaller engine never claimed the pool, so the growth had nothing to wait for";
   ASSERT_EQ(cudaStreamSynchronize(held), cudaSuccess);
   ASSERT_EQ(cudaStreamSynchronize(growing), cudaSuccess);
 
@@ -2513,6 +2567,11 @@ TEST_F(SharedScratchBackendTest, AGrowthOnACallerStreamDisposesWithTheDeviceLock
   ASSERT_TRUE(small.handle()->shared_scratch);
   ASSERT_TRUE(big.handle()->shared_scratch);
   const int device_id = big.handle()->device_id;
+  if (!pool_hands_over_through_a_flag(device_id)) {
+    GTEST_SKIP() << "Without the flag a pooled call keeps the pool lock until it has finished, so its disposal comes "
+                    "after the enqueue it retires and never waits under the lock; "
+                    "WithoutAFlagAPooledCallHoldsThePoolUntilItHasFinished covers that lock";
+  }
 
   // Without this the larger engine allocates rather than grows, and a growth that
   // retires nothing frees nothing. Drained, so the only enqueue the growth's wait
@@ -2800,15 +2859,6 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
 // ---------------------------------------------------------------------------
 // A thread that has not used CUDA yet
 // ---------------------------------------------------------------------------
-
-// The driver calls are looked up through the runtime, so this target links no driver library.
-template <typename Fn>
-bool find_driver_function(const char* symbol, unsigned int version, Fn& fn) {
-  cudaDriverEntryPointQueryResult query_result = cudaDriverEntryPointSymbolNotFound;
-  const cudaError_t err = cudaGetDriverEntryPointByVersion(
-      symbol, reinterpret_cast<void**>(&fn), version, cudaEnableDefault, &query_result);
-  return err == cudaSuccess && query_result == cudaDriverEntryPointSuccess;
-}
 
 // TensorRT 11.3 needs a current context for its default-stream driver lookup; 11.1 passes without the fix.
 // Each selection needs a fresh thread because a context stays current after a call.
