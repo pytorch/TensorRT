@@ -5,9 +5,7 @@ import json
 import logging
 import os
 
-import huggingface_hub
 import torch
-from huggingface_hub import snapshot_download
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +127,9 @@ def load_quantization_config(model_name):
     if os.path.isdir(model_name):
         model_path = model_name
     else:
+        import huggingface_hub
+        from huggingface_hub import snapshot_download
+
         # Download model from Hugging Face Hub
         model_path = snapshot_download(
             model_name,

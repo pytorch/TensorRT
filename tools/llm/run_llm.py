@@ -22,7 +22,6 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from quantize_utils import load_quantization_config
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
@@ -257,6 +256,11 @@ if __name__ == "__main__":
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
     arg_parser.add_argument(
+        "--pre_quantized",
+        action="store_true",
+        help="Load a pre-quantized ModelOpt checkpoint with hf_quant_config.json",
+    )
+    arg_parser.add_argument(
         "--quant_format",
         help=("Apply quantization format. Options: int8, fp8, nvfp4 (default: None)"),
         default=None,
@@ -274,7 +278,15 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     with torch.inference_mode():
-        hf_quant_config = load_quantization_config(args.model)
+        hf_quant_config = None
+        if args.pre_quantized or args.quant_format is not None:
+            from quantize_utils import load_quantization_config
+
+            hf_quant_config = load_quantization_config(args.model)
+            if args.pre_quantized and not hf_quant_config:
+                raise RuntimeError(
+                    "--pre_quantized requires a checkpoint with hf_quant_config.json"
+                )
         model = get_model(args, hf_quant_config)
 
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
