@@ -9,7 +9,109 @@ from time import time
 import torch
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"))
-from flux_demo import compile_model
+
+
+@torch.no_grad()
+def smoke_test(args):
+    """Check a reduced, randomly initialized Flux transformer without a pipeline."""
+    if args.dtype != "fp16":
+        raise ValueError("--smoke_test currently supports only --dtype fp16")
+    if (
+        args.num_layers < 0
+        or args.num_single_layers < 0
+        or args.num_layers + args.num_single_layers == 0
+    ):
+        raise ValueError("Specify at least one block, with nonnegative layer counts")
+    if args.dynamic_shapes or args.use_sdpa:
+        raise ValueError("--smoke_test uses static shapes and default Flux attention")
+
+    from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
+
+    torch.manual_seed(42)
+    # Construct only the requested blocks on CPU. Never load the full checkpoint.
+    model = (
+        FluxTransformer2DModel(
+            num_layers=args.num_layers,
+            num_single_layers=args.num_single_layers,
+            guidance_embeds=True,
+        )
+        .eval()
+        .to(device="cuda:0", dtype=torch.float16)
+    )
+    config = model.config
+
+    class TransformerWrapper(torch.nn.Module):
+        def __init__(self, transformer):
+            super().__init__()
+            self.transformer = transformer
+
+        def forward(
+            self,
+            hidden_states,
+            encoder_hidden_states,
+            pooled_projections,
+            timestep,
+            img_ids,
+            txt_ids,
+            guidance,
+        ):
+            return self.transformer(
+                hidden_states=hidden_states,
+                encoder_hidden_states=encoder_hidden_states,
+                pooled_projections=pooled_projections,
+                timestep=timestep,
+                img_ids=img_ids,
+                txt_ids=txt_ids,
+                guidance=guidance,
+                return_dict=False,
+            )[0]
+
+    model = TransformerWrapper(model).eval()
+    device = "cuda:0"
+    inputs = {
+        "hidden_states": torch.randn(
+            1, 64, config.in_channels, device=device, dtype=torch.float16
+        ),
+        "encoder_hidden_states": torch.randn(
+            1, 16, config.joint_attention_dim, device=device, dtype=torch.float16
+        ),
+        "pooled_projections": torch.randn(
+            1, config.pooled_projection_dim, device=device, dtype=torch.float16
+        ),
+        "timestep": torch.ones(1, device=device, dtype=torch.float16),
+        "img_ids": torch.zeros(64, 3, device=device, dtype=torch.float16),
+        "txt_ids": torch.zeros(16, 3, device=device, dtype=torch.float16),
+        "guidance": torch.ones(1, device=device, dtype=torch.float32),
+    }
+    print(
+        f"Random-weight Flux smoke test: {args.num_layers} dual-stream blocks, "
+        f"{args.num_single_layers} single-stream blocks"
+    )
+    expected = model(**inputs)
+    if not torch.isfinite(expected).all():
+        raise RuntimeError("PyTorch output contains non-finite values")
+    if args.pytorch:
+        print(f"PyTorch smoke test passed: output shape {tuple(expected.shape)}")
+        return
+
+    import torch_tensorrt
+
+    example_inputs = tuple(inputs.values())
+    ep = torch.export.export(model, args=example_inputs, strict=False)
+    compiled = torch_tensorrt.dynamo.compile(
+        ep,
+        inputs=example_inputs,
+        min_block_size=1,
+        require_full_compilation=True,
+        use_fp32_acc=True,
+        truncate_double=True,
+        offload_module_to_cpu=args.low_vram_mode,
+        workspace_size=1 << 30,
+    )
+    actual = compiled(*example_inputs)
+    torch.cuda.synchronize()
+    torch.testing.assert_close(actual, expected, rtol=2e-2, atol=2e-2)
+    print(f"TensorRT smoke test passed: output shape {tuple(actual.shape)}")
 
 
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
@@ -47,14 +149,18 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
     return
 
 
-from diffusers import FluxPipeline
-
-
 def main(args):
     print(f"Running flux_perfwith args: {args}")
+    if args.smoke_test:
+        smoke_test(args)
+        return
     if not args.pytorch:
+        from flux_demo import compile_model
+
         pipe, backbone, trt_gm = compile_model(args)
     else:
+        from diffusers import FluxPipeline
+
         pipe = (
             FluxPipeline.from_pretrained(
                 args.model,
@@ -110,5 +216,22 @@ if __name__ == "__main__":
         help="Use pytorch runtime and no tensorrt",
     )
     parser.add_argument("--max_batch_size", type=int, default=1)
+    parser.add_argument(
+        "--smoke_test",
+        action="store_true",
+        help="Test a small random-weight transformer without loading the Flux pipeline",
+    )
+    parser.add_argument(
+        "--num_layers",
+        type=int,
+        default=1,
+        help="Number of dual-stream blocks in --smoke_test (default: 1)",
+    )
+    parser.add_argument(
+        "--num_single_layers",
+        type=int,
+        default=0,
+        help="Number of single-stream blocks in --smoke_test (default: 0)",
+    )
     args = parser.parse_args()
     main(args)
