@@ -50,6 +50,10 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 
 #### Key Arguments
 
+For `run_llm.py`, ModelOpt and its calibration dependencies are only imported when
+`--quant_format` is specified or a pre-quantized checkpoint is loaded. FP16, BF16,
+and FP32 inference with an unquantized checkpoint does not require ModelOpt.
+
 - `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
 - `--prompt`: Input prompt for generation.
