@@ -112,7 +112,6 @@ class TensorRTProxyModule(ModuleType):
         try:
             return getattr(self._target_module, name)
         except AttributeError:
-            print(f"AttributeError: {name}")
             # For nested modules like tensorrt.tensorrt
             if name == "tensorrt" and self._nested_module:
                 return self._nested_module
