@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
     has_dynamic_shape,
+    prepend_ones,
     set_layer_name,
     to_numpy,
 )
@@ -1100,7 +1101,6 @@ def index_put_converter(
     _check_index_entries(node_args)
     # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
     # would move the values in input[indices]. Give such an index its rank in the graph.
-    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
     graph_indices = node_args[1] if len(node_args) > 1 else None
     ranks = (
         [_rank_in_graph(index) for index in graph_indices]
@@ -1113,7 +1113,6 @@ def index_put_converter(
                 ctx, target, source_ir, f"{name}_index_{i}_0d", idx, ()
             )
             if isinstance(idx, ITensor)
-            and idx.dtype != trt.bool
             and tuple(idx.shape) == (1,)
             and i < len(ranks)
             and ranks[i] == 0
@@ -1121,6 +1120,71 @@ def index_put_converter(
         )
         for i, idx in enumerate(input_indices)
     ]
+    defined = [idx for idx in input_indices if idx is not None]
+    lone_index = defined[0] if len(defined) == 1 else None
+    if (
+        lone_index is not None
+        and not isinstance(lone_index, int)
+        and is_boolean_tensor(lone_index)
+        and len(lone_index.shape) == 0
+    ):
+        graph_input, graph_values = (
+            _graph_tensor(node_args[i]) if len(node_args) > 2 else None for i in (0, 2)
+        )
+        values_shape, input_shape = tuple(values.shape), tuple(input_tensor.shape)
+
+        def dim_fits(k: int) -> bool:
+            size, input_size = values_shape[-k], input_shape[-k]
+            if size == 1 or size == input_size >= 0:
+                return True
+            # A dynamic dim fits only when the graph proves it is the input's dim.
+            return (
+                graph_input is not None
+                and graph_values is not None
+                and min(graph_input.dim(), graph_values.dim()) >= k
+                and statically_known_true(
+                    graph_values.shape[-k] == graph_input.shape[-k]
+                )
+            )
+
+        one_element = all(size == 1 for size in values_shape)
+        fits_input = len(values_shape) <= len(input_shape) and all(
+            dim_fits(k) for k in range(1, len(values_shape) + 1)
+        )
+        if not (one_element or fits_input):
+            raise ValueError(
+                f"index_put: with a 0-d mask, values of shape {values_shape} must have "
+                f"one element or broadcast to the input shape {input_shape} without "
+                "more dims, and each dynamic dim "
+                "must be the same dim as the input's"
+            )
+        # A 0-d mask covers no input dims. PyTorch runs it with a one-element CPU value as
+        # masked_fill, which writes the value everywhere or nowhere, and the converter
+        # does so for any one-element value. Values with more elements fill the input as
+        # in input[mask] = values.
+        fill_value = values
+        if one_element:
+            fill_value = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_fill_value", values, ()
+            )
+        fill_value = cast_trt_tensor(
+            ctx, fill_value, input_tensor.dtype, f"{name}_fill_value_cast"
+        )
+        # A select keeps the input dtype, where impl.condition.where makes int64 int32.
+        mask = get_trt_tensor(ctx, lone_index, f"{name}_mask", min_rank=0)
+        rank = len(input_tensor.shape)
+        if rank:
+            mask = prepend_ones(ctx, mask, f"{name}_mask_broadcast", rank)
+        if len(fill_value.shape) < rank:
+            fill_value = prepend_ones(
+                ctx,
+                fill_value,
+                f"{name}_fill_value_broadcast",
+                rank - len(fill_value.shape),
+            )
+        return impl.condition.select(
+            ctx, target, source_ir, f"{name}_fill", fill_value, input_tensor, mask
+        )
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )
