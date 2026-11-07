@@ -132,6 +132,22 @@ def convert_binary_elementwise(
         )
         return _fold_constants(op_type, lhs_val, rhs_val)
 
+    # TensorRT takes an INT8 constant only as quantized data, so int8 constants (and
+    # Python ints next to an int8 tensor) become int32 ones, and an int8 result made
+    # from one does not wrap around as in PyTorch until it is cast back to int8 at a
+    # graph output.
+    output = getattr(ctx.current_node, "meta", {}).get("val")
+    if getattr(output, "dtype", None) == torch.int8 and any(
+        (isinstance(v, torch.Tensor) and v.dtype == torch.int8)
+        or (isinstance(v, int) and not isinstance(v, bool))
+        for v in (lhs_val, rhs_val)
+    ):
+        logger.warning(
+            f"{name} computes an int8 result from an int8 constant in int32, so int8 "
+            "overflow does not wrap around as it does in PyTorch when the result feeds "
+            "other ops in the engine. An int8 graph output is cast back to int8 and wraps."
+        )
+
     # If the following conditions are true:
     #  1. the network has implicit batch dimension,
     #  2. one operand has shape [] (real shape is [batch_size]),

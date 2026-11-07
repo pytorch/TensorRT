@@ -593,6 +593,23 @@ def pow(
         lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val")
     if isinstance(rhs_val, torch.Tensor):
         rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val")
+    # TensorRT fuses x * x into a reduction that reads it, but not x ** 2, so a sum of
+    # squares (as in a vector norm) would write every square to memory first.
+    if (
+        isinstance(lhs_val, TRTTensor)
+        and isinstance(rhs_val, (int, float))
+        and rhs_val == 2
+        and lhs_val.dtype in (trt.float32, trt.float16, trt.bfloat16)
+    ):
+        return convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name,
+            trt.ElementWiseOperation.PROD,
+            lhs_val,
+            lhs_val,
+        )
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )

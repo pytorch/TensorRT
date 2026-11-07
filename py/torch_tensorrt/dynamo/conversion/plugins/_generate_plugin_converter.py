@@ -136,7 +136,16 @@ def _generate_plugin_converter(
 
         unique_id = uuid.uuid4()
         itensor_args = [
-            get_trt_tensor(ctx, t, f"{t_name}_{unique_id}")
+            get_trt_tensor(
+                ctx,
+                t,
+                f"{t_name}_{unique_id}",
+                target_quantized_type=(
+                    trt.DataType.INT8
+                    if getattr(t, "dtype", None) == torch.int8
+                    else None
+                ),
+            )
             for (t, t_name) in zip(tensor_args, tensor_inputs)
         ]
 

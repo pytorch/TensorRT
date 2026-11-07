@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -78,6 +79,101 @@ class TestAddConverter(DispatchTestCase):
             add(),
             inputs,
         )
+
+    def test_add_int8_buffer(self):
+        # TensorRT reads an INT8 constant as quantized data, so a plain int8 weight
+        # must not become one.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.arange(-128, 128, dtype=torch.int8).reshape(16, 16)
+                )
+
+            def forward(self, x):
+                return torch.ops.aten.add.Tensor(self.offsets, x)
+
+        inputs = [torch.randn(16, 16)]
+        self.run_test(
+            add(),
+            inputs,
+            rtol=0,
+            atol=0,
+        )
+
+    def test_add_int8_buffer_computes_in_int32(self):
+        # Casting the widened constant back to int8 inside the network sent the TensorRT
+        # builder into a very long search on a large model, so the sum stays int32 and an
+        # int8 sum that overflows does not wrap around as in PyTorch.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.tensor([100, -100, 120, 5], dtype=torch.int8)
+                )
+
+            def forward(self, x):
+                total = torch.ops.aten.add.Tensor(self.offsets, x.to(torch.int8))
+                return total.to(torch.float32)
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        with self.assertLogs(
+            "torch_tensorrt.dynamo.conversion.impl.elementwise.base", level="WARNING"
+        ) as logs:
+            trt_model = torch_tensorrt.dynamo.compile(
+                torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+            )
+        self.assertTrue(any("does not wrap around" in line for line in logs.output))
+        torch.testing.assert_close(
+            trt_model(*inputs).cpu(),
+            torch.tensor([200.0, -200.0, 240.0, 10.0]),
+            rtol=0,
+            atol=0,
+        )
+        # PyTorch wraps around in int8; the engine does not, as the warning says.
+        torch.testing.assert_close(
+            model(*inputs).cpu(), torch.tensor([-56.0, 56.0, -16.0, 10.0])
+        )
+
+    def test_add_int8_buffer_int8_output_wraps(self):
+        # An int8 graph output is cast back from int32 once, at the engine output, so it
+        # wraps like PyTorch.
+        class add(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "offsets", torch.tensor([100, -100, 120, 5], dtype=torch.int8)
+                )
+
+            def forward(self, x):
+                return torch.ops.aten.add.Tensor(self.offsets, x.to(torch.int8))
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+        )
+        out = trt_model(*inputs)
+        self.assertEqual(out.dtype, torch.int8)
+        torch.testing.assert_close(
+            out.cpu(), torch.tensor([-56, 56, -16, 10], dtype=torch.int8)
+        )
+
+    def test_add_python_int_to_int8_warns(self):
+        class add(nn.Module):
+            def forward(self, x):
+                return (x.to(torch.int8) + 100).to(torch.float32)
+
+        model = add().cuda().eval()
+        inputs = (torch.tensor([100.0, -100.0, 120.0, 5.0]).cuda(),)
+        with self.assertLogs(
+            "torch_tensorrt.dynamo.conversion.impl.elementwise.base", level="WARNING"
+        ) as logs:
+            torch_tensorrt.dynamo.compile(
+                torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+            )
+        self.assertTrue(any("does not wrap around" in line for line in logs.output))
 
 
 if __name__ == "__main__":

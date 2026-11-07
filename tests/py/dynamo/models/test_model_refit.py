@@ -276,6 +276,42 @@ def test_batch_norm_refit_one_engine_without_weightmap():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@pytest.mark.unit
+def test_batch_norm_refit_fp16_input_fp32_weights():
+    # The new weights fold to a scale above the float16 range, unlike the weights
+    # the engine was built with.
+    model = nn.BatchNorm2d(3).eval().to("cuda")
+    model2 = nn.BatchNorm2d(3).eval().to("cuda")
+    with torch.no_grad():
+        model2.weight.fill_(1000.0)
+        model2.running_var.fill_(1e-4)
+    inputs = [(1e-3 * torch.randn((1, 3, 8, 8))).half().to("cuda")]
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        min_block_size=1,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+    )
+
+    torch.testing.assert_close(
+        new_trt_gm(*inputs), exp_program2.module()(*inputs), rtol=1e-2, atol=1e-2
+    )
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",

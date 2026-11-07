@@ -5,6 +5,7 @@
 import importlib
 import os
 import shutil
+import tempfile
 import unittest
 from typing import Optional
 
@@ -354,6 +355,38 @@ class TestEngineCache(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
+    def test_cache_hit_with_a_calibration_dataloader(self):
+        model = torch.nn.Sequential(torch.nn.Linear(16, 16), torch.nn.ReLU())
+        model = model.eval().to("cuda")
+        x = torch.randn(4, 16, device="cuda")
+        # A lambda collate_fn cannot be pickled, as a saved engine's settings are.
+        loader = torch.utils.data.DataLoader(
+            [x], batch_size=None, collate_fn=lambda batch: (batch,)
+        )
+        with tempfile.TemporaryDirectory() as engine_cache_dir:
+            custom_engine_cache = MyEngineCache(engine_cache_dir)
+            outputs = []
+            for _ in range(2):
+                trt_gm = torch_trt.dynamo.compile(
+                    torch.export.export(model, (x,)),
+                    (x,),
+                    min_block_size=1,
+                    immutable_weights=False,
+                    cache_built_engines=True,
+                    reuse_cached_engines=True,
+                    custom_engine_cache=custom_engine_cache,
+                    enable_autocast=True,
+                    autocast_low_precision_type=torch.float16,
+                    autocast_calibration_dataloader=loader,
+                )
+                outputs.append(trt_gm(x))
+        assertions.assertEqual(list(custom_engine_cache.hashes.values()), [1])
+        torch.testing.assert_close(outputs[1], outputs[0])
+
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
@@ -663,6 +696,14 @@ class TestEngineCache(TestCase):
             def forward(self, x):
                 return x.permute(self.dims)
 
+        class Scale(torch.nn.Module):
+            def __init__(self, dtype):
+                super().__init__()
+                self.register_buffer("w", torch.ones(3, dtype=dtype, device="cuda"))
+
+            def forward(self, x):
+                return x * self.w
+
         class Cond(torch.nn.Module):
             def __init__(self, branch):
                 super().__init__()
@@ -679,6 +720,8 @@ class TestEngineCache(TestCase):
                 torch.nn.Linear(3, 4).cuda(),
                 torch.nn.Linear(3, 5).cuda(),
             ),
+            # A converter can build other layers for another weight dtype.
+            "weight dtype": (Scale(torch.float32), Scale(torch.float16)),
         }
         for name, models in pairs.items():
             with self.subTest(name):
