@@ -148,17 +148,6 @@ def convert_binary_elementwise(
             "other ops in the engine. An int8 graph output is cast back to int8 and wraps."
         )
 
-    # If the following conditions are true:
-    #  1. the network has implicit batch dimension,
-    #  2. one operand has shape [] (real shape is [batch_size]),
-    #  3. another operand is a scalar,
-    # then the result should also have shape [] (real shape is [batch_size]).
-    #
-    # In such case, we need to convert the scalar operand to tensor, because
-    # this way the shape will become [1], and then will be properly squeezed
-    # into [], meaning that the result will have shape [], which is what we
-    # expect.
-    #
     # Wrap Python scalars using PyTorch's weak scalar-promotion rules. This
     # preserves low-precision floating-point tensors while allowing mixed
     # integer/float and bool/numeric expressions to promote when required.
@@ -169,10 +158,21 @@ def convert_binary_elementwise(
         promoted = torch.result_type(torch.empty([1], dtype=torch_tensor_dtype), scalar)
         return _enums.dtype._from(promoted).to(trt.DataType)
 
+    # A scalar next to a 0-d tensor stays 0-d, or the result would gain a dim.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = to_torch(rhs_val, dtype=_scalar_wrap_dtype(lhs_dtype, rhs_val))
+        dtype = _scalar_wrap_dtype(lhs_dtype, rhs_val)
+        rhs_val = (
+            get_trt_tensor(ctx, rhs_val, f"{name}_rhs", dtype, min_rank=0)
+            if len(lhs_val.shape) == 0
+            else to_torch(rhs_val, dtype=dtype)
+        )
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = to_torch(lhs_val, dtype=_scalar_wrap_dtype(rhs_dtype, lhs_val))
+        dtype = _scalar_wrap_dtype(rhs_dtype, lhs_val)
+        lhs_val = (
+            get_trt_tensor(ctx, lhs_val, f"{name}_lhs", dtype, min_rank=0)
+            if len(rhs_val.shape) == 0
+            else to_torch(lhs_val, dtype=dtype)
+        )
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 

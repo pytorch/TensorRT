@@ -1100,7 +1100,6 @@ def index_put_converter(
     _check_index_entries(node_args)
     # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
     # would move the values in input[indices]. Give such an index its rank in the graph.
-    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
     graph_indices = node_args[1] if len(node_args) > 1 else None
     ranks = (
         [_rank_in_graph(index) for index in graph_indices]
@@ -1113,7 +1112,6 @@ def index_put_converter(
                 ctx, target, source_ir, f"{name}_index_{i}_0d", idx, ()
             )
             if isinstance(idx, ITensor)
-            and idx.dtype != trt.bool
             and tuple(idx.shape) == (1,)
             and i < len(ranks)
             and ranks[i] == 0
@@ -1121,6 +1119,28 @@ def index_put_converter(
         )
         for i, idx in enumerate(input_indices)
     ]
+    defined = [idx for idx in input_indices if idx is not None]
+    one_element = all(size == 1 for size in values.shape)
+    if (
+        len(defined) == 1
+        and is_boolean_tensor(defined[0])
+        and len(defined[0].shape) == 0
+        and (one_element or len(values.shape) <= len(input_tensor.shape))
+    ):
+        # A 0-d mask covers no input dims, so PyTorch runs this as masked_fill, which
+        # writes a one-element value, whatever its shape, everywhere or nowhere. Values
+        # with more elements fill the input as in input[mask] = values.
+        fill_value = values
+        if one_element:
+            fill_value = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_fill_value", values, ()
+            )
+        fill_value = cast_trt_tensor(
+            ctx, fill_value, input_tensor.dtype, f"{name}_fill_value_cast"
+        )
+        return impl.condition.where(
+            ctx, target, source_ir, f"{name}_fill", fill_value, input_tensor, defined[0]
+        )
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )

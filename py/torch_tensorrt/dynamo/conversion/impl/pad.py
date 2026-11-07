@@ -115,6 +115,11 @@ def constant_padNd(
     pad: Sequence[Union[int, TRTTensor]],
     value: Union[int, float] = 0,
 ) -> TRTTensor:
+    # TensorRT can fail to build a fill-mode slice that pads by zero when an
+    # elementwise layer follows it, and such a pad changes nothing anyway.
+    if all(isinstance(amount, int) and amount == 0 for amount in pad):
+        return input
+
     rank = len(input.shape)
 
     start_indices_tensor, padded_shape_tensor = get_padded_shape_tensors(

@@ -610,6 +610,17 @@ def pow(
             lhs_val,
             lhs_val,
         )
+    # A vector norm decomposes to pow(sum, 0.5). TensorRT evaluates POW as a general power, which
+    # costs several times a SQRT, and PyTorch's own compiler makes the same substitution.
+    if (
+        isinstance(lhs_val, TRTTensor)
+        and isinstance(rhs_val, (int, float))
+        and rhs_val == 0.5
+        and lhs_val.dtype in (trt.float32, trt.float16, trt.bfloat16)
+    ):
+        return convert_unary(
+            ctx, target, source_ir, name, trt.UnaryOperation.SQRT, lhs_val
+        )
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )

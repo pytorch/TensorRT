@@ -18,6 +18,14 @@ class TestMeanDimConverter(DispatchTestCase):
         inputs = [torch.randn(1, 10)]
         self.run_test(TestModule(), inputs)
 
+    def test_mean_dim_of_0d_tensor(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.mean.dim(x, [0], True)
+
+        inputs = [torch.randn(())]
+        self.run_test(TestModule(), inputs)
+
     def test_mean_dim_keepdims_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):

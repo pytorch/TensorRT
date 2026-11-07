@@ -47,6 +47,23 @@ class TestSoftmaxConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
+    @parameterized.expand([(0,), (-1,)])
+    def test_softmax_of_0d_tensor(self, dim):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._softmax.default(x, dim, False)
+
+        inputs = [torch.randn(())]
+        self.run_test(TestModule(), inputs)
+
+    def test_log_softmax_of_0d_tensor(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._log_softmax.default(x, 0, False)
+
+        inputs = [torch.randn(())]
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True, enable_passes=True)
+
     def test_softmax_over_size_one_dim_followed_by_matmul(self):
         skip_if_trt_rtx_turing(self, "aten.mm (an FP32 GEMM)")
 
