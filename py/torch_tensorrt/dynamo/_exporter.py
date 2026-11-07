@@ -27,6 +27,7 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
     plan_buffer,
@@ -1038,6 +1039,37 @@ def inline_trt_modules(
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (tuple(engine_inputs), *engine_info),
+                )
+            elif trt_module.engine is None and get_offloaded_engine_path(
+                trt_module._plan_buffer()
+            ):
+                # compile_and_save to ExecuTorch, the only save that keeps the engine in its file. It is
+                # passed as a uint8 buffer mapped from the file, the form the ExecuTorch backend packs,
+                # and the backend streams the file itself into the program.
+                # A Python-only build registers the placeholder op only with meta_ops.
+                import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
+
+                engine_info = trt_module._pack_engine_info()
+                engine_tensor = engine_info[ENGINE_IDX]
+                buffer_name = f"{name}_engine"
+                gm.register_buffer(buffer_name, engine_tensor)
+                engine_node = gm.graph.get_attr(buffer_name)
+                engine_node.meta["val"] = (
+                    fake_mode.from_tensor(engine_tensor)
+                    if fake_mode is not None
+                    else torch.empty(
+                        engine_tensor.shape, dtype=torch.uint8, device="meta"
+                    )
+                )
+                str_args = [str(value) for value in engine_info]
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+                    (
+                        tuple(engine_inputs),
+                        *str_args[:ENGINE_IDX],
+                        engine_node,
+                        *str_args[ENGINE_IDX + 1 :],
+                    ),
                 )
             else:
                 engine_name = f"{name}_engine"
