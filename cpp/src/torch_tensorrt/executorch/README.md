@@ -377,7 +377,11 @@ Set it before you load the methods that should use the pool. What it costs:
 
 - **No parallelism between pooled calls on one device.** The delegate holds a per-device lock from
   claiming the buffer until the work is queued and marked. Two pooled calls can be submitted from
-  two threads, on one stream or two, but they never run at the same time on the device.
+  two threads, on one stream or two, but they never run at the same time on the device. Each call's
+  stream waits for the call before it on a small flag in GPU memory that the pool owns, not on a
+  CUDA event: NVIDIA drivers 580 and 595 were seen to drop a stream's wait on an event while
+  another thread used the same stream. A GPU without 64-bit stream memory operations waits on the
+  host instead, and the delegate logs that once per GPU.
 - **A pooled call waits for the pooled call before it.** Do not hold back the work of one pooled
   call, for example with a host function on its stream, until a later pooled call returns. The
   later call then never returns.
@@ -394,11 +398,11 @@ above, keeps them apart from the pool.
 #### Capturing a call into a CUDA graph is not supported
 
 A pooled call whose stream is being captured fails with `Error::NotSupported`. The handoff from one
-pooled call to the next waits on an event recorded outside the capture, and that wait fails with
-`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. A growth of
-the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or thread-local capture.
-Without the refusal, you would learn of it only when `cudaStreamEndCapture` returns
-`cudaErrorStreamCaptureInvalidated`.
+pooled call to the next waits on the pool's flag and then writes it. A capture records both into
+the graph, so a replay would write an old value to the flag, and every later pooled call on that
+GPU would wait forever. Nothing reports that. A growth of the buffer adds a `cudaMalloc` and a
+host wait, which invalidate a global or thread-local capture, and you would learn of it only when
+`cudaStreamEndCapture` returns `cudaErrorStreamCaptureInvalidated`.
 
 - The check runs before anything in the call that could break the capture.
 - If the query fails for another reason, such as an earlier fault on the device, the call fails

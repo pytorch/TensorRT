@@ -644,10 +644,10 @@ Set the option before you load the methods that should use the shared buffer. Me
 before it keep their own scratch.
 
 The cost is parallelism. Two calls that share the buffer never run at the same time on one
-device: the delegate takes a per-device lock from claiming the buffer to queuing the work. The
-buffer never shrinks. Do not call ``cudaDeviceReset()`` on a device that ran an engine with the
-shared buffer. Recording a call into your own CUDA graph is not supported, with or without the
-shared buffer.
+device: the delegate takes a per-device lock from claiming the buffer to queuing the work, and
+each call's stream waits for the call before it on a small flag in GPU memory. The buffer never
+shrinks. Do not call ``cudaDeviceReset()`` on a device that ran an engine with the shared buffer.
+Recording a call into your own CUDA graph is not supported, with or without the shared buffer.
 
 Shared engines
 ^^^^^^^^^^^^^^^

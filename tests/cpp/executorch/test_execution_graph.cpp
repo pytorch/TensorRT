@@ -23,6 +23,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <future>
@@ -2106,6 +2107,320 @@ TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
+// cudaMalloc does not clear memory, and the handoff's wait compares cyclically, so the pool has to
+// clear its flag before any claimant can read it. Here the flag is made while the first claimant's
+// stream is held, from memory filled with a pattern, and is read back once that call has released the
+// pool. A clear queued on the held stream has not run yet, so the pattern is still there.
+TEST_F(ExecutionGraphTest, TheHandoffFlagIsClearedBeforeAnyClaimantCanReadIt) {
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+  {
+    // The flag outlives a reset, so it is dropped here (and leaked) to make the next claim create one.
+    std::lock_guard<std::mutex> lock(device.mu);
+    if (device.marker.host_wait_only) {
+      GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+    }
+    device.marker.flag = nullptr;
+    device.marker.sequence = 0;
+  }
+
+  struct Gate {
+    std::atomic<bool> open{false};
+  } gate;
+  ASSERT_EQ(
+      cudaLaunchHostFunc(
+          streams_[0],
+          [](void* data) {
+            // Bounded, so a case that fails before opening the gate cannot hang the stream.
+            const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (!static_cast<Gate*>(data)->open.load() && std::chrono::steady_clock::now() < give_up) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          },
+          &gate),
+      cudaSuccess);
+  Error result = Error::Internal;
+  std::thread caller([&] {
+    CudaCalls calls;
+    calls.fill_allocations_with = 0x55;
+    result = engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+  });
+
+  // The call holds the pool's lock from its claim until it has queued its write to the flag.
+  void* flag = nullptr;
+  unsigned long long sequence = 0;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  while (flag == nullptr && std::chrono::steady_clock::now() < deadline) {
+    if (device.mu.try_lock()) {
+      if (device.marker.sequence > 0) {
+        flag = device.marker.flag;
+        sequence = device.marker.sequence;
+      }
+      device.mu.unlock();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  unsigned long long value = 0;
+  cudaStream_t read_stream = nullptr;
+  cudaError_t read_error = cudaErrorUnknown;
+  if (flag != nullptr && cudaStreamCreateWithFlags(&read_stream, cudaStreamNonBlocking) == cudaSuccess) {
+    read_error = cudaMemcpyAsync(&value, flag, sizeof(value), cudaMemcpyDeviceToHost, read_stream);
+    if (read_error == cudaSuccess) {
+      read_error = cudaStreamSynchronize(read_stream);
+    }
+    EXPECT_EQ(cudaStreamDestroy(read_stream), cudaSuccess);
+  }
+  gate.open.store(true);
+  caller.join();
+
+  // Only a claim learns that the GPU cannot wait on the flag, so a first run checks again here.
+  bool host_wait_only = false;
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    host_wait_only = device.marker.host_wait_only;
+  }
+  if (host_wait_only) {
+    EXPECT_EQ(result, Error::Ok);
+    EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  ASSERT_NE(flag, nullptr) << "the call never recorded its enqueue on the pool's flag";
+  ASSERT_EQ(read_error, cudaSuccess);
+  EXPECT_EQ(sequence, 1u);
+  EXPECT_EQ(value, 0u) << "the flag still held what its allocation left there after the call that made it had "
+                          "released the pool, so another claimant could have read that value";
+  EXPECT_EQ(result, Error::Ok);
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// Kernels for the handoff test below, as PTX so the test needs no CUDA compiler. take marks the
+// shared token as held and counts it if another holder had it, then spins for spin_ns. give hands
+// the token back and counts it if this holder no longer had it. touch adds one to a float.
+constexpr char kHandoffKernels[] = R"(
+.version 7.0
+.target sm_70
+.address_size 64
+
+.visible .entry take(.param .u64 owner, .param .u64 overlaps, .param .u32 id, .param .u64 spin_ns)
+{
+  .reg .pred %p<3>;
+  .reg .b32 %r<3>;
+  .reg .b64 %rd<7>;
+  ld.param.u64 %rd1, [owner];
+  ld.param.u64 %rd2, [overlaps];
+  ld.param.u32 %r1, [id];
+  ld.param.u64 %rd3, [spin_ns];
+  cvta.to.global.u64 %rd1, %rd1;
+  cvta.to.global.u64 %rd2, %rd2;
+  atom.global.exch.b32 %r2, [%rd1], %r1;
+  setp.eq.s32 %p1, %r2, 0;
+  @%p1 bra TAKE_SPIN;
+  red.global.add.u32 [%rd2], 1;
+TAKE_SPIN:
+  mov.u64 %rd4, %globaltimer;
+TAKE_LOOP:
+  mov.u64 %rd5, %globaltimer;
+  sub.u64 %rd6, %rd5, %rd4;
+  setp.lt.u64 %p2, %rd6, %rd3;
+  @%p2 bra TAKE_LOOP;
+  ret;
+}
+
+.visible .entry give(.param .u64 owner, .param .u64 overlaps, .param .u32 id)
+{
+  .reg .pred %p<2>;
+  .reg .b32 %r<3>;
+  .reg .b64 %rd<3>;
+  ld.param.u64 %rd1, [owner];
+  ld.param.u64 %rd2, [overlaps];
+  ld.param.u32 %r1, [id];
+  cvta.to.global.u64 %rd1, %rd1;
+  cvta.to.global.u64 %rd2, %rd2;
+  atom.global.cas.b32 %r2, [%rd1], %r1, 0;
+  setp.eq.s32 %p1, %r2, %r1;
+  @%p1 bra GIVE_DONE;
+  red.global.add.u32 [%rd2+4], 1;
+GIVE_DONE:
+  ret;
+}
+
+.visible .entry touch(.param .u64 data)
+{
+  .reg .f32 %f<3>;
+  .reg .b64 %rd<2>;
+  ld.param.u64 %rd1, [data];
+  cvta.to.global.u64 %rd1, %rd1;
+  ld.global.f32 %f1, [%rd1];
+  add.f32 %f2, %f1, 0f3F800000;
+  st.global.f32 [%rd1], %f2;
+  ret;
+}
+)";
+
+// Two pooled engines replay on two streams while a third thread shares the first stream, launching a
+// one-kernel graph and synchronizing that stream in a loop. That third thread is what made some drivers
+// (580 and 595 were seen) drop a stream's wait on the pool's handoff event, so two pooled graphs ran on
+// the shared scratch at the same time and gave wrong outputs, with no CUDA error. Each replay here
+// takes a token on the device before its graph and gives it back after, inside the window the handoff
+// orders, so any two replays that overlap are counted. With the event wait a run of this size counts
+// some on every run measured; the handoff must make it zero.
+TEST_F(ExecutionGraphReplayTest, PooledReplaysOnTwoStreamsNeverOverlapWhileAnotherThreadSharesAStream) {
+  constexpr int kReplays = 2000;
+  constexpr unsigned long long kSpinNanoseconds = 200000;
+  constexpr std::chrono::seconds kGiveUpAfter{60};
+  cudaLibrary_t library = nullptr;
+  ASSERT_EQ(cudaLibraryLoadData(&library, kHandoffKernels, nullptr, nullptr, 0, nullptr, nullptr, 0), cudaSuccess);
+  cudaKernel_t take = nullptr, give = nullptr, touch = nullptr;
+  ASSERT_EQ(cudaLibraryGetKernel(&take, library, "take"), cudaSuccess);
+  ASSERT_EQ(cudaLibraryGetKernel(&give, library, "give"), cudaSuccess);
+  ASSERT_EQ(cudaLibraryGetKernel(&touch, library, "touch"), cudaSuccess);
+  int* owner = nullptr;
+  unsigned int* overlaps = nullptr;
+  float* touched = nullptr;
+  ASSERT_EQ(cudaMalloc(&owner, sizeof(int)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&overlaps, 2 * sizeof(unsigned int)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&touched, sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(owner, 0, sizeof(int)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(overlaps, 0, 2 * sizeof(unsigned int)), cudaSuccess);
+  ASSERT_EQ(cudaMemset(touched, 0, sizeof(float)), cudaSuccess);
+
+  // The third thread's graph: one kernel, recorded on the stream it shares.
+  cudaGraphExec_t other_work = nullptr;
+  {
+    cudaGraph_t graph = nullptr;
+    void* touch_args[] = {&touched};
+    ASSERT_EQ(cudaStreamBeginCapture(streams_[0], cudaStreamCaptureModeThreadLocal), cudaSuccess);
+    ASSERT_EQ(
+        cudaLaunchKernel(reinterpret_cast<const void*>(touch), dim3(1), dim3(1), touch_args, 0, streams_[0]),
+        cudaSuccess);
+    ASSERT_EQ(cudaStreamEndCapture(streams_[0], &graph), cudaSuccess);
+    ASSERT_EQ(cudaGraphInstantiate(&other_work, graph, 0), cudaSuccess);
+    ASSERT_EQ(cudaGraphDestroy(graph), cudaSuccess);
+  }
+
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engines[2];
+    std::vector<float> input(kMaxElements, 1.0f);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engines[i].load(blob), Error::Ok);
+      ASSERT_TRUE(engines[i].handle()->claims_pooled_scratch);
+      ASSERT_EQ(cudaMemcpy(inputs_[i], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+      for (int warm = 0; warm < 3; ++warm) {
+        ASSERT_EQ(engines[i].run(inputs_[i], outputs_[i], 8, 32, streams_[i]), Error::Ok);
+      }
+      ASSERT_TRUE(engines[i].is_captured());
+    }
+
+    std::atomic<bool> stop{false};
+    std::atomic<int> failed_runs{0};
+    size_t launches[2] = {0, 0};
+    const auto replay = [&](int id) {
+      CudaCalls calls;
+      calls.before_launch = [&](cudaStream_t stream) {
+        unsigned int holder = static_cast<unsigned int>(id + 1);
+        unsigned long long spin = kSpinNanoseconds;
+        void* args[] = {&owner, &overlaps, &holder, &spin};
+        EXPECT_EQ(
+            cudaLaunchKernel(reinterpret_cast<const void*>(take), dim3(1), dim3(1), args, 0, stream), cudaSuccess);
+      };
+      calls.after_launch = [&](cudaStream_t stream) {
+        unsigned int holder = static_cast<unsigned int>(id + 1);
+        void* args[] = {&owner, &overlaps, &holder};
+        EXPECT_EQ(
+            cudaLaunchKernel(reinterpret_cast<const void*>(give), dim3(1), dim3(1), args, 0, stream), cudaSuccess);
+      };
+      for (int i = 0; i < kReplays && !stop.load(); ++i) {
+        if (engines[id].run(inputs_[id], outputs_[id], 8, 32, streams_[id]) != Error::Ok) {
+          failed_runs.fetch_add(1);
+        }
+      }
+      launches[id] = calls.launches.size();
+    };
+    std::thread first(replay, 0);
+    std::thread second(replay, 1);
+    std::atomic<bool> replays_done{false};
+    std::thread other([&] {
+      while (!replays_done.load()) {
+        if (cudaGraphLaunch(other_work, streams_[0]) != cudaSuccess ||
+            cudaStreamSynchronize(streams_[0]) != cudaSuccess) {
+          failed_runs.fetch_add(1);
+          return;
+        }
+      }
+    });
+
+    // A handoff wait that never returns would hold both replay threads in their final synchronize. If
+    // that happens, the flag is set to the pool's sequence from here, which satisfies every wait queued
+    // so far and keeps later handoffs working, so the case fails instead of hanging. The wait compares
+    // cyclically, so a larger value would not do. If even that does not end them, the process stops.
+    auto finished = std::async(std::launch::async, [&] {
+      first.join();
+      second.join();
+    });
+    bool hung = false;
+    if (finished.wait_for(kGiveUpAfter) != std::future_status::ready) {
+      hung = true;
+      stop.store(true);
+      SharedScratchDevice& device = scratch_pool().get(engines[0].handle()->device_id);
+      void* flag = nullptr;
+      unsigned long long sequence = 0;
+      {
+        std::lock_guard<std::mutex> lock(device.mu);
+        flag = device.marker.flag;
+        sequence = device.marker.sequence;
+      }
+      if (flag != nullptr) {
+        cudaStream_t release_stream = nullptr;
+        EXPECT_EQ(cudaStreamCreateWithFlags(&release_stream, cudaStreamNonBlocking), cudaSuccess);
+        EXPECT_EQ(
+            cudaMemcpyAsync(flag, &sequence, sizeof(sequence), cudaMemcpyHostToDevice, release_stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamSynchronize(release_stream), cudaSuccess);
+        EXPECT_EQ(cudaStreamDestroy(release_stream), cudaSuccess);
+      }
+      if (finished.wait_for(kGiveUpAfter) != std::future_status::ready) {
+        std::fprintf(stderr, "the pooled replays are still blocked after the handoff flag was released\n");
+        std::abort();
+      }
+    }
+    replays_done.store(true);
+    other.join();
+    ASSERT_FALSE(hung) << "the pooled replays did not finish within " << kGiveUpAfter.count() << " seconds";
+
+    unsigned int counted[2] = {0, 0};
+    ASSERT_EQ(cudaMemcpy(counted, overlaps, sizeof(counted), cudaMemcpyDeviceToHost), cudaSuccess);
+    EXPECT_EQ(failed_runs.load(), 0);
+    EXPECT_EQ(launches[0], static_cast<size_t>(kReplays)) << "the first engine did not replay on every call";
+    EXPECT_EQ(launches[1], static_cast<size_t>(kReplays)) << "the second engine did not replay on every call";
+    EXPECT_EQ(counted[0], 0u) << "a pooled replay started while another still held the shared scratch";
+    EXPECT_EQ(counted[1], 0u) << "a pooled replay ended after another had already taken the shared scratch";
+    std::vector<float> output(kMaxElements);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(cudaMemcpy(output.data(), outputs_[i], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+      for (float value : output) {
+        ASSERT_FLOAT_EQ(value, 1.0f / 8);
+      }
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+  EXPECT_EQ(cudaGraphExecDestroy(other_work), cudaSuccess);
+  EXPECT_EQ(cudaFree(owner), cudaSuccess);
+  EXPECT_EQ(cudaFree(overlaps), cudaSuccess);
+  EXPECT_EQ(cudaFree(touched), cudaSuccess);
+  EXPECT_EQ(cudaLibraryUnload(library), cudaSuccess);
+}
+
 // A pooled engine records while it holds its device's pool lock, so it must not wait for the capture
 // lock that a load, a destroy, or another engine's recording on any device holds. It runs that call
 // plainly and records later.
@@ -2201,8 +2516,11 @@ TEST_F(ExecutionGraphTest, AFailedPooledPlainCallDrainsBeforeReleasingThePool) {
     ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
     ASSERT_EQ(engine.handle()->execution_graph, nullptr);
     ASSERT_EQ(engine.handle()->device_id, 0);
-    // Run once on the engine's device, so the failing call finds the pool's buffer already there.
+    // Run once on the engine's device, so the pool has its handoff flag. Then empty the pool, so the
+    // failing call has no earlier call to wait for: a stream on another device cannot wait on the flag,
+    // and that refusal would come before the enqueue this case is about.
     ASSERT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
     cudaStream_t other = nullptr;
     ASSERT_EQ(cudaSetDevice(1), cudaSuccess);
     ASSERT_EQ(cudaStreamCreateWithFlags(&other, cudaStreamNonBlocking), cudaSuccess);

@@ -30,6 +30,8 @@ struct CudaCalls {
 
   size_t malloc_calls = 0;
   size_t fail_malloc_call = 0;
+  // Each allocation that succeeds is filled with this byte before it is handed back, unless negative.
+  int fill_allocations_with = -1;
   size_t free_calls = 0;
   size_t memcpy_calls = 0;
   // The copy with this 1-based count fails without being queued.
@@ -49,6 +51,7 @@ struct CudaCalls {
   std::vector<cudaError_t> graph_exec_destroys;
   std::function<void(cudaStream_t)> during_capture;
   std::function<void(cudaGraph_t)> after_capture;
+  std::function<void(cudaStream_t)> before_launch;
   std::function<void(cudaStream_t)> after_launch;
   std::function<void(cudaStream_t)> before_synchronize;
   std::vector<CudaCall> operations;

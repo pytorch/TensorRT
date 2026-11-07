@@ -78,7 +78,18 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
     *pointer = nullptr;
     return cudaErrorMemoryAllocation;
   }
-  return __real_cudaMalloc(pointer, bytes);
+  const auto result = __real_cudaMalloc(pointer, bytes);
+  if (result == cudaSuccess && active_calls && active_calls->fill_allocations_with >= 0) {
+    // On a stream of its own and waited for, so the fill is done before the caller sees the memory and
+    // waits for nothing else on the device.
+    cudaStream_t fill_stream = nullptr;
+    if (cudaStreamCreateWithFlags(&fill_stream, cudaStreamNonBlocking) == cudaSuccess) {
+      (void)cudaMemsetAsync(*pointer, active_calls->fill_allocations_with, bytes, fill_stream);
+      (void)__real_cudaStreamSynchronize(fill_stream);
+      (void)__real_cudaStreamDestroy(fill_stream);
+    }
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaFree(void* pointer) {
@@ -140,6 +151,9 @@ cudaError_t __wrap_cudaGraphLaunch(cudaGraphExec_t graph, cudaStream_t stream) {
     active_calls->operations.push_back({CudaCallKind::Launch, stream});
     if (active_calls->launch_error != cudaSuccess) {
       return active_calls->launch_error;
+    }
+    if (active_calls->before_launch) {
+      active_calls->before_launch(stream);
     }
   }
   const auto result = __real_cudaGraphLaunch(graph, stream);
