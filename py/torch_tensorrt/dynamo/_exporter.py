@@ -26,7 +26,7 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
-from torch_tensorrt.dynamo.runtime._offloaded_engines import engine_file_of
+from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
     plan_buffer,
@@ -1035,7 +1035,7 @@ def inline_trt_modules(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (tuple(engine_inputs), *engine_info),
                 )
-            elif trt_module.engine is None and engine_file_of(
+            elif trt_module.engine is None and get_offloaded_engine_path(
                 trt_module._plan_buffer()
             ):
                 # compile_and_save to ExecuTorch, the only save that keeps the engine in its file. It is

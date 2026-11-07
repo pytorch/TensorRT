@@ -22,7 +22,7 @@ from executorch.exir.backend.backend_details import (
 )
 from torch.export.exported_program import ExportedProgram
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj
-from torch_tensorrt.dynamo.runtime._offloaded_engines import engine_file_of
+from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     ALIASED_IO_IDX,
     DEVICE_IDX,
@@ -601,7 +601,7 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         # (engine_bytes_tensor) and copy only a tensor that did not come from one.
         # An engine still in its file (compile_and_save) is streamed from the file into
         # the .pte, never read into memory.
-        engine_file = engine_file_of(serialized_engine)
+        engine_file = get_offloaded_engine_path(serialized_engine)
         engine_bytes = getattr(serialized_engine, ENGINE_BYTES_ATTR, None)
         if engine_file is None and not isinstance(engine_bytes, bytes):
             if isinstance(serialized_engine, torch.Tensor):

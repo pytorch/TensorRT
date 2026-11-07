@@ -4,23 +4,12 @@
 from __future__ import annotations
 
 import collections.abc
-import inspect
 import logging
 import operator
 import os
 import platform
 import warnings
-from typing import (
-    Any,
-    Collection,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
 import torch
@@ -76,10 +65,8 @@ from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
-from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._offloaded_engines import (
-    keep_offloaded_engines,
-    keeping_offloaded_engines,
+    defer_engine_setup_to_load,
 )
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
@@ -1468,11 +1455,10 @@ def compile_module(
 
     # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
     # compile_and_save keeps them in their files for the save.
-    keep_offloaded = keeping_offloaded_engines()
     set_up_deferred_engines = (
         settings.lazy_engine_init
         and not settings.enable_cross_compile_for_windows
-        and not keep_offloaded
+        and not defer_engine_setup_to_load()
     )
 
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
@@ -1482,7 +1468,7 @@ def compile_module(
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
-        and not keep_offloaded
+        and not defer_engine_setup_to_load()
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1738,7 +1724,7 @@ def compile_module(
             )
 
             if (
-                (settings.lazy_engine_init or keep_offloaded)
+                (settings.lazy_engine_init or defer_engine_setup_to_load())
                 and _debugger_config
                 and (
                     _debugger_config.save_engine_profile
@@ -1806,7 +1792,7 @@ def compile_module(
 
     # Only set output tensors as unowned if not in dryrun mode (TRT modules exist), and not for engines
     # kept in their files, which have no engine to set it on and only matter to this runtime
-    if not settings.dryrun and not keep_offloaded:
+    if not settings.dryrun and not defer_engine_setup_to_load():
         output_node = list(partitioned_module.graph.nodes)[-1]
         for arg in output_node.args:
             # A single-output graph's output node arg is a bare Node rather
@@ -2564,80 +2550,3 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
         )
 
     return replace_execute_engine_no_op_node(exp_program)
-
-
-def _keyword_names(fn: Any) -> set[str]:
-    return {
-        name
-        for name, parameter in inspect.signature(fn).parameters.items()
-        if parameter.kind
-        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    }
-
-
-def compile_and_save(
-    exported_program: ExportedProgram,
-    file_path: Union[str, os.PathLike[str]],
-    output_format: Literal[
-        "exported_program", "torchscript", "aot_inductor", "executorch"
-    ] = "exported_program",
-    **kwargs: Any,
-) -> None:
-    """Compile ``exported_program`` with TensorRT and save it, keeping each engine in a temporary file
-    instead of in memory from its build to the save.
-
-    Equivalent to::
-
-        trt_gm = torch_tensorrt.dynamo.compile(exported_program, ...)
-        torch_tensorrt.save(trt_gm, file_path, output_format=output_format, ...)
-
-    but each engine goes to a temporary file as soon as it is built, so no built engine is held on the
-    GPU or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever
-    loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).
-    The other formats save each engine from a loaded one, so their engines are loaded once all of them
-    are built, and their save needs as much memory as after ``compile``. The call returns nothing.
-
-    The files go to the system temporary directory (``TMPDIR``) and are deleted when the call returns. It
-    needs room for every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take
-    the memory this saves. Linux only, since Windows can't delete a file while it is memory-mapped.
-
-    Each keyword argument goes to :func:`torch_tensorrt.dynamo.compile` or to :func:`torch_tensorrt.save`,
-    by name. ``inputs``, ``arg_inputs`` and ``kwarg_inputs`` go to both when the save traces the module,
-    which every format but ``"executorch"`` does by default.
-    """
-    if platform.system() == "Windows":
-        raise NotImplementedError(
-            "compile_and_save keeps each engine in a memory-mapped file, which Windows can't delete; "
-            "use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."
-        )
-    from torch_tensorrt._compile import _EXECUTORCH_SAVE_OPTIONS, save
-
-    compile_keywords = _keyword_names(compile) - {"exported_program"}
-    save_keywords = (
-        (_keyword_names(save) - {"module", "file_path", "output_format"})
-        | set(_EXECUTORCH_SAVE_OPTIONS)
-        | {"inductor_configs"}
-    )
-    unknown = sorted(set(kwargs) - compile_keywords - save_keywords)
-    if unknown:
-        raise TypeError(
-            f"compile_and_save() got unexpected keyword arguments: {unknown}"
-        )
-    input_keywords = {"inputs", "arg_inputs", "kwarg_inputs"}
-    compile_kwargs = {k: v for k, v in kwargs.items() if k in compile_keywords}
-    save_kwargs = {
-        k: v for k, v in kwargs.items() if k in save_keywords - input_keywords
-    }
-    if output_format != "executorch" or save_kwargs.get("retrace"):
-        # The save traces the compiled module, so it takes the example inputs too.
-        save_kwargs.update({k: v for k, v in kwargs.items() if k in input_keywords})
-
-    with keep_offloaded_engines():
-        trt_gm = compile(exported_program, **compile_kwargs)
-        if output_format != "executorch":
-            # Only an ExecuTorch save streams an engine from its file. The other formats save each
-            # engine from a loaded one.
-            for module in trt_gm.modules():
-                if isinstance(module, TorchTensorRTModule):
-                    module.setup_engine()
-        save(trt_gm, os.fspath(file_path), output_format=output_format, **save_kwargs)

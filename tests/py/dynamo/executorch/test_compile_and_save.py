@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import glob
+import os
 import tempfile
 
 import pytest
@@ -12,6 +13,7 @@ pytest.importorskip("executorch.exir")
 import torch_tensorrt  # noqa: E402
 from executorch.exir._serialize._cord import FileBackedData  # noqa: E402
 from executorch.exir._serialize._named_data_store import NamedDataStore  # noqa: E402
+from torch_tensorrt._utils import _cache_root  # noqa: E402
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule  # noqa: E402
 
 
@@ -51,7 +53,7 @@ def test_engines_stream_from_their_files_into_the_program(tmp_path, monkeypatch)
     torch.manual_seed(0)
     x = torch.randn(4, 64, device="cuda")
     pte_path = tmp_path / "model.pte"
-    torch_tensorrt.dynamo.compile_and_save(
+    torch_tensorrt.compile_and_save(
         torch.export.export(_TwoEngines().eval().cuda(), (x,)),
         pte_path,
         output_format="executorch",
@@ -60,11 +62,15 @@ def test_engines_stream_from_their_files_into_the_program(tmp_path, monkeypatch)
         torch_executed_ops={torch.ops.aten.sin.default},
     )
 
-    # No engine was ever set up, and each one reached the program as its own file.
+    # No engine was ever set up, and each one reached the program as its own file, from the cache directory.
     assert setups == []
     assert len(streamed) == 2
-    assert all(path.endswith(".engine") for path in streamed)
+    offloaded = str(_cache_root() / "offloaded_engines")
+    assert all(
+        path.endswith(".engine") and os.path.dirname(path) == offloaded
+        for path in streamed
+    )
     pte = pte_path.read_bytes()
     assert all(pte.find(engine) >= 0 for engine in streamed.values())
     # The files are gone once the program is saved.
-    assert not glob.glob(str(tmp_path / "*.engine"))
+    assert not glob.glob(str(tmp_path / "**" / "*.engine"), recursive=True)
