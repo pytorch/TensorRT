@@ -26,6 +26,8 @@ class TestArgmaxConverter(DispatchTestCase):
             ("dim_0_keep_dim_true", (4, 4, 4), 0, True),
             ("dim_0_keep_dim_false", (4, 4, 4), 0, False),
             ("dim_negative_keep_dim_true", (1, 2, 3), -1, True),
+            ("0d_dim_none", (), None, False),
+            ("0d_dim_0_keep_dim", (), 0, True),
         ]
     )
     def test_argmax(self, _, input_shape, dim, keep_dim):
@@ -36,7 +38,7 @@ class TestArgmaxConverter(DispatchTestCase):
             def forward(self, input):
                 return torch.ops.aten.argmax.default(input, dim, keep_dim)
 
-        input = [torch.randn(*input_shape)]
+        input = [torch.randn(input_shape)]
 
         self.run_test(ArgMax(), input)
 

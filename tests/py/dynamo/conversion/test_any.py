@@ -22,6 +22,7 @@ class TestAnyConverter(DispatchTestCase):
                 (2, 3, 4, 5),
             ),
             ("5d", (6, 7, 5, 4, 5)),
+            ("0d", ()),
         ]
     )
     def test_any_default_float_dtype(self, _, input_shape):
@@ -29,7 +30,7 @@ class TestAnyConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.any.default(x)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(Any(), inputs)
 
     @parameterized.expand(

@@ -35,6 +35,11 @@ def argmax_argmin(
 ) -> TRTTensor:
     if input.dtype == trt.int32:
         input = cast_trt_tensor(ctx, input, trt.float32, name, target, source_ir)
+    if len(input.shape) == 0:
+        # TensorRT cannot run topk on a 0-d tensor. As shape (1,) along that dim the
+        # result is 0-d, which PyTorch returns whatever keep_dim says.
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+        dim, keep_dim = 0, False
 
     # Three different cases here:
     # 1. dim == None, flatten input tensor first, keep_dim will be ignore and the output rank == input rank
