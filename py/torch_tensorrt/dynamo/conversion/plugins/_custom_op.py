@@ -47,6 +47,11 @@ def custom_op(
         the real kernel must still return non-aliasing tensors as required by PyTorch.
         Ops returning ``None`` get synthetic aliased outputs for their mutations;
         their fake kernel should return ``None`` as usual.
+        When one tensor is passed as 2 arguments that the op mutates, the plugin
+        writes into that tensor itself, so that the writes through both arguments add
+        up. If the tensor is a clone of a graph input, the plugin can then also change
+        the caller's input. The same holds for an FP8 tensor, because TensorRT does not
+        let the layer that would copy it read FP8 data.
     """
     generate_plugin(op_name)
     if _aot_register is not None:

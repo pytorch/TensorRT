@@ -926,6 +926,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 )
 
         self.ctx.current_node = self._cur_node
+        self.ctx.node_values = self.env
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:
