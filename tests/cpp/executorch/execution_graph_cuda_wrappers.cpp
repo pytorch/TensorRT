@@ -114,6 +114,8 @@ cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
 cudaError_t __real_cudaStreamDestroy(cudaStream_t);
+cudaError_t __real_cudaEventRecord(cudaEvent_t, cudaStream_t);
+cudaError_t __real_cudaEventCreateWithFlags(cudaEvent_t*, unsigned int);
 cudaError_t __real_cudaGraphExecDestroy(cudaGraphExec_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
@@ -250,6 +252,21 @@ cudaError_t __wrap_cudaStreamSynchronize(cudaStream_t stream) {
     }
   }
   return __real_cudaStreamSynchronize(stream);
+}
+
+cudaError_t __wrap_cudaEventCreateWithFlags(cudaEvent_t* event, unsigned int flags) {
+  if (active_calls && active_calls->fail_event_creates > 0) {
+    --active_calls->fail_event_creates;
+    return cudaErrorMemoryAllocation;
+  }
+  return __real_cudaEventCreateWithFlags(event, flags);
+}
+
+cudaError_t __wrap_cudaEventRecord(cudaEvent_t event, cudaStream_t stream) {
+  if (active_calls && ++active_calls->event_record_calls == active_calls->fail_event_record_call) {
+    return cudaErrorInvalidResourceHandle;
+  }
+  return __real_cudaEventRecord(event, stream);
 }
 
 cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {

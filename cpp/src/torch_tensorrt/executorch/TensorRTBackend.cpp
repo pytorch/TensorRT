@@ -652,6 +652,10 @@ Error initialize_engine_io(EngineHandle& handle) {
   if (get_current == nullptr || get_current(&handle.context) != CUDA_SUCCESS) {
     handle.context = nullptr;
   }
+  static const auto get_id = driver_entry_point<PFN_cuCtxGetId_v12000>("cuCtxGetId", 12000);
+  if (handle.context == nullptr || get_id == nullptr || get_id(handle.context, &handle.context_id) != CUDA_SUCCESS) {
+    handle.context_id = 0;
+  }
 
   if (handle.shared_scratch) {
     // Gated so a handle loaded with the option off pays no TensorRT call for a
@@ -1225,6 +1229,33 @@ Error refuse_pooled_call_on_a_capturing_stream(cudaStream_t stream, int device_i
   return Error::NotSupported;
 }
 
+// Refuses a pooled call on a stream of another device or of another regular CUDA context than the
+// engine's, a new context with the handle of the engine's destroyed one included. Such a call would
+// claim, and maybe grow, the pool, and only then fail in enqueueV3. A green context stream reports the
+// primary context of its device, so it passes when the engine was loaded in that context.
+Error refuse_pooled_call_from_another_context(cudaStream_t stream, const EngineHandle& engine) {
+  static const auto get_context = driver_entry_point<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+  static const auto get_id = driver_entry_point<PFN_cuCtxGetId_v12000>("cuCtxGetId", 12000);
+  CUcontext context = nullptr;
+  CUgreenCtx green = nullptr;
+  if (engine.context == nullptr || get_context == nullptr || get_context(stream, &context, &green) != CUDA_SUCCESS) {
+    return Error::Ok;
+  }
+  // The driver gives a destroyed context's handle to a new one, so the same handle is the engine's context only
+  // when the id matches too. An id that cannot be read, as on a driver without cuCtxGetId, counts as a match.
+  unsigned long long id = 0;
+  if (context == engine.context &&
+      (engine.context_id == 0 || get_id == nullptr || get_id(context, &id) != CUDA_SUCCESS ||
+       id == engine.context_id)) {
+    return Error::Ok;
+  }
+  ET_LOG(
+      Error,
+      "TensorRTBackend::execute: the selected stream belongs to another CUDA device or regular CUDA context than the one this engine on the shared activation scratch was loaded in, on device %d",
+      engine.device_id);
+  return Error::InvalidState;
+}
+
 // Sets out_ptr to a buffer of at least `need` bytes on `device_id`, with `stream`
 // ordered after the enqueue that last used the buffer. Returns with `claim`
 // holding the device's lock: the caller must submit its enqueue, call
@@ -1236,7 +1267,8 @@ Error refuse_pooled_call_on_a_capturing_stream(cudaStream_t stream, int device_i
 //
 // What the pool makes is made in `context`, the engine's: the thread's current
 // context may be a green context or another regular context, which the caller
-// may destroy first.
+// may destroy first. `context_id` is that context's id, which the pool keeps to
+// refuse an engine of another context.
 //
 // `need` is a real request and never zero -- execute() substitutes
 // kMinPooledScratchBytes for a zero before calling, so that the size the pool
@@ -1253,10 +1285,18 @@ Error claim_shared_scratch(
     SharedScratchClaim& claim,
     int device_id,
     CUcontext context,
+    unsigned long long context_id,
     size_t need,
     cudaStream_t stream,
     void*& out_ptr) {
   SharedScratchDevice& dev = claim.hold(device_id);
+  if (dev.context_id != 0 && context_id != 0 && context_id != dev.context_id) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: the shared activation scratch on device %d belongs to the regular CUDA context of the device's first pooled call, and this engine was loaded in another one",
+        device_id);
+    return Error::InvalidState;
+  }
 
   const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, [context]() -> cudaEvent_t {
     ContextScope scope(context, context != nullptr);
@@ -1283,6 +1323,11 @@ Error claim_shared_scratch(
         "TensorRTBackend::execute: failed to create the shared activation scratch handoff event on device %d",
         device_id);
     return Error::Internal;
+  }
+  // Tied once the pool holds something made in the context, so a first claim that made nothing leaves the
+  // pool free for a later one in another context.
+  if (dev.context_id == 0) {
+    dev.context_id = context_id;
   }
   if (handoff.needs_wait) {
     const cudaError_t err = cudaStreamWaitEvent(stream, handoff.event, 0);
@@ -1919,14 +1964,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (capture_err != Error::Ok) {
       return capture_err;
     }
-    // The pool's completion event belongs to the engine's context, so such a call would fail only after
-    // it had set its shapes and claimed, and maybe grown, the pool in that other context.
-    if (engine->execution_graph && engine->execution_graph->serves_another_regular_context(stream)) {
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: an engine on the shared activation scratch cannot run on a stream of "
-          "another regular CUDA context");
-      return Error::InvalidState;
+    const Error context_err = refuse_pooled_call_from_another_context(stream, *engine);
+    if (context_err != Error::Ok) {
+      return context_err;
     }
   }
 
@@ -2452,8 +2492,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // under some shape has to be given a buffer whatever this call's shapes need,
     // or enqueueV3 refuses it.
     const size_t scratch_bytes = need == 0 ? kMinPooledScratchBytes : need;
-    const Error scratch_err =
-        claim_shared_scratch(scratch_claim, engine->device_id, engine->context, scratch_bytes, stream, scratch_buffer);
+    const Error scratch_err = claim_shared_scratch(
+        scratch_claim, engine->device_id, engine->context, engine->context_id, scratch_bytes, stream, scratch_buffer);
     if (scratch_err != Error::Ok) {
       return scratch_err;
     }

@@ -107,11 +107,10 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * other buffers than that graph's, the engine records again in its own context,
  * on buffers of its own; when that recording cannot go ahead, the call fails and
  * the engine keeps the graph of its own calls, unless the call brought new
- * shapes. An engine on the shared activation scratch pool fails on a
- * stream of another regular context, since the pool's completion event belongs
- * to the engine's context; once the engine has run in its own context, such a
- * call made while that context is current fails before it sets its shapes or
- * claims the pool. Other streams take the
+ * shapes. An engine on the shared activation scratch pool fails on a stream of
+ * another device or of another regular context before it sets its shapes or
+ * claims the pool, since the pool belongs to the engine's device and context.
+ * Other streams take the
  * ordinary path, and the graphs are kept unless the scratch buffer, the shapes,
  * or the optimization profile changed.
  */

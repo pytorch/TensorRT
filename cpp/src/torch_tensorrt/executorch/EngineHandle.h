@@ -83,6 +83,9 @@ struct EngineHandle {
   // keeps across calls; a call on a green context stream still runs in that green context. With a driver older
   // than CUDA 12.5, a green context current at load is recorded here instead.
   CUcontext context = nullptr;
+  // That context's id, zero when the driver cannot report it. The driver can give a destroyed context's
+  // handle to a new one, but never its id.
+  unsigned long long context_id = 0;
   // The device's primary context, retained when a green context was current at load, so that context is
   // the one current while the engine and exec_ctx are created. Released when this handle is destroyed.
   CUcontext retained_primary = nullptr;

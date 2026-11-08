@@ -54,6 +54,11 @@ struct SharedScratchDevice {
   std::mutex mu;
   void* buffer = nullptr;
   std::size_t capacity = 0;
+  // The id of the context of the engine whose claim first made the pool's event, which the flag and the
+  // buffer are made in too. A claim from an engine loaded in another regular context is refused. An id and
+  // not a handle, since the driver can give a destroyed context's handle to a new one. The test-only reset
+  // leaves it.
+  unsigned long long context_id = 0;
   SharedScratchMarker marker;
   // The stream a growth queues its free of the buffer it replaced on. Created on
   // the first growth that has one to dispose of; nothing in the normal path

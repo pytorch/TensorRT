@@ -152,14 +152,6 @@ Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream) {
   return Error::InvalidState;
 }
 
-bool ExecutionGraph::serves_another_regular_context(cudaStream_t stream) const {
-  CUcontext context = nullptr;
-  CUgreenCtx green = nullptr;
-  unsigned long long green_id = 0;
-  return engine_context_ != nullptr && recording_context(stream, context, green, green_id) && green == nullptr &&
-      context != engine_context_;
-}
-
 ExecutionGraph::~ExecutionGraph() {
   reset_graph();
   for (void* buffer : buffers_) {

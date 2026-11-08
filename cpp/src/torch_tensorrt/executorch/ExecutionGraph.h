@@ -96,10 +96,6 @@ class ExecutionGraph {
       const std::vector<size_t>& binding_bytes,
       const void* scratch);
 
-  // Whether `stream` belongs to a regular CUDA context other than the one the engine ran in, while
-  // that context is current. False until the engine has run in its own context.
-  bool serves_another_regular_context(cudaStream_t stream) const;
-
   // Whether the graph for the context of the last call that could replay is recorded.
   bool is_captured() const {
     return last_graph_->graph_exec_ != nullptr;

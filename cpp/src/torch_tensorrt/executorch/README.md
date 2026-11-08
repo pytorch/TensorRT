@@ -317,12 +317,13 @@ warm-up call, then a recording on its next call. So a caller that makes one call
 than 4 green contexts in turn never replays. A caller may free its own buffers after any call,
 since a later call on other addresses records again or copies.
 
-Destroy the engine before the green contexts it ran on. TensorRT requires a green context to outlive
-every CUDA graph recorded in it, and the engine keeps a green context's graph until the engine is
-destroyed or a newer green context takes its place. With TensorRT 11.4 and newer, an engine with
-auxiliary streams needs this order even with replay off: TensorRT makes those streams in the green
-context it runs in, and destroying the engine after that context logs a "context is destroyed"
-error.
+Destroy the engine before the regular CUDA context it was loaded in, and before the green contexts
+it ran on. A call after the load context is destroyed can crash, also when a new context was given
+the destroyed one's handle. TensorRT requires a green context to outlive every CUDA graph recorded
+in it, and the engine keeps a green context's graph until the engine is destroyed or a newer green
+context takes its place. With TensorRT 11.4 and newer, an engine with auxiliary streams needs this
+order even with replay off: TensorRT makes those streams in the green context it runs in, and
+destroying the engine after that context logs a "context is destroyed" error.
 
 An engine loaded while a green context is current is created in the device's primary context, which it
 keeps until it is destroyed, so that green context may be destroyed first if the engine never runs
@@ -351,11 +352,18 @@ Some calls do not replay:
   The engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
   buffers the delegate keeps for such a call are allocated in the engine's context, so that other
   context may be destroyed first.
-- An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
-  at all, with or without replay: the scratch's completion event belongs to the engine's context.
-  With replay on, once the engine has run in its own context, such a call made while that other
-  context is current fails before it sets its shapes or claims the shared scratch, and the engine
-  keeps its graphs. With replay off, or with no context current, the call is not refused up front.
+- An engine on the shared activation scratch fails on a stream of another device or of another
+  regular CUDA context than the one it was loaded in, with or without replay. Such a call fails
+  before it sets its shapes or claims the shared scratch, and the engine keeps its graphs. Green
+  context streams of its device run when it was loaded in the device's primary context. The scratch
+  and its completion event are one per device, made in the context of the device's first pooled
+  call, so load every pooled engine on a device in the same regular context. A pooled engine loaded
+  in another one fails before it runs. Keep that context alive while the process uses the scratch:
+  the scratch, and every larger buffer it grows into, is made in it. With a driver older than CUDA
+  12.5, that context is a green context when the first pooled engine was loaded while one was
+  current, so keep that green context alive too. The check on the stream uses cuStreamGetCtx_v2,
+  which CUDA 12.5 added, so with an older driver a call on a stream of another device or context
+  still fails, but only later, after it claims the scratch.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
   ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
   that gives up its place to a newer green context starts over.
@@ -393,7 +401,9 @@ options.set_option("use_shared_activation_scratch", true);
 const Error error = set_option("TensorRTBackend", options.view());
 ```
 
-Set it before you load the methods that should use the pool. What it costs:
+Set it before you load the methods that should use the pool. Load every pooled engine on a device in
+the same regular CUDA context, and keep that context alive while the process uses the pool, with
+replay on or off; [CUDA graph replay](#cuda-graph-replay) has the detail. What it costs:
 
 - **No parallelism between pooled calls on one device.** The delegate holds a per-device lock from
   claiming the buffer until the work is queued and marked. Two pooled calls can be submitted from

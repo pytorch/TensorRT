@@ -80,6 +80,8 @@ cc_test(
         "-Wl,--wrap=cudaStreamDestroy",
         "-Wl,--wrap=cudaGraphExecDestroy",
         "-Wl,--wrap=cudaGetDriverEntryPointByVersion",
+        "-Wl,--wrap=cudaEventRecord",
+        "-Wl,--wrap=cudaEventCreateWithFlags",
     ],
     linkstatic = True,
     target_compatible_with = select({

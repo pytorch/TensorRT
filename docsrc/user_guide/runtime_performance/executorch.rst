@@ -596,11 +596,12 @@ call with other shapes starts every graph over. A fifth green context takes the 
 called longest ago, and a replaced one starts over with a warm-up call, so one call on each of more
 than 4 green contexts in turn never replays.
 
-Destroy the engine before the green contexts it ran on. TensorRT requires a green context to
-outlive every CUDA graph recorded in it, and the engine keeps such a graph until the engine is
-destroyed or a newer green context takes its place. With TensorRT 11.4 and newer, an engine with
-auxiliary streams needs this order even with replay off, since TensorRT makes those streams in the
-green context.
+Destroy the engine before the regular CUDA context it was loaded in, and before the green contexts
+it ran on. A call after the load context is destroyed can crash, also when a new context was given
+the destroyed one's handle. TensorRT requires a green context to outlive every CUDA graph recorded
+in it, and the engine keeps such a graph until the engine is destroyed or a newer green context
+takes its place. With TensorRT 11.4 and newer, an engine with auxiliary streams needs this order
+even with replay off, since TensorRT makes those streams in the green context.
 
 An engine loaded while a green context is current is created in the device's primary context, which
 it keeps until it is destroyed, so that green context may be destroyed first if the engine never
@@ -625,11 +626,18 @@ Some calls never replay:
   The engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
   buffers the delegate keeps for such a call are allocated in the engine's context, so that other
   context may be destroyed first.
-* An engine on the shared activation scratch cannot serve a stream of another regular CUDA context
-  at all, with or without replay: the scratch's completion event belongs to the engine's context.
-  With replay on, once the engine has run in its own context, such a call made while that other
-  context is current fails before it sets its shapes or claims the shared scratch, and the engine
-  keeps its graphs. With replay off, or with no context current, the call is not refused up front.
+* An engine on the shared activation scratch fails on a stream of another device or of another
+  regular CUDA context than the one it was loaded in, with or without replay. Such a call fails
+  before it sets its shapes or claims the shared scratch, and the engine keeps its graphs. Green
+  context streams of its device run when it was loaded in the device's primary context. The scratch
+  and its completion event are one per device, made in the context of the device's first pooled
+  call, so load every pooled engine on a device in the same regular context. A pooled engine loaded
+  in another one fails before it runs. Keep that context alive while the process uses the scratch:
+  the scratch, and every larger buffer it grows into, is made in it. With a driver older than CUDA
+  12.5, that context is a green context when the first pooled engine was loaded while one was
+  current, so keep that green context alive too. The check on the stream uses cuStreamGetCtx_v2,
+  which CUDA 12.5 added, so with an older driver a call on a stream of another device or context
+  still fails, but only later, after it claims the scratch.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.
@@ -659,7 +667,9 @@ option, all contexts on a device share one buffer instead. The buffer grows to t
 any call has needed, so you save the sum of the separate sizes minus the largest one.
 
 Set the option before you load the methods that should use the shared buffer. Methods loaded
-before it keep their own scratch.
+before it keep their own scratch. Load every method that uses it on a device in the same regular
+CUDA context, and keep that context alive while the process uses the buffer, with replay on or off.
+`CUDA graph replay`_ has the detail.
 
 The cost is parallelism. Two calls that share the buffer never run at the same time on one
 device: the delegate takes a per-device lock from claiming the buffer to queuing the work. The

@@ -60,6 +60,11 @@ struct CudaCalls {
   size_t fail_memcpy_call = 0;
   // The next this many captures fail.
   size_t fail_captures = 0;
+  size_t event_record_calls = 0;
+  // The event record with this 1-based count fails without being queued.
+  size_t fail_event_record_call = 0;
+  // The next this many cudaEventCreateWithFlags calls fail without creating an event.
+  size_t fail_event_creates = 0;
   bool disable_memory_pools = false;
   bool disable_stream_context = false;
   size_t stream_context_queries = 0;
