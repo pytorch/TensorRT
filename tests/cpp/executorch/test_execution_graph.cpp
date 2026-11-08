@@ -168,6 +168,64 @@ std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols, bool alias =
   return wrap_plan(*plan, metadata, alias);
 }
 
+// Two independent branches of two layers each, big enough that TensorRT runs one of them on an auxiliary
+// stream it creates with the execution context.
+std::vector<uint8_t> build_aux_stream_blob(int32_t rows, int32_t cols) {
+  static TRTLogger logger;
+  static std::vector<float> weights[4];
+  TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
+  if (!builder) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(0));
+  TRTUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+  if (!network || !config || !config->setMaxAuxStreams(1)) {
+    return {};
+  }
+  auto* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{rows, cols});
+  if (!input) {
+    return {};
+  }
+  nvinfer1::ITensor* branches[2] = {};
+  for (int b = 0; b < 2; ++b) {
+    nvinfer1::ITensor* t = input;
+    for (int l = 0; l < 2; ++l) {
+      std::vector<float>& w = weights[b * 2 + l];
+      w.resize(static_cast<size_t>(cols) * cols);
+      for (size_t i = 0; i < w.size(); ++i) {
+        w[i] = static_cast<float>(static_cast<int>((i * 31 + b * 7 + l * 3) % 17) - 8) / (8.0f * cols);
+      }
+      auto* constant = network->addConstant(
+          nvinfer1::Dims2{cols, cols}, {nvinfer1::DataType::kFLOAT, w.data(), static_cast<int64_t>(w.size())});
+      auto* product = constant
+          ? network->addMatrixMultiply(
+                *t, nvinfer1::MatrixOperation::kNONE, *constant->getOutput(0), nvinfer1::MatrixOperation::kNONE)
+          : nullptr;
+      auto* activation =
+          product ? network->addActivation(*product->getOutput(0), nvinfer1::ActivationType::kTANH) : nullptr;
+      if (!activation) {
+        return {};
+      }
+      t = activation->getOutput(0);
+    }
+    branches[b] = t;
+  }
+  auto* sum = network->addElementWise(*branches[0], *branches[1], nvinfer1::ElementWiseOperation::kSUM);
+  if (!sum) {
+    return {};
+  }
+  sum->getOutput(0)->setName("output_0");
+  network->markOutput(*sum->getOutput(0));
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
+  if (!plan) {
+    return {};
+  }
+  return wrap_plan(
+      *plan,
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],"device_id":0})",
+      false);
+}
+
 std::vector<uint8_t> build_kv_blob() {
   static TRTLogger logger;
   TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
@@ -2741,6 +2799,65 @@ TEST_F(ExecutionGraphReplayTest, AStagedGreenGraphFreesItsBuffersOnTheStreamWhen
   ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, green[4].stream));
   EXPECT_EQ(calls.free_calls, 0u);
   EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, green[4].stream));
+}
+
+// TensorRT may run some kernels of an engine on auxiliary streams. A recording holds TensorRT's join of
+// those streams as a dependency inside the graph, so a pooled engine with them replays with the outputs of
+// its plain calls, on a plain stream and on a green context's stream.
+TEST_F(ExecutionGraphReplayTest, AnEngineWithAuxiliaryStreamsReplaysWithItsPlainOutputs) {
+  const SizesType rows = 128;
+  const SizesType cols = 256;
+  const auto blob = build_aux_stream_blob(rows, cols);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  const bool green_supported = green_contexts_supported();
+  {
+    // Declared before the engines, which TensorRT requires to be destroyed first.
+    GreenStream green;
+    BackendOption plain_options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+    ASSERT_EQ(set_options({plain_options, 2}), Error::Ok);
+    LoadedGraphEngine plain;
+    ASSERT_EQ(plain.load(blob), Error::Ok);
+    BackendOption graph_options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+    ASSERT_EQ(set_options({graph_options, 2}), Error::Ok);
+    LoadedGraphEngine graph;
+    ASSERT_EQ(graph.load(blob), Error::Ok);
+    ASSERT_TRUE(graph.handle()->claims_pooled_scratch);
+    if (graph.handle()->engine->getNbAuxStreams() == 0) {
+      GTEST_SKIP() << "TensorRT built this engine without auxiliary streams";
+    }
+    const size_t count = static_cast<size_t>(rows) * cols;
+    std::vector<float> input(count), expected(count), actual(count);
+    std::vector<cudaStream_t> streams = {streams_[0]};
+    if (green_supported) {
+      ASSERT_NO_FATAL_FAILURE(green.create());
+      streams.push_back(green.stream);
+    }
+    int seed = 0;
+    for (cudaStream_t stream : streams) {
+      SCOPED_TRACE(stream == streams_[0] ? "plain stream" : "green context stream");
+      CudaCalls calls;
+      for (int i = 0; i < 3; ++i, ++seed) {
+        // A new input on every call, so a replay that does no work cannot pass with an earlier call's output.
+        for (size_t j = 0; j < count; ++j) {
+          input[j] = static_cast<float>(static_cast<int>((j * 13 + seed * 5) % 29) - 14) / 14.0f;
+        }
+        std::fill(expected.begin(), expected.end(), -1.0f);
+        ASSERT_EQ(plain.run(input.data(), expected.data(), rows, cols, streams_[0]), Error::Ok);
+        std::fill(actual.begin(), actual.end(), -1.0f);
+        ASSERT_EQ(graph.run(input.data(), actual.data(), rows, cols, stream), Error::Ok);
+        for (size_t j = 0; j < count; ++j) {
+          ASSERT_NEAR(actual[j], expected[j], 1e-5f) << "call " << i << " element " << j;
+        }
+      }
+      EXPECT_EQ(calls.captures.size(), 1u);
+      EXPECT_EQ(calls.launches.size(), 2u);
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+  if (!green_supported) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU, so only the plain stream was checked";
+  }
 }
 
 // A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
