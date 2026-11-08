@@ -3294,7 +3294,7 @@ def aten_ops_add(
             ctx,
             target,
             SourceIR.ATEN,
-            name,
+            name + "_alpha",
             other,
             alpha,
         )
