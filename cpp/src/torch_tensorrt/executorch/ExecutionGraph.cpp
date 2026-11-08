@@ -246,10 +246,12 @@ Error ExecutionGraph::enqueue_in(
   if (handle.shape_epoch != shape_epoch_) {
     reset_graph();
     capture_failed_ = false;
+    own_buffers_failed_ = false;
     failed_captures_ = 0;
-    // A caller that kept moving its buffers keeps moving them under new shapes too, so it stays on
-    // buffers this graph owns instead of paying two more recordings for every set of shapes.
+    // A caller that moved its buffers away from recordings on them twice keeps moving them under new shapes
+    // too, so it stays on buffers this graph owns instead of paying more recordings for every set of shapes.
     staged_ = moves_ > 1;
+    staged_until_repeat_ = false;
     shape_epoch_ = handle.shape_epoch;
   }
   if (capture_failed_) {
@@ -260,12 +262,31 @@ Error ExecutionGraph::enqueue_in(
   const CUcontext record_context =
       stream_green == nullptr && handle.context != nullptr ? handle.context : stream_context;
   const bool other_context = record_context != stream_context;
-  // A graph reads and writes the addresses it was recorded on. A caller that moves its buffers once
-  // gets a new recording on the new ones; one that keeps moving them, such as one alternating two
-  // sets, would record on every call, so the second move switches to buffers this graph owns.
-  if (!other_context && !staged_ && addresses != recorded_ && graph_exec_ != nullptr) {
-    drop_graph();
-    staged_ = ++moves_ > 1;
+  // A graph reads and writes the addresses it was recorded on. A caller that hands in new buffers on
+  // every call, or alternates two sets, would record on every call, so a first recording goes on the
+  // caller's addresses only when they repeat the previous call's, and on buffers this graph owns until
+  // they do. A caller that moves its buffers away from a recording on them once gets a new recording on
+  // the new ones; one that keeps moving them switches to buffers this graph owns at the second move.
+  if (!other_context) {
+    bool waits_for_repeat = false;
+    if (!staged_ && addresses != recorded_ && graph_exec_ != nullptr) {
+      drop_graph();
+      staged_ = ++moves_ > 1;
+    } else if (!staged_ && graph_exec_ == nullptr && warmed_up_ && addresses != previous_) {
+      // Without buffers of its own, the graph runs these calls plainly.
+      waits_for_repeat = own_buffers_failed_;
+      staged_ = !own_buffers_failed_;
+      staged_until_repeat_ = !own_buffers_failed_;
+    } else if (staged_until_repeat_ && addresses == previous_) {
+      drop_graph();
+      release_buffers(stream);
+      staged_ = false;
+      staged_until_repeat_ = false;
+    }
+    previous_ = addresses;
+    if (waits_for_repeat) {
+      return enqueue_plain(context, stream);
+    }
   }
   // TensorRT cannot run on a stream of another regular context, so a call from one that no graph
   // serves records one in the engine's context, on buffers this graph owns. Until that recording can
@@ -322,8 +343,16 @@ Error ExecutionGraph::enqueue_in(
             return Error::MemoryAllocationFailed;
           }
           fall_back("buffer allocation failed", allocation);
-          capture_failed_ = true;
           release_buffers(stream);
+          // The caller's addresses need no buffers of this graph, so a later call that repeats them still
+          // records on them, and calls that keep moving run plainly until then.
+          if (staged_until_repeat_) {
+            staged_ = false;
+            staged_until_repeat_ = false;
+            own_buffers_failed_ = true;
+          } else {
+            capture_failed_ = true;
+          }
           return enqueue_plain(context, stream);
         }
         buffers_[i] = buffer;
@@ -441,6 +470,11 @@ Error ExecutionGraph::enqueue_in(
     graph_exec_ = exec;
     staged_ = own_buffers;
     recorded_ = own_buffers ? buffers_ : addresses;
+    if (!own_buffers) {
+      // A graph on the caller's addresses leaves this graph's buffers unused. New shapes can clear the
+      // repeat that would otherwise free them, so they are freed here.
+      release_buffers(stream);
+    }
   }
   if (graph_exec_ != nullptr) {
     const auto error = cuda_error(cudaGraphLaunch(graph_exec_, stream), "launch");

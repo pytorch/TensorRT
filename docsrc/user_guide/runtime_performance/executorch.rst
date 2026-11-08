@@ -588,14 +588,17 @@ replays copy nothing. With the recipe in `Keep inputs and outputs on the GPU`_, 
 does not own them: from Python pass ``clone_outputs=False``, or from C++ give each output once with
 ``Module::set_output``, and reuse the same input tensors. These are still copied on every call:
 host buffers (unless the GPU reads host memory directly), buffers off a 256-byte boundary,
-non-row-major inputs, and an output that shares memory with an input. When the buffers change, that
-call records again on the new ones. When they change a second time, for any input shapes, the engine
-records on GPU buffers of its own and copies the inputs in and the outputs out on every call, also
-after the shapes or the profile change. With few kernels, or with large inputs and outputs, those
-copies can cost more than the launches they save. So buffers that move on every call cost up to 3
-recordings for a set of shapes in each graph until they have moved twice. After that, each new set
-of shapes records once and first replays on its 3rd call. Each growth of the shared activation
-scratch in between adds one recording and moves the first replay later.
+non-row-major inputs, and an output that shares memory with an input. A graph goes on the caller's
+buffers once a call brings the same buffers as the call before it. Until then the engine records on
+GPU buffers of its own and copies the inputs in and the outputs out on every call after the first.
+When the buffers of a graph on the caller's buffers change, that call records again on the new ones.
+When they change a second time, for any input shapes, that graph records on its own buffers and
+copies on every call, also after the shapes or the profile change. The plain graph and the graph of
+each green context count their own changes. With few kernels, or with large inputs and outputs,
+those copies can cost more than the launches they save. So buffers that move on every call, or
+alternate between two sets, cost one recording for each set of shapes in each graph, as buffers that
+stay put do, and both first replay on the 3rd call. Each growth of the shared activation scratch in
+between adds a call without a graph and a recording, and moves the first replay later.
 
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded there, and its replays stay on the green context's SMs. Kernels that

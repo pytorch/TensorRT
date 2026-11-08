@@ -933,9 +933,9 @@ TEST_F(ExecutionGraphReplayTest, MovedAddressesRecordAgainOnceThenCopyThroughOwn
   EXPECT_EQ(replay.launches.size(), 1u);
 }
 
-// Buffers that keep moving keep moving under new shapes too, so once they have moved twice the engine stays on
-// buffers of its own, and each later set of shapes records once instead of up to 3 times.
-TEST_F(ExecutionGraphReplayTest, BuffersThatKeepMovingRecordOnceForEachLaterSetOfShapes) {
+// Buffers that move on every call never repeat the previous call's, so each set of shapes records once, on the
+// graph's own buffers, as for buffers that stay put.
+TEST_F(ExecutionGraphReplayTest, BuffersThatMoveOnEveryCallRecordOnceForEachSetOfShapes) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
   const SizesType shapes[][2] = {{2, 8}, {4, 4}, {2, 8}, {4, 4}};
@@ -950,8 +950,86 @@ TEST_F(ExecutionGraphReplayTest, BuffersThatKeepMovingRecordOnceForEachLaterSetO
     }
     captures.push_back(calls.captures.size());
   }
-  // The buffers move for the second time under the second set of shapes.
-  EXPECT_EQ(captures, std::vector<size_t>({2, 2, 1, 1}));
+  EXPECT_EQ(captures, std::vector<size_t>({1, 1, 1, 1}));
+}
+
+// Buffers that stay put after one call on other buffers record again on the caller's addresses, release the
+// graph's own buffers, and replay with no copies.
+TEST_F(ExecutionGraphReplayTest, BuffersThatSettleReplayOnThemAndReleaseOwnBuffers) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i == 0 ? 0 : 1, 2, 8, i, streams_[0]));
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  EXPECT_EQ(calls.malloc_calls, 2u);
+  EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[1]);
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 0u);
+  EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// Buffers that settle under new shapes record on the caller's addresses, and the graph's own buffers from the
+// call before go then, not when the engine is destroyed.
+TEST_F(ExecutionGraphReplayTest, BuffersThatSettleUnderNewShapesReleaseOwnBuffers) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, 0, streams_[0]));
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 1, 2, 8, 1, streams_[0]));
+  EXPECT_EQ(calls.malloc_calls, 2u);
+  for (int i = 2; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 1, 4, 8, i, streams_[0]));
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+}
+
+// The graph's own buffers are not needed for buffers that settle, so a failure to allocate them still leaves a
+// recording on the caller's addresses that replays with no copies.
+TEST_F(ExecutionGraphReplayTest, BuffersThatSettleReplayOnThemWhenOwnBuffersFailToAllocate) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  calls.fail_malloc_call = 1;
+  for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i == 0 ? 0 : 1, 2, 8, i, streams_[0]));
+  }
+  EXPECT_EQ(calls.malloc_calls, 1u);
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[1]);
+}
+
+// Without buffers of its own, a graph still records only on caller buffers that repeat, so buffers that keep
+// moving after the allocation fails run plainly instead of recording on every call.
+TEST_F(ExecutionGraphReplayTest, BuffersThatKeepMovingWhenOwnBuffersFailToAllocateRunPlainly) {
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  CudaCalls calls;
+  calls.fail_malloc_call = 1;
+  for (int i = 0; i < 10; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i, streams_[0]));
+  }
+  EXPECT_EQ(calls.malloc_calls, 1u);
+  EXPECT_TRUE(calls.captures.empty());
+  EXPECT_TRUE(calls.launches.empty());
+  for (int i = 10; i < 13; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 1, 2, 8, i, streams_[0]));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(3, streams_[0]));
 }
 
 // The output moves while the input stays put. Replaying on the recorded output would leave the new one unwritten.
@@ -1232,10 +1310,12 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamCaptureFailureFallsBackAndRecover
   {
     CudaCalls calls;
     calls.fail_captures = 3;
+    // The same buffers until recording gives up, so every recording goes on the caller's addresses.
+    const int slots[] = {0, 0, 0, 1, 0, 1};
     for (int i = 0; i < 6; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare_default(graph, i % 2, 2, 8, i + 1));
-      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
-      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
+      ASSERT_NO_FATAL_FAILURE(compare_default(graph, slots[i], 2, 8, i + 1));
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[slots[i]]);
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[slots[i]]);
       EXPECT_FALSE(graph.is_captured());
     }
     ASSERT_EQ(calls.captures.size(), 3u);
@@ -1260,9 +1340,9 @@ TEST_F(ExecutionGraphReplayTest, AFailedRecordingIsRetriedOnTheNextCall) {
   CudaCalls calls;
   calls.fail_captures = 2;
   for (int i = 0; i < 2; ++i) {
-    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i + 2, streams_[0]));
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 2, streams_[0]));
     EXPECT_FALSE(graph.is_captured());
-    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
   }
   for (int i = 0; i < 3; ++i) {
     ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, i + 4, streams_[0]));
@@ -3851,10 +3931,12 @@ TEST_F(ExecutionGraphReplayTest, CaptureFailureRestoresCallerBindingsAndSuppress
   {
     CudaCalls calls;
     calls.fail_captures = 3;
+    // The same buffers until recording gives up, so every recording goes on the caller's addresses.
+    const int slots[] = {0, 0, 0, 1, 0, 1};
     for (int i = 0; i < 6; ++i) {
-      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, i % 2, 2, 8, i + 2, streams_[0]));
-      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
-      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, slots[i], 2, 8, i + 2, streams_[0]));
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[slots[i]]);
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[slots[i]]);
       EXPECT_FALSE(graph.is_captured());
     }
     EXPECT_EQ(calls.captures.size(), 3u);

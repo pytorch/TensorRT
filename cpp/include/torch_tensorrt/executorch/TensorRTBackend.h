@@ -100,13 +100,16 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5
  * keep ordinary enqueueV3. A replay reads and writes the buffers it was recorded
  * on, so keep each input and output in the same device buffer from call to call,
- * and replays copy nothing. When the buffers move, that call records again on
- * the new ones. When they move a second time, for any shapes, the engine
- * records on buffers of its own and copies the inputs in and the outputs out on
- * every call, also after the shapes or the optimization profile change. Host buffers
- * on a GPU that does not read host memory directly, buffers off a 256-byte
- * boundary, inputs that are not row-major, and outputs that share memory with
- * an input are still copied on every call.
+ * and replays copy nothing. A graph goes on the caller's buffers once a call
+ * brings the buffers of the call before it, and on buffers of its own until
+ * then. When the buffers under a graph on the caller's buffers move, that call
+ * records again on the new ones. When they move a second time, for any shapes,
+ * that graph records on buffers of its own and copies the inputs in and the
+ * outputs out on every call, also after the shapes or the optimization profile
+ * change. The plain graph and the graph of each green context count their own
+ * moves. Host buffers on a GPU that does not read host memory directly, buffers
+ * off a 256-byte boundary, inputs that are not row-major, and outputs that
+ * share memory with an input are still copied on every call.
  * An engine on the shared activation scratch pool records again whenever the
  * pool hands it a different buffer. Streams of the current regular context,
  * green context streams of the engine's device, and calls with no caller stream
