@@ -578,7 +578,7 @@ class LoadedEngine {
 };
 
 // Sets `out` to the device-wide bytes in use, or returns false leaving it alone.
-// It reports the failure rather than substituting a figure because both callers
+// It reports the failure rather than substituting a figure because its callers
 // subtract two of these: a zero for the first reading of a pair makes the second
 // look like the whole cost of what was measured between them, which is a pass.
 bool device_bytes_in_use(std::size_t& out) {
@@ -589,6 +589,23 @@ bool device_bytes_in_use(std::size_t& out) {
   }
   out = total_bytes - free_bytes;
   return true;
+}
+
+// Sets `followed` to whether device-wide memory in use moves by at least half of a
+// written cudaMalloc of `bytes`. On some integrated GPUs it does not (on a DGX
+// Spark's GB10 a 64 MiB allocation moved it by 0.5 MiB), so a bound on it would
+// measure nothing there. The Jetson board tested, also integrated, does track it.
+void measure_whether_memory_in_use_follows_allocations(std::size_t bytes, bool& followed) {
+  std::size_t before = 0;
+  ASSERT_TRUE(device_bytes_in_use(before)) << "cudaMemGetInfo failed, so this test measured nothing";
+  void* probe = nullptr;
+  ASSERT_EQ(cudaMalloc(&probe, bytes), cudaSuccess);
+  std::unique_ptr<void, cudaError_t (*)(void*)> free_probe(probe, cudaFree);
+  ASSERT_EQ(cudaMemset(probe, 0, bytes), cudaSuccess);
+  ASSERT_EQ(cudaDeviceSynchronize(), cudaSuccess);
+  std::size_t after = 0;
+  ASSERT_TRUE(device_bytes_in_use(after)) << "cudaMemGetInfo failed, so this test measured nothing";
+  followed = after >= before + bytes / 2;
 }
 
 // Linked in with -Wl,--wrap=cudaMalloc, so every cudaMalloc the delegate makes
@@ -1136,6 +1153,12 @@ TEST_F(SharedScratchBackendTest, PooledEnginesShareOneActivationScratchAllocatio
   ASSERT_GE(scratch_bytes_, kMinMeasurableScratch)
       << "the fixture engine reports " << scratch_bytes_
       << " bytes of activation scratch, too little for the memory comparison to resolve";
+  bool memory_is_measurable = false;
+  ASSERT_NO_FATAL_FAILURE(measure_whether_memory_in_use_follows_allocations(scratch_bytes_, memory_is_measurable));
+  if (!memory_is_measurable) {
+    GTEST_SKIP() << "cudaMemGetInfo does not show a written " << scratch_bytes_
+                 << "-byte cudaMalloc on this device, so the memory comparison would measure nothing";
+  }
 
   cudaStream_t stream = nullptr;
   ASSERT_EQ(cudaStreamCreate(&stream), cudaSuccess);
@@ -1230,6 +1253,10 @@ void SharedScratchBackendTest::run_a_growth_and_bound_what_it_cost(bool synchron
   ASSERT_GE(big_scratch_bytes_, scratch_bytes_ + kMinMeasurableScratch)
       << "the two fixture engines ask for " << scratch_bytes_ << " and " << big_scratch_bytes_
       << " bytes of activation scratch, too close for the growth to be measurable";
+  // Asked here, outside the measurement, and answered last, so the output comparisons are made either way.
+  bool memory_is_measurable = false;
+  ASSERT_NO_FATAL_FAILURE(
+      measure_whether_memory_in_use_follows_allocations(big_scratch_bytes_ - scratch_bytes_, memory_is_measurable));
 
   cudaStream_t stream = nullptr;
   ASSERT_EQ(cudaStreamCreate(&stream), cudaSuccess);
@@ -1343,6 +1370,10 @@ void SharedScratchBackendTest::run_a_growth_and_bound_what_it_cost(bool synchron
       << "the smaller engine stopped producing its own output once the growth moved the shared buffer";
 
   // Last, so the output comparisons above are made either way.
+  if (!memory_is_measurable) {
+    GTEST_SKIP() << "cudaMemGetInfo does not show a written " << big_scratch_bytes_ - scratch_bytes_
+                 << "-byte cudaMalloc on this device, so the two bounds below would measure nothing";
+  }
   if (device_gave_memory_back) {
     GTEST_SKIP() << "device-wide memory in use fell from " << before << " to " << after
                  << " bytes across the growth, which a growth cannot do, so another process released memory on this "
