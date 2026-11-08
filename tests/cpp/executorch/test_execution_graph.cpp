@@ -2720,6 +2720,29 @@ TEST_F(ExecutionGraphReplayTest, AFifthGreenContextTakesThePlaceOfTheLeastRecent
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>({green[0].stream, green[1].stream}));
 }
 
+// A staged green graph copies through buffers of its own. The green context that takes its place frees them
+// on its stream, not with a device-wide cudaFree.
+TEST_F(ExecutionGraphReplayTest, AStagedGreenGraphFreesItsBuffersOnTheStreamWhenItsPlaceIsTaken) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream green[5];
+  for (GreenStream& each : green) {
+    ASSERT_NO_FATAL_FAILURE(each.create());
+  }
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  ASSERT_NO_FATAL_FAILURE(stage(plain, graph, 2, 8, green[0].stream));
+  int seed = 10;
+  for (int index : {1, 2, 3}) {
+    ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, green[index].stream));
+  }
+  CudaCalls calls;
+  ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, green[4].stream));
+  EXPECT_EQ(calls.free_calls, 0u);
+  EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(2, green[4].stream));
+}
+
 // A graph does not need the stream it was recorded on, and one kept in a green context could not be destroyed
 // once a caller destroyed that context.
 TEST_F(ExecutionGraphReplayTest, EachRecordingDestroysItsCaptureStream) {
