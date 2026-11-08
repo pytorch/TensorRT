@@ -51,6 +51,7 @@ from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .reset_folded_constructors import reset_folded_constructors
 from .rule_based_autocast import rule_based_autocast
+from .split_sequence_first_attention_heads import split_sequence_first_attention_heads
 
 pre_lowering_pass_list = [
     remove_detach,
@@ -92,6 +93,7 @@ post_lowering_pass_list = [
     fold_shared_kv_attention,
     force_causal_efficient_attention,
     decompose_unsupported_attention,
+    split_sequence_first_attention_heads,
     annotate_fp8_sdpa,
     decompose_dynamic_slice_scatter,
     collapse_high_rank_permutes,
