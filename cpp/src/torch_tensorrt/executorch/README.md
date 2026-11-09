@@ -506,10 +506,16 @@ A call whose shapes need no scratch still needs a buffer installed, because `enq
 context with none when its engine needs scratch for any shape. Against an empty pool such a call
 allocates the one-byte minimum, not the engine's figure for its whole profile, because the pool
 never shrinks: on one dynamic test engine that figure is 4 MiB, against 128 KiB for the next real
-call. Each call also installs its own size rather than the pool's capacity. A size query that
-failed then shows up, because TensorRT refuses a buffer smaller than the bound shapes need, and
-the delegate fails the call with `Error::InvalidState` instead of running on a buffer it may have
-freed.
+call. Each call also installs its own size rather than the pool's capacity. TensorRT refuses a
+buffer smaller than the bound shapes need, and the delegate then fails the call with
+`Error::InvalidState` instead of running on a buffer it may have freed.
+
+Some engines cannot tell their size for the bound shapes before their first run. One example is an
+engine with a boolean mask assignment such as `y[mask] = x[mask]`, where the number of selected
+elements depends on the data. TensorRT reports an error for that query, and the delegate then uses
+the upper bound for the engine's optimization profile, which is no more than the engine
+allocates for itself with the option off. The first time this happens in a process, it logs two lines
+at the Info level, the second with TensorRT's reason.
 
 ### Shared engines
 

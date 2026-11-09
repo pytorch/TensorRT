@@ -2676,22 +2676,23 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // other shapes, or another one -- grows it and moves it. A kSTATIC context owns
   // its private scratch, so the install must not be made on one.
   //
-  // A reported zero has two causes that reach here and nothing distinguishes them:
-  // bound shapes that genuinely need none -- an empty input inside a profile that
-  // admits one -- and a query that failed. Neither sizes the pool: a zero asks for
-  // kMinPooledScratchBytes, which any live buffer already covers. The install is
-  // what tells the two apart, because setDeviceMemoryV2 refuses a buffer smaller
-  // than the bound shapes need, so a call whose query failed ends here rather than
-  // enqueueing against whatever pointer the context was last given, which a growth
-  // may since have freed. The README's shared activation scratch section says why
-  // the minimum rather than the engine's profile-wide figure.
+  // A query that TensorRT reports as failed is answered with the profile's upper
+  // bound instead; see pooled_scratch_bytes_for_shapes. A zero left after that
+  // means the bound shapes genuinely need none (an empty input inside a profile
+  // that admits one) and does not size the pool: it asks for
+  // kMinPooledScratchBytes, which any live buffer already covers. The README's
+  // shared activation scratch section says why the minimum rather than the
+  // engine's profile-wide figure. The install is still checked, because
+  // setDeviceMemoryV2 refuses a buffer smaller than the bound shapes need, so a
+  // size that falls short ends the call here rather than enqueueing against
+  // whatever pointer the context was last given, which a growth may since have
+  // freed.
   //
   // What is installed is this call's own requirement and not the capacity the pool
   // holds, which is larger whenever an earlier call asked for more. The larger
   // figure would tell TensorRT it owns bytes holding another engine's activations
   // -- the pool never clears the buffer -- and would blunt the refusal above,
-  // since after a growth the capacity may well cover what a failed query
-  // concealed.
+  // since after a growth the capacity may well cover a size that falls short.
   //
   // The claim holds the device's pool lock from here through the record of the
   // enqueue below; see SharedScratchClaim for why it spans that far. Every return
@@ -2699,7 +2700,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // restore above, so its free lands on the right device.
   void* scratch_buffer = nullptr;
   if (pooled_scratch) {
-    const size_t need = ctx->updateDeviceMemorySizeForShapes();
+    const size_t need = pooled_scratch_bytes_for_shapes(*ctx, engine->device_id);
     // The substitution for a zero is made here and once: the same figure has to
     // be the size the pool guarantees and the size the context is told it owns,
     // and nothing downstream checks that two copies of it still agree --

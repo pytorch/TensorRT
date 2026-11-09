@@ -10,10 +10,10 @@
 // option, and the pooled execute() path -- the kUSER_MANAGED context, the
 // updateDeviceMemorySizeForShapes/setDeviceMemoryV2 pair, the enqueue handoff
 // between two caller streams, the growth a larger engine forces on a pool a
-// smaller one already allocated, two of the three things that make the per-shape
-// query answer zero -- the third, a failed query, cannot be induced from inside
-// this process, and one of the two, an empty batch, answers zero only on some
-// GPUs -- and two threads submitting against one pooled buffer at once.
+// smaller one already allocated, the three things that make the per-shape query
+// answer zero (an engine that needs none; an empty batch, which answers zero only
+// on some GPUs; a query TensorRT fails), and two threads submitting against one
+// pooled buffer at once.
 // It also covers the one place this branch could have moved the option-off path
 // without meaning to, and where it says it did not: the error returns of an
 // unpooled call.
@@ -144,6 +144,11 @@ constexpr int kDynCols = 64;
 constexpr int kDynMaxBatch = 128;
 // Inside the same profile and not empty, so one engine covers both answers.
 constexpr int kDynBatch = 4;
+
+// The input of the engine whose size query fails before its first run. Small,
+// because only whether the call runs and what it computes matter.
+constexpr int kMaskRows = 4;
+constexpr int kMaskCols = 8;
 
 // Engines loaded together in the memory test. Four is enough for the private
 // case to cost 4x the scratch and the pooled case 1x.
@@ -332,6 +337,94 @@ std::vector<std::uint8_t> build_dynamic_batch_engine_blob() {
       "input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims3{kDynMaxBatch, kDynRows, kDynCols});
   config->addOptimizationProfile(profile);
 
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
+  if (plan == nullptr) {
+    return {};
+  }
+  return wrap_engine_plan(*plan);
+}
+
+// Computes max(input, 0) the way a boolean mask assignment `y[x > 0] = x[x > 0]`
+// is lowered: NonZero gives the positions, whose count depends on the data, and
+// a gather and a scatter move the selected values. The count passes through a
+// select before it sizes a slice, which is what makes TensorRT's per-shape size
+// query fail until the context's first enqueue; without the select it answers.
+bool add_data_dependent_size_net(nvinfer1::INetworkDefinition& network, nvinfer1::ITensor& input) {
+  static const float kZero = 0.0f;
+  static const std::int32_t kCountAxis = 1;
+  static const std::int32_t kNoCount = 0;
+  static const std::int32_t kRank = 3;
+
+  nvinfer1::IConstantLayer* zero =
+      network.addConstant(nvinfer1::Dims3{1, 1, 1}, nvinfer1::Weights{nvinfer1::DataType::kFLOAT, &kZero, 1});
+  nvinfer1::IConstantLayer* count_axis =
+      network.addConstant(nvinfer1::Dims{1, {1}}, nvinfer1::Weights{nvinfer1::DataType::kINT32, &kCountAxis, 1});
+  nvinfer1::IConstantLayer* no_count =
+      network.addConstant(nvinfer1::Dims{1, {1}}, nvinfer1::Weights{nvinfer1::DataType::kINT32, &kNoCount, 1});
+  nvinfer1::IConstantLayer* rank =
+      network.addConstant(nvinfer1::Dims{1, {1}}, nvinfer1::Weights{nvinfer1::DataType::kINT32, &kRank, 1});
+  if (zero == nullptr || count_axis == nullptr || no_count == nullptr || rank == nullptr) {
+    return false;
+  }
+
+  nvinfer1::IElementWiseLayer* mask =
+      network.addElementWise(input, *zero->getOutput(0), nvinfer1::ElementWiseOperation::kGREATER);
+  nvinfer1::INonZeroLayer* positions = network.addNonZero(*mask->getOutput(0)); // [3, N]
+  nvinfer1::IShapeLayer* positions_shape = network.addShape(*positions->getOutput(0));
+  nvinfer1::ICastLayer* shape_i32 = network.addCast(*positions_shape->getOutput(0), nvinfer1::DataType::kINT32);
+  nvinfer1::IGatherLayer* count = network.addGather(*shape_i32->getOutput(0), *count_axis->getOutput(0), 0);
+  nvinfer1::IElementWiseLayer* any =
+      network.addElementWise(*count->getOutput(0), *no_count->getOutput(0), nvinfer1::ElementWiseOperation::kGREATER);
+  nvinfer1::ISelectLayer* picked = network.addSelect(*any->getOutput(0), *count->getOutput(0), *count->getOutput(0));
+  nvinfer1::ITensor* slice_size_parts[2] = {rank->getOutput(0), picked->getOutput(0)};
+  nvinfer1::IConcatenationLayer* slice_size = network.addConcatenation(slice_size_parts, 2);
+  nvinfer1::ISliceLayer* sliced =
+      network.addSlice(*positions->getOutput(0), nvinfer1::Dims2{0, 0}, nvinfer1::Dims2{1, 1}, nvinfer1::Dims2{1, 1});
+  sliced->setInput(2, *slice_size->getOutput(0));
+  nvinfer1::IShuffleLayer* indices = network.addShuffle(*sliced->getOutput(0)); // [N, 3]
+  indices->setFirstTranspose(nvinfer1::Permutation{{1, 0}});
+
+  nvinfer1::IGatherLayer* values = network.addGatherV2(input, *indices->getOutput(0), nvinfer1::GatherMode::kND);
+  nvinfer1::IElementWiseLayer* zeros =
+      network.addElementWise(input, *zero->getOutput(0), nvinfer1::ElementWiseOperation::kPROD);
+  nvinfer1::IScatterLayer* scattered = network.addScatter(
+      *zeros->getOutput(0), *indices->getOutput(0), *values->getOutput(0), nvinfer1::ScatterMode::kND);
+  if (scattered == nullptr) {
+    return false;
+  }
+  scattered->getOutput(0)->setName("output_0");
+  network.markOutput(*scattered->getOutput(0));
+  return true;
+}
+
+std::vector<std::uint8_t> build_data_dependent_size_engine_blob() {
+  static BuilderLogger logger;
+
+  TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
+  if (builder == nullptr) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(0));
+  if (network == nullptr) {
+    return {};
+  }
+  nvinfer1::ITensor* input =
+      network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims3{1, -1, kMaskCols});
+  if (input == nullptr || !add_data_dependent_size_net(*network, *input)) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+  if (config == nullptr) {
+    return {};
+  }
+  // The first profile allows more rows, so its scratch bound is larger than the second one's.
+  for (const int max_rows : {4 * kMaskRows, kMaskRows}) {
+    nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
+    profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims3{1, 1, kMaskCols});
+    profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims3{1, kMaskRows, kMaskCols});
+    profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims3{1, max_rows, kMaskCols});
+    config->addOptimizationProfile(profile);
+  }
   TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
   if (plan == nullptr) {
     return {};
@@ -667,7 +760,8 @@ bool open_user_managed_context(const std::vector<std::uint8_t>& blob, int rows, 
 
 // Counts the reference-count calls TensorRT makes on a recorder as it attaches
 // and detaches one, which is how a test attached to the delegate's own context
-// sees install_pooled_scratch scope its recorder over the install.
+// sees install_pooled_scratch and pooled_scratch_bytes_for_shapes scope their
+// recorders over the install and the size query.
 //
 // TensorRT documents setErrorRecorder as calling incRefCount on the recorder it
 // takes and decRefCount on the one it replaces, and it does. That makes the count
@@ -1646,20 +1740,16 @@ TEST_F(SharedScratchBackendTest, AnEmptyInputRunsWithThePoolEnabled) {
   EXPECT_EQ(std::memcmp(expected.data(), actual.data(), dyn_elems * sizeof(float)), 0);
 }
 
-// The install is what separates the two causes of a zero from the per-shape
-// query. Where an empty batch answers zero, both reach execute() as a zero and
-// neither is asked to size the pool, so both can be handed a buffer as small as one
-// byte; only one of them is safe with it. Where the bound shapes genuinely need
-// nothing the engine expects nothing and the one-byte buffer is accepted, which the
-// case after this one pins. Where the query failed the engine expects what it
-// always did, TensorRT refuses the install through a call that returns void, and
-// the context keeps the buffer it was last given -- which a growth may already
-// have freed, and enqueueV3 then reports success while the engine reads and
-// writes memory the pool no longer owns.
+// The install is what catches a size that falls short of what the bound shapes
+// need. Where the bound shapes genuinely need nothing the engine expects nothing
+// and the one-byte buffer is accepted, which the case after this one pins. Where
+// the size falls short, TensorRT refuses the install through a call that returns
+// void, and the context keeps the buffer it was last given -- which a growth may
+// already have freed, and enqueueV3 then reports success while the engine reads
+// and writes memory the pool no longer owns.
 //
-// The failed query itself cannot be induced from inside this process, so what is
-// pinned here is the check that catches its consequence, over the same TensorRT
-// call execute() makes.
+// A short size cannot be induced through execute(), so what is pinned here is
+// the check, over the same TensorRT call execute() makes.
 TEST_F(SharedScratchBackendTest, AnUndersizedScratchInstallIsSeenAsRefused) {
   LiveContext needs_scratch;
   ASSERT_TRUE(open_user_managed_context(blob(), kRows, kCols, 1, needs_scratch))
@@ -1753,10 +1843,10 @@ TEST_F(SharedScratchBackendTest, AnInstallKeepsAReferenceOnTheRecorderItSwapsOut
 // only the refusal, so every other case here stays green.
 //
 // Forcing the refusal itself through execute() is not available. The size
-// execute() installs is what the per-shape query just returned, over a buffer the
-// pool has grown to at least that, so the installed size is never short of what
-// the context expects. Only a failed query makes the two disagree, and that
-// cannot be induced from inside this process.
+// execute() installs is what the per-shape query just returned, or the profile's
+// upper bound when TensorRT failed the query, over a buffer the pool has grown to
+// at least that, so the installed size is never short of what the context
+// expects.
 //
 // Nor is the choice between that size and the pool's capacity observable through
 // TensorRT: an install larger than the context expects is accepted in silence, so
@@ -1768,10 +1858,11 @@ TEST_F(SharedScratchBackendTest, AnInstallKeepsAReferenceOnTheRecorderItSwapsOut
 //
 // What is observable is the recorder. install_pooled_scratch attaches one for
 // the duration of the install and restores the previous one after, because that
-// is the only channel TensorRT reports a refusal on. A recorder this test leaves
-// on the delegate's context therefore sees itself replaced and put back exactly
-// once per pooled run, and sees nothing at all if the install stops going
-// through the helper.
+// is the only channel TensorRT reports a refusal on, and
+// pooled_scratch_bytes_for_shapes does the same around the size query. A
+// recorder this test leaves on the delegate's context therefore sees itself
+// replaced and put back exactly twice per pooled run, and only once if the
+// install stops going through the helper.
 TEST_F(SharedScratchBackendTest, ExecuteInstallsPooledScratchThroughTheCheckedHelper) {
   // Declared before the engine so it outlives the context TensorRT attaches it
   // to: the context decrements this recorder's count as it is destroyed.
@@ -1792,16 +1883,17 @@ TEST_F(SharedScratchBackendTest, ExecuteInstallsPooledScratchThroughTheCheckedHe
   ASSERT_EQ(pooled.run(stream), Error::Ok);
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
 
-  // Two of each and not one: TensorRT drops a reference on the recorder it
-  // replaces and takes it again on the restore, and the install holds one of its
-  // own across the swap so that the caller's recorder cannot reach zero in
-  // between -- AnInstallKeepsAReferenceOnTheRecorderItSwapsOut is that half.
-  EXPECT_EQ(recorder.detached.load(), 2)
-      << "a pooled execute() did not replace the context's error recorder, so its activation-scratch install was not "
-         "the checked one and a refusal by TensorRT would go unread";
-  EXPECT_EQ(recorder.reattached.load(), 2)
-      << "the recorder the caller had attached was not put back after the install, so TensorRT's diagnostics for the "
-         "rest of the call go somewhere the caller did not ask for";
+  // Two of each per swap and not one: TensorRT drops a reference on the recorder
+  // it replaces and takes it again on the restore, and each swap holds one of its
+  // own across it so that the caller's recorder cannot reach zero in between
+  // (AnInstallKeepsAReferenceOnTheRecorderItSwapsOut is that half). Two swaps: the
+  // size query, then the install.
+  EXPECT_EQ(recorder.detached.load(), 4)
+      << "a pooled execute() did not replace the context's error recorder around both the size query and the "
+         "activation-scratch install, so an error TensorRT reports for one of them would go unread";
+  EXPECT_EQ(recorder.reattached.load(), 4)
+      << "the recorder the caller had attached was not put back after the size query and the install, so TensorRT's "
+         "diagnostics for the rest of the call go somewhere the caller did not ask for";
   EXPECT_EQ(pooled.context()->getErrorRecorder(), &recorder)
       << "execute() left an error recorder of its own attached to the context";
   EXPECT_EQ(recorder.reported.load(), 0)
@@ -1888,6 +1980,72 @@ TEST_F(SharedScratchBackendTest, AFailedPooledAllocationLeavesTheDeviceLockFreeA
   ASSERT_EQ(actual.size(), kElems);
   EXPECT_NE(actual[0], kSentinel) << "the engine did not write its output, so the run above did not reach it";
 
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+}
+
+// ---------------------------------------------------------------------------
+// An engine whose per-shape size query fails before its first run
+// ---------------------------------------------------------------------------
+
+// TensorRT 11.4 reports an error for the per-shape query of this engine and
+// answers zero until the context's first enqueue, so a pooled call that takes the
+// zero at its word installs too little and fails. The call has to use the upper
+// bound of the profile it runs instead, which the pool's capacity afterwards
+// shows. It runs the second profile, whose bound is the smaller, so a bound read
+// from the first profile, or the largest over both, shows too.
+TEST_F(SharedScratchBackendTest, AnEngineWhoseSizeQueryFailsRunsWithThePoolEnabled) {
+  const std::vector<std::uint8_t> blob = build_data_dependent_size_engine_blob();
+  ASSERT_FALSE(blob.empty()) << "TensorRT could not build the data-dependent-size engine";
+  const std::int64_t profile_bytes = engine_scratch_requirement(blob);
+  ASSERT_GT(profile_bytes, 0) << "the engine needs no activation scratch, so it never reaches the pool";
+  std::int64_t second_profile_bytes = 0;
+  {
+    // Declared before the context so it outlives it.
+    CountingErrorRecorder recorder;
+    LiveContext probe;
+    ASSERT_TRUE(open_user_managed_context(blob, kMaskRows, kMaskCols, 1, probe));
+    probe.ctx->setErrorRecorder(&recorder);
+    probe.ctx->updateDeviceMemorySizeForShapes();
+    if (recorder.reported.load() == 0) {
+      GTEST_SKIP() << "this TensorRT sizes the engine's scratch before its first run, so no call here reaches a "
+                      "failed size query";
+    }
+    second_profile_bytes = probe.engine->getDeviceMemorySizeForProfileV2(1);
+    ASSERT_GT(second_profile_bytes, 0) << "the second profile needs no activation scratch, so a run on it never "
+                                          "reaches the pool";
+    ASSERT_LT(second_profile_bytes, profile_bytes)
+        << "the second profile's bound is not the smaller, so the pool's capacity cannot tell it from the largest";
+  }
+
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+  constexpr std::uint32_t kSeed = 31;
+  LoadedEngine pooled;
+  ASSERT_EQ(pooled.load(blob, kSeed, kMaskRows, kMaskCols), Error::Ok);
+  ASSERT_TRUE(pooled.handle()->claims_pooled_scratch);
+  const int device = pooled.handle()->device_id;
+
+  OptimizationProfileGuard guard{1};
+  for (int run = 0; run < 2; ++run) {
+    ASSERT_TRUE(pooled.fill_output(kSentinel));
+    ASSERT_EQ(pooled.run(stream), Error::Ok) << "run " << run;
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+    EXPECT_EQ(shared_scratch_capacity_for_testing(device), static_cast<std::size_t>(second_profile_bytes))
+        << "run " << run;
+
+    const std::vector<float> actual = pooled.read_output();
+    ASSERT_EQ(actual.size(), pooled.elems());
+    std::size_t selected = 0;
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+      const float in = pattern(i, kSeed);
+      selected += in > 0.0f ? 1 : 0;
+      EXPECT_EQ(actual[i], in > 0.0f ? in : 0.0f) << "element " << i << " of run " << run;
+    }
+    // Neither none nor all, or the output would not depend on the mask.
+    EXPECT_GT(selected, 0u);
+    EXPECT_LT(selected, actual.size());
+  }
   ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
 }
 

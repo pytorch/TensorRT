@@ -107,7 +107,8 @@ struct EngineHandle {
   // needing activation scratch under some shape; a handle loaded with the option
   // off keeps this false and says nothing about what its engine needs, because it
   // has its own kSTATIC scratch either way. It is a predicate and not a size
-  // because the size is never the right amount to install: enqueueV3 refuses a
+  // because the size is not the amount to install while TensorRT can size the
+  // bound shapes (pooled_scratch_bytes_for_shapes): enqueueV3 refuses a
   // kUSER_MANAGED context with no device memory once the engine needs any, however
   // little the shapes bound to a given call need, so execute() must hand such a
   // call some buffer -- but the engine's own figure covers every shape in the

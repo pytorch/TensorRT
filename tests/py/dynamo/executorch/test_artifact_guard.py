@@ -1269,6 +1269,10 @@ _CONVERSION_WIDTHS = {"%d": 11, "%zu": 20, "%lld": 20}
             "cpp/src/torch_tensorrt/executorch/ExecutionGraph.cpp",
             "TensorRTBackend::execute: enqueueV3 failed.",
         ),
+        (
+            "cpp/src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
+            "TensorRTBackend::execute: TensorRT could not size the activation scratch",
+        ),
     ],
 )
 @pytest.mark.unit

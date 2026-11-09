@@ -7,11 +7,12 @@
 
 #pragma once
 
-// The one step of execute()'s pooled path that the backend's test drives
-// directly, declared beside the source that defines it rather than in the
-// installed header set: it is an implementation detail of execute(), and a
-// declaration in an installed header is API the next release has to keep.
-// SharedScratchPool.h sits here for the same reason.
+// The steps of execute()'s pooled path that read what TensorRT reports, split
+// out so the backend's test can drive install_pooled_scratch directly. They are
+// declared beside the source that defines them rather than in the installed
+// header set: they are implementation details of execute(), and a declaration in
+// an installed header is API the next release has to keep. SharedScratchPool.h
+// sits here for the same reason.
 
 #include <NvInfer.h>
 
@@ -37,6 +38,18 @@ namespace executorch_backend {
 // The backend's own test calls it over the same TensorRT call to cover a refusal
 // that cannot be induced through execute().
 bool install_pooled_scratch(nvinfer1::IExecutionContext& ctx, void* buffer, std::size_t bytes, int device_id);
+
+// Returns the activation scratch the shapes bound on `ctx`, a kUSER_MANAGED
+// context, need. Where TensorRT reports that it cannot work that out, returns
+// the upper bound for the context's optimization profile instead, and logs that
+// it did, naming `device_id`.
+//
+// updateDeviceMemorySizeForShapes fails that way, answering zero, for some
+// engines with a data-dependent shape inside them, until the context's first
+// enqueue. setDeviceMemoryV2's documentation names the profile's figure as an
+// upper bound, so the call can run on it, and it is no more than a kSTATIC
+// context allocates.
+std::size_t pooled_scratch_bytes_for_shapes(nvinfer1::IExecutionContext& ctx, int device_id);
 
 } // namespace executorch_backend
 } // namespace torch_tensorrt
