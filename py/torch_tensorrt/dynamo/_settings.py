@@ -60,6 +60,7 @@ from torch_tensorrt.dynamo._defaults import (
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     RELEASE_WEIGHTS_AFTER_BUILD,
+    REPLACE_INTERLEAVE_STACK_WITH_CAT,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
@@ -209,6 +210,7 @@ class CompilationSettings:
         fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
         tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
@@ -304,6 +306,7 @@ class CompilationSettings:
     fallback_pytorch_plugin_ops: bool = FALLBACK_PYTORCH_PLUGIN_OPS
     collapse_high_rank_permutes: bool = COLLAPSE_HIGH_RANK_PERMUTES
     convert_antialiased_resize: bool = CONVERT_ANTIALIASED_RESIZE
+    replace_interleave_stack_with_cat: bool = REPLACE_INTERLEAVE_STACK_WITH_CAT
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
     tune_build_route_file: Optional[str] = TUNE_BUILD_ROUTE_FILE
@@ -391,6 +394,9 @@ class CompilationSettings:
         state.setdefault("fallback_pytorch_plugin_ops", FALLBACK_PYTORCH_PLUGIN_OPS)
         state.setdefault("collapse_high_rank_permutes", COLLAPSE_HIGH_RANK_PERMUTES)
         state.setdefault("convert_antialiased_resize", CONVERT_ANTIALIASED_RESIZE)
+        state.setdefault(
+            "replace_interleave_stack_with_cat", REPLACE_INTERLEAVE_STACK_WITH_CAT
+        )
         state.setdefault("fold_shared_kv_attention", FOLD_SHARED_KV_ATTENTION)
         state.setdefault("release_weights_after_build", RELEASE_WEIGHTS_AFTER_BUILD)
         state.setdefault("deduplicate_weights", DEDUPLICATE_WEIGHTS)
@@ -445,6 +451,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "fallback_pytorch_plugin_ops",
     "collapse_high_rank_permutes",
     "convert_antialiased_resize",
+    "replace_interleave_stack_with_cat",
 }
 
 

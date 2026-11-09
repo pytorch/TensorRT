@@ -50,6 +50,7 @@ from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes  # noqa: F401
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
+from .replace_interleave_stack_with_cat import replace_interleave_stack_with_cat
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .reset_folded_constructors import reset_folded_constructors
 from .rule_based_autocast import rule_based_autocast
@@ -60,6 +61,7 @@ pre_lowering_pass_list = [
     remove_assert_nodes,
     rule_based_autocast,
     preserve_attention_output_layout,
+    replace_interleave_stack_with_cat,
 ]
 
 
@@ -343,6 +345,10 @@ def pre_export_lowering(
             settings.autocast_calibration_dataloader,
             [torch.ops.higher_order.wrap_with_autocast],
         )
+    elif settings.replace_interleave_stack_with_cat:
+        # The stack rewrite also works on a copy, so that the caller's program
+        # stays as it was.
+        ep = _copy_program(ep)
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     for sub in iter_cond_subgraphs(gm):

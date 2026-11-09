@@ -435,6 +435,15 @@ Graph Partitioning
        ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
        graph. Only static input and output heights and widths and floating-point
        inputs are converted. Some sizes run slower than in PyTorch, so measure it.
+   * - ``replace_interleave_stack_with_cat``
+     - ``False``
+     - Write a stack whose only user is a reshape that merges the new axis into a
+       neighbor axis, as in ``torch.stack([even, odd], dim=3).flatten(2, 3)`` for a
+       2x upsample, as a concatenation of unsqueezed inputs. This can make large,
+       image-sized interleaves faster on GPUs where TensorRT fuses the region around
+       them, but slower where TensorRT runs them as separate layers and adds copies,
+       so measure it. Only programs from ``torch.export`` are rewritten, not
+       ``torch.compile`` graphs.
 
 ----
 
@@ -541,7 +550,7 @@ rebuilt from scratch:
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``.
+``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
