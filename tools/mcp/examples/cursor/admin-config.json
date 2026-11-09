@@ -1,6 +1,6 @@
 {
-    "workspace_root": "YOUR_PATH/TensorRT/mcp_example",
-    "output_root": "YOUR_PATH/TensorRT/mcp_example/jobs",
+    "workspace_root": "YOUR_PATH/TensorRT/tools/mcp/examples/cursor",
+    "output_root": "YOUR_PATH/TensorRT/.mcp-runs",
     "models": {
         "add": {
             "path": "factories_add.py",

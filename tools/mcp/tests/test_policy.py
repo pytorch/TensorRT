@@ -1,4 +1,5 @@
 import inspect
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,28 @@ from torch_tensorrt_mcp.models import (
 )
 from torch_tensorrt_mcp.policy import Policy, PolicyError, confined_path
 from torch_tensorrt_mcp.worker import _samples, _verify_provenance
+
+
+def test_policy_creates_missing_output_root(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    output = tmp_path / "nested" / "output"
+    config = tmp_path / "config.json"
+    config.write_text(
+        json.dumps(
+            {
+                "workspace_root": str(workspace),
+                "output_root": str(output),
+                "models": {},
+                "inputs": {},
+            }
+        )
+    )
+
+    policy = Policy.load(config)
+
+    assert policy.output_root == output
+    assert output.is_dir()
 
 
 def test_settings_and_factory_arguments_are_strict(policy):
