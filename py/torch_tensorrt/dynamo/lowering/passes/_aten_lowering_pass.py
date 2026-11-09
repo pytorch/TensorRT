@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import torch
 import torch.utils._pytree as pytree
@@ -19,6 +19,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     set_defer_graph_cleanup,
     trace_intermediate_node_outputs,
 )
+from torch_tensorrt.dynamo.tools.weight_mapping import raise_if_mapped_files_changed
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
@@ -255,11 +256,35 @@ def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
     return len(a_values) == len(b_values) and all(map(same, a_values, b_values))
 
 
+def _get_weights_the_graph_reads(
+    ep: torch.export.ExportedProgram,
+) -> Dict[str, torch.Tensor]:
+    """The program's weights that its graph reads, by name: lifted parameters, buffers and constants whose
+    placeholders have users. ``torch.export`` lifts a parameter the module never uses too.
+    """
+    signature = ep.graph_signature
+    names = {
+        **signature.inputs_to_parameters,
+        **signature.inputs_to_buffers,
+        **signature.inputs_to_lifted_tensor_constants,
+    }
+    weights = {}
+    for node in ep.graph.nodes:
+        if node.op == "placeholder" and node.users and node.name in names:
+            tensor = ep.state_dict.get(
+                names[node.name], ep.constants.get(names[node.name])
+            )
+            if isinstance(tensor, torch.Tensor):
+                weights[names[node.name]] = tensor
+    return weights
+
+
 def pre_export_lowering(
     ep: torch.export.ExportedProgram,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.export.ExportedProgram:
     """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
+    raise_if_mapped_files_changed(_get_weights_the_graph_reads(ep).values())
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
