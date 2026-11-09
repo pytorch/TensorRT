@@ -1825,6 +1825,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // pointer of the input they alias so their update lands in-place.
   std::vector<void*> input_bind_ptrs(num_inputs, nullptr);
   std::vector<size_t> binding_bytes(num_inputs + num_outputs);
+  // Where each input's caller memory starts and ends, for the overlap test on the outputs below.
+  std::vector<std::pair<uintptr_t, uintptr_t>> input_ranges;
+  input_ranges.reserve(num_inputs);
   size_t arg_idx = 0; // running index into delegate args
   std::vector<nvinfer1::Dims> input_dims(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
@@ -1837,6 +1840,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
     exec_aten::Tensor et_in = arg->toTensor();
     binding_bytes[i] = et_in.nbytes();
+    if (et_in.nbytes() != 0) {
+      const uintptr_t begin = reinterpret_cast<uintptr_t>(et_in.const_data_ptr());
+      input_ranges.emplace_back(begin, begin + et_in.nbytes());
+    }
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
@@ -2072,6 +2079,24 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // (arg index, device_src ptr) for outputs staged through a device buffer.
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
+  // An engine's kernels can write an output before they finish reading an input, so an output that
+  // shares memory with an input is staged too. The caller's memory is what counts: a staged input
+  // that the engine updates is copied back into it after the engine. Comparing every pair would cost
+  // hundreds of microseconds a call for an engine with hundreds of inputs and outputs, so the ranges are
+  // sorted by start, each end is raised to the largest end so far, and one binary search per output answers.
+  std::sort(input_ranges.begin(), input_ranges.end());
+  for (size_t i = 1; i < input_ranges.size(); ++i) {
+    input_ranges[i].second = std::max(input_ranges[i].second, input_ranges[i - 1].second);
+  }
+  const auto overlaps_an_input = [&input_ranges](const void* ptr, size_t bytes) {
+    const uintptr_t begin = reinterpret_cast<uintptr_t>(ptr);
+    const auto starts_after = std::lower_bound(
+        input_ranges.begin(),
+        input_ranges.end(),
+        begin + bytes,
+        [](const std::pair<uintptr_t, uintptr_t>& range, uintptr_t end) { return range.first < end; });
+    return starts_after != input_ranges.begin() && (starts_after - 1)->second > begin;
+  };
   for (size_t o = 0; o < num_outputs; ++o) {
     const std::string& name = engine->output_binding_names[o];
 
@@ -2223,10 +2248,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = 1;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-    } else if (device_reachable && is_tensor_address_aligned(et_out.const_data_ptr())) {
+    } else if (
+        device_reachable && is_tensor_address_aligned(et_out.const_data_ptr()) &&
+        !overlaps_an_input(et_out.const_data_ptr(), et_out.nbytes())) {
       bind_ptr = et_out.mutable_data_ptr();
     } else {
-      if (device_reachable) {
+      if (device_reachable && !is_tensor_address_aligned(et_out.const_data_ptr())) {
         report_unaligned(name, et_out.const_data_ptr());
       }
       const size_t needed = et_out.nbytes();

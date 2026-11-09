@@ -544,6 +544,188 @@ TEST_F(ExecutionGraphTest, DisabledByDefault) {
   EXPECT_EQ(saved_default_has_graph_, memory_pools_);
 }
 
+// output_i = input_i * 2 + 1 for three independent 1-D float inputs of up to 1024 elements, so each output can
+// be placed anywhere against every input.
+std::vector<uint8_t> build_three_path_blob() {
+  static TRTLogger logger;
+  TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
+  if (!builder) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(0));
+  TRTUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+  auto* profile = builder->createOptimizationProfile();
+  if (!network || !config || !profile) {
+    return {};
+  }
+  static const float scale = 2.0f;
+  static const float bias = 1.0f;
+  std::string bindings;
+  for (int path = 0; path < 3; ++path) {
+    const std::string suffix = std::to_string(path);
+    auto* input = network->addInput(("input_" + suffix).c_str(), nvinfer1::DataType::kFLOAT, nvinfer1::Dims{1, {-1}});
+    auto* multiplier = network->addConstant(nvinfer1::Dims{1, {1}}, {nvinfer1::DataType::kFLOAT, &scale, 1});
+    auto* addend = network->addConstant(nvinfer1::Dims{1, {1}}, {nvinfer1::DataType::kFLOAT, &bias, 1});
+    if (!input || !multiplier || !addend) {
+      return {};
+    }
+    auto* product = network->addElementWise(*input, *multiplier->getOutput(0), nvinfer1::ElementWiseOperation::kPROD);
+    auto* sum = product
+        ? network->addElementWise(*product->getOutput(0), *addend->getOutput(0), nvinfer1::ElementWiseOperation::kSUM)
+        : nullptr;
+    if (!sum || !profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims{1, {1}}) ||
+        !profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims{1, {256}}) ||
+        !profile->setDimensions(input->getName(), nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims{1, {1024}})) {
+      return {};
+    }
+    sum->getOutput(0)->setName(("output_" + suffix).c_str());
+    network->markOutput(*sum->getOutput(0));
+    bindings += R"({"name":"input_)" + suffix + R"(","is_input":true},)";
+  }
+  for (int path = 0; path < 3; ++path) {
+    bindings += R"({"name":"output_)" + std::to_string(path) + R"(","is_input":false})" + (path < 2 ? "," : "");
+  }
+  if (config->addOptimizationProfile(profile) < 0) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
+  if (!plan) {
+    return {};
+  }
+  return wrap_plan(*plan, R"({"io_bindings":[)" + bindings + R"(],"device_id":0})", false);
+}
+
+// Runs the three-path engine once, without replay, on views of one device arena given as offsets and lengths in
+// floats, then checks that output_0 went through a buffer of the engine exactly when `overlaps`, and that every
+// output holds 2 * x + 1 for each x its input held before the call.
+void expect_output_0_staged_when_overlapping(
+    const std::vector<size_t>& in,
+    const std::vector<size_t>& length,
+    const std::vector<size_t>& out,
+    bool overlaps,
+    cudaStream_t stream) {
+  static const std::vector<uint8_t> blob = build_three_path_blob();
+  ASSERT_FALSE(blob.empty());
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  constexpr size_t kArena = 4096;
+  void* raw = nullptr;
+  ASSERT_EQ(cudaMalloc(&raw, kArena * sizeof(float)), cudaSuccess);
+  std::unique_ptr<void, decltype(&cudaFree)> arena_guard(raw, &cudaFree);
+  float* const arena = static_cast<float*>(raw);
+  std::vector<float> before(kArena);
+  for (size_t i = 0; i < kArena; ++i) {
+    before[i] = static_cast<float>(i);
+  }
+  ASSERT_EQ(cudaMemcpyAsync(arena, before.data(), kArena * sizeof(float), cudaMemcpyHostToDevice, stream), cudaSuccess);
+  SizesType sizes[] = {
+      static_cast<SizesType>(length[0]), static_cast<SizesType>(length[1]), static_cast<SizesType>(length[2])};
+  DimOrderType dim_order[] = {0};
+  StridesType strides[] = {1};
+  TensorImpl input_0(ScalarType::Float, 1, &sizes[0], arena + in[0], dim_order, strides);
+  TensorImpl input_1(ScalarType::Float, 1, &sizes[1], arena + in[1], dim_order, strides);
+  TensorImpl input_2(ScalarType::Float, 1, &sizes[2], arena + in[2], dim_order, strides);
+  TensorImpl output_0(ScalarType::Float, 1, &sizes[0], arena + out[0], dim_order, strides);
+  TensorImpl output_1(ScalarType::Float, 1, &sizes[1], arena + out[1], dim_order, strides);
+  TensorImpl output_2(ScalarType::Float, 1, &sizes[2], arena + out[2], dim_order, strides);
+  EValue values[] = {
+      EValue(Tensor(&input_0)),
+      EValue(Tensor(&input_1)),
+      EValue(Tensor(&input_2)),
+      EValue(Tensor(&output_0)),
+      EValue(Tensor(&output_1)),
+      EValue(Tensor(&output_2))};
+  EValue* args[] = {&values[0], &values[1], &values[2], &values[3], &values[4], &values[5]};
+  ASSERT_EQ(engine.run({args, 6}, stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  EXPECT_EQ(engine.handle()->exec_ctx->getTensorAddress("output_0") != arena + out[0], overlaps);
+  std::vector<float> after(kArena);
+  ASSERT_EQ(cudaMemcpy(after.data(), arena, kArena * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  for (size_t p = 0; p < 3; ++p) {
+    for (size_t i = 0; i < length[p]; ++i) {
+      ASSERT_FLOAT_EQ(after[out[p] + i], before[in[p] + i] * 2.0f + 1.0f) << "output_" << p << " element " << i;
+    }
+  }
+}
+
+// Offsets below are in floats, and 64 floats are 256 bytes, so every view is aligned and bound directly unless it
+// overlaps an input. output_1 and output_2 always sit apart from everything.
+
+// An output can overlap a large input past the end of a smaller input that starts inside the large one.
+TEST_F(ExecutionGraphReplayTest, AnOutputOverlappingAnInputPastTheEndOfAnotherInputIsStaged) {
+  expect_output_0_staged_when_overlapping({0, 64, 2048}, {512, 64, 64}, {256, 3072, 3328}, true, streams_[0]);
+}
+
+// Inputs can come in any order of address, so an output that overlaps the last input, which lies below the
+// others, is staged too.
+TEST_F(ExecutionGraphReplayTest, AnOutputOverlappingAnInputAtALowerAddressThanTheOthersIsStaged) {
+  expect_output_0_staged_when_overlapping({2048, 2560, 0}, {256, 256, 256}, {128, 3072, 3584}, true, streams_[0]);
+}
+
+// An output that starts inside an input, or ends inside one, overlaps it.
+TEST_F(ExecutionGraphReplayTest, AnOutputThatPartlyOverlapsAnInputIsStaged) {
+  {
+    SCOPED_TRACE("starts inside");
+    expect_output_0_staged_when_overlapping({0, 2048, 2304}, {256, 64, 64}, {64, 3072, 3328}, true, streams_[0]);
+  }
+  {
+    SCOPED_TRACE("ends inside");
+    expect_output_0_staged_when_overlapping({128, 2048, 2304}, {256, 64, 64}, {0, 3072, 3328}, true, streams_[0]);
+  }
+}
+
+// Ranges that only touch share no memory, so the output stays bound directly.
+TEST_F(ExecutionGraphReplayTest, AnOutputThatOnlyTouchesAnInputIsBoundDirectly) {
+  {
+    SCOPED_TRACE("output ends where the input starts");
+    expect_output_0_staged_when_overlapping({256, 2048, 2304}, {256, 64, 64}, {0, 3072, 3328}, false, streams_[0]);
+  }
+  {
+    SCOPED_TRACE("input ends where the output starts");
+    expect_output_0_staged_when_overlapping({0, 2048, 2304}, {256, 64, 64}, {256, 3072, 3328}, false, streams_[0]);
+  }
+}
+
+// A kernel can write an output before it has read all of an input, so an output that shares memory with an
+// input is written to a buffer of the engine and copied over after the engine finishes, with or without
+// replay. Without replay, an output next to an input is still bound directly.
+TEST_F(ExecutionGraphReplayTest, AnOutputThatOverlapsAnInputIsStaged) {
+  for (bool replay : {false, true}) {
+    SCOPED_TRACE(replay ? "replay" : "plain");
+    ASSERT_EQ(set_graphs(replay), Error::Ok);
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(blob_), Error::Ok);
+    ASSERT_EQ(engine.handle()->execution_graph != nullptr, replay);
+    std::vector<float> input(16), output(16);
+    for (int call = 0; call < 4; ++call) {
+      SCOPED_TRACE(call);
+      for (size_t i = 0; i < input.size(); ++i) {
+        input[i] = static_cast<float>(i + call * 16);
+      }
+      ASSERT_EQ(
+          cudaMemcpyAsync(inputs_[0], input.data(), sizeof(float) * input.size(), cudaMemcpyHostToDevice, streams_[0]),
+          cudaSuccess);
+      ASSERT_EQ(engine.run(inputs_[0], inputs_[0], 2, 8, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      EXPECT_NE(engine.handle()->exec_ctx->getTensorAddress("output_0"), inputs_[0]);
+      ASSERT_EQ(
+          cudaMemcpy(output.data(), inputs_[0], sizeof(float) * output.size(), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t i = 0; i < output.size(); ++i) {
+        ASSERT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f) << "element " << i;
+      }
+    }
+    EXPECT_EQ(engine.is_captured(), replay);
+    if (!replay) {
+      // 2x8 floats end 64 bytes in, well before the next 256-byte boundary.
+      void* next_to_input = static_cast<char*>(inputs_[0]) + 256;
+      ASSERT_EQ(engine.run(inputs_[0], next_to_input, 2, 8, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      EXPECT_EQ(engine.handle()->exec_ctx->getTensorAddress("output_0"), next_to_input);
+    }
+  }
+}
+
 TEST_F(ExecutionGraphReplayTest, LoadOptionWinsOverProcessRefusalAndSavedChoice) {
   char on[] = "1";
   char off[] = "0";

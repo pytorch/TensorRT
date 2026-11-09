@@ -152,6 +152,11 @@ Every buffer you pass in must stay alive and unchanged until `execute()` returns
 thread frees an input during the call, the call can return a wrong answer with `Error::Ok`. Nothing
 below your code can detect that. Python callers cannot hit this, because a tensor owns its memory.
 
+An output that shares memory with an input, other than an output the program declares an alias of
+that input, is written to a buffer of the delegate and copied over once the engine finishes, with or
+without CUDA graphs. The answer is right; the cost is an extra copy of that output per call.
+ExecuTorch's memory planning never makes them overlap.
+
 TensorRT needs every input and output address to be a multiple of 256 bytes, and it does not check.
 A view that starts partway into its storage, such as `x[1:]` of a 1-D tensor, misses that. So the
 delegate copies such a buffer through an aligned one of its own, and logs this once per engine. The
