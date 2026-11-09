@@ -569,6 +569,7 @@ def compile(
     autocast_calibration_dataloader: Optional[
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
+    autocast_model_regions: str = _defaults.AUTOCAST_MODEL_REGIONS,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
@@ -685,6 +686,7 @@ def compile(
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
@@ -913,6 +915,7 @@ def compile(
         "autocast_max_output_threshold": autocast_max_output_threshold,
         "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
+        "autocast_model_regions": autocast_model_regions,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "max_partition_size": max_partition_size,

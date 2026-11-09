@@ -38,6 +38,7 @@ from .fold_slice_into_constant_pad import fold_slice_into_constant_pad
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .inline_autocast_regions import inline_autocast_regions
 from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
@@ -323,6 +324,14 @@ def pre_export_lowering(
         # Autocast inserts casts and changes the dtypes of nodes, so it works on a
         # copy, and the caller's program stays as it was.
         ep = _copy_program(ep)
+        # Without a low precision type autocast changes nothing, so the regions keep
+        # theirs. Inlining comes before calibration, so that it records the values of
+        # the inlined ops.
+        if (
+            settings.autocast_model_regions == "reclassify"
+            and settings.autocast_low_precision_type is not None
+        ):
+            inline_autocast_regions(ep.graph_module)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "

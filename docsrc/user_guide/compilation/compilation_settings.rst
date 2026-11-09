@@ -225,6 +225,21 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        absolute max values) for each node. The autocast pass runs the model on this
        data to check ``autocast_max_output_threshold`` and
        ``autocast_max_depth_of_reduction``. Without it, both rules are skipped.
+   * - ``autocast_model_regions``
+     - ``"keep"``
+     - What autocast does with the regions the model itself runs under
+       ``torch.autocast``. ``"keep"`` builds them with the precisions that PyTorch
+       autocast gives them. ``"reclassify"`` removes their autocast, so that the rules,
+       exclusions and calibration above choose the precision of every op in them too.
+       This can be faster, for example when PyTorch autocast keeps a LayerNorm or a
+       softmax in FP32, but it overrides a choice of the model author, so check the
+       accuracy. Regions with ``enabled=False``, which a model uses to keep ops in FP32,
+       keep their autocast. So do regions whose values inlining would change, such as
+       one that writes into a buffer in place, and regions inside a ``torch.no_grad()``
+       block when the model is exported with grad mode on. Exported under
+       ``torch.no_grad()``, the block leaves nothing in the graph.
+       ``autocast_excluded_node_names`` also matches the names that ops have in the
+       regions.
 
 ----
 
@@ -521,7 +536,7 @@ rebuilt from scratch:
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
-``autocast_max_depth_of_reduction``,
+``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,

@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_LOW_PRECISION_TYPE,
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    AUTOCAST_MODEL_REGIONS,
     BUILD_ROUTE,
     CACHE_BUILT_ENGINES,
     COLLAPSE_HIGH_RANK_PERMUTES,
@@ -172,6 +173,7 @@ class CompilationSettings:
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner
             splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The
             size is then not derived from the budget and the process's resident memory, so the same model and size always
@@ -280,6 +282,7 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    autocast_model_regions: str = AUTOCAST_MODEL_REGIONS
     # Set by autocast, not by users: the nodes it kept in high precision using the
     # calibration data. Saved in place of the data so refit can reuse the choice.
     _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
@@ -343,6 +346,11 @@ class CompilationSettings:
             self.release_weights_after_build = bool(self.release_weights_after_build)
         if isinstance(self.autocast_excluded_node_names, str):
             self.autocast_excluded_node_names = {self.autocast_excluded_node_names}
+        if self.autocast_model_regions not in ("keep", "reclassify"):
+            raise ValueError(
+                'autocast_model_regions must be "keep" or "reclassify", got '
+                f"{self.autocast_model_regions!r}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -400,6 +408,7 @@ class CompilationSettings:
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
         state.setdefault("max_partition_size", MAX_PARTITION_SIZE)
         state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
+        state.setdefault("autocast_model_regions", AUTOCAST_MODEL_REGIONS)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
@@ -426,6 +435,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_excluded_ops",
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
+    "autocast_model_regions",
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",

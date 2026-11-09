@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import base64
+import copy
 import logging
 import operator
 import pickle
@@ -1602,6 +1603,634 @@ def test_autocast_gives_autocast_regions_their_traced_dtypes():
         ),
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_model_regions():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = nn.Linear(64, 64)
+            self.norm = nn.LayerNorm(64)
+            self.fc2 = nn.Linear(64, 64)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.norm(self.fc1(x) * 1000.0)
+                with torch.autocast(x.device.type, enabled=False):
+                    h = torch.softmax(h, dim=-1)
+                y = self.fc2(h)
+            return y.float() + x
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 8, 64, device="cuda")
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+        autocast_excluded_nodes={"^fc2$"},
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(
+        torch.export.export(model, (x,)), CompilationSettings(**kwargs)
+    )
+    vals = {n.target: n.meta.get("val") for n in ep.graph.nodes}
+    # Calibration keeps the layer norm, which reads values above 512, in
+    # float32.
+    assert vals[torch.ops.aten.layer_norm.default].dtype == torch.float32
+    # The last linear, fc2, is excluded by the path of its module.
+    assert vals[torch.ops.aten.linear.default].dtype == torch.float32
+    # Only the nested region with enabled=False is left, and its softmax still
+    # runs in float32.
+    (region,) = ep.graph.find_nodes(
+        op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+    )
+    assert region.args[2] is False
+    body = getattr(ep.graph_module, region.args[4].target)
+    (softmax,) = body.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.softmax.int
+    )
+    assert softmax.meta["val"].dtype == torch.float32
+
+    # Without a low precision type autocast changes nothing, so the regions stay.
+    settings = CompilationSettings(**{**kwargs, "autocast_low_precision_type": None})
+    ep = pre_export_lowering(torch.export.export(model, (x,)), settings)
+    assert torch.ops.higher_order.wrap_with_autocast in (
+        n.target for n in ep.graph.nodes
+    )
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_inline_autocast_regions():
+    from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
+        inline_autocast_regions,
+    )
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+            self.register_buffer("cache", torch.zeros(4, 8, dtype=torch.float16))
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # A 0-dim tensor leaves the division in the dtype of the linear.
+                eight = torch.tensor(8.0, dtype=torch.float64, device=x.device)
+                y = self.linear(x) / eight
+                # lerp needs its inputs in one dtype, as they had under autocast.
+                z = torch.lerp(y, self.cache[pos], 0.5)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # The same 0-dim tensor leaves pow, which autocast casts, in float32.
+                # matmul, which autocast casts too, gets the cache in float32.
+                z = torch.pow(z, eight) @ self.cache.T
+                # Export asserts here that z is float16, which the inlined z is not.
+                return z.float()
+
+    x = torch.randn(2, 8, device="cuda")
+    pos = torch.tensor([1, 3], device="cuda")
+    gm = torch.export.export(Model().cuda().eval(), (x, pos)).graph_module
+    inline_autocast_regions(gm)
+    nodes = {n.target: n for n in gm.graph.nodes}
+    # Under the region the linear and the division ran in float16, now in float32
+    # like the inputs of the linear. Autocast does not cast the inputs of a
+    # division, so it keeps its float64 divisor.
+    div = nodes[torch.ops.aten.div.Tensor]
+    assert div.meta["val"].dtype == torch.float32
+    assert div.args[1].meta["val"].dtype == torch.float64
+    # lerp gets the cache in float32, like y.
+    lerp = nodes[torch.ops.aten.lerp.Scalar]
+    assert lerp.meta["val"].dtype == torch.float32
+    # The second region gets z as the first now gives it, without a cast to float16.
+    power = nodes[torch.ops.aten.pow.Tensor_Tensor]
+    assert power.args[0] is lerp
+    assert power.meta["val"].dtype == torch.float32
+    matmul = nodes[torch.ops.aten.matmul.default]
+    assert matmul.args[1].meta["val"].dtype == torch.float32
+    assert not dict(gm.named_children())
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_model_regions_with_mixed_dtypes():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(64, 64)
+            self.register_buffer("weight", torch.randn(64, 64).half() / 8)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # Autocast gives both inputs of this matmul float16.
+                y = self.linear(x) @ self.weight
+            # A float16 matmul, so it needs y in float16 too.
+            return (y @ self.weight).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 8, 64, device="cuda")
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+        autocast_excluded_nodes={"^linear$"},
+    )
+    ep = pre_export_lowering(
+        torch.export.export(model, (x,)), CompilationSettings(**kwargs)
+    )
+    assert torch.ops.higher_order.wrap_with_autocast not in (
+        n.target for n in ep.graph.nodes
+    )
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_casts_an_output_only_for_ops_outside():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                z = (y @ x).float()
+            # This op outside the regions gets y in float16, as before.
+            return z, y.float()
+
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # Both matmuls stay in float32. x @ x is 131072, above the float16 range, so the
+    # second one must not read it through the cast for the op outside.
+    z, y = ep.module()(x)
+    torch.testing.assert_close(z, x @ x @ x)
+    # The op outside gets y in float16, where 131072 is inf.
+    torch.testing.assert_close(y, torch.full_like(x, float("inf")))
+
+
+@torch.library.custom_op("autocast_regions_test::read_first_rows", mutates_args=())
+def read_first_rows(t: torch.Tensor) -> torch.Tensor:
+    # Reads from the start of the storage, which can lie before the view.
+    return t.as_strided(t.shape, t.stride(), 0).clone()
+
+
+@read_first_rows.register_fake
+def _(t: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like(t)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "case",
+    [
+        "cache",
+        "total",
+        "read_view",
+        "write_view",
+        "dtype_view",
+        "output_views",
+        "foreach_output_views",
+        "foreach_then_read",
+        "nested_views",
+        "view_of_input",
+        "view_then_region_write",
+        "read_only_views",
+        "storage_read",
+        "contiguous_copy",
+        "storage_copy",
+        "storage_in_place",
+        "storage_custom",
+        "storage_no_grad",
+        "read_in_disabled",
+        "nested",
+        "after_inlined",
+        "nested_float",
+        "new_input",
+        "read_then_write",
+        "write_region_output",
+        "to_copy",
+        "pow",
+        "fresh",
+    ],
+)
+def test_autocast_model_regions_keeps_values(case):
+    class Cache(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+            self.register_buffer("cache", torch.zeros(4, 8, dtype=torch.float16))
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                self.cache.index_copy_(0, pos, self.linear(x).half())
+            return self.cache.float()
+
+    class Total(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+            self.register_buffer("total", torch.zeros(1, 8))
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                self.total.add_(self.linear(x))
+            return self.total.clone()
+
+    class ReadView(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x.T
+                # The view taken before add_ sees what add_ writes into y.
+                v = y[:, :2]
+                y.add_(1.0)
+                return v.float()
+
+    class WriteView(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                y[:, :2].add_(1.0)
+                return y.float()
+
+    class DtypeView(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (x.T @ x).view(torch.int32).float()
+
+    class OutputViews(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x.T
+                v = y[:, :1]
+            v.add_(10.0)
+            return y.float()
+
+    class ForeachOutputViews(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:2]
+            # y sees what _foreach_add_ writes into v through a list.
+            torch._foreach_add_([v], 10.0)
+            return y.float()
+
+    class ForeachThenRead(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                # _foreach_add_ returns nothing, so mul reads y itself.
+                torch._foreach_add_([y], 1.0)
+                return (y * 2.0).float()
+
+    class NestedViews(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x.T
+                with torch.autocast(x.device.type, enabled=False):
+                    v = y[:, :1]
+            v.add_(10.0)
+            return y.float()
+
+    class ViewOfInput(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v = x[:, :2]
+            # v sees what add_ writes into x.
+            x.add_(1.0)
+            return v.float()
+
+    class ViewThenRegionWrite(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+            self.register_buffer("cache", torch.zeros(4, 8))
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v = self.cache[:2]
+            # This region writes into the cache, and v sees the write.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                self.cache.index_copy_(0, pos, self.linear(x).float())
+            return v.float()
+
+    class ReadOnlyViews(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                a, b = y[:4], y[2:6]
+            # Nothing writes into y, so its slices can be separate copies.
+            return (a * b).float()
+
+    class StorageRead(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            # as_strided reads all of y through its view v.
+            return torch.as_strided(v, (8, 8), (8, 1), 0).float()
+
+    class ContiguousCopy(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            # contiguous() copies the strided v, so c misses the write into v.
+            c = v.contiguous()
+            v.add_(1.0)
+            return c.float()
+
+    class StorageCopy(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            return torch.as_strided_copy(v, (8, 8), (8, 1), 0).float()
+
+    class StorageInPlace(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            return v.as_strided_((8, 8), (8, 1), 0).float()
+
+    class StorageCustom(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[2:6]
+            return read_first_rows(v).float()
+
+    class StorageNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            with torch.no_grad():
+                return torch.as_strided(v, (8, 8), (8, 1), 0).float()
+
+    class ReadInDisabled(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[::2]
+            # This region reads only the elements of v, so v can be a separate copy.
+            with torch.autocast(x.device.type, enabled=False):
+                return v.float().softmax(-1)
+
+    class Nested(Cache):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear(x)
+                with torch.autocast(x.device.type, enabled=False):
+                    self.cache.index_copy_(0, pos, h)
+            return self.cache.float()
+
+    class AfterInlined(Cache):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear(x)
+            # This region keeps its autocast and needs h in float16, as before.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                self.cache.index_copy_(0, pos, h)
+            return self.cache.float()
+
+    class ToCopy(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # The float() copy of the strided y[::2] is contiguous, so view works.
+                y = x.T @ x
+                return y[::2].float().view(-1)
+
+    class Pow(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("exponent", torch.tensor(65505.0))
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # pow runs in float32, where -1 ** 65505 is -1. In float16 the
+                # exponent would round to 65504, which is even.
+                return torch.pow(x.sign().half(), self.exponent)
+
+    class Fresh(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear1 = nn.Linear(8, 8)
+            self.relu = nn.ReLU(inplace=True)
+            self.linear2 = nn.Linear(8, 8)
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # In-place ops on new values that nothing else reads.
+                h = self.linear2(self.relu(self.linear1(x)))
+                h.add_(1.0).mul_(2.0)
+            return h.float()
+
+    class NewInput(Fresh):
+        def forward(self, x, pos):
+            # Only the region uses h, a new value, so add_ can write into a cast.
+            h = self.linear1(x)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h.add_(1.0)
+                return self.linear2(h).float()
+
+    class ReadThenWrite(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # norm and half() read y before div_ writes into it, and keep no
+                # view of it.
+                y = self.linear1(x).float()
+                y.div_(y.norm(dim=-1, keepdim=True) + y.half().abs().max())
+                return y
+
+    class WriteRegionOutput(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class NestedFloat(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+                # This region keeps its autocast. It gets h in float16, as traced,
+                # also when linear1 runs in float32, so float() still copies h.
+                with torch.autocast(x.device.type, enabled=False):
+                    y = h.float()
+                    y.add_(1.0)
+                return (self.linear2(y) + h).float()
+
+    models = {
+        "cache": (
+            Cache,
+            {"autocast_excluded_ops": {torch.ops.aten.index_copy_.default}},
+        ),
+        "total": (Total, {}),
+        "read_view": (ReadView, {"autocast_excluded_node_names": {"^add_$"}}),
+        "write_view": (WriteView, {"autocast_excluded_node_names": {"^add_$"}}),
+        "dtype_view": (DtypeView, {}),
+        "output_views": (
+            OutputViews,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "foreach_output_views": (
+            ForeachOutputViews,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "foreach_then_read": (
+            ForeachThenRead,
+            {"autocast_excluded_node_names": {"matmul.*"}},
+        ),
+        "nested_views": (
+            NestedViews,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "view_of_input": (
+            ViewOfInput,
+            {"autocast_excluded_ops": {torch.ops.aten.add_.Tensor}},
+        ),
+        "view_then_region_write": (ViewThenRegionWrite, {}),
+        "read_only_views": (
+            ReadOnlyViews,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "storage_read": (
+            StorageRead,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "contiguous_copy": (
+            ContiguousCopy,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "storage_copy": (
+            StorageCopy,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "storage_in_place": (
+            StorageInPlace,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "storage_custom": (
+            StorageCustom,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "storage_no_grad": (
+            StorageNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "read_in_disabled": (
+            ReadInDisabled,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "nested": (
+            Nested,
+            {"autocast_excluded_ops": {torch.ops.aten.index_copy_.default}},
+        ),
+        "after_inlined": (AfterInlined, {}),
+        "nested_float": (NestedFloat, {"autocast_excluded_node_names": {"^linear$"}}),
+        "new_input": (NewInput, {}),
+        "read_then_write": (ReadThenWrite, {}),
+        "write_region_output": (WriteRegionOutput, {}),
+        "to_copy": (ToCopy, {}),
+        "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
+        "fresh": (Fresh, {}),
+    }
+    cls, kwargs = models[case]
+    model = cls().cuda().eval()
+
+    def inputs(i):
+        x = torch.randn(
+            1, 8, device="cuda", generator=torch.Generator("cuda").manual_seed(i)
+        )
+        return x, torch.tensor([i], device="cuda")
+
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        **kwargs,
+    )
+    ep = pre_export_lowering(
+        torch.export.export(copy.deepcopy(model), inputs(0)), settings
+    )
+    # A region keeps its autocast when inlining would change its values. Regions
+    # with enabled=False (args[2]) always keep theirs.
+    kept = any(
+        n.target == torch.ops.higher_order.wrap_with_autocast and n.args[2]
+        for n in ep.graph.nodes
+    )
+    inlined = (
+        "new_input",
+        "read_then_write",
+        "write_region_output",
+        "to_copy",
+        "read_only_views",
+        "nested_float",
+        "read_in_disabled",
+    )
+    assert kept == (case not in (*inlined, "pow", "fresh"))
+    lowered = ep.module()
+    # A second call shows whether the first call's write into a buffer was kept.
+    for i in range(2):
+        torch.testing.assert_close(
+            lowered(*inputs(i)).float(), model(*inputs(i)), rtol=1e-2, atol=1e-2
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "pattern, dtype",
+    [
+        ("^matmul$", torch.float32),
+        ("^matmul_1$", torch.float32),
+        ("^mul$", torch.float16),
+    ],
+    ids=["name_in_region", "name_after_inlining", "other_name"],
+)
+def test_autocast_model_regions_excludes_nodes_by_name(pattern, dtype):
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return x @ x
+
+    x = torch.randn(4, 4, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={pattern},
+    )
+    ep = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
+    (matmul,) = ep.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.matmul.default
+    )
+    # The region's output already has the name matmul, so inlining renames the op.
+    assert matmul.name == "matmul_1"
+    assert matmul.meta["val"].dtype == dtype
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_rejects_unknown_values():
+    assert CompilationSettings().autocast_model_regions == "keep"
+    with pytest.raises(ValueError, match="autocast_model_regions"):
+        CompilationSettings(autocast_model_regions="inline")
 
 
 @pytest.mark.unit

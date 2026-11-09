@@ -13,6 +13,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
 
+from .inline_autocast_regions import NAME_IN_REGION
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,7 +75,7 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
 
 
 class NodeNameRegexRule(NodeRuleBase):
-    """Rule for keeping nodes in high precision whose name in the graph matches a user regex."""
+    """Rule for keeping nodes in high precision whose name in the graph, or in its autocast region, matches a user regex."""
 
     def __init__(self, node_name_regex: Collection[str]) -> None:
         """Initialize the rule.
@@ -84,7 +86,11 @@ class NodeNameRegexRule(NodeRuleBase):
         self.node_name_regex = node_name_regex
 
     def _check_inner(self, node: torch.fx.Node) -> bool:
-        return any(re.match(regex, node.name) for regex in self.node_name_regex)
+        name_in_region = node.meta.get(NAME_IN_REGION, node.name)
+        return any(
+            re.match(regex, node.name) or re.match(regex, name_in_region)
+            for regex in self.node_name_regex
+        )
 
 
 class NodeNameSetRule(NodeRuleBase):
