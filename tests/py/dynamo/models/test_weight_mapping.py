@@ -8,6 +8,7 @@ import mmap
 import os
 import platform
 import struct
+import subprocess
 import sys
 
 import pytest
@@ -254,6 +255,39 @@ def test_a_tie_stored_under_its_later_name_maps(tmp_path):
     torch.testing.assert_close(model.embed.weight, ref.embed.weight)
 
 
+class _Aliased(torch.nn.Module):
+    def __init__(self, second=lambda w: w.detach()):
+        super().__init__()
+        self.w1 = torch.nn.Parameter(torch.arange(8.0))
+        self.w2 = torch.nn.Parameter(second(self.w1))
+
+
+@pytest.mark.parametrize("device", ["cpu", "meta"])
+def test_distinct_tensors_sharing_a_storage_keep_sharing_it(tmp_path, device):
+    ref = _Aliased()
+    save_weights_for_mapping(ref, tmp_path / "w.safetensors")
+    with torch.device(device):
+        model = _Aliased()
+    mapping = map_weights(model, tmp_path / "w.safetensors")
+    assert mapping.missing == [] and mapping.mapped_bytes == ref.w1.nbytes
+    assert model.w1 is not model.w2
+    with torch.no_grad():
+        model.w1 += 1
+    torch.testing.assert_close(model.w2, ref.w1 + 1)
+
+
+def test_tensors_partly_sharing_a_storage_raise(tmp_path):
+    model = _Aliased(second=lambda w: w.detach()[2:])
+    with pytest.raises(ValueError, match="w2 and w1 share memory"):
+        save_weights_for_mapping(model, tmp_path / "w.safetensors")
+    _write_raw_tensors(
+        tmp_path / "w.safetensors", {"w1": torch.zeros(8), "w2": torch.zeros(6)}
+    )
+    with pytest.raises(ValueError, match="w2 and w1 share memory"):
+        map_weights(model, tmp_path / "w.safetensors")
+    assert model.w2.data_ptr() == model.w1.data_ptr() + 8  # unchanged
+
+
 def _write_raw_tensors(path, tensors):
     header, data, offset = {}, b"", 0
     for name, t in tensors.items():
@@ -322,12 +356,60 @@ def test_a_buffer_the_checkpoint_does_not_store_must_be_real(tmp_path):
         save_weights_for_mapping(model, tmp_path / "w.safetensors", source=source)
 
 
+def test_real_tensors_the_checkpoint_stores_are_read_from_it(tmp_path, caplog):
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    torch.manual_seed(0)
+    ref = torch.nn.BatchNorm1d(4)
+    ref(torch.randn(16, 4) * 3 + 2)  # trains the running statistics
+    safetensors_torch.save_file(ref.state_dict(), str(tmp_path / "sd.safetensors"))
+    # Real buffers with their initial values, as accelerate's init_empty_weights() leaves them.
+    model = torch.nn.BatchNorm1d(4)
+    model.register_buffer("scale", torch.full((4,), 2.0))  # persistent, not stored
+    source = weight_mapping.checkpoint_source(tmp_path / "sd.safetensors")
+    with caplog.at_level(
+        logging.WARNING, logger="torch_tensorrt.dynamo.tools.weight_mapping"
+    ):
+        save_weights_for_mapping(model, tmp_path / "w.safetensors", source=source)
+    assert "not in the source" in caplog.text and "scale" in caplog.text
+    with torch.device("meta"):
+        mapped = torch.nn.BatchNorm1d(4)
+        mapped.register_buffer("scale", torch.empty(4))
+    map_weights(mapped, tmp_path / "w.safetensors")
+    for name, value in ref.state_dict().items():
+        torch.testing.assert_close(mapped.state_dict()[name], value)
+    torch.testing.assert_close(mapped.scale, torch.full((4,), 2.0))
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="needs symlinks")
+def test_saving_never_writes_through_a_link(tmp_path):
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep")
+    path = tmp_path / "w.safetensors"
+    (tmp_path / "w.safetensors.partial").symlink_to(
+        victim
+    )  # at the old fixed temporary name
+    _reference(path)
+    assert victim.read_text() == "keep"
+    assert not path.is_symlink()
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "victim.txt",
+        "w.safetensors",
+        "w.safetensors.partial",
+    ]
+
+
 class _TwoBuffers(torch.nn.Module):
-    def __init__(self):
+    def __init__(
+        self, n=mmap.PAGESIZE
+    ):  # float32: 4 pages each, whatever the page size
         super().__init__()
-        n = mmap.PAGESIZE  # float32: 4 pages each, whatever the page size
         self.register_buffer("a", torch.arange(n, dtype=torch.float32))
         self.register_buffer("b", -torch.arange(n, dtype=torch.float32))
+
+
+# MADV_PAGEOUT takes pages from the kernel's LRU lists, which new pages join in batches, so a count of the
+# pages it drops needs more than a few pages.
+_PAGEOUT_N = 2**18
 
 
 def _mapped_two_buffers(tmp_path):
@@ -346,23 +428,103 @@ def _has_pageout():
     return sys.platform == "linux" and release >= (5, 4)
 
 
+def _present(tensor):
+    page = mmap.PAGESIZE
+    start = tensor.data_ptr() // page * page
+    end = -(-(tensor.data_ptr() + tensor.nbytes) // page) * page
+    return weight_mapping._present_bytes(start, end - start)
+
+
 @pytest.mark.skipif(not _has_pageout(), reason="needs MADV_PAGEOUT (Linux 5.4+)")
 def test_release_keeps_writes(tmp_path):
     ref, model = _mapped_two_buffers(tmp_path)
-    assert release_mapped_storage(model.b.untyped_storage())
+    assert release_mapped_storage(model.b.untyped_storage()) is not None
     torch.testing.assert_close(model.a, ref.a + 5.0)
     torch.testing.assert_close(model.b, ref.b + 5.0)  # swapped out, not discarded
-    assert not release_mapped_storage(torch.ones(4).untyped_storage())
+    assert release_mapped_storage(torch.ones(4).untyped_storage()) is None
 
 
 @pytest.mark.skipif(not hasattr(mmap, "MADV_DONTNEED"), reason="needs MADV_DONTNEED")
 def test_release_without_pageout_drops_only_its_own_pages(tmp_path, monkeypatch):
-    monkeypatch.setattr(weight_mapping, "_PAGE_DROP_ADVICE", (mmap.MADV_DONTNEED,))
+    monkeypatch.setattr(weight_mapping, "_MADV_PAGEOUT", None)
     ref, model = _mapped_two_buffers(tmp_path)
-    assert release_mapped_storage(model.b.untyped_storage())
+    assert release_mapped_storage(model.b.untyped_storage()) > 0
     torch.testing.assert_close(model.a, ref.a + 5.0)  # a neighbour's writes survive
     # b's whole pages were re-read from the file; its edge page, shared with a neighbour, was kept.
     assert not torch.equal(model.b, ref.b + 5.0)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="needs Linux's page map")
+def test_release_drops_pages_of_a_file_the_process_cannot_write(tmp_path, monkeypatch):
+    """MADV_PAGEOUT skips a file's pages, and still succeeds, unless the process owns the file or may write
+    to it: a model file baked into a container image as root and read by a normal user, say.
+    """
+    ref = _TwoBuffers()
+    save_weights_for_mapping(ref, tmp_path / "w.safetensors")
+    with torch.device("meta"):
+        model = _TwoBuffers()
+    with monkeypatch.context() as m:
+        m.setattr(os, "geteuid", lambda: 12345)  # neither root nor the owner
+        m.setattr(os, "access", lambda *args, **kwargs: False)
+        map_weights(model, tmp_path / "w.safetensors")
+    assert not weight_mapping._mappings[-1].can_pageout
+    torch.testing.assert_close(model.a, ref.a)  # reads its pages in
+    assert release_mapped_storage(model.a.untyped_storage()) > 0
+    assert _present(model.a) <= 2 * mmap.PAGESIZE  # only the edge pages it shares
+
+
+@pytest.mark.skipif(not _has_pageout(), reason="needs MADV_PAGEOUT (Linux 5.4+)")
+def test_release_counts_only_pages_that_left_memory(tmp_path):
+    ref = _TwoBuffers(_PAGEOUT_N)
+    save_weights_for_mapping(ref, tmp_path / "w.safetensors")
+    with torch.device("meta"):
+        model = _TwoBuffers(_PAGEOUT_N)
+    map_weights(model, tmp_path / "w.safetensors")
+    torch.testing.assert_close(model.a, ref.a)  # reads its pages in
+    # MADV_PAGEOUT leaves pages that another process maps too, yet succeeds.
+    reader = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import mmap, sys\n"
+            "f = open(sys.argv[1], 'rb')\n"
+            "m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)\n"
+            "sum(m[i] for i in range(0, len(m), mmap.PAGESIZE))\n"
+            "print(flush=True)\n"
+            "sys.stdin.read()",
+            str(tmp_path / "w.safetensors"),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    try:
+        reader.stdout.readline()
+        assert release_mapped_storage(model.a.untyped_storage()) == 0
+    finally:
+        reader.communicate()
+    assert release_mapped_storage(model.a.untyped_storage()) > 0
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux's memory accounting")
+def test_a_file_larger_than_memory_maps(tmp_path):
+    """A copy-on-write mapping reserves memory for every page by default, and Linux refuses one larger than
+    RAM and swap: the models too big to load are the ones to map."""
+    with open("/proc/sys/vm/overcommit_memory") as f:
+        if f.read().strip() == "2":
+            pytest.skip("strict overcommit refuses it anyway")
+    with open("/proc/meminfo") as f:
+        meminfo = {line.split(":")[0]: int(line.split()[1]) * 1024 for line in f}
+    numel = 2 * (meminfo["MemTotal"] + meminfo["SwapTotal"]) // 4
+    header = {"w": {"dtype": "F32", "shape": [numel], "data_offsets": [0, numel * 4]}}
+    path = tmp_path / "big.safetensors"
+    _write_raw(path, header)
+    os.truncate(path, path.stat().st_size + numel * 4)  # sparse: takes no disk
+    with torch.device("meta"):
+        model = torch.nn.Module()
+        model.register_buffer("w", torch.empty(numel))
+    map_weights(model, path)
+    assert model.w[-1].item() == 0.0
+    del model
 
 
 def test_mappings_are_freed_with_their_views(tmp_path):
@@ -380,14 +542,18 @@ def test_mappings_are_freed_with_their_views(tmp_path):
     assert len(weight_mapping._mappings) == before
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="needs Linux's page map")
 def test_release_storage_drops_pages_of_mapped_weights(tmp_path):
-    ref = _reference(tmp_path / "w.safetensors")
+    ref = _TwoBuffers(_PAGEOUT_N)
+    save_weights_for_mapping(ref, tmp_path / "w.safetensors")
     with torch.device("meta"):
-        model = _Tied()
+        model = _TwoBuffers(_PAGEOUT_N)
     map_weights(model, tmp_path / "w.safetensors")
-    mapped = model.proj.weight.untyped_storage()
-    assert release_storage(mapped) == mapped.nbytes() > 0  # pages dropped, not resized
-    torch.testing.assert_close(model.proj.weight, ref.proj.weight)
+    torch.testing.assert_close(model.a, ref.a)  # reads its pages in
+    mapped = model.a.untyped_storage()
+    # Its whole pages are dropped, not resized away.
+    assert 0 < release_storage(mapped) < mapped.nbytes() == ref.a.nbytes
+    torch.testing.assert_close(model.a, ref.a)
     plain = torch.ones(4).untyped_storage()
     assert release_storage(plain, mapped_only=True) == 0 and plain.nbytes() == 16
     assert release_storage(plain) == 16 and plain.nbytes() == 0  # resize_(0) as before
@@ -440,7 +606,7 @@ def test_compile_mapped_weights_and_release_them(tmp_path, monkeypatch):
     )
     # TensorRT-RTX differs from eager by up to 2e-3 even without TF32.
     torch.testing.assert_close(trt(x.cuda()).cpu(), ref(x), rtol=1e-2, atol=1e-2)
-    assert calls and all(calls)  # every released weight was a mapped one
+    assert calls and None not in calls  # every released weight was a mapped one
     torch.testing.assert_close(
         model.proj.weight, ref.proj.weight
     )  # re-read from the file

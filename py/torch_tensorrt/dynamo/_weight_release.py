@@ -82,8 +82,9 @@ def release_storage(storage: torch.UntypedStorage, mapped_only: bool = False) ->
         return 0
     # A weight mapped by map_weights is a view of a file: resize_ cannot free it, but its pages can be
     # dropped (re-read from the file if used again).
-    if release_mapped_storage(storage):
-        return nbytes
+    released = release_mapped_storage(storage)
+    if released is not None:
+        return released
     if mapped_only:
         return 0
     try:

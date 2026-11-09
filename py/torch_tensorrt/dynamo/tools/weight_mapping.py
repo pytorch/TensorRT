@@ -7,12 +7,13 @@
 Nothing is read until something touches a weight. During compilation that is TensorRT, while it builds
 the engine that uses the weight (it takes weights as host pointers, so a CPU view is read in place).
 
-``release_mapped_storage`` drops a mapped weight's resident pages; they are read back if the weight is used
-again. ``release_weights_after_build`` calls it once a weight's last engine is built.
+``release_weights_after_build`` drops a mapped weight's resident pages once its last engine is built; they
+are read back if the weight is used again.
 
 ``save_weights_for_mapping`` writes a module's weights as they are after loading, for checkpoints whose
 loader casts (a view must already have the model's dtype). With ``source=`` it converts a checkpoint
-without loading it: the module is built on ``meta``, and each weight is read, cast and written in turn.
+without loading it: each weight is read from the checkpoint, cast and written in turn, so the module can
+be built on ``meta``.
 """
 
 import ctypes
@@ -22,6 +23,7 @@ import logging
 import math
 import mmap
 import os
+import platform
 import struct
 import sys
 import threading
@@ -32,6 +34,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Hashable,
     Iterable,
     Iterator,
     List,
@@ -64,15 +67,19 @@ _DTYPES: Dict[str, torch.dtype] = {
     "F32": torch.float32,
     "F64": torch.float64,
 }
-# Ways to drop a copy-on-write mapping's resident pages, best first. MADV_PAGEOUT (Linux 5.4+; Python names it
-# only when built with headers that have it) keeps writes made to them; MADV_DONTNEED discards them.
-_PAGE_DROP_ADVICE = tuple(
-    advice
-    for advice in (
-        getattr(mmap, "MADV_PAGEOUT", 21 if sys.platform == "linux" else None),
-        getattr(mmap, "MADV_DONTNEED", None),
-    )
-    if advice is not None
+# Ways to drop a copy-on-write mapping's resident pages. MADV_PAGEOUT (Linux 5.4+; Python names it only when
+# built with headers that have it) keeps writes made to them; MADV_DONTNEED discards them.
+_MADV_PAGEOUT = getattr(mmap, "MADV_PAGEOUT", 21 if sys.platform == "linux" else None)
+_MADV_DONTNEED = getattr(mmap, "MADV_DONTNEED", None)
+# Python names it from 3.13; the fallback is its value on Linux x86-64 and aarch64.
+_MAP_NORESERVE = getattr(
+    mmap,
+    "MAP_NORESERVE",
+    (
+        0x4000
+        if sys.platform == "linux" and platform.machine() in ("x86_64", "aarch64")
+        else 0
+    ),
 )
 _DTYPE_NAMES = {dtype: name for name, dtype in _DTYPES.items()}
 _MAX_HEADER_BYTES = 100 * 1024 * 1024  # the safetensors format's limit
@@ -92,6 +99,9 @@ class _MappedFile(NamedTuple):
     path: str
     # (st_dev, st_ino, st_size, st_mtime_ns) when it was mapped.
     file_id: Tuple[int, int, int, int]
+    # Whether MADV_PAGEOUT drops its unwritten pages: Linux skips them unless the process owns the file or
+    # may write to it.
+    can_pageout: bool
 
 
 _mappings: List[_MappedFile] = []
@@ -117,6 +127,36 @@ def _registrations(
             for key, tensor in table.items():
                 if tensor is not None:
                     yield (f"{prefix}.{key}" if prefix else key), table, key
+
+
+def _registrations_by_memory(
+    module: torch.nn.Module, what: str
+) -> Dict[Hashable, List[Tuple[str, Dict[str, torch.Tensor], str]]]:
+    """``_registrations``, grouped by the memory each tensor is: a tied weight's names together, and also
+    distinct tensors that are the same view of one storage, such as ``w`` and ``Parameter(w.detach())``.
+    Tensors that share a storage otherwise raise, since ``what`` would separate them."""
+    groups: Dict[Hashable, List[Tuple[str, Dict[str, torch.Tensor], str]]] = {}
+    storages: Dict[int, Tuple[str, Hashable]] = {}
+    for name, table, key in _registrations(module):
+        tensor = table[key]
+        memory: Hashable = id(tensor)
+        if tensor.layout == torch.strided and not is_traceable_wrapper_subclass(tensor):
+            storage = tensor.untyped_storage()._cdata
+            memory = (
+                storage,
+                tensor.storage_offset(),
+                tuple(tensor.shape),
+                tuple(tensor.stride()),
+                tensor.dtype,
+            )
+            other, other_memory = storages.setdefault(storage, (name, memory))
+            if other_memory != memory:
+                raise ValueError(
+                    f"{name} and {other} share memory without being the same tensor, and {what} would "
+                    "separate them. Make one a copy of the other (clone()), or use one tensor for both."
+                )
+        groups.setdefault(memory, []).append((name, table, key))
+    return groups
 
 
 def _read_header(path: str) -> Tuple[Dict[str, Dict[str, object]], int]:
@@ -247,8 +287,9 @@ def map_weights(
 ) -> MappedWeights:
     """Point ``module``'s parameters and buffers at zero-copy views of the safetensors file ``path``.
 
-    Build the module on the ``meta`` device to never allocate its weights; its tensors are replaced, and
-    a tied weight stays tied. A real tensor, on any device, keeps its object and gets ``.data = view``, so
+    Build the module on the ``meta`` device to never allocate its weights; its tensors are replaced. A tied
+    weight stays tied, and tensors that are one view of a storage keep sharing it; tensors that share a
+    storage otherwise raise. A real tensor, on any device, keeps its object and gets ``.data = view``, so
     the module ends up on the CPU, ready for CPU compilation. The file is mapped copy-on-write and never
     written. It must stay in place and unchanged while the weights are used: rewriting it changes or
     invalidates them.
@@ -268,28 +309,47 @@ def map_weights(
     """
     path = os.fspath(path)
     header, data_start = _read_header(path)
+    groups = _registrations_by_memory(module, "map_weights")
     with open(path, "rb") as f:
-        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_COPY)
+        if sys.platform == "win32":
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_COPY)
+        else:
+            # ACCESS_COPY without reserving memory for every page that could be written, which Linux refuses
+            # for a file larger than RAM and swap (with vm.overcommit_memory=2 it still does).
+            mm = mmap.mmap(
+                f.fileno(),
+                0,
+                flags=mmap.MAP_PRIVATE | _MAP_NORESERVE,
+                prot=mmap.PROT_READ | mmap.PROT_WRITE,
+            )
         stat = os.fstat(f.fileno())
     file_id = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
+    can_pageout = (
+        os.name != "posix"
+        or os.geteuid() in (0, stat.st_uid)
+        or os.access(path, os.W_OK)
+    )
     result = MappedWeights()
 
-    # Make every view first, so an error leaves the module as it was. Keyed by the original tensor's id,
-    # which the stored original keeps from being reused.
-    views: Dict[int, Tuple[torch.Tensor, torch.Tensor]] = {}
-    absent: List[Tuple[str, torch.Tensor]] = []
-    for name, table, key in _registrations(module):
-        tensor = table[key]
-        if id(tensor) in views:
-            continue  # a tied weight, seen under another name
-        if prefix + name not in header:
-            absent.append((name, tensor))
-            continue
-        view = _view(mm, data_start, header[prefix + name], tensor, prefix + name)
-        views[id(tensor)] = (tensor, view)
-        result.mapped_bytes += view.nbytes
-    # A tied weight the file stores under a later name is not missing.
-    missing = [(name, tensor) for name, tensor in absent if id(tensor) not in views]
+    # Make every view first, so an error leaves the module as it was. One view per memory, under whichever
+    # of its names the file stores.
+    views: Dict[Hashable, torch.Tensor] = {}
+    for memory, registrations in groups.items():
+        stored = [
+            (n, table[key]) for n, table, key in registrations if prefix + n in header
+        ]
+        if stored:
+            name, tensor = stored[0]
+            views[memory] = _view(
+                mm, data_start, header[prefix + name], tensor, prefix + name
+            )
+            result.mapped_bytes += views[memory].nbytes
+    missing = [
+        (name, table[key])
+        for memory, registrations in groups.items()
+        if memory not in views
+        for name, table, key in registrations
+    ]
     result.missing = [name for name, _ in missing]
     persistent = set(module.state_dict())
     required = [name for name in result.missing if name in persistent]
@@ -319,26 +379,28 @@ def map_weights(
         )
 
     with torch.no_grad():
-        replacements: Dict[int, torch.Tensor] = {}
-        for _, table, key in list(_registrations(module)):
-            tensor = table[key]
-            if id(tensor) not in views:
-                continue
-            view = views[id(tensor)][1]
-            if not tensor.is_meta:
-                tensor.data = view
-                continue
-            if id(tensor) not in replacements:
-                replacements[id(tensor)] = (
-                    torch.nn.Parameter(view, requires_grad=tensor.requires_grad)
-                    if isinstance(tensor, torch.nn.Parameter)
-                    else view
-                )
-            table[key] = replacements[id(tensor)]
+        for memory, view in views.items():
+            replacements: Dict[int, torch.Tensor] = {}
+            for _, table, key in groups[memory]:
+                tensor = table[key]
+                if not tensor.is_meta:
+                    tensor.data = view
+                    continue
+                if id(tensor) not in replacements:
+                    # Distinct tensors stay distinct, over the one view.
+                    alias = view.view_as(view) if replacements else view
+                    replacements[id(tensor)] = (
+                        torch.nn.Parameter(alias, requires_grad=tensor.requires_grad)
+                        if isinstance(tensor, torch.nn.Parameter)
+                        else alias
+                    )
+                table[key] = replacements[id(tensor)]
 
     with _lock:
         _mappings.append(
-            _MappedFile(_address(mm), len(mm), weakref.ref(mm), path, file_id)
+            _MappedFile(
+                _address(mm), len(mm), weakref.ref(mm), path, file_id, can_pageout
+            )
         )
     return result
 
@@ -350,15 +412,19 @@ def _address(mm: mmap.mmap) -> int:
     return address
 
 
-def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
-    """Drop the resident pages of a storage that views a file mapped by ``map_weights``; True if it does.
-    The tensor stays valid: its pages are read back when it is used again, from the file, or from swap for
-    pages it has written. Kernels before Linux 5.4 can only discard written pages, which then revert to the
-    file's data. Where pages can't be dropped (Windows), this returns False.
+def release_mapped_storage(storage: torch.UntypedStorage) -> Optional[int]:
+    """Drop the resident pages of a storage that views a file mapped by ``map_weights``, and return how many
+    bytes left this process's memory; None if the storage isn't such a view. The tensor stays valid: its
+    pages are read back when it is used again, from the file, or from swap for pages it has written.
+
+    Where the process owns the file or may write to it, MADV_PAGEOUT (Linux 5.4+) drops the pages and keeps
+    writes made to them; it leaves pages another process maps too. Elsewhere, MADV_DONTNEED drops them and
+    discards such writes: those pages revert to the file's data. Only pages entirely inside the storage are
+    dropped, so a weight smaller than a page releases nothing. On Windows nothing is.
     """
     ptr, nbytes = storage.data_ptr(), storage.nbytes()
     if not nbytes:
-        return False
+        return None
     for mapped in _live_mappings():
         mm = mapped.mm()
         if mm is None or not (
@@ -369,8 +435,8 @@ def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
         page = mmap.PAGESIZE
         lo = -(-(ptr - mapped.base) // page) * page
         hi = (ptr - mapped.base + nbytes) // page * page
-        return hi <= lo or _drop_pages(mm, lo, hi - lo)
-    return False
+        return _drop_pages(mapped, mm, lo, hi - lo) if hi > lo else 0
+    return None
 
 
 def _live_mappings() -> List[_MappedFile]:
@@ -414,19 +480,40 @@ def raise_if_mapped_files_changed(tensors: Iterable[torch.Tensor]) -> None:
             )
 
 
-def _drop_pages(mm: mmap.mmap, start: int, length: int) -> bool:
-    for advice in _PAGE_DROP_ADVICE:
+def _drop_pages(mapped: _MappedFile, mm: mmap.mmap, start: int, length: int) -> int:
+    """Drop the pages of ``mm[start:start + length]``; return how many bytes left this process's memory."""
+    address = mapped.base + start
+    before = _present_bytes(address, length)
+    for advice in (_MADV_PAGEOUT if mapped.can_pageout else None, _MADV_DONTNEED):
+        if advice is None:
+            continue
         try:
             mm.madvise(advice, start, length)
-            return True
         except OSError:  # MADV_PAGEOUT on a kernel before 5.4
             continue
+        # Measured, since MADV_PAGEOUT also succeeds for pages it skips.
+        after = _present_bytes(address, length)
+        return length if before is None or after is None else max(0, before - after)
     warnings.warn(
         "Pages of memory-mapped weights can't be dropped on this platform, so released weights stay "
         "resident until their file is unmapped.",
         RuntimeWarning,
     )
-    return False
+    return 0
+
+
+def _present_bytes(address: int, length: int) -> Optional[int]:
+    """How much of the page-aligned range at ``address`` this process has in memory, from its page map;
+    None where that can't be read."""
+    page = mmap.PAGESIZE
+    try:
+        with open("/proc/self/pagemap", "rb") as f:
+            f.seek(address // page * 8)
+            entries = bytearray(f.read(length // page * 8))
+    except OSError:
+        return None
+    # Bit 63 of a page's entry: the page is present.
+    return int((torch.frombuffer(entries, dtype=torch.int64) < 0).sum()) * page
 
 
 def save_weights_for_mapping(
@@ -436,29 +523,32 @@ def save_weights_for_mapping(
     source: Optional[WeightSource] = None,
 ) -> None:
     """Write ``module``'s parameters and buffers, with their dtypes, to a safetensors file ``map_weights`` can
-    map. A tied weight is written once, under its first name.
+    map. A tied weight, or tensors that are one view of a storage, are written once, under the first name.
 
-    Tensors are copied to the host and written one at a time. A tensor on the ``meta`` device is read from
+    Tensors are copied to the host and written one at a time. With ``source``, each is read from
     ``source(name, tensor)`` instead, which returns its data in any dtype, as one tensor or as chunks that
-    concatenate along dimension 0 into it. Each chunk is cast to the tensor's dtype and written as it comes.
-    Converting a checkpoint this way holds one chunk in memory at a time: build the model on ``meta``, change
-    it as the compiled model will be (dtypes, shapes), and let ``source`` read the checkpoint. The file is
-    written under a temporary name and renamed when complete.
+    concatenate along dimension 0 into it, and raises KeyError for a name it doesn't store. A real tensor
+    that ``source`` doesn't store is written from the module (with a warning if it is persistent); one on
+    ``meta`` raises. Each chunk is cast to the tensor's dtype and written as it comes. Converting a
+    checkpoint this way holds one chunk in memory at a time: build the model on ``meta``, change it as the
+    compiled model will be (dtypes, shapes), and let ``source`` read the checkpoint. The file is written
+    under a new, random name next to ``path`` and renamed when complete.
     """
-    entries: Dict[int, Tuple[str, torch.Tensor]] = {}
-    for name, table, key in _registrations(module):
+    entries: List[Tuple[str, torch.Tensor]] = []
+    for registrations in _registrations_by_memory(
+        module, "save_weights_for_mapping"
+    ).values():
+        name, table, key = registrations[0]
         tensor = table[key]
-        if id(tensor) in entries:
-            continue
         if tensor.is_meta and source is None:
             raise ValueError(
                 f"{name} is on the meta device; pass source= to read it, or materialize it"
             )
         if tensor.dtype not in _DTYPE_NAMES:
             raise ValueError(f"{name}: dtype {tensor.dtype} has no safetensors name")
-        entries[id(tensor)] = (name, tensor)
+        entries.append((name, tensor))
     # Largest element size first, so every tensor's offset stays aligned to its dtype.
-    ordered = sorted(entries.values(), key=lambda e: -e[1].element_size())
+    ordered = sorted(entries, key=lambda e: -e[1].element_size())
     header: Dict[str, object] = {"__metadata__": {"format": "pt"}}
     offset = 0
     for name, t in ordered:
@@ -472,17 +562,32 @@ def save_weights_for_mapping(
     blob = json.dumps(header, separators=(",", ":")).encode()
     blob += b" " * (-len(blob) % 8)  # data starts 8-byte aligned
     path = os.fspath(path)
-    partial = path + ".partial"
+    partial = f"{path}.{os.urandom(8).hex()}.partial"
+    # O_EXCL creates a new file: it never writes through a link or into a file someone else made.
+    fd = os.open(
+        partial,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+        0o666,
+    )
+    not_in_source: List[str] = []
     try:
-        with open(partial, "wb") as f:
+        with os.fdopen(fd, "wb") as f:
             f.write(struct.pack("<Q", len(blob)))
             f.write(blob)
             for name, t in ordered:
-                _write_tensor(f, name, t, source)
+                if _write_tensor(f, name, t, source):
+                    not_in_source.append(name)
         os.replace(partial, path)
     finally:
         if os.path.exists(partial):
             os.remove(partial)
+    persistent = set(module.state_dict()) if not_in_source else set()
+    kept = [name for name in not_in_source if name in persistent]
+    if kept:
+        logger.warning(
+            f"{len(kept)} parameters and persistent buffers are not in the source, so their values in the "
+            f"module were written: {kept[:8]}"
+        )
 
 
 def _write_tensor(
@@ -490,12 +595,23 @@ def _write_tensor(
     name: str,
     like: torch.Tensor,
     source: Optional[WeightSource],
-) -> None:
-    """Write `like`'s data, from `source` if it is on ``meta``, one chunk at a time, in `like`'s dtype."""
+) -> bool:
+    """Write `like`'s data, read from `source` if given, one chunk at a time, in `like`'s dtype. Return True
+    if `source` doesn't store it, so `like`'s own data was written."""
     chunks: Union[torch.Tensor, Iterable[torch.Tensor]] = like
-    if like.is_meta:
-        assert source is not None
-        chunks = source(name, like)
+    not_in_source = False
+    if source is not None:
+        try:
+            chunks = source(name, like)
+        except KeyError:
+            if like.is_meta:
+                raise ValueError(
+                    f"{name} is not in the source, and on the meta device it has no values to write. A "
+                    "buffer a checkpoint doesn't store, such as non-persistent rotary frequencies, must be "
+                    "real: build the model with accelerate's init_empty_weights(), which keeps buffers "
+                    "real, or set the buffer before writing."
+                ) from None
+            not_in_source = True
     if isinstance(chunks, torch.Tensor):
         chunks = [chunks]
     expected, written = like.numel() * like.element_size(), 0
@@ -514,6 +630,7 @@ def _write_tensor(
         del data
     if written != expected:
         raise ValueError(f"{name}: source gave {written} bytes, expected {expected}")
+    return not_in_source
 
 
 def checkpoint_source(
@@ -525,7 +642,8 @@ def checkpoint_source(
     """A ``source=`` for ``save_weights_for_mapping`` that reads each tensor from the safetensors checkpoint
     ``path``, under ``key(name)`` (the name itself by default), in chunks of at most ``chunk_bytes`` along
     dimension 0, so no whole checkpoint tensor is ever in memory. The file's dtype may differ; the writer
-    casts each chunk. ``path`` may also be a sharded checkpoint's ``model.safetensors.index.json``.
+    casts each chunk. A name the checkpoint doesn't store raises KeyError. ``path`` may also be a sharded
+    checkpoint's ``model.safetensors.index.json``.
     """
     try:
         from safetensors import safe_open
@@ -542,24 +660,17 @@ def checkpoint_source(
     directory = os.path.dirname(path)
     files: Dict[str, Tuple[Any, Set[str]]] = {}  # each file open once, with its names
 
-    def missing_tensor_error(stored_name: str) -> ValueError:
-        return ValueError(
-            f"{stored_name} is not in {path}. A buffer a checkpoint doesn't store, such as non-persistent "
-            "rotary frequencies, must be a real tensor, not on meta: build the model with accelerate's "
-            "init_empty_weights(), which keeps buffers real, or set the buffer before writing."
-        )
-
     def get_checkpoint_file(stored_name: str) -> Any:
-        """The open safetensors file that stores ``stored_name``."""
+        """The open safetensors file that stores ``stored_name``; KeyError if none does."""
         if shard_of and stored_name not in shard_of:
-            raise missing_tensor_error(stored_name)
+            raise KeyError(stored_name)
         file = os.path.join(directory, shard_of[stored_name]) if shard_of else path
         if file not in files:
             handle = safe_open(file, framework="pt", device="cpu")
             files[file] = (handle, set(handle.keys()))
         handle, names = files[file]
         if stored_name not in names:
-            raise missing_tensor_error(stored_name)
+            raise KeyError(stored_name)
         return handle
 
     def read_tensor_chunks(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:

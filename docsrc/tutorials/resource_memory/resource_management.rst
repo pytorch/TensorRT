@@ -204,11 +204,12 @@ zero-copy views of a safetensors file:
   valid; its pages are read back if it is used again.
 
 ``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
-building it allocates no weights, maps them, and drops their pages when the block ends, unless the block
-sets ``release_weights_after_build=False``. It turns the resource partitioner on, so the model is built
-as several engines, each small enough to build within ``cpu_memory_budget`` (or the available memory
-without one), so only about one engine's weights are resident at a time. A part of the model that runs in
-PyTorch gets its weights on the GPU after compilation (``offload_module_to_cpu``, on in the block):
+building it allocates no weights, maps them, and drops their pages when the block ends, unless
+``release_weights_after_build=False``. Its ``compile_settings`` turn the resource partitioner on, so the
+model is built as several engines, each small enough to build within ``cpu_memory_budget`` (or the
+available memory without one), so only about one engine's weights are resident at a time. They also give a
+part of the model that runs in PyTorch its weights on the GPU after compilation
+(``offload_module_to_cpu``). Pass them to ``compile``:
 
 .. code-block:: python
 
@@ -216,32 +217,26 @@ PyTorch gets its weights on the GPU after compilation (``offload_module_to_cpu``
     import torch_tensorrt
 
     # Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.
-    ctx = torch_tensorrt.dynamo.low_memory(
+    with torch_tensorrt.dynamo.low_memory(
         lambda: MyModel().eval(), "model.safetensors", cpu_memory_budget=8 << 30
-    )
-    with ctx as model:
-        print(f"{ctx.report.mapped_bytes / 2**30:.2f} GiB mapped")
+    ) as low_mem:
+        print(f"{low_mem.report.mapped_bytes / 2**30:.2f} GiB mapped")
         example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
-        exported = torch.export.export(model, (example,))
-        trt_model = torch_tensorrt.dynamo.compile(exported, inputs=[example.cuda()])
+        exported = torch.export.export(low_mem.model, (example,))
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported, inputs=[example.cuda()], **low_mem.compile_settings
+        )
 
 ``cpu_memory_budget`` is the host memory the compiling process may use, counting what it already uses,
 and each engine gets up to a quarter of what's left. In :ref:`compile_from_mapped_weights`, a model with
 192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
 compiling, against all 192 MiB when built as one engine.
 
-``low_memory`` also takes the compile settings that lower memory during compilation:
+``low_memory`` takes the compile settings that lower memory during compilation:
 ``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget`` and
-``release_weights_after_build``. They're the defaults for every call to
-``torch_tensorrt.dynamo.compile`` inside the block, including in a script you don't own, and so for
-``torch_tensorrt.compile(..., ir="dynamo")``. ``torch.compile(backend="tensorrt")``,
-``cross_compile_for_windows`` and ``convert_exported_program_to_serialized_trt_engine`` don't use them.
-A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins over the block's:
-
-.. code-block:: python
-
-    with torch_tensorrt.dynamo.low_memory(cpu_memory_budget=8 << 30):
-        run_export_script()
+``release_weights_after_build``. ``compile_settings`` holds the ones given, with the first two on unless
+set. They apply only to the calls they're passed to: another model compiled inside the block keeps its own
+settings.
 
 ``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
 
@@ -255,18 +250,22 @@ A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins
   float32 for a bfloat16 model, is converted once, as below. The file is checked from its header before
   anything is mapped: a truncated file, bytes after the last tensor, or tensors whose bytes overlap, leave
   gaps or don't hold their dtype and shape raise. Damage inside a tensor's bytes isn't detected, since
-  that would mean reading the whole file.
+  that would mean reading the whole file. Tied weights, and distinct tensors that are one view of a
+  storage (``w`` and ``Parameter(w.detach())``), are stored once and mapped to one view, so they stay
+  shared; tensors that share a storage otherwise raise.
 - **Converting without loading.** ``save_weights_for_mapping(model, path, source=...)`` writes a model
-  built on ``meta`` straight from a checkpoint. It writes one tensor at a time. For each meta tensor it
-  calls ``source(name, tensor)``, which returns the data whole or in chunks along dimension 0, and it
-  casts each chunk to the model's dtype. ``checkpoint_source(checkpoint, key=...)`` is a ready source that
+  built on ``meta`` straight from a checkpoint. It writes one tensor at a time. For each tensor it calls
+  ``source(name, tensor)``, which returns the data whole or in chunks along dimension 0, and it casts
+  each chunk to the model's dtype. ``checkpoint_source(checkpoint, key=...)`` is a ready source that
   reads a safetensors file, or a sharded checkpoint's ``model.safetensors.index.json``, in 64 MiB chunks,
   so even a float32 checkpoint is never loaded. Change the meta model the way the compiled model will be
   changed first, such as casting it to bfloat16, so the file holds the dtypes and shapes the export maps.
   For pi0.5, converting the 14.5 GB float32 checkpoint held 0.9 GiB of process memory, against 9.3 GiB
-  for loading it on the CPU and writing the loaded model. Buffers a checkpoint doesn't store, such as
-  non-persistent rotary frequencies, must be real tensors, not on ``meta``: accelerate's
-  ``init_empty_weights()`` builds a model that way. ``save_weights_for_mapping(model, path)`` without a
+  for loading it on the CPU and writing the loaded model. A tensor the source doesn't store (it raises
+  ``KeyError``) is written from the model, with a warning if it is persistent, so buffers a checkpoint
+  doesn't store, such as non-persistent rotary frequencies, must be real tensors, not on ``meta``.
+  accelerate's ``init_empty_weights()`` builds a model that way, and its persistent buffers, such as batch
+  norm statistics, still come from the checkpoint. ``save_weights_for_mapping(model, path)`` without a
   source writes a model that is already loaded.
 
   .. code-block:: python
@@ -279,22 +278,26 @@ A setting left at ``None`` isn't set, and an argument passed to ``compile`` wins
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** raise in ``low_memory``: every tensor must be in the file, non-persistent buffers
-  such as rotary frequencies included, and ``save_weights_for_mapping`` writes those too.
-  ``map_weights`` alone raises for any name in the model's ``state_dict``, but doesn't require
-  non-persistent buffers. With ``strict=False``, it lists missing names in its result's ``missing`` and
-  leaves them as they were. A missing tensor on ``meta`` stays there, with no values, and a warning names
-  it. On any error the model is left unchanged.
+- **Missing names** raise for any name in the model's ``state_dict``, in ``map_weights`` and so in
+  ``low_memory``; non-persistent buffers, such as rotary frequencies, aren't required, so recompute those
+  or write them with ``save_weights_for_mapping``. With ``strict=False``, ``map_weights`` lists missing
+  names in its result's ``missing`` and leaves them as they were. A missing tensor on ``meta`` stays
+  there, with no values, and a warning names it: a model that reads it can't be exported or compiled,
+  and ``compile`` names it; one that never reads it is fine. On any error the model is left unchanged.
 - **The file must stay in place and unchanged** while the model or its weights are in use: rewriting it
-  changes or invalidates the weights. ``map_weights`` maps it copy-on-write and never writes to it.
-  Weights are read when compilation first uses them, so ``compile`` checks that the file of each mapped
+  changes or invalidates the weights. ``map_weights`` maps it copy-on-write and never writes to it. It
+  reserves no memory for the mapping, so a file larger than RAM and swap maps too, except with
+  ``vm.overcommit_memory=2``. Weights are read when compilation first uses them, so ``compile`` checks that the file of each mapped
   weight the program reads is still the one mapped (same inode, size and modification time) and raises
   otherwise; reading a weight past the end of a file truncated since would kill the process with
   ``SIGBUS``. ``release_weights_after_build=True`` also frees weights that aren't mapped, which the
   source model then can't use.
-- **Releasing pages uses** ``madvise``: ``MADV_PAGEOUT`` on Linux 5.4 and later, which keeps writes made
-  to a weight, else ``MADV_DONTNEED``, which discards them, so the weight reverts to the file's data. On
-  Windows the mapping works, but pages stay resident until the file is unmapped, and a warning says so.
+- **Releasing pages uses** ``madvise``. Where the process owns the weights file or may write to it,
+  ``MADV_PAGEOUT`` (Linux 5.4 and later) drops a weight's pages and keeps writes made to it; it leaves
+  pages another process maps too. Elsewhere, such as a root-owned file in a container image read by a
+  normal user, ``MADV_DONTNEED`` drops them and discards such writes, so the weight reverts to the file's
+  data. The bytes reported released are the pages that left the process's memory. On Windows the mapping
+  works, but pages stay resident until the file is unmapped, and a warning says so.
 
 With mapped weights, CPU compilation and the resource partitioner, the host's peak stays near the
 largest single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host

@@ -276,12 +276,26 @@ def _get_weights_the_graph_reads(
     return weights
 
 
+def _raise_if_weights_on_meta(weights: Dict[str, torch.Tensor]) -> None:
+    """A model built on ``meta`` whose weights were never loaded or mapped exports fine, then has nothing to
+    build an engine from. A weight the graph never reads may stay on ``meta``."""
+    on_meta = [name for name, tensor in weights.items() if tensor.is_meta]
+    if on_meta:
+        raise ValueError(
+            f"{len(on_meta)} weights of the program are on the meta device, so they have no values: "
+            f"{on_meta[:8]}. Load the model's weights, or map them with "
+            "torch_tensorrt.dynamo.tools.map_weights, before exporting it."
+        )
+
+
 def pre_export_lowering(
     ep: torch.export.ExportedProgram,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.export.ExportedProgram:
     """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
-    raise_if_mapped_files_changed(_get_weights_the_graph_reads(ep).values())
+    weights = _get_weights_the_graph_reads(ep)
+    _raise_if_weights_on_meta(weights)
+    raise_if_mapped_files_changed(weights.values())
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )

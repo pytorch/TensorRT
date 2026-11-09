@@ -119,19 +119,24 @@ print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 # weights resident.
 
 x = torch.randn(4, 2048)
-ctx = torch_tensorrt.dynamo.low_memory(
-    lambda: MLP().eval(),
-    path,
-    cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),
-)
-with ctx as model, torch.no_grad():
+with (
+    torch_tensorrt.dynamo.low_memory(
+        lambda: MLP().eval(),
+        path,
+        cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),
+    ) as low_mem,
+    torch.no_grad(),
+):
     print(
-        f"mapped {ctx.report.mapped_bytes / 2**20:.0f} MiB; "
+        f"mapped {low_mem.report.mapped_bytes / 2**20:.0f} MiB; "
         f"resident: {resident_mib(path):.0f} MiB"
     )
-    exported = torch.export.export(model, (x,))
+    exported = torch.export.export(low_mem.model, (x,))
     trt_model, peak = peak_resident_mib(
-        path, lambda: torch_tensorrt.dynamo.compile(exported, inputs=[x.cuda()])
+        path,
+        lambda: torch_tensorrt.dynamo.compile(
+            exported, inputs=[x.cuda()], **low_mem.compile_settings
+        ),
     )
     engines = [name for name, _ in trt_model.named_children() if "_run_on_acc" in name]
     # As one engine, without the partitioner, the whole file (192 MiB here) is resident while it builds.

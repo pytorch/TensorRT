@@ -31,7 +31,6 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
-from torch_tensorrt.dynamo._low_memory import with_low_memory_defaults
 from torch_tensorrt.dynamo._weight_release import (
     WeightReleaser,
     building,
@@ -472,7 +471,6 @@ def cross_compile_for_windows(
     return trt_gm
 
 
-@with_low_memory_defaults
 def compile(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
