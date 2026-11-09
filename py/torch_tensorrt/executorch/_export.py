@@ -81,6 +81,7 @@ def _prepare_graph_module(
     kwarg_inputs: Mapping[str, Any] | None,
     dynamic_shapes: Any | None,
     retrace: bool,
+    share_tensors: bool = False,
 ) -> ExportedProgram:
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._exporter import export as export_graph_module
@@ -122,6 +123,7 @@ def _prepare_graph_module(
         kwarg_inputs=torch_keyword_arguments,
         dynamic_shapes=dynamic_shapes,
         use_legacy_exporter=not retrace,
+        share_tensors=share_tensors,
     )
 
 
@@ -155,6 +157,7 @@ def _prepare_programs(
     kwarg_inputs: Mapping[str, Any] | None,
     dynamic_shapes: Any | None,
     retrace: bool | None,
+    share_tensors: bool = False,
 ) -> tuple[ExportedProgram | dict[str, ExportedProgram], tuple[str, ...]]:
     """Normalize the source into the programs to export and their method names.
 
@@ -183,6 +186,7 @@ def _prepare_programs(
             kwarg_inputs=kwarg_inputs,
             dynamic_shapes=dynamic_shapes,
             retrace=False if retrace is None else retrace,
+            share_tensors=share_tensors,
         )
         return program, ("forward",)
 
@@ -671,6 +675,14 @@ def export(
         kwarg_inputs=kwarg_inputs,
         dynamic_shapes=dynamic_shapes,
         retrace=retrace,
+        # A GraphModule's program is discarded after lowering, so it can share the
+        # module's tensors, unless a caller's partitioner lowers them: its backend may
+        # free what it lowers, as CudaBackend's low_memory_mode does.
+        share_tensors=not (
+            any(partitioners.values())
+            if isinstance(partitioners, Mapping)
+            else partitioners
+        ),
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
     copyback_by_method = _copyback_buffers_by_method(source, method_names)
