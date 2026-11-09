@@ -441,8 +441,54 @@ _L2: list[Suite] = [
             "test_cutile_example.py",
             "test_cutile_elf.py",
             "test_kernel_schema_safety.py",
+            # Its cuTile cases; kernels-cutedsl runs its CuTe DSL ones.
+            "test_frontend_layout_facts.py",
         ),
         setup=("cuda-core", "cuda-tile"),
+        jobs="2",
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
+        # dynamo-regions runs these files on every row, but has cuda-core,
+        # cuda-tile and nvidia-cutlass-dsl only where test-ext's flashinfer-python
+        # pulls them in (Linux, Python 3.11-3.12), at whatever versions pip
+        # resolves for it. So their cuTile and CUDA C++ cases, selected by name
+        # ("cutile" or "cuda" in it), run again here on every Linux row with the
+        # toolchains that these setup steps install.
+        "regions-generation",
+        tier="l1",
+        lanes=("full", "nightly"),
+        paths=(
+            "regions/test_generation_backends.py",
+            "regions/test_generation_candidates.py",
+            "regions/test_generation_frontends.py",
+            "regions/test_generation_integration.py",
+            "regions/test_generation_launch.py",
+            "regions/test_generation_worker.py",
+        ),
+        keyword="cutile or cuda",
+        setup=("cuda-core", "cuda-tile"),
+        jobs="2",
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
+        # As regions-generation does for cuTile and CUDA C++, this reruns the
+        # CuTe DSL generation cases, selected by name, on every Linux row with
+        # the nvidia-cutlass-dsl release that kernels-cutedsl pins. With that
+        # tested release, TORCH_TENSORRT_STRICT_TOOLCHAIN_TESTS makes a backend
+        # that cannot compile and load its probe kernel fail the GPU cases.
+        # dynamo-regions leaves it unset: its DSL comes unpinned through
+        # flashinfer-python, so such a failure skips there, and a new DSL
+        # release cannot fail unrelated pull requests.
+        "regions-cutedsl",
+        tier="l1",
+        lanes=("full", "nightly"),
+        paths=("regions/test_generation_frontends.py",),
+        keyword="cutedsl",
+        setup=("cuda-core", "cutedsl"),
+        env={"TORCH_TENSORRT_STRICT_TOOLCHAIN_TESTS": "1"},
         jobs="2",
         variants=("standard",),
         platforms=("linux-x86_64",),
@@ -452,7 +498,9 @@ _L2: list[Suite] = [
         tier="l0",
         lanes=("fast", "full"),
         cwd="tests/py/kernels",
-        paths=("test_cutedsl_op.py",),
+        # test_frontend_layout_facts.py: its CuTe DSL cases, which skip
+        # cuTile's without the cuda-tile toolchain.
+        paths=("test_cutedsl_op.py", "test_frontend_layout_facts.py"),
         setup=("cuda-core", "cutedsl"),
         jobs="2",
         variants=("standard",),

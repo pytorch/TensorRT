@@ -6,7 +6,8 @@
 import copy
 import logging
 import operator
-from typing import Any, Iterable, Optional, Sequence
+import os
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Sequence
 
 import torch
 from torch._prims_common import is_cpu_scalar_tensor
@@ -35,6 +36,10 @@ from ._types import (
     audit_region_placement,
 )
 from ._validation import validate_output_aliases
+
+if TYPE_CHECKING:
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.region._session import RegionCompilationSession
 
 logger = logging.getLogger(__name__)
 # The metadata a region scope puts on its members.
@@ -164,6 +169,8 @@ _SAMPLING_SWITCHES: dict[torch._ops.OpOverloadPacket, tuple[str, ...]] = {
     torch.ops.aten.feature_alpha_dropout: ("p", "train"),
     torch.ops.aten.native_dropout: ("p", "train"),
     torch.ops.aten.rrelu: ("training",),
+    # What decomposition makes of rrelu in a generated region's reference.
+    torch.ops.aten.rrelu_with_noise_functional: ("training",),
     torch.ops.aten.scaled_dot_product_attention: ("dropout_p",),
     torch.ops.aten.lstm: ("dropout", "train"),
     torch.ops.aten.gru: ("dropout", "train"),
@@ -324,6 +331,21 @@ def _describe(nodes: Sequence[torch.fx.Node]) -> str:
     return ", ".join(
         f"{node.name}{list(getattr(node.meta.get('val'), 'shape', ()))}"
         for node in nodes
+    )
+
+
+def _generated(plugin_key: int) -> bool:
+    """Whether a fused_kernel region's kernel comes from a KernelGenerator.
+
+    A generated kernel is written for the order the region first reads its
+    inputs, so such a region needs no ``inputs=``.
+    """
+    from torch_tensorrt.region import KernelGenerator
+    from torch_tensorrt.region._session import current_session
+
+    session = current_session()
+    return session is not None and isinstance(
+        session.plugins.get(plugin_key), KernelGenerator
     )
 
 
@@ -518,9 +540,10 @@ def normalize_region_scopes(
             raise RegionCaptureError(
                 f"Cannot extract region {region_id!r}: {error}"
             ) from error
-        if fused is not None:
+        listed = _boundary(begin)["inputs"] if fused is not None else None
+        if fused is not None and (listed is not None or not _generated(plugin)):
             # Read the marker now: an earlier region may have replaced a listed tensor.
-            ordered_inputs = _bind_inputs(inputs, _boundary(begin)["inputs"], fused)
+            ordered_inputs = _bind_inputs(inputs, listed, fused)
             if inputs != ordered_inputs:
                 placeholders = dict(
                     zip(inputs, (n for n in child.graph.nodes if n.op == "placeholder"))
@@ -701,13 +724,212 @@ def _resolve_alias_copies(hop: torch.fx.Node, *, drop: bool) -> None:
                 hop.graph.erase_node(operand)
 
 
+class _NoExampleData(Exception):
+    """An example input is a shape specification, not the caller's data."""
+
+
+def _example_batch(
+    example_inputs: Optional[tuple[Sequence[Any], dict[Any, Any]]],
+) -> Any:
+    """Return compile()'s example inputs as one validation batch, or None.
+
+    An ``Input`` built from a shape holds random placeholder values, which say
+    nothing about the values the model gives its regions, so only tensors and
+    ``Input`` objects made from tensors count.
+    """
+    from torch_tensorrt._Input import Input
+
+    def data(value: Any) -> Any:
+        if isinstance(value, Input):
+            if not getattr(value, "_has_example_data", False):
+                raise _NoExampleData
+            return value.torch_tensor
+        if isinstance(value, (list, tuple)) and not hasattr(value, "_fields"):
+            return type(value)(data(item) for item in value)
+        if isinstance(value, dict):
+            return {key: data(item) for key, item in value.items()}
+        return value
+
+    if example_inputs is None:
+        return None
+    args, kwargs = example_inputs
+    try:
+        args, kwargs = tuple(data(value) for value in args), data(dict(kwargs))
+    except _NoExampleData:
+        return None
+    # The form validation_inputs batches take: positional inputs, then a dict
+    # of the keyword inputs when the model takes some.
+    return (*args, kwargs) if kwargs else args
+
+
+def _validation_samples(
+    gm: torch.fx.GraphModule,
+    nodes: list[torch.fx.Node],
+    records: list[RegionRecord],
+    session: Optional["RegionCompilationSession"],
+    settings: Optional["CompilationSettings"],
+    example_inputs: Optional[tuple[Sequence[Any], dict[Any, Any]]] = None,
+) -> dict[torch.fx.Node, list[tuple[torch.Tensor, ...]]]:
+    """Capture generated regions' inputs from their generators' validation batches.
+
+    Before any region is replaced, the parent graph still runs every region's
+    PyTorch reference with the model's own weights. Generators without
+    validation_inputs use the compilation's example inputs, when they hold
+    data, as one batch, within the byte limit on samples; if those cannot run
+    the model, they validate on synthetic inputs alone, as before.
+    """
+    from torch_tensorrt.region import KernelGenerator
+
+    if session is None or (settings is not None and settings.dryrun):
+        return {}
+    sources, implicit = {}, {}
+    for node, record in zip(nodes, records):
+        generator = session.plugins.get(record.plugin_key)
+        if record.route != "plugin" or not isinstance(generator, KernelGenerator):
+            continue
+        if generator.validation_inputs is not None:
+            sources[node] = generator.validation_inputs
+        else:
+            implicit[node] = record.id
+    if not sources and not implicit:
+        return {}
+    from ._generation._samples import capture_example_samples, capture_samples
+
+    samples = capture_samples(gm, sources) if sources else {}
+    batch = _example_batch(example_inputs) if implicit else None
+    if batch is not None and any(
+        isinstance(node.target, torch._ops.OpOverload)
+        and node.target._schema.is_mutable
+        for node in gm.graph.nodes
+    ):
+        # The run would change the caller's buffers or inputs unasked.
+        logger.info("Example inputs are not run: the model writes to its state")
+        batch = None
+    if batch is not None:
+        try:
+            samples.update(capture_example_samples(gm, implicit, batch, samples))
+        except Exception as error:
+            # A string, so that log records do not keep the traceback alive.
+            logger.warning(
+                "Generated kernels are validated on synthetic inputs only: the "
+                "compilation's example inputs did not run the model (%s: %s); "
+                "pass KernelGenerator validation_inputs to validate on real inputs",
+                type(error).__name__,
+                str(error),
+            )
+        # The run left the model's activations cached in this process; return
+        # them to the GPU for the evaluation workers. Only once the handler has
+        # exited: until then the traceback of a failed run holds them.
+        torch.cuda.empty_cache()
+    return samples
+
+
+def _check_generated_regions(
+    gm: torch.fx.GraphModule,
+    records: list[RegionRecord],
+    session: Optional["RegionCompilationSession"],
+    settings: Optional["CompilationSettings"],
+) -> None:
+    """Check every generated region for what generation requires, before any search.
+
+    An invalid region then fails at once, not after the searches of the regions
+    before it. A dry run logs each failure as a warning instead and records it
+    for the dry-run report.
+    """
+    from torch_tensorrt.region import KernelGenerator
+
+    for record in records:
+        generator = None if session is None else session.plugins.get(record.plugin_key)
+        if record.route != "plugin" or not isinstance(generator, KernelGenerator):
+            continue
+        try:
+            if os.name != "posix":
+                raise RegionError(
+                    f"Kernel generation for region {record.id!r} requires a POSIX "
+                    "host; use fused_kernel(kernel=...) on this platform"
+                )
+            from ._generation._factory import check_generation
+
+            check_generation(
+                gm.get_submodule(record.child_target),
+                generator,
+                region_id=record.id,
+                settings=settings,
+            )
+        except RegionError as error:
+            if settings is None or not settings.dryrun:
+                raise
+            logger.warning("Region dry-run: %s", error)
+            record.dryrun_error = str(error)
+
+
+def _has_implicit_samples(
+    session: Optional["RegionCompilationSession"], record: RegionRecord
+) -> bool:
+    """Whether a generated region's samples come from the compilation's example inputs."""
+    from torch_tensorrt.region import KernelGenerator
+
+    generator = None if session is None else session.plugins.get(record.plugin_key)
+    return (
+        isinstance(generator, KernelGenerator) and generator.validation_inputs is None
+    )
+
+
+def _kernel_registration(
+    child: torch.fx.GraphModule,
+    record: RegionRecord,
+    session: Optional["RegionCompilationSession"],
+    settings: Optional["CompilationSettings"],
+    samples: Optional[list[tuple[torch.Tensor, ...]]] = None,
+    *,
+    implicit_samples: bool = False,
+) -> Any:
+    """Return a fused_kernel registration, or None for a dry run's stand-in."""
+    from torch_tensorrt.region import KernelGenerator
+
+    if session is None or record.plugin_key not in session.plugins:
+        raise RegionError("fused_kernel requires its owning compilation session")
+    registration = session.plugins[record.plugin_key]
+    if not isinstance(registration, KernelGenerator):
+        return registration
+    # Generation calls a paid agent and builds trial engines; a dry run does neither.
+    if settings is not None and settings.dryrun:
+        logger.warning(
+            "Dry run generates no kernel for region %r; its PyTorch reference "
+            "stands in for the kernel",
+            record.id,
+        )
+        return None
+    from ._generation._factory import generate_registration
+
+    return generate_registration(
+        child,
+        registration,
+        region_id=record.id,
+        settings=settings,
+        memo=session.generated_kernels,
+        samples=samples,
+        implicit_samples=implicit_samples,
+    )
+
+
 def materialize_regions(
-    gm: torch.fx.GraphModule, captured: torch.fx.GraphModule
+    gm: torch.fx.GraphModule,
+    captured: torch.fx.GraphModule,
+    settings: Optional["CompilationSettings"] = None,
+    example_inputs: Optional[tuple[Sequence[Any], dict[Any, Any]]] = None,
 ) -> torch.fx.GraphModule:
     """Replace captured HOPs with PyTorch leaves or custom-kernel operators.
 
     ``execute_in_torch`` regions run their bodies from ``captured``, the graph
-    before decomposition.
+    before decomposition. Every generated region is checked for what
+    generation requires before the first search. A dry run logs those failures
+    as warnings and generates no kernel: an operator that runs the region's
+    PyTorch reference stands in for it, and partitioning places that operator
+    as it would place the kernel's plugin. ``example_inputs`` are the
+    compilation's ``(arg_inputs, kwarg_inputs)``: a generator without
+    ``validation_inputs`` validates its kernels on the region inputs they
+    produce, when they hold data.
     """
     region_nodes = [node for node in gm.graph.nodes if is_region_hop(node)]
     if not region_nodes:
@@ -720,6 +942,42 @@ def materialize_regions(
         record.id: captured.get_submodule(record.child_target)
         for record in region_hop_records(captured)
     }
+    _check_generated_regions(gm, records, session, settings)
+    samples = _validation_samples(
+        gm, region_nodes, records, session, settings, example_inputs
+    )
+    registrations = {}
+    for node, record in zip(region_nodes, records):
+        if record.route == "plugin":
+            # The generation memo keeps what identical regions still need.
+            registrations[node] = _kernel_registration(
+                gm.get_submodule(record.child_target),
+                record,
+                session,
+                settings,
+                samples.pop(node, None),
+                implicit_samples=_has_implicit_samples(session, record),
+            )
+    if session is not None and session.generated_kernels:
+        from torch_tensorrt.region import KernelGenerator
+
+        from ._generation._factory import final_registration
+
+        # A later identical region may have replaced the shared kernel with one
+        # that also passed the earlier regions' samples: every region takes it.
+        for node, record in zip(region_nodes, records):
+            generator = session.plugins.get(record.plugin_key)
+            if registrations.get(node) is not None and isinstance(
+                generator, KernelGenerator
+            ):
+                final = final_registration(
+                    gm.get_submodule(record.child_target),
+                    generator,
+                    region_id=record.id,
+                    memo=session.generated_kernels,
+                )
+                if final is not None:
+                    registrations[node] = final
     for index, (node, record) in enumerate(zip(region_nodes, records)):
         body_node = node.args[0]
         child = gm.get_submodule(record.child_target)
@@ -728,26 +986,36 @@ def materialize_regions(
         child_name = f"_ttrt_torch_region_{index}"
         while hasattr(gm, child_name):
             child_name += "_"
-        route = record.route
         plugin_op = None
+        stand_in_error = None
+        if record.route == "plugin":
+            registration = registrations[node]
+            if registration is None:
+                from ._plugins import register_stand_in
+
+                try:
+                    plugin_op = register_stand_in(child, region_id=record.id)
+                except RegionError as error:
+                    # No plugin can have these boundaries, so generation fails
+                    # too; the dry run shows the reference body instead.
+                    record.route = "torch"
+                    stand_in_error = str(error)
+            else:
+                from ._plugins import register_region_plugin
+
+                try:
+                    plugin_op = register_region_plugin(
+                        child, registration, region_id=record.id
+                    )
+                except ValueError as error:
+                    # Kernel registration names the generated operator, not the
+                    # region.
+                    error.add_note(f"Raised for fused_kernel region {record.id!r}")
+                    raise
+        route = record.route
         # A body captured before decomposition reads the inputs, not their copies.
         _resolve_alias_copies(node, drop=route == "torch" and record.operator_key < 0)
-        if route == "plugin":
-            from ._plugins import register_region_plugin
-
-            if session is None or record.plugin_key not in session.plugins:
-                raise RegionError(
-                    "fused_kernel requires its owning compilation session"
-                )
-            try:
-                plugin_op = register_region_plugin(
-                    child, session.plugins[record.plugin_key], region_id=record.id
-                )
-            except ValueError as error:
-                # Kernel registration names the generated operator, not the region.
-                error.add_note(f"Raised for fused_kernel region {record.id!r}")
-                raise
-        else:
+        if route == "torch":
             if record.operator_key >= 0:
                 if session is None or record.operator_key not in session.operators:
                     raise RegionError(
@@ -774,6 +1042,9 @@ def materialize_regions(
                 "route": route,
                 "backend": record.backend,
             }
+            if stand_in_error is not None:
+                # The dry-run report says why a generated region runs its body.
+                call.meta[REGION_META_KEY]["stand_in_error"] = stand_in_error
         if route == "plugin" and len(node.meta["val"]) == 1:
             call.meta["val"] = node.meta["val"][0]
             for user in list(node.users):
@@ -801,6 +1072,10 @@ def materialize_regions(
         record.output_names = tuple(n.name for n in output.all_input_nodes)
         record.reference_graph = str(child.graph) if route == "torch" else None
         record.plugin_op = plugin_op
+    if session is not None:
+        # Generation is over: drop the kernels and validation samples that
+        # identical regions shared, rather than hold them while engines build.
+        session.generated_kernels.clear()
     attach_region_records(gm, records)
     gm.graph.lint()
     gm.recompile()

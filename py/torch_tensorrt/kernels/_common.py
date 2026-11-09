@@ -502,6 +502,28 @@ def normalize_block_dims(
     return int(padded[0]), int(padded[1]), int(padded[2])
 
 
+def validate_pointer_alignment(
+    op_name: str, value: Any, *, frontend: str, pointer: Optional[str] = None
+) -> None:
+    """Require a ``pointer_alignment`` byte count: a power of two from 1 to 256.
+
+    Every frontend names the alignment a compiled kernel may assume for its
+    tensor pointers this way. Its default, ``None``, assumes only each pointer's
+    element alignment, and each frontend resolves it before calling this.
+    """
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= 256
+        or value & (value - 1)
+    ):
+        target = "" if pointer is None else f" for '{pointer}'"
+        raise ValueError(
+            f"{frontend} '{op_name}' pointer_alignment{target} must be a power of "
+            f"two between 1 and 256 bytes; got {value!r}."
+        )
+
+
 ENTRY_RE = re.compile(
     r"((?:(?:\.(?:visible|weak))\s+)?\.entry\s+([\w$%]+)\s*\()([^)]*)(\))",
     re.DOTALL,

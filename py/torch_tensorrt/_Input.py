@@ -52,6 +52,9 @@ class Input(object):
     low_tensor_domain_incl: float = 0.0
     high_tensor_domain_excl: float = low_tensor_domain_incl + DOMAIN_OFFSET
     torch_tensor: torch.Tensor = None
+    # Whether torch_tensor holds the caller's data, not a random placeholder
+    # made from the shape.
+    _has_example_data: bool = False
     name: str = ""
     is_shape_tensor: bool = False
     shared_dims: Dict[int, str] = (
@@ -273,6 +276,7 @@ class Input(object):
 
         if "torch_tensor" in kwargs:
             self.torch_tensor = kwargs["torch_tensor"]
+            self._has_example_data = True
         else:
             if self.is_shape_tensor:
                 self.torch_tensor = torch.tensor(

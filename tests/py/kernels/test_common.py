@@ -1,13 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Behavior shared by the compiled-kernel frontend capability guards."""
+"""Behavior shared by the compiled-kernel frontends: capability guards and options."""
 
+import inspect
 from types import SimpleNamespace
 
 import pytest
 import torch
 
+import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels import _common, _cutile, _triton
 
 from .conftest import register_once, skip_no_qdp
@@ -198,3 +200,29 @@ def test_generated_descriptor_preserves_meta_dtype(preserve_input_dtype):
     (output_desc,) = QDP_REGISTRY[op_name].register_func(input_desc)
     assert output_desc.dtype == trt.float16
     assert output_desc.ndim == input_desc.ndim
+
+
+@pytest.mark.parametrize("frontend", ["triton_op", "cutile_op", "cutedsl_op"])
+def test_alignment_option_is_spelled_the_same_on_every_frontend(frontend):
+    """The default assumes only each pointer's element alignment."""
+    parameters = inspect.signature(getattr(ttk, frontend)).parameters
+    assert parameters["pointer_alignment"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameters["pointer_alignment"].default is None
+    assert "aligned_io" not in parameters
+
+
+@pytest.mark.parametrize("value", [1, 2, 16, 256])
+def test_pointer_alignment_accepts_powers_of_two_up_to_256(value):
+    _common.validate_pointer_alignment("ns::op", value, frontend="triton_op")
+
+
+@pytest.mark.parametrize("value", [0, -16, 3, 24, 512, True, 16.0, "16", None])
+def test_pointer_alignment_must_be_a_power_of_two_up_to_256(value):
+    with pytest.raises(
+        ValueError,
+        match=r"cutile_op 'ns::op' pointer_alignment for 'x' must be a power of two "
+        r"between 1 and 256 bytes",
+    ):
+        _common.validate_pointer_alignment(
+            "ns::op", value, frontend="cutile_op", pointer="x"
+        )

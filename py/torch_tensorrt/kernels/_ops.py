@@ -200,6 +200,7 @@ def triton_op(
     priority: ConverterPriority = ConverterPriority.STANDARD,
     capability_validator: Optional[Callable[..., Any]] = None,
     schema: Optional[str] = None,
+    pointer_alignment: Optional[int] = None,
 ) -> None:
     """Register a ``@triton.jit`` kernel as a TensorRT AOT QDP plugin.
 
@@ -253,12 +254,28 @@ def triton_op(
             must pass for the op to be lowered to the plugin.
         schema: optional explicit Tensor-only Torch schema. Use this when
             ``meta_fn`` cannot carry complete resolvable type annotations.
+        pointer_alignment: byte alignment the kernel may assume for every
+            tensor pointer, a power of two from 1 to 256, or None (the default)
+            for no assumption beyond each pointer's element alignment. Triton
+            specializes pointers only on 16-byte alignment, so 16 or more
+            compiles them as 16-byte aligned, letting Triton vectorize loads
+            and stores as its JIT does for aligned tensors, and smaller values
+            change nothing. TensorRT allocations are aligned, but an engine can
+            pass a plugin a view at an odd offset of a fused buffer, such as
+            one input of an eliminated concatenation; leave this unset unless
+            the graph rules that out.
+
+    ``i32`` extras whose values are constants at engine build time, as static
+    shapes make them, and are multiples of 16 are compiled with that fact, as
+    Triton's JIT specializes such arguments. The PTX carries no source line
+    information, which shortens TensorRT's per-enqueue module load.
 
     Raises:
         ValueError: if ``signature`` does not exactly match the kernel's runtime
             declaration order, does not follow the calling convention, has an
             unsupported type, disagrees with ``meta_fn``'s tensor arity, or has
-            no source for its scalar arguments.
+            no source for its scalar arguments, or if the kernel needs more
+            shared memory than a TensorRT plugin launch provides.
         RuntimeError: if Triton's compiled launch metadata is incomplete or
             requires a feature the TensorRT AOT path cannot reproduce.
 
@@ -314,29 +331,55 @@ def triton_op(
         extra_args_fn,
     )
 
+    if pointer_alignment is not None:
+        _common.validate_pointer_alignment(
+            op_name, pointer_alignment, frontend="triton_op"
+        )
     artifact = _triton.compile_triton_to_ptx(
-        kernel, signature, constexprs, num_warps=num_warps, num_stages=num_stages
+        kernel,
+        signature,
+        constexprs,
+        num_warps=num_warps,
+        num_stages=num_stages,
+        pointer_alignment=pointer_alignment,
     )
+    _triton.check_plugin_shared_memory(op_name, artifact)
 
     final_validator = _triton.make_dtype_capability_validator(
         op_name, layout, capability_validator, artifact=artifact
     )
+    aot_fn = _common.make_pointer_aot_fn(
+        op_name,
+        layout,
+        grid,
+        # Triton reports occupancy in warps; TRT wants threads per block.
+        (artifact.num_warps * 32, 1, 1),
+        artifact.shared_mem,
+        extra_args_fn,
+        lambda: _triton.validate_target(artifact),
+        frontend="triton_op",
+    )
+    if layout.scalars:
+        aot_fn = _triton.specialize_on_constant_extras(
+            aot_fn,
+            layout,
+            _triton.specialization_compiler(
+                op_name,
+                kernel,
+                signature,
+                constexprs,
+                artifact,
+                num_warps=num_warps,
+                num_stages=num_stages,
+                pointer_alignment=pointer_alignment,
+            ),
+        )
 
     register_precompiled_qdp_plugin(
         op_name=op_name,
         ptx=artifact.ptx,
         kernel_name=artifact.kernel_name,
-        aot_fn=_common.make_pointer_aot_fn(
-            op_name,
-            layout,
-            grid,
-            # Triton reports occupancy in warps; TRT wants threads per block.
-            (artifact.num_warps * 32, 1, 1),
-            artifact.shared_mem,
-            extra_args_fn,
-            lambda: _triton.validate_target(artifact),
-            frontend="triton_op",
-        ),
+        aot_fn=aot_fn,
         eager_fn=eager_fn,
         meta_fn=meta_fn,
         supports_dynamic_shapes=supports_dynamic_shapes,
@@ -368,6 +411,8 @@ def cutile_op(
     eager_fn: Optional[Callable[..., Any]] = None,
     arch_override: Optional[str] = None,
     max_ptx_version: Optional[int] = None,
+    pointer_alignment: Optional[int] = None,
+    static_shapes: Optional[Mapping[str, Sequence[int]]] = None,
     supports_dynamic_shapes: bool = True,
     requires_output_allocator: bool = False,
     priority: ConverterPriority = ConverterPriority.STANDARD,
@@ -437,6 +482,19 @@ def cutile_op(
             ``92``-style int (``.version 9.2``), minimum 92. It does not bypass
             the CUDA 13.2+ driver/toolkit requirements. The compiler's header is left
             unchanged by default. A capped candidate is verified by the driver.
+        pointer_alignment: byte alignment cuTile may assume for every array's
+            base address, a power of two from 1 to 256. The default, None,
+            like 1, assumes nothing beyond each array's element alignment.
+            16 or more lets cuTile emit 128-bit loads and stores, but the
+            caller must guarantee it: TensorRT can bind a plugin to a
+            sub-buffer view at a smaller offset, and a violated assumption
+            faults or reads wrong data. Such a kernel is compiled without TMA,
+            whose descriptors the AOT launch cannot pass.
+        static_shapes: the exact shape of each array's tensor, keyed by
+            ``signature`` name, for an op that only runs at those shapes. It
+            requires ``supports_dynamic_shapes=False`` and the derived ``grid``
+            launch. cuTile then also assumes the divisibility of every extent
+            and stride, and conversion declines tensors of other shapes.
         capability_validator: optional extra predicate gating conversion. It is
             combined with the dtype check derived from ``signature`` — both must
             pass for the op to be lowered to the plugin.
@@ -498,9 +556,27 @@ def cutile_op(
                 f"cutile_op '{op_name}' block_size is only used with the derived "
                 "grid launch and would be ignored by the custom aot_fn."
             )
+    if static_shapes is not None and supports_dynamic_shapes:
+        raise ValueError(
+            f"cutile_op '{op_name}' static_shapes requires "
+            "supports_dynamic_shapes=False, since the kernel assumes those shapes."
+        )
+    array_facts = _cutile.array_layout_facts(
+        op_name,
+        layout,
+        pointer_alignment=pointer_alignment,
+        static_shapes=static_shapes,
+        derived_launch=aot_fn is None,
+    )
 
     ptx, kernel_name, reqntid = _cutile.compile_cutile_to_ptx(
-        op_name, kernel, layout, constants_dict, arch_override, max_ptx_version
+        op_name,
+        kernel,
+        layout,
+        constants_dict,
+        arch_override,
+        max_ptx_version,
+        array_facts,
     )
 
     if aot_fn is None:
@@ -539,7 +615,7 @@ def cutile_op(
         requires_output_allocator=requires_output_allocator,
         priority=priority,
         capability_validator=_cutile.make_dtype_capability_validator(
-            op_name, layout, capability_validator
+            op_name, layout, capability_validator, static_shapes
         ),
         schema=schema_info.schema,
     )
@@ -558,7 +634,7 @@ def cutedsl_op(
     extra_args_fn: Optional[Callable[..., Any]] = None,
     eager_fn: Optional[Callable[..., Any]] = None,
     shared_mem: int = 0,
-    pointer_alignment: Union[int, Mapping[str, int]] = 1,
+    pointer_alignment: Optional[Union[int, Mapping[str, int]]] = None,
     supports_dynamic_shapes: bool = True,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     capability_validator: Optional[Callable[..., Any]] = None,
@@ -580,10 +656,14 @@ def cutedsl_op(
     the op's CUDA implementation outside TensorRT.
 
     ``pointer_alignment`` is the byte alignment CuTe may assume for every tensor
-    pointer, or a mapping from pointer names to alignments (unlisted pointers
-    use 1). The default of 1 is always safe; declaring 16 lets CuTe emit 128-bit
-    vectorized loads and stores, but the caller must guarantee every bound
-    buffer meets it, since a misaligned pointer faults at runtime.
+    pointer, a power of two from 1 to 256, or a mapping from pointer names to
+    alignments. The default, None, and a mapping's unlisted pointers assume
+    each pointer's element size, which every tensor of that dtype meets
+    (CuTe's vectorized copies need at least that).
+    Declaring 16 lets CuTe emit 128-bit vectorized loads and stores, but the
+    caller must guarantee every bound buffer meets it, since a misaligned
+    pointer faults at runtime; TensorRT can bind sub-buffer views at smaller
+    offsets.
 
     Compilation targets the current CUDA device with fixed pointer dtypes.
     Kernels may construct CuTe tensors from their pointers, but descriptor
