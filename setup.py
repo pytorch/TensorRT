@@ -661,6 +661,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.region_compilation",
+    "torch_tensorrt.dynamo.region_compilation._generation",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
@@ -704,6 +705,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.region_compilation": "py/torch_tensorrt/dynamo/region_compilation",
+    "torch_tensorrt.dynamo.region_compilation._generation": "py/torch_tensorrt/dynamo/region_compilation/_generation",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
@@ -741,7 +743,12 @@ if _FX_FE_AVAIL:
         ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
     )
 
-package_data = {}
+package_data = {
+    "torch_tensorrt.dynamo.region_compilation._generation": [
+        "skills/kernel-author/SKILL.md",
+        "skills/kernel-author/references/*.md",
+    ],
+}
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (

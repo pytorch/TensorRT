@@ -1,5 +1,8 @@
 """Tests for triton_op (Triton kernel -> AOT QDP plugin path)."""
 
+import contextlib
+import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -19,6 +22,9 @@ from .conftest import (
     skip_no_triton,
 )
 from .test_common import _FakeNode
+
+# Triton's switch for source line information in the PTX it emits.
+_LINE_INFO = "TRITON_DISABLE_LINE_INFO"
 
 # A minimal PTX ``.entry`` carrying the two trailing scratch params Triton adds
 # to every kernel, used as the stub compiler's output in the no-GPU unit tests.
@@ -416,6 +422,8 @@ def _stub_triton(monkeypatch, requested, omitted_metadata=(), **extra_metadata):
         def __init__(self, ptx):
             self.asm = {"ptx": ptx}
             self.metadata = fake_metadata
+            # Triton reads this setting while it compiles.
+            self.disable_line_info = os.environ.get(_LINE_INFO)
 
     class _FakeTriton:
         runtime = types.SimpleNamespace(
@@ -514,6 +522,264 @@ def test_missing_launch_metadata_fails_closed(monkeypatch):
     _stub_triton(monkeypatch, [], omitted_metadata=("global_scratch_size",))
     with pytest.raises(RuntimeError, match="missing.*global_scratch_size"):
         _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+
+
+# ---- No-GPU: plugin PTX without line information ----
+
+
+class _CompilationKnobs:
+    """Stands in for ``triton.knobs.compilation``.
+
+    Like Triton's, ``scope()`` restores on exit every knob and environment
+    variable it covers, including those other threads changed meanwhile.
+    """
+
+    _ENVIRONMENT = (_LINE_INFO, "TRITON_ALWAYS_COMPILE")
+
+    def __init__(self):
+        self.listener = None
+
+    @contextlib.contextmanager
+    def scope(self):
+        knobs = dict(self.__dict__)
+        environment = {name: os.environ.get(name) for name in self._ENVIRONMENT}
+        try:
+            yield
+        finally:
+            self.__dict__.clear()
+            self.__dict__.update(knobs)
+            for name, value in environment.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
+
+def _triton_with(compilation):
+    return types.SimpleNamespace(knobs=types.SimpleNamespace(compilation=compilation))
+
+
+def test_plugin_compiles_every_attempt_without_line_info(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.delenv(_LINE_INFO, raising=False)
+    monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: 91)
+    monkeypatch.setattr(_triton, "_triton_default_ptx_version", lambda: None)
+    compiled = _stub_triton(monkeypatch, [])
+    _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+    # The first compile emits ISA 9.3, so a second one targets the driver's.
+    assert [result.disable_line_info for result in compiled] == ["1", "1"]
+    assert _LINE_INFO not in os.environ
+
+
+def test_line_info_scope_leaves_settings_that_other_threads_change(monkeypatch):
+    """Triton's scope() would undo every compilation setting changed meanwhile."""
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.delenv(_LINE_INFO, raising=False)
+    monkeypatch.delenv("TRITON_ALWAYS_COMPILE", raising=False)
+    compilation = _CompilationKnobs()
+    listener = object()
+    with _triton._without_line_info(_triton_with(compilation)):
+        assert os.environ[_LINE_INFO] == "1"
+        compilation.listener = listener
+        monkeypatch.setenv("TRITON_ALWAYS_COMPILE", "1")
+    assert _LINE_INFO not in os.environ
+    assert compilation.listener is listener
+    assert os.environ["TRITON_ALWAYS_COMPILE"] == "1"
+
+
+@pytest.mark.parametrize("setting", ["environment", "knob"])
+def test_explicit_line_info_settings_stay_in_charge(monkeypatch, setting):
+    from torch_tensorrt.kernels import _triton
+
+    compilation = _CompilationKnobs()
+    if setting == "environment":
+        monkeypatch.setenv(_LINE_INFO, "0")
+    else:
+        # A knob set while Triton does not propagate knobs to the environment.
+        monkeypatch.delenv(_LINE_INFO, raising=False)
+        compilation.disable_line_info = False
+    expected = os.environ.get(_LINE_INFO), dict(vars(compilation))
+    with _triton._without_line_info(_triton_with(compilation)):
+        assert (os.environ.get(_LINE_INFO), vars(compilation)) == expected
+    assert (os.environ.get(_LINE_INFO), vars(compilation)) == expected
+
+
+def test_line_info_scope_keeps_a_value_set_while_it_was_open(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.delenv(_LINE_INFO, raising=False)
+    with _triton._without_line_info(types.SimpleNamespace()):
+        monkeypatch.setenv(_LINE_INFO, "0")
+    assert os.environ[_LINE_INFO] == "0"
+
+
+@skip_no_triton
+def test_line_info_scope_reaches_tritons_compilation_setting(monkeypatch):
+    import triton
+
+    from torch_tensorrt.kernels import _triton
+
+    compilation = getattr(getattr(triton, "knobs", None), "compilation", None)
+    if compilation is None or "disable_line_info" in vars(compilation):
+        pytest.skip("Triton without knobs, or with an explicit line info knob")
+    monkeypatch.delenv(_LINE_INFO, raising=False)
+    with _triton._without_line_info(triton):
+        assert compilation.disable_line_info is True
+    assert compilation.disable_line_info is False
+
+
+# ---- No-GPU: plugin shared memory and i32 specializations ----
+
+_PLUGIN_SHARED_MEMORY = 48 * 1024
+# An extra that a dynamic shape leaves symbolic until TensorRT enqueues.
+_SYMBOLIC = types.SimpleNamespace(is_constant=False)
+
+
+def _artifact(shared_mem=0, kernel_name="my_kernel", num_warps=4, ptx=b"// ptx"):
+    from torch_tensorrt.kernels import _triton
+
+    target = types.SimpleNamespace(backend="cuda", arch=90, warp_size=32)
+    return _triton.CompiledTritonArtifact(
+        ptx, kernel_name, num_warps, shared_mem, target, 90
+    )
+
+
+@pytest.mark.parametrize(
+    "shared_mem, limit, fits",
+    [
+        (_PLUGIN_SHARED_MEMORY, _PLUGIN_SHARED_MEMORY, True),
+        (_PLUGIN_SHARED_MEMORY + 1, _PLUGIN_SHARED_MEMORY, False),
+        (64 * 1024, 99 * 1024, True),
+    ],
+)
+def test_plugin_shared_memory_is_checked_against_a_plugin_launch(
+    monkeypatch, shared_mem, limit, fits
+):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(
+        _triton, "plugin_shared_memory_limit", lambda device=None: limit
+    )
+    if fits:
+        _triton.check_plugin_shared_memory("ns::op", _artifact(shared_mem))
+        return
+    with pytest.raises(
+        ValueError, match=f"needs {shared_mem} bytes .* at most {limit}"
+    ):
+        _triton.check_plugin_shared_memory("ns::op", _artifact(shared_mem))
+
+
+@skip_no_qdp
+def test_triton_op_rejects_a_kernel_whose_shared_memory_no_plugin_launch_provides(
+    monkeypatch,
+):
+    """Such a plugin registered and built, then failed on every enqueue."""
+    from torch_tensorrt.kernels import _register, _triton
+
+    monkeypatch.setattr(
+        _triton, "compile_triton_to_ptx", lambda *a, **k: _artifact(64 * 1024)
+    )
+    monkeypatch.setattr(
+        _triton, "plugin_shared_memory_limit", lambda device=None: _PLUGIN_SHARED_MEMORY
+    )
+    monkeypatch.setattr(
+        _register,
+        "register_precompiled_qdp_plugin",
+        lambda *a, **k: pytest.fail("registered a plugin that cannot launch"),
+    )
+    with pytest.raises(ValueError, match="smaller tiles or num_stages=1"):
+        ttk.triton_op(
+            "ttk_test::shared_memory_overflow",
+            kernel=_FakeKernel(["x", "y"]),
+            signature={"x": "*fp32", "y": "*fp32"},
+            constexprs={},
+            grid=lambda i, o: 1,
+            meta_fn=_identity_meta,
+        )
+
+
+@pytest.mark.parametrize(
+    "extras, hinted",
+    [
+        ((1024, 64), ("n", "m")),
+        ((1024, 1000), ("n",)),
+        ((1000, 8), ()),
+        ((0, 16), ("n", "m")),
+        # A dynamic dimension keeps an extra symbolic: never specialized.
+        ((_SYMBOLIC, 1024), ("m",)),
+        ((_SYMBOLIC, _SYMBOLIC), ()),
+    ],
+)
+def test_only_constant_i32_extras_divisible_by_16_select_a_specialization(
+    extras, hinted
+):
+    from torch_tensorrt.kernels import _triton
+
+    layout = _triton.analyze_signature(
+        {"x": "*fp32", "n": "i32", "m": "i32", "y": "*fp32"}, (1, 1)
+    )
+    launch = types.SimpleNamespace(block_x=128, shared_mem=0)
+    requested = []
+
+    def compile_specialized(names):
+        requested.append(names)
+        return _artifact(shared_mem=1024, num_warps=8, ptx=b"// specialized")
+
+    specialized = _triton.specialize_on_constant_extras(
+        lambda inputs, outputs, tactic: (launch, list(extras)),
+        layout,
+        compile_specialized,
+    )
+    result = specialized([], [], 0)
+    assert requested == ([hinted] if hinted else [])
+    if hinted:
+        assert result == (launch, list(extras), ("my_kernel", "// specialized"))
+        assert (launch.block_x, launch.shared_mem) == (256, 1024)
+    else:
+        assert result == (launch, list(extras))
+        assert (launch.block_x, launch.shared_mem) == (128, 0)
+
+
+def test_unusable_specializations_keep_the_registered_ptx(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    compiled = {
+        ("n",): _artifact(ptx=b"// n"),
+        ("m",): _artifact(kernel_name="renamed"),
+        ("n", "m"): _artifact(shared_mem=64 * 1024),
+    }
+    calls = []
+
+    def compile_triton_to_ptx(kernel, signature, constexprs, **options):
+        calls.append(options["divisible_by_16"])
+        if options["divisible_by_16"] not in compiled:
+            raise RuntimeError("Triton rejected the hint")
+        return compiled[options["divisible_by_16"]]
+
+    monkeypatch.setattr(_triton, "compile_triton_to_ptx", compile_triton_to_ptx)
+    monkeypatch.setattr(
+        _triton, "plugin_shared_memory_limit", lambda device=None: _PLUGIN_SHARED_MEMORY
+    )
+    compile_specialized = _triton.specialization_compiler(
+        "ns::op",
+        object(),
+        {},
+        {},
+        _artifact(),
+        num_warps=4,
+        num_stages=None,
+        pointer_alignment=None,
+    )
+    assert compile_specialized(("n",)).ptx == b"// n"
+    assert compile_specialized(("n",)).ptx == b"// n"
+    # A renamed entry, too much shared memory, and a failed compile.
+    assert compile_specialized(("m",)) is None
+    assert compile_specialized(("n", "m")) is None
+    assert compile_specialized(("k",)) is None
+    assert compile_specialized(("k",)) is None
+    assert calls == [("n",), ("m",), ("n", "m"), ("k",)]
 
 
 @skip_no_qdp
@@ -949,6 +1215,104 @@ def test_multi_input_output_reduction_dynamic():
         torch.testing.assert_close(reduced, expected.sum(-1), atol=1e-4, rtol=1e-4)
 
 
+_PTX_LINE_INFO = re.compile(r"(?m)^\s*\.(?:loc|file)\s")
+
+
+@skip_no_cuda
+@skip_no_triton
+def test_plugin_ptx_carries_no_line_information(monkeypatch):
+    """TensorRT reloads plugin PTX on every enqueue; line info only adds size."""
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.delenv(_LINE_INFO, raising=False)
+    signature = {"x_ptr": "*fp32", "n": "i32", "y_ptr": "*fp32"}
+    constexprs = {"BLOCK": 256}
+    artifact = _triton.compile_triton_to_ptx(_ttk_add_one_kernel, signature, constexprs)
+    assert not _PTX_LINE_INFO.search(artifact.ptx.decode())
+    # Triton's own compilation of the same kernel, as a JIT launch makes it.
+    source = triton.compiler.ASTSource(
+        fn=_ttk_add_one_kernel, signature=signature, constexprs=constexprs
+    )
+    assert _PTX_LINE_INFO.search(triton.compile(source).asm["ptx"])
+    assert _LINE_INFO not in os.environ
+
+
+if triton is not None:
+
+    @triton.jit
+    def _ttk_row_add_one(x, cols, y, BLOCK: tl.constexpr):
+        col = tl.arange(0, BLOCK)
+        offset = tl.program_id(0) * cols + col
+        tl.store(y + offset, tl.load(x + offset, col < cols) + 1, col < cols)
+
+
+@skip_no_cuda
+@skip_no_qdp
+@skip_no_triton
+@pytest.mark.parametrize("static", [True, False], ids=["static", "dynamic"])
+def test_only_an_extra_the_engine_fixes_selects_a_divisible_specialization(
+    monkeypatch, static
+):
+    """TensorRT asks for the launch once, while it builds the engine, with a
+    symbolic expression for every dimension the input profile lets vary. Such
+    an extra keeps the registered PTX, even when the optimization shape makes
+    it a multiple of 16, so no other value can reach a kernel that assumes one.
+    """
+    import uuid
+
+    import tensorrt.plugin as trtp
+
+    from torch_tensorrt.kernels import _triton
+
+    # A fresh op: each registration caches the specializations it compiled.
+    name = f"row_add_one_{uuid.uuid4().hex[:8]}"
+    ttk.triton_op(
+        f"ttk_test::{name}",
+        kernel=_ttk_row_add_one,
+        signature={"x": "*fp32", "cols": "i32", "y": "*fp32"},
+        constexprs={"BLOCK": 512},
+        grid=lambda i, o: (i[0].shape_expr[0],),
+        meta_fn=_identity_meta,
+        extra_args_fn=lambda i, o: [trtp.SymInt32(i[0].shape_expr[1])],
+        pointer_alignment=16,
+        supports_dynamic_shapes=True,
+    )
+    hinted = []
+    compile_triton_to_ptx = _triton.compile_triton_to_ptx
+
+    def record(*args, **kwargs):
+        hinted.append(kwargs["divisible_by_16"])
+        return compile_triton_to_ptx(*args, **kwargs)
+
+    monkeypatch.setattr(_triton, "compile_triton_to_ptx", record)
+    op = getattr(torch.ops.ttk_test, name)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return op(x)
+
+    if static:
+        inputs, shapes = [torch.randn(4, 256, device="cuda")], [(4, 256)]
+    else:
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(2, 200), opt_shape=(4, 256), max_shape=(8, 300)
+            )
+        ]
+        shapes = [(2, 200), (4, 256), (5, 257), (8, 300)]
+    compiled = torch_tensorrt.compile(
+        Model().cuda().eval(),
+        ir="dynamo",
+        inputs=inputs,
+        min_block_size=1,
+        require_full_compilation=True,
+    )
+    assert hinted == ([("cols",)] if static else [])
+    for shape in shapes:
+        x = torch.randn(shape, device="cuda")
+        torch.testing.assert_close(compiled(x), x + 1)
+
+
 def test_conversion_and_aot_reject_target_mismatch(captured_registration, monkeypatch):
     from torch_tensorrt.kernels import _triton
 
@@ -978,4 +1342,300 @@ def test_conversion_and_aot_reject_target_mismatch(captured_registration, monkey
             [types.SimpleNamespace(dtype=trt.float32)],
             [types.SimpleNamespace(dtype=trt.float32)],
             0,
+        )
+
+
+# ---- AOT plugin code: alignment hints, specialization, shared memory, line info ----
+
+
+class _HintedKernel:
+    arg_names = ["x", "n", "y", "BLOCK"]
+
+
+@pytest.mark.parametrize(
+    "pointer_alignment, hinted", [(None, False), (8, False), (16, True), (256, True)]
+)
+def test_divisibility_hints_follow_pointer_alignment_and_named_i32_arguments(
+    pointer_alignment, hinted
+):
+    from torch_tensorrt.kernels import _triton
+
+    signature = {"x": "*fp16", "n": "i32", "y": "*fp16"}
+    kernel = _HintedKernel()
+    pointers = {(0,): [["tt.divisibility", 16]], (2,): [["tt.divisibility", 16]]}
+    # Without a 16-byte promise, a plugin may get views at odd offsets, and
+    # Triton specializes no smaller pointer alignment.
+    attrs = _triton._divisibility_attrs(kernel, signature, pointer_alignment, ())
+    assert attrs == (pointers if hinted else {})
+    assert _triton._divisibility_attrs(
+        kernel, signature, pointer_alignment, ("n",)
+    ) == {**(pointers if hinted else {}), (1,): [["tt.divisibility", 16]]}
+    with pytest.raises(ValueError, match="not i32 signature entries"):
+        _triton._divisibility_attrs(kernel, signature, pointer_alignment, ("x",))
+
+
+@skip_no_qdp
+@pytest.mark.parametrize("pointer_alignment", [0, 24, 512, True, 16.0])
+def test_triton_op_rejects_an_invalid_pointer_alignment(
+    captured_registration, monkeypatch, pointer_alignment
+):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(
+        _triton,
+        "compile_triton_to_ptx",
+        lambda *a, **k: pytest.fail("compiled with an invalid pointer_alignment"),
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"triton_op 'ttk_test::misaligned' pointer_alignment must be a power "
+        r"of two between 1 and 256 bytes",
+    ):
+        ttk.triton_op(
+            "ttk_test::misaligned",
+            kernel=_FakeKernel(["x_ptr", "y_ptr"]),
+            signature={"x_ptr": "*fp32", "y_ptr": "*fp32"},
+            constexprs={},
+            grid=lambda i, o: (1,),
+            meta_fn=_identity_meta,
+            pointer_alignment=pointer_alignment,
+        )
+    assert captured_registration == {}
+
+
+def test_aot_impl_embeds_a_specialization_chosen_at_build_time():
+    trtp = pytest.importorskip("tensorrt.plugin")
+    from torch_tensorrt.kernels import _register
+
+    schema = types.SimpleNamespace(tensor_arg_names=("x",), num_outputs=1)
+    launch = trtp.KernelLaunchParams()
+    impl = _register._make_aot_impl(
+        schema, "registered ptx", "entry", lambda i, o, t: (launch, None, ("e2", "p2"))
+    )
+    name, ptx, params, extras = impl(object(), (object(),), 0)
+    assert (name, ptx, params) == ("e2", "p2", launch)
+
+
+def test_ttgir_allocations_are_summarized_largest_first():
+    from torch_tensorrt.kernels import _triton
+
+    ttgir = (
+        "%1 = ttg.local_alloc : () -> !ttg.memdesc<64x128xf32, #shared, #smem, mutable>\n"
+        "%2 = ttg.local_alloc %0 : (tensor<64x128xf32>) -> !ttg.memdesc<64x128xf32, #s>\n"
+        "%3 = ttg.local_alloc : () -> !ttg.memdesc<2x32x64xbf16, #shared, #smem>\n"
+        "%4 = ttg.local_alloc : () -> !ttg.memdesc<16xi1, #shared, #smem>\n"
+    )
+    compiled = types.SimpleNamespace(asm={"ttgir": ttgir})
+    assert _triton.shared_memory_allocations(compiled) == (
+        "2 x 64x128xf32 (32768 B each)",
+        "1 x 2x32x64xbf16 (8192 B)",
+        "1 x 16xi1 (16 B)",
+    )
+    assert _triton.shared_memory_allocations(types.SimpleNamespace(asm={})) == ()
+
+
+_SCALED_ROWS, _SCALED_COLS = 64, 2048
+
+if triton is not None:
+
+    @triton.jit
+    def _ttk_scale_static(x_ptr, y_ptr, N: tl.constexpr, BLOCK: tl.constexpr):
+        offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        mask = offsets < N
+        x = tl.load(x_ptr + offsets, mask=mask).to(tl.float32)
+        tl.store(y_ptr + offsets, (x * 2.0 + 1.0).to(tl.bfloat16), mask=mask)
+
+    @triton.jit
+    def _ttk_scale_runtime(x_ptr, n, y_ptr, BLOCK: tl.constexpr):
+        offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        mask = offsets < n
+        x = tl.load(x_ptr + offsets, mask=mask).to(tl.float32)
+        tl.store(y_ptr + offsets, (x * 2.0 + 1.0).to(tl.bfloat16), mask=mask)
+
+
+_STATIC_SCALE = (
+    {"x_ptr": "*bf16", "y_ptr": "*bf16"},
+    {"N": _SCALED_ROWS * _SCALED_COLS, "BLOCK": 1024},
+)
+_RUNTIME_SCALE = ({"x_ptr": "*bf16", "n": "i32", "y_ptr": "*bf16"}, {"BLOCK": 1024})
+
+
+def _vector_ops(artifact):
+    return len(re.findall(r"\b(?:ld|st)\.global\.v4", artifact.ptx.decode()))
+
+
+@skip_no_cuda
+@skip_no_triton
+def test_pointer_alignment_of_16_with_static_dims_vectorizes_the_plugin_ptx():
+    from torch_tensorrt.kernels import _triton
+
+    element = _triton.compile_triton_to_ptx(_ttk_scale_static, *_STATIC_SCALE)
+    aligned = _triton.compile_triton_to_ptx(
+        _ttk_scale_static, *_STATIC_SCALE, pointer_alignment=16
+    )
+    assert _vector_ops(element) == 0
+    assert _vector_ops(aligned) > 0
+
+
+@skip_no_cuda
+@skip_no_qdp
+@skip_no_triton
+@pytest.mark.parametrize(
+    "pointer_alignment, vectorized", [(None, False), (8, False), (16, True)]
+)
+def test_triton_op_registers_ptx_compiled_for_its_pointer_alignment(
+    monkeypatch, pointer_alignment, vectorized
+):
+    from torch_tensorrt.kernels import _register
+
+    registered = {}
+    monkeypatch.setattr(
+        _register,
+        "register_precompiled_qdp_plugin",
+        lambda *a, **k: registered.update(k),
+    )
+    ttk.triton_op(
+        f"ttk_test::scale_aligned_to_{pointer_alignment}",
+        kernel=_ttk_scale_static,
+        signature=_STATIC_SCALE[0],
+        constexprs=_STATIC_SCALE[1],
+        grid=lambda i, o: (_SCALED_ROWS * _SCALED_COLS // 1024,),
+        meta_fn=_identity_meta,
+        pointer_alignment=pointer_alignment,
+    )
+    vector_ops = _vector_ops(types.SimpleNamespace(ptx=registered["ptx"]))
+    assert (vector_ops > 0) is vectorized
+
+
+@skip_no_cuda
+@skip_no_triton
+def test_build_time_constant_extras_are_hinted():
+    from torch_tensorrt.kernels import _triton
+
+    unknown = _triton.compile_triton_to_ptx(
+        _ttk_scale_runtime, *_RUNTIME_SCALE, pointer_alignment=16
+    )
+    known = _triton.compile_triton_to_ptx(
+        _ttk_scale_runtime,
+        *_RUNTIME_SCALE,
+        pointer_alignment=16,
+        divisible_by_16=("n",),
+    )
+    assert _vector_ops(unknown) == 0 and _vector_ops(known) > 0
+
+
+@skip_no_cuda
+@skip_no_triton
+def test_plugin_ptx_has_no_line_info_unless_the_environment_asks(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    def directives(artifact):
+        return len(re.findall(r"^\s*\.loc\b", artifact.ptx.decode(), re.M))
+
+    monkeypatch.delenv("TRITON_DISABLE_LINE_INFO", raising=False)
+    assert (
+        directives(_triton.compile_triton_to_ptx(_ttk_scale_static, *_STATIC_SCALE))
+        == 0
+    )
+    assert "TRITON_DISABLE_LINE_INFO" not in os.environ
+    monkeypatch.setenv("TRITON_DISABLE_LINE_INFO", "0")
+    assert (
+        directives(_triton.compile_triton_to_ptx(_ttk_scale_static, *_STATIC_SCALE)) > 0
+    )
+
+
+@skip_no_cuda
+@skip_no_qdp
+@skip_no_triton
+@pytest.mark.parametrize("pointer_alignment", [None, 16])
+def test_triton_op_engine_is_correct_and_specialized(monkeypatch, pointer_alignment):
+    import tensorrt.plugin as trtp
+
+    from torch_tensorrt.kernels import _triton
+
+    compiled_names = []
+    alignments = set()
+    real = _triton.compile_triton_to_ptx
+
+    def recording(*args, **kwargs):
+        compiled_names.append(tuple(kwargs.get("divisible_by_16", ())))
+        alignments.add(kwargs.get("pointer_alignment"))
+        return real(*args, **kwargs)
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    monkeypatch.setattr(_triton, "compile_triton_to_ptx", recording)
+    name = f"aligned_scale_{pointer_alignment}"
+    ttk.triton_op(
+        f"ttk_test::{name}",
+        kernel=_ttk_scale_runtime,
+        signature=_RUNTIME_SCALE[0],
+        constexprs=_RUNTIME_SCALE[1],
+        grid=lambda i, o: (trtp.cdiv(i[0].shape_expr.numel(), 1024),),
+        meta_fn=meta,
+        extra_args_fn=lambda i, o: [trtp.SymInt32(i[0].shape_expr.numel())],
+        num_warps=4,
+        pointer_alignment=pointer_alignment,
+    )
+    op = getattr(torch.ops.ttk_test, name)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return op(x)
+
+    x = torch.randn(_SCALED_ROWS, _SCALED_COLS, device="cuda", dtype=torch.bfloat16)
+    compiled = torch_tensorrt.compile(
+        Model().eval().cuda(),
+        ir="dynamo",
+        inputs=[x],
+        min_block_size=1,
+        require_full_compilation=True,
+        offload_module_to_cpu=False,
+    )
+    with torch.no_grad():
+        actual = compiled(x)
+    torch.testing.assert_close(actual, (x.float() * 2.0 + 1.0).to(torch.bfloat16))
+    # The static engine fixes n = 131072, a multiple of 16, at build time.
+    assert ("n",) in compiled_names
+    # The registered PTX and its build-time specialization share the promise.
+    assert alignments == {pointer_alignment}
+
+
+@skip_no_cuda
+@skip_no_qdp
+@skip_no_triton
+def test_triton_op_rejects_more_shared_memory_than_a_plugin_launch_has():
+    from torch_tensorrt.kernels import _triton
+
+    @triton.jit
+    def big_tiles(a_ptr, b_ptr, c_ptr, BLOCK: tl.constexpr):
+        rows = tl.arange(0, BLOCK)
+        a = tl.load(a_ptr + rows[:, None] * BLOCK + rows[None, :])
+        b = tl.load(b_ptr + rows[:, None] * BLOCK + rows[None, :])
+        c = tl.dot(a, b)
+        tl.store(c_ptr + rows[:, None] * BLOCK + rows[None, :], c.to(tl.float16))
+
+    signature = {"a_ptr": "*fp16", "b_ptr": "*fp16", "c_ptr": "*fp16"}
+    artifact = _triton.compile_triton_to_ptx(
+        big_tiles, signature, {"BLOCK": 128}, num_warps=8, num_stages=1
+    )
+    if artifact.shared_mem <= _triton.plugin_shared_memory_limit():
+        pytest.skip(f"this GPU stages these tiles in {artifact.shared_mem} bytes")
+
+    def meta(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(a)
+
+    with pytest.raises(
+        ValueError, match="bytes of shared memory, but a TensorRT plugin"
+    ):
+        ttk.triton_op(
+            "ttk_test::oversized_tiles",
+            kernel=big_tiles,
+            signature=signature,
+            constexprs={"BLOCK": 128},
+            grid=lambda i, o: (1,),
+            meta_fn=meta,
+            num_warps=8,
+            num_stages=1,
         )

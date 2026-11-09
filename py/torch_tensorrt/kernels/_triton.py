@@ -3,13 +3,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import inspect
 import logging
 import operator
+import os
 import re
+import threading
+from collections import Counter
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, NamedTuple, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, NamedTuple, Optional, Tuple
 
 import torch
 
@@ -24,6 +28,20 @@ _LOGGER = logging.getLogger(__name__)
 # us that scratch is zero; it only tells us that Triton did not report it, so
 # fail before compilation instead of weakening the launch validation.
 _MIN_TRITON_VERSION = Version("3.5.0")
+# The shared memory every CUDA GPU gives a block without an opt-in. TensorRT's
+# AOT plugin launch never opts in, so this is also the plugin limit; above it,
+# the engine builds but fails at enqueue.
+_DEFAULT_BLOCK_SHARED_MEMORY = 48 * 1024
+# Setting this environment variable, to any value, leaves plugin PTX line
+# information as Triton's own setting decides.
+_LINE_INFO_ENV = "TRITON_DISABLE_LINE_INFO"
+# Serializes the process-wide line-information setting; see _without_line_info.
+_LINE_INFO_LOCK = threading.RLock()
+# A TTGIR shared-memory buffer: ``ttg.local_alloc ... -> !ttg.memdesc<2x64x128xf16``.
+_LOCAL_ALLOC_RE = re.compile(
+    r"ttg\.local_alloc\b[^\n]*?->\s*!ttg\.memdesc<((?:\d+x)+)([A-Za-z]\w*)"
+)
+_ELEMENT_BITS = {"i1": 8, "f8E4M3FN": 8, "f8E5M2": 8, "bf16": 16, "tf32": 32}
 
 
 class CompiledTritonArtifact(NamedTuple):
@@ -374,6 +392,75 @@ def _triton_import() -> Any:
     return triton
 
 
+@contextlib.contextmanager
+def _without_line_info(triton: Any) -> Iterator[None]:
+    """Compile plugin PTX without source line information.
+
+    TensorRT 11.0 loads a plugin's PTX again on every enqueue, so smaller PTX
+    costs less host time per call. Triton reads the setting from the
+    ``TRITON_DISABLE_LINE_INFO`` environment variable and keys its cache on
+    that variable, so the scoped change cannot reuse or pollute the cache
+    entries of other compilations. An explicit setting, the variable or
+    ``triton.knobs.compilation.disable_line_info``, is left in charge.
+
+    The environment is process-wide: while the scope is open, a Triton
+    compilation in any other thread, such as one that Inductor or a JIT
+    launch starts, also omits line information. Scopes hold a lock for their
+    whole duration, and each removes on exit only the variable it set, and
+    only while it still holds the value the scope gave it. Changes that other
+    threads make meanwhile to other Triton settings therefore survive, which
+    ``triton.knobs.compilation.scope()`` would undo: it restores every
+    compilation knob and environment variable it covers.
+    """
+    with _LINE_INFO_LOCK:
+        compilation = getattr(getattr(triton, "knobs", None), "compilation", None)
+        if _LINE_INFO_ENV in os.environ or "disable_line_info" in getattr(
+            compilation, "__dict__", {}
+        ):
+            yield
+            return
+        os.environ[_LINE_INFO_ENV] = "1"
+        try:
+            yield
+        finally:
+            if os.environ.get(_LINE_INFO_ENV) == "1":
+                del os.environ[_LINE_INFO_ENV]
+
+
+def _divisibility_attrs(
+    kernel: Any,
+    signature: Dict[str, str],
+    pointer_alignment: Optional[int],
+    divisible_by_16: Tuple[str, ...],
+) -> Dict[Tuple[int, ...], Any]:
+    """``tt.divisibility=16`` hints, as Triton's JIT derives them at launch.
+
+    Pointers get the hint only with a ``pointer_alignment`` of 16 or more, the
+    only pointer alignment Triton specializes: TensorRT can pass a plugin a
+    view at an odd offset of a fused buffer. Named i32 arguments get it
+    because the caller knows their values.
+    """
+    unknown = [
+        name
+        for name in divisible_by_16
+        if not isinstance(signature.get(name), str) or signature[name].strip() != "i32"
+    ]
+    if unknown:
+        raise ValueError(
+            f"divisible_by_16 names {unknown}, which are not i32 signature entries."
+        )
+    aligned = pointer_alignment is not None and pointer_alignment >= 16
+    hinted = [
+        name
+        for name, type_str in signature.items()
+        if (aligned and type_str.strip().startswith("*")) or name in divisible_by_16
+    ]
+    return {
+        (list(kernel.arg_names).index(name),): [["tt.divisibility", 16]]
+        for name in hinted
+    }
+
+
 def _compile_within_driver_isa(
     triton: Any,
     kernel: Any,
@@ -381,6 +468,7 @@ def _compile_within_driver_isa(
     constexprs: Dict[str, Any],
     options: Dict[str, Any],
     target: Any,
+    attrs: Optional[Dict[Tuple[int, ...], Any]] = None,
 ) -> Any:
     """Compile ``kernel``, holding the PTX ISA to what the driver can load.
 
@@ -391,7 +479,8 @@ def _compile_within_driver_isa(
     with nothing in the message pointing at the ISA.
 
     The cap only ever lowers the ISA: a ``ptx_version`` above what the bundled
-    ``ptxas`` can assemble fails the compile outright.
+    ``ptxas`` can assemble fails the compile outright. ``attrs`` are ASTSource
+    argument attributes such as divisibility hints.
     """
 
     def _compile(ptx_version: Optional[int] = None) -> Any:
@@ -399,11 +488,13 @@ def _compile_within_driver_isa(
             fn=kernel,
             signature=dict(signature),
             constexprs=dict(constexprs),
+            attrs=dict(attrs) if attrs else None,
         )
         opts = dict(options)
         if ptx_version is not None:
             opts["ptx_version"] = ptx_version
-        return triton.compile(src, target=target, options=opts or None)
+        with _without_line_info(triton):
+            return triton.compile(src, target=target, options=opts or None)
 
     driver_max = _driver_max_ptx_version()
     if driver_max is None:
@@ -596,11 +687,17 @@ def compile_triton_to_ptx(
     constexprs: Dict[str, Any],
     num_warps: Optional[int] = None,
     num_stages: Optional[int] = None,
+    *,
+    pointer_alignment: Optional[int] = None,
+    divisible_by_16: Tuple[str, ...] = (),
 ) -> CompiledTritonArtifact:
     """Compile a ``@triton.jit`` kernel to PTX ahead of time.
 
     This mirrors what ``examples/dynamo/aot_plugin.py`` does by hand inside its
     ``@trtp.aot_impl`` body, but performs it once so callers don't have to.
+    The PTX carries no source line information, which keeps the per-enqueue
+    module load in TensorRT short; set ``TRITON_DISABLE_LINE_INFO`` or
+    ``triton.knobs.compilation.disable_line_info`` to decide this yourself.
 
     Args:
         kernel: the ``@triton.jit`` kernel function.
@@ -614,11 +711,41 @@ def compile_triton_to_ptx(
             Triton's own choice. Also sets the launch's threads-per-block.
         num_stages: software pipelining depth, forwarded to ``triton.compile``.
             Defaults to Triton's own choice.
+        pointer_alignment: byte alignment, a power of two, that every pointer
+            argument may be assumed to have; ``None`` assumes only element
+            alignment. 16 or more compiles the pointers as 16-byte aligned, as
+            Triton's JIT specializes aligned tensors, so loads and stores can
+            be vectorized; the launch must then never pass a pointer at a
+            smaller alignment. Triton specializes no smaller alignment.
+        divisible_by_16: names of ``i32`` arguments whose launch values are
+            multiples of 16.
 
     Returns:
         An immutable artifact containing unmodified PTX, the entry symbol,
         launch metadata, GPU target, and PTX ISA version.
     """
+    return _compile_triton(
+        kernel,
+        signature,
+        constexprs,
+        num_warps,
+        num_stages,
+        pointer_alignment=pointer_alignment,
+        divisible_by_16=divisible_by_16,
+    )[1]
+
+
+def _compile_triton(
+    kernel: Any,
+    signature: Dict[str, str],
+    constexprs: Dict[str, Any],
+    num_warps: Optional[int] = None,
+    num_stages: Optional[int] = None,
+    *,
+    pointer_alignment: Optional[int] = None,
+    divisible_by_16: Tuple[str, ...] = (),
+) -> Tuple[Any, CompiledTritonArtifact]:
+    """``compile_triton_to_ptx``, also returning Triton's compiled kernel."""
     validate_compile_options(num_warps, num_stages)
     triton = _triton_import()
     target = triton.runtime.driver.active.get_current_target()
@@ -635,8 +762,11 @@ def compile_triton_to_ptx(
     if num_stages is not None:
         options["num_stages"] = num_stages
 
+    attrs = _divisibility_attrs(
+        kernel, signature, pointer_alignment, tuple(divisible_by_16)
+    )
     compiled = _compile_within_driver_isa(
-        triton, kernel, signature, constexprs, options, target
+        triton, kernel, signature, constexprs, options, target, attrs
     )
     # Read back from metadata rather than trusting the request: Triton clamps
     # num_warps to what the kernel can actually use.
@@ -657,7 +787,7 @@ def compile_triton_to_ptx(
         compiled_warps,
         shared_mem,
     )
-    return CompiledTritonArtifact(
+    return compiled, CompiledTritonArtifact(
         ptx_bytes,
         kernel_name,
         compiled_warps,
@@ -665,3 +795,146 @@ def compile_triton_to_ptx(
         target,
         _parse_ptx_version(ptx),
     )
+
+
+def plugin_shared_memory_limit(device: Any = None) -> int:
+    """Shared memory a TensorRT AOT plugin launch can give one block, in bytes.
+
+    TensorRT 11.0 does not opt plugin kernels into more than the device's
+    default per-block amount, unlike Triton's own launcher.
+    """
+    if device is None:
+        device = torch.cuda.current_device()
+    return int(torch.cuda.get_device_properties(device).shared_memory_per_block)
+
+
+def check_plugin_shared_memory(
+    op_name: str, artifact: CompiledTritonArtifact, device: Any = None
+) -> None:
+    """Reject a kernel whose shared memory a plugin launch cannot provide.
+
+    Such a kernel registers, and its engine builds, but every enqueue fails.
+    """
+    if artifact.shared_mem <= _DEFAULT_BLOCK_SHARED_MEMORY:
+        return
+    limit = plugin_shared_memory_limit(device)
+    if artifact.shared_mem > limit:
+        raise ValueError(
+            f"triton_op '{op_name}' kernel '{artifact.kernel_name}' needs "
+            f"{artifact.shared_mem} bytes of shared memory, but a TensorRT plugin "
+            f"launch provides at most {limit}: TensorRT does not opt plugins into "
+            "more, so the engine would fail at enqueue. Use smaller tiles or "
+            "num_stages=1."
+        )
+
+
+def shared_memory_allocations(compiled: Any, limit: int = 4) -> Tuple[str, ...]:
+    """Describe the largest explicit shared-memory buffers of a compilation.
+
+    Reads ``ttg.local_alloc`` results from the TTGIR, such as
+    ``"7 x 64x128xf32 (32768 B each)"``. Scratch for layout conversions and
+    reductions is assigned later and is not listed. Returns nothing when the
+    IR is unavailable or its format changed.
+    """
+    asm = getattr(compiled, "asm", None)
+    ttgir = asm.get("ttgir") if isinstance(asm, Mapping) else None
+    if not isinstance(ttgir, str):
+        return ()
+    sizes: Counter[tuple[str, int]] = Counter()
+    for shape, element in _LOCAL_ALLOC_RE.findall(ttgir):
+        bits = _ELEMENT_BITS.get(element)
+        if bits is None:
+            match = re.fullmatch(r"[a-z]+(\d+)", element)
+            if match is None:
+                continue
+            bits = max(8, int(match.group(1)))
+        count = 1
+        for extent in shape.rstrip("x").split("x"):
+            count *= int(extent)
+        sizes[(f"{shape}{element}", count * bits // 8)] += 1
+    ranked = sorted(sizes.items(), key=lambda item: -item[0][1] * item[1])
+    return tuple(
+        f"{number} x {kind} ({size} B{' each' if number > 1 else ''})"
+        for (kind, size), number in ranked[:limit]
+    )
+
+
+def specialization_compiler(
+    op_name: str,
+    kernel: Any,
+    signature: Dict[str, str],
+    constexprs: Dict[str, Any],
+    artifact: CompiledTritonArtifact,
+    *,
+    num_warps: Optional[int],
+    num_stages: Optional[int],
+    pointer_alignment: Optional[int],
+) -> Callable[[Tuple[str, ...]], Optional[CompiledTritonArtifact]]:
+    """Compile, once per set of names, the kernel with those i32 extras hinted.
+
+    A specialization that fails to compile, renames its entry or needs more
+    shared memory than a plugin launch provides is not used.
+    """
+    compiled: Dict[Tuple[str, ...], Optional[CompiledTritonArtifact]] = {}
+
+    def compile_specialized(names: Tuple[str, ...]) -> Optional[CompiledTritonArtifact]:
+        if names not in compiled:
+            try:
+                candidate: Optional[CompiledTritonArtifact] = compile_triton_to_ptx(
+                    kernel,
+                    signature,
+                    constexprs,
+                    num_warps=num_warps,
+                    num_stages=num_stages,
+                    pointer_alignment=pointer_alignment,
+                    divisible_by_16=names,
+                )
+                assert candidate is not None
+                check_plugin_shared_memory(op_name, candidate)
+                if candidate.kernel_name != artifact.kernel_name:
+                    candidate = None
+            except Exception as exc:
+                _LOGGER.debug(
+                    "triton_op '%s' keeps its registered PTX; specializing on %s "
+                    "failed: %s",
+                    op_name,
+                    names,
+                    exc,
+                )
+                candidate = None
+            compiled[names] = candidate
+        return compiled[names]
+
+    return compile_specialized
+
+
+def specialize_on_constant_extras(
+    aot_fn: Callable[..., Any],
+    layout: _common.SignatureLayout,
+    compile_specialized: Callable[[Tuple[str, ...]], Optional[CompiledTritonArtifact]],
+) -> Callable[..., Any]:
+    """Launch PTX specialized on i32 extras that the engine build fixes.
+
+    When the shapes an extra derives from are static, its value is a constant
+    at engine build time. Constants divisible by 16 then get the hint Triton's
+    JIT would give them, which together with aligned pointers lets loads
+    vectorize. ``compile_specialized`` returns the artifact for those names,
+    or None to keep the registered PTX.
+    """
+
+    def specialized(inputs: Any, outputs: Any, tactic: int) -> Any:
+        launch, extras = aot_fn(inputs, outputs, tactic)
+        names = tuple(
+            param.name
+            for param, value in zip(layout.scalars, extras)
+            if (constant := _common.constant_int(value)) is not None
+            and constant % 16 == 0
+        )
+        artifact = compile_specialized(names) if names else None
+        if artifact is None:
+            return launch, extras
+        launch.block_x = artifact.num_warps * 32
+        launch.shared_mem = artifact.shared_mem
+        return launch, extras, (artifact.kernel_name, artifact.ptx.decode("utf-8"))
+
+    return specialized

@@ -27,16 +27,22 @@ to place in those slots and returns plausible-looking garbage.
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import inspect
 import io
 import logging
+import math
 import re
 import struct
 import subprocess
+import threading
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Dict,
+    Iterator,
     List,
     Mapping,
     NamedTuple,
@@ -330,12 +336,60 @@ def validate_cutile_config(
     return layout
 
 
+def _static_shape_validator(
+    op_name: str,
+    layout: SignatureLayout,
+    static_shapes: Mapping[str, Sequence[int]],
+    user_validator: Optional[Callable[..., bool]],
+) -> Callable[..., bool]:
+    """Decline tensors whose shapes differ from the ones the kernel assumes."""
+    expected = [tuple(static_shapes[param.name]) for param in layout.arrays]
+
+    def _value(node: Any) -> Any:
+        meta = getattr(node, "meta", None)
+        return meta.get("val") if isinstance(meta, dict) else None
+
+    def _shape(value: Any) -> Optional[Tuple[Optional[int], ...]]:
+        if not isinstance(value, torch.Tensor):
+            return None
+        # A symbolic dimension can take other values, so it never matches.
+        return tuple(dim if isinstance(dim, int) else None for dim in value.shape)
+
+    def _validator(node: Any, settings: Any = None) -> bool:
+        if user_validator is not None and not user_validator(node, settings):
+            return False
+        produced = _value(node)
+        values = [_value(arg) for arg in getattr(node, "args", ())]
+        values += list(produced) if isinstance(produced, (tuple, list)) else [produced]
+        actual = [_shape(value) for value in values]
+        if actual != expected:
+            _LOGGER.warning(
+                "Not lowering '%s' to its cuTile plugin: tensor shapes %s differ "
+                "from the static_shapes %s it was compiled for.",
+                op_name,
+                actual,
+                expected,
+            )
+            return False
+        return True
+
+    return _validator
+
+
 def make_dtype_capability_validator(
     op_name: str,
     layout: SignatureLayout,
     user_validator: Optional[Callable[..., bool]] = None,
+    static_shapes: Optional[Mapping[str, Sequence[int]]] = None,
 ) -> Callable[..., bool]:
-    """Require tensor metadata matching every compiled cuTile array."""
+    """Require tensor metadata matching every compiled cuTile array.
+
+    With ``static_shapes``, also require exactly those tensor shapes.
+    """
+    if static_shapes is not None:
+        user_validator = _static_shape_validator(
+            op_name, layout, static_shapes, user_validator
+        )
     return _common.make_dtype_capability_validator(
         op_name,
         "cuTile",
@@ -729,6 +783,161 @@ def _should_verify_ptx(arch_override: Optional[str]) -> bool:
     return torch.cuda.is_available() and arch_override == _default_arch()
 
 
+def array_layout_facts(
+    op_name: str,
+    layout: SignatureLayout,
+    *,
+    pointer_alignment: Optional[int] = None,
+    static_shapes: Optional[Mapping[str, Sequence[int]]] = None,
+    derived_launch: bool = True,
+) -> List[Dict[str, Any]]:
+    """``ArrayConstraint`` assumptions that hold for every launch, per array.
+
+    The derived launch passes TensorRT's dense row-major extents and strides
+    (:func:`build_extra_args`), so the last stride is always 1. Static shapes
+    also fix each extent and stride; their divisibility facts follow cuTile's
+    own JAX integration: extents by 16 elements, strides by 16 bytes. A base
+    address alignment is the caller's promise, since TensorRT can bind a plugin
+    to a sub-buffer view at a smaller offset; ``None`` and 1 promise none.
+    """
+    if pointer_alignment is not None:
+        _common.validate_pointer_alignment(
+            op_name, pointer_alignment, frontend="cutile_op"
+        )
+    names = [param.name for param in layout.arrays]
+    if static_shapes is not None:
+        if not isinstance(static_shapes, Mapping) or set(static_shapes) != set(names):
+            raise ValueError(
+                f"cutile_op '{op_name}' static_shapes must map exactly the "
+                f"signature's arrays {names} to their tensor shapes."
+            )
+        for param in layout.arrays:
+            shape = static_shapes[param.name]
+            if (
+                isinstance(shape, (str, bytes))
+                or not isinstance(shape, Sequence)
+                or any(
+                    isinstance(dim, bool) or not isinstance(dim, int) or dim < 0
+                    for dim in shape
+                )
+                or (param.ndim != 1 and len(shape) != param.ndim)
+            ):
+                raise ValueError(
+                    f"cutile_op '{op_name}' static_shapes['{param.name}'] must be a "
+                    f"sequence of non-negative ints with {param.ndim} dimension(s) "
+                    f"(or any shape for a rank-1 array); got {shape!r}."
+                )
+        if not derived_launch:
+            raise ValueError(
+                f"cutile_op '{op_name}' static_shapes describes the derived grid "
+                "launch; a custom aot_fn supplies its own extents and strides."
+            )
+    facts: List[Dict[str, Any]] = []
+    for param in layout.arrays:
+        fact: Dict[str, Any] = {}
+        if pointer_alignment is not None and pointer_alignment > 1:
+            fact["base_addr_divisible_by"] = pointer_alignment
+        if derived_launch:
+            fact["stride_constant"] = (None,) * (param.ndim - 1) + (1,)
+        if static_shapes is not None:
+            shape = static_shapes[param.name]
+            # A rank-1 array is the flattened view build_extra_args describes.
+            extents = [math.prod(shape)] if param.ndim == 1 else list(shape)
+            strides = [math.prod(extents[i + 1 :]) for i in range(param.ndim)]
+            vector = max(1, 16 // param.dtype.itemsize)
+            fact["stride_constant"] = tuple(
+                1 if stride == 1 else None for stride in strides
+            )
+            fact["stride_divisible_by"] = tuple(
+                vector if stride != 1 and stride % vector == 0 else 1
+                for stride in strides
+            )
+            fact["shape_divisible_by"] = tuple(
+                16 if extent % 16 == 0 else 1 for extent in extents
+            )
+        facts.append(fact)
+    return facts
+
+
+# Serializes the process-wide patch of cuTile's view load and store code
+# generation; see _without_tma.
+_TMA_LOCK = threading.RLock()
+
+
+def _tma_hints() -> Optional[Tuple[Any, ...]]:
+    """cuTile's view load and store operations, or ``None`` if they moved.
+
+    Their ``allow_tma`` argument becomes the bytecode hint that keeps an
+    operation from using TMA. The pointer loads and stores that ``ct.gather``
+    and ``ct.scatter`` compile to never use TMA, and tileiras rejects the hint
+    on them.
+    """
+    try:
+        from cuda.tile._ir.ops import TileLoad, TileStore
+
+        operations = (TileLoad, TileStore)
+        for operation in operations:
+            fields = {field.name for field in dataclasses.fields(operation)}
+            # The class's own method, so restoring it leaves the class as it was.
+            method = vars(operation)["generate_bytecode"]
+            parameters = list(inspect.signature(method).parameters)
+            if "allow_tma" not in fields or parameters != ["self", "ctx"]:
+                return None
+    except (ImportError, AttributeError, KeyError, TypeError, ValueError):
+        return None
+    return operations
+
+
+def _view_without_tma(generate_bytecode: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap a view operation's code generation to pass ``allow_tma=False``."""
+
+    def without_tma(self: Any, ctx: Any) -> Any:
+        allow_tma = self.allow_tma
+        self.allow_tma = False
+        try:
+            return generate_bytecode(self, ctx)
+        finally:
+            # The operation belongs to the kernel's IR; leave it as it was.
+            self.allow_tma = allow_tma
+
+    return without_tma
+
+
+@contextlib.contextmanager
+def _without_tma(operations: Sequence[Any]) -> Iterator[None]:
+    """Compile every cuTile view load and store as if it passed ``allow_tma=False``.
+
+    TMA needs a tensor-map descriptor built on the host, which cuTile adds as
+    extra kernel parameters; TensorRT's AOT launch can pass only pointers and
+    32-bit integers. cuda-tile has no compile option for this, only the
+    ``allow_tma`` argument of ``ct.load``, ``ct.store`` and the other view
+    loads and stores, so for the duration of the export the plugin build
+    generates every such operation's bytecode as if that argument were
+    ``False``. Pointer loads and stores, such as those of ``ct.gather`` and
+    ``ct.scatter``, are left alone: they never use TMA, and tileiras rejects
+    the hint on them.
+
+    The code generation is a method of cuTile's operation classes, so the
+    change is process-wide: while the scope is open, every cuTile compilation
+    in any thread is TMA-free, including the first ``ct.launch`` of an
+    unrelated kernel, whose JIT cache then keeps that code. Scopes hold a lock
+    for their whole duration and read the methods they restore only once they
+    hold it, so overlapping scopes in different threads cannot restore each
+    other's patch and leave TMA disabled for the rest of the process.
+    """
+    with _TMA_LOCK:
+        originals = [
+            (operation, operation.generate_bytecode) for operation in operations
+        ]
+        try:
+            for operation, original in originals:
+                operation.generate_bytecode = _view_without_tma(original)
+            yield
+        finally:
+            for operation, original in originals:
+                operation.generate_bytecode = original
+
+
 def compile_cutile_to_ptx(
     op_name: str,
     kernel: Any,
@@ -736,6 +945,7 @@ def compile_cutile_to_ptx(
     constants: Mapping[str, Any],
     arch_override: Optional[str] = None,
     max_ptx_version: Optional[int] = None,
+    array_facts: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> Tuple[bytes, str, Optional[Tuple[int, int, int]]]:
     """Compile a cuTile kernel to TRT-ready PTX.
 
@@ -749,6 +959,10 @@ def compile_cutile_to_ptx(
             current device's compute capability.
         max_ptx_version: Explicit ISA ceiling as a ``92``-style int (minimum 92), pinning the
             ``.version`` header. By default the emitted version header is unchanged.
+        array_facts: per-array ``ArrayConstraint`` assumptions from
+            :func:`array_layout_facts`, in signature order. A base address
+            alignment of 16 bytes or more compiles without TMA, whose
+            descriptors the AOT launch cannot pass.
 
     Returns:
         ``(ptx_bytes, kernel_name, reqntid)`` — the reordered PTX to embed in
@@ -783,6 +997,25 @@ def compile_cutile_to_ptx(
             "compile ahead of time. Install 'cuda-tile>=1.3,<2'."
         ) from exc
 
+    facts = [dict(fact) for fact in array_facts or [{}] * len(layout.arrays)]
+    if len(facts) != len(layout.arrays):
+        raise ValueError(
+            f"cutile_op '{op_name}' has {len(facts)} array_facts for "
+            f"{len(layout.arrays)} arrays."
+        )
+    tma_context = None
+    if any(fact.get("base_addr_divisible_by", 1) >= 16 for fact in facts):
+        tma_context = _tma_hints()
+        if tma_context is None:
+            # TMA would add descriptor parameters the AOT launch cannot pass.
+            _LOGGER.warning(
+                "cutile_op '%s': this cuda-tile release offers no way to disable "
+                "TMA, so the plugin is compiled without the pointer alignment "
+                "assumption.",
+                op_name,
+            )
+            for fact in facts:
+                fact.pop("base_addr_divisible_by", None)
     parameters: List[Any] = [
         ArrayConstraint(
             dtype=_cutile_dtype(ct, param.dtype),
@@ -793,8 +1026,9 @@ def compile_cutile_to_ptx(
             stride_lower_bound_incl=0,
             alias_groups=(),
             may_alias_internally=False,
+            **fact,
         )
-        for param in layout.arrays
+        for param, fact in zip(layout.arrays, facts)
     ]
     parameters.extend(ConstantConstraint(value) for value in constants.values())
 
@@ -806,13 +1040,18 @@ def compile_cutile_to_ptx(
 
     buffer = io.BytesIO()
     try:
-        export_kernel(
-            kernel,
-            [signature],
-            buffer,
-            gpu_code=arch_override or _default_arch(),
-            output_format="cubin",
-        )
+        with (
+            contextlib.nullcontext()
+            if tma_context is None
+            else _without_tma(tma_context)
+        ):
+            export_kernel(
+                kernel,
+                [signature],
+                buffer,
+                gpu_code=arch_override or _default_arch(),
+                output_format="cubin",
+            )
     except FileNotFoundError as exc:
         raise RuntimeError(
             f"cutile_op '{op_name}' could not find the 'tileiras' compiler. "

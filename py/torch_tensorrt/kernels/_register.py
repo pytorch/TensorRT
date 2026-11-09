@@ -392,7 +392,12 @@ def _make_aot_impl(
     kernel_name: str,
     user_aot_fn: Callable[..., Any],
 ) -> Callable[..., Any]:
-    """Build the exact-signature QDP AOT callback without mutating registries."""
+    """Build the exact-signature QDP AOT callback without mutating registries.
+
+    ``user_aot_fn`` returns launch params, optionally with extra args, or a
+    third item ``(kernel_name, ptx)`` naming a specialization of the kernel
+    that the engine build should embed instead of the registered PTX.
+    """
     import tensorrt.plugin as trtp
 
     # Build the aot_impl function body with the correct positional arg names so
@@ -403,13 +408,16 @@ def _make_aot_impl(
 def _aot_impl({sig}):
     inputs = [{", ".join(tensor_arg_names)}]
     result = _user_aot_fn(inputs, outputs, tactic)
-    if isinstance(result, tuple) and len(result) == 2:
+    kernel_name, ptx = _kernel_name, _ptx_str
+    if isinstance(result, tuple) and len(result) == 3:
+        launch_params, extra_args, (kernel_name, ptx) = result
+    elif isinstance(result, tuple) and len(result) == 2:
         launch_params, extra_args = result
     else:
         launch_params, extra_args = result, None
     if extra_args is None:
         extra_args = _trtp.SymIntExprs(0)
-    return (_kernel_name, _ptx_str, launch_params, extra_args)
+    return (kernel_name, ptx, launch_params, extra_args)
 """
 
     fn_globals = {

@@ -102,7 +102,8 @@ def test_ptx_may_declare_wider_pointer_alignment():
     [
         (1, {"x": 1, "out": 1}),
         (16, {"x": 16, "out": 16}),
-        ({"x": 16}, {"x": 16, "out": 1}),
+        # A pointer the mapping leaves out keeps its element alignment.
+        ({"x": 16}, {"x": 16, "out": 4}),
     ],
 )
 def test_pointer_alignment_resolves_per_pointer(alignment, expected):
@@ -192,7 +193,8 @@ def test_unsupported_target_fails_clearly():
         (12070, 85),
         (12080, 87),
         (13020, 92),
-        (13030, None),
+        # CuTe DSL 4.8 emits PTX 9.4, which a 13.3 driver rejects.
+        (13030, 93),
         (14000, None),
     ],
 )

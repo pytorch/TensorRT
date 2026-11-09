@@ -40,8 +40,12 @@ _TESTED_SERIES = "4.8"
 CACHE_DIR_ENV = "TORCH_TENSORRT_CUTEDSL_CACHE_DIR"
 
 # Highest PTX ISA each CUDA driver release loads, from the PTX ISA release notes.
-# Releases between entries (e.g. 12.7) use the closest earlier entry; drivers
-# newer than the table impose no ceiling and are still checked by a driver load.
+# Releases between entries (e.g. 12.7) use the closest earlier entry. A CUDA 13.x
+# driver newer than the table loads PTX ISA 9.x for its minor version x, up to
+# 13.9: the ``major * 10 + minor`` encoding that CuTe's ``+ptxNN`` option and
+# ``.version`` parsing share has no value for an ISA such as 9.10, so 13.10 and
+# any other newer driver impose no ceiling. Every result is still checked by a
+# driver load.
 _CUDA_TO_PTX_ISA: Tuple[Tuple[Tuple[int, int], int], ...] = (
     ((12, 0), 80),
     ((12, 1), 81),
@@ -55,6 +59,7 @@ _CUDA_TO_PTX_ISA: Tuple[Tuple[Tuple[int, int], int], ...] = (
     ((13, 0), 90),
     ((13, 1), 91),
     ((13, 2), 92),
+    ((13, 3), 93),
 )
 
 # CuTe's default ISA depends only on its bundled toolchain, so once it exceeds a
@@ -184,31 +189,34 @@ def validate_config(
 
 
 def normalize_pointer_alignment(
-    op_name: str, layout: _common.SignatureLayout, alignment: PointerAlignment
+    op_name: str,
+    layout: _common.SignatureLayout,
+    alignment: Optional[PointerAlignment] = None,
 ) -> Dict[str, int]:
-    """Resolve the byte alignment CuTe may assume for each tensor pointer."""
-    pointers = [param.name for param in layout.inputs + layout.outputs]
-    if isinstance(alignment, Mapping):
+    """Resolve the byte alignment CuTe may assume for each tensor pointer.
+
+    Pointers without an explicit value (all of them when ``alignment`` is
+    ``None``) use their element size, which every tensor of that dtype meets.
+    """
+    params = layout.inputs + layout.outputs
+    pointers = [param.name for param in params]
+    element = {param.name: param.dtype.itemsize for param in params}
+    if alignment is None:
+        resolved = element
+    elif isinstance(alignment, Mapping):
         unknown = sorted(set(alignment) - set(pointers), key=str)
         if unknown:
             raise ValueError(
                 f"cutedsl_op '{op_name}' pointer_alignment names unknown pointer "
                 f"parameter(s) {unknown}; expected a subset of {pointers}."
             )
-        resolved = {name: alignment.get(name, 1) for name in pointers}
+        resolved = {name: alignment.get(name, element[name]) for name in pointers}
     else:
         resolved = dict.fromkeys(pointers, alignment)
     for name, value in resolved.items():
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or not 1 <= value <= 256
-            or value & (value - 1)
-        ):
-            raise ValueError(
-                f"cutedsl_op '{op_name}' pointer_alignment for '{name}' must be a "
-                f"power of two between 1 and 256 bytes; got {value!r}."
-            )
+        _common.validate_pointer_alignment(
+            op_name, value, frontend="cutedsl_op", pointer=name
+        )
     return resolved
 
 
@@ -288,7 +296,13 @@ def _target_arch(arch: Tuple[int, int]) -> str:
 
 
 def _driver_ptx_version() -> Optional[int]:
-    """PTX ISA the loaded driver accepts, or ``None`` when newer than the table."""
+    """PTX ISA the loaded driver accepts, or ``None`` when no ceiling is known.
+
+    CuTe DSL bundles its own, possibly newer, CUDA toolchain, so a driver from a
+    later CUDA 13 release than the table still needs a ceiling: CUDA 13.x
+    drivers load PTX ISA 9.x. From CUDA 13.10 on, that ISA has no two-digit
+    encoding (``100`` would mean PTX ISA 10.0), so no ceiling is known.
+    """
     from cuda.bindings import driver
 
     status, raw_version = driver.cuDriverGetVersion()
@@ -300,6 +314,8 @@ def _driver_ptx_version() -> Optional[int]:
         )
     release = (version // 1000, (version % 1000) // 10)
     if release > _CUDA_TO_PTX_ISA[-1][0]:
+        if release[0] == 13 and release[1] <= 9:
+            return 90 + release[1]
         _LOGGER.debug(
             "CUDA driver %d.%d is newer than the known PTX ISA table; "
             "relying on the driver load check",

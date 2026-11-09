@@ -6,7 +6,9 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import logging
+import operator
 import uuid
 from dataclasses import dataclass, replace
 from functools import partial
@@ -30,7 +32,21 @@ class _TensorBoundary:
     device: torch.device
 
     @classmethod
-    def from_value(cls, value: Any, *, where: str) -> _TensorBoundary:
+    def from_value(
+        cls,
+        value: Any,
+        *,
+        where: str,
+        producer: str | None = None,
+        region_input: bool = False,
+    ) -> _TensorBoundary:
+        """Describe a boundary tensor, or refuse one that no plugin can have.
+
+        ``producer`` names the operation inside the region that computes an
+        output, so that refusing the output's layout says where it comes from.
+        ``region_input`` marks an input, whose layout code before the region
+        decides.
+        """
         if not isinstance(value, torch.Tensor):
             raise RegionError(f"{where} requires Tensor metadata")
         if any(not isinstance(dim, int) for dim in value.shape):
@@ -38,6 +54,23 @@ class _TensorBoundary:
         if value.device.type != "cuda":
             raise RegionError(f"{where} requires CUDA tensors")
         if value.layout != torch.strided or not value.is_contiguous():
+            if region_input and value.layout == torch.strided:
+                # Such as the query, key and value that attention modules
+                # transpose before calling attention.
+                raise RegionError(
+                    f"{where} requires contiguous strided tensors, but it is not "
+                    "contiguous; call .contiguous() on it before the region, or "
+                    "move the operation that makes it non-contiguous, such as a "
+                    "transpose, into the region"
+                )
+            if producer is not None and value.layout == torch.strided:
+                # PyTorch picks some outputs' layouts, as its memory-efficient
+                # attention kernel does for float32 inputs or an attn_mask.
+                raise RegionError(
+                    f"{where} requires contiguous strided tensors, but "
+                    f"{producer} returns a non-contiguous tensor; call "
+                    ".contiguous() on the output inside the region"
+                )
             raise RegionError(f"{where} requires contiguous strided tensors")
         if value.is_conj() or value.is_neg():
             raise RegionError(f"{where} requires resolved conjugate and negative views")
@@ -56,6 +89,18 @@ def _matches_boundaries(
     return len(specs) == len(values) and all(
         spec.matches(value) for spec, value in zip(specs, values)
     )
+
+
+def _producer(node: torch.fx.Node) -> str | None:
+    """Name the operation that computes a region output, if one does."""
+    if node.op != "call_function":
+        return None
+    if node.target is operator.getitem and isinstance(node.args[0], torch.fx.Node):
+        # One output of a multi-output operation.
+        return _producer(node.args[0])
+    if isinstance(node.target, torch._ops.OpOverload):
+        return str(node.target)
+    return getattr(node.target, "__name__", str(node.target))
 
 
 def _boundaries(
@@ -77,15 +122,17 @@ def _boundaries(
     output_values = [node.meta.get("val") for node in outputs]
     input_specs = [
         _TensorBoundary.from_value(
-            value, where=f"Plugin region {region_id!r} input {i}"
+            value, where=f"Plugin region {region_id!r} input {i}", region_input=True
         )
         for i, value in enumerate(input_values)
     ]
     output_specs = [
         _TensorBoundary.from_value(
-            value, where=f"Plugin region {region_id!r} output {i}"
+            value,
+            where=f"Plugin region {region_id!r} output {i}",
+            producer=_producer(node),
         )
-        for i, value in enumerate(output_values)
+        for i, (node, value) in enumerate(zip(outputs, output_values))
     ]
     if len({spec.device for spec in input_specs + output_specs}) != 1:
         raise RegionError(
@@ -225,6 +272,46 @@ def _triton_signature(
     return signature
 
 
+def register_stand_in(
+    child: torch.fx.GraphModule, *, region_id: str
+) -> torch._ops.OpOverload:
+    """Register an operator that runs a region's reference in place of its kernel.
+
+    A dry run generates no kernel. The operator has the schema, fake
+    implementation, and conversion check that register_region_plugin gives a
+    kernel's plugin, so partitioning places it where that plugin would run,
+    but no plugin: converting it raises.
+    """
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+        dynamo_tensorrt_converter,
+    )
+    from torch_tensorrt.kernels._register import _register_pytorch_op
+
+    input_specs, output_specs = _boundaries(child, region_id)
+    meta_fn, eager_fn, validator = _make_callbacks(
+        child, input_specs, output_specs, region_id
+    )
+    arguments = ", ".join(f"Tensor arg{i}" for i in range(len(input_specs)))
+    returns = ", ".join("Tensor" for _ in output_specs)
+    if len(output_specs) > 1:
+        returns = f"({returns})"
+    namespace = "torch_tensorrt_region_fused"
+    name = f"stand_in_{uuid.uuid4().hex}"
+    _register_pytorch_op(
+        f"{namespace}::{name}", meta_fn, eager_fn, f"({arguments}) -> {returns}"
+    )
+    op: torch._ops.OpOverload = getattr(getattr(torch.ops, namespace), name).default
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise RegionError(
+            f"Region {region_id!r} has a dry run's stand-in for its generated "
+            "kernel, which no engine can contain; compile without dryrun"
+        )
+
+    dynamo_tensorrt_converter(op, capability_validator=validator)(refuse)
+    return op
+
+
 def register_region_plugin(
     child: torch.fx.GraphModule,
     registration: KernelSpec | partial[None],
@@ -257,6 +344,7 @@ def register_region_plugin(
         capability_validator=validator,
     )
     with torch.cuda.device(input_specs[0].device):
+        func = registration.func if isinstance(registration, partial) else None
         if isinstance(registration, KernelSpec):
             declared_inputs = registration.inputs
             if declared_inputs is None:
@@ -298,7 +386,43 @@ def register_region_plugin(
                 ),
                 **common,
             )
-        else:
+        elif func is kernels.cutile_op:
+            # Without an explicit signature, use the generated-kernel array names.
+            signature = registration.keywords.get("signature") or {
+                **{f"arg{i}": spec.dtype for i, spec in enumerate(input_specs)},
+                **{f"out{i}": spec.dtype for i, spec in enumerate(output_specs)},
+            }
+            # cuTile matches the schema's and callback's input names with the
+            # kernel's input arrays, so both take their names from the signature.
+            names = list(signature)[: len(input_specs)]
+            meta_fn.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+                [
+                    inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                    for name in names
+                ]
+            )
+            arguments = ", ".join(f"Tensor {name}" for name in names)
+            registration(
+                op_name,
+                signature=signature,
+                **{**common, "schema": f"({arguments}) -> {returns}"},
+            )
+        elif func is kernels.ptx_op:
+            from torch_tensorrt.kernels._common import check_aot_dtypes
+
+            # Generated CUDA already validated and compiled this pointer ABI.
+            # Keep the engine binding guard when using the precompiled funnel.
+            registration(
+                op_name,
+                aot_fn=check_aot_dtypes(
+                    op_name,
+                    registration.keywords["aot_fn"],
+                    [boundary.dtype for boundary in input_specs],
+                    [boundary.dtype for boundary in output_specs],
+                ),
+                **common,
+            )
+        elif func is kernels.triton_op:
             # fused_kernel defaults grid to None because a CUDA KernelSpec omits it.
             if not callable(registration.keywords.get("grid")):
                 raise RegionError(
@@ -312,5 +436,11 @@ def register_region_plugin(
                 op_name,
                 signature=signature,
                 **common,
+            )
+        else:
+            raise RegionError(
+                f"Plugin region {region_id!r} registration must be a KernelSpec or "
+                "a functools.partial of kernels.triton_op, kernels.cutile_op, or "
+                f"kernels.ptx_op; got {registration!r:.200}"
             )
     return getattr(getattr(torch.ops, namespace), name).default

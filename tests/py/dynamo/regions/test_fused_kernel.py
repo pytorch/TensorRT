@@ -731,6 +731,19 @@ def test_plugin_region_rejects_unsupported_tensor_boundaries(kind):
             return y
 
     error = "requires CUDA tensors" if kind == "cpu" else "requires contiguous"
+    if kind == "input_layout":
+        # A region cannot change its input's layout; the fix is outside it.
+        error = (
+            r"input 0 requires contiguous strided tensors, but it is not "
+            r"contiguous; call \.contiguous\(\) on it before the region"
+        )
+    if kind == "output_layout":
+        # The refusal names the operation that computes the output, and the fix.
+        error = (
+            r"output 0 requires contiguous strided tensors, but aten\.\w+\.\w+ "
+            r"returns a non-contiguous tensor; call \.contiguous\(\) on the "
+            "output inside the region"
+        )
     with pytest.raises(RegionError, match=error):
         _compile(InvalidBoundary().eval(), [torch.randn(3, 17, device="cuda")])
 

@@ -55,6 +55,8 @@ class DryRunTracker:
         unsupported_ops (Dict[str, int]): Set of operators not supported in TRT
         to_run_in_torch (List[str]): Set of nodes to run in Torch
         stop_reason (Optional[str]): Why the dry run stopped before partitioning
+        region_errors (List[str]): Regions for which compiling without dryrun
+            raises RegionError, and the error
     """
 
     total_ops_in_graph: int = 0
@@ -71,6 +73,7 @@ class DryRunTracker:
     unsupported_ops: Dict[str, int] = field(default_factory=dict)
     to_run_in_torch: List[str] = field(default_factory=list)
     stop_reason: Optional[str] = None
+    region_errors: List[str] = field(default_factory=list)
 
 
 @observable()  # type: ignore[misc]
@@ -97,6 +100,12 @@ def dryrun_stats_display(
             f"The graph consists of {dryrun_tracker.total_ops_in_graph} Total Operators, "
             f"of which {dryrun_tracker.supported_ops_in_graph} operators are supported, "
             f"{coverage}% coverage\n\n"
+        )
+    if dryrun_tracker.region_errors:
+        formatted_errors = "\n".join(dryrun_tracker.region_errors)
+        formatted_stats += (
+            "Compiling without dryrun raises RegionError for the following "
+            f"regions:\n{formatted_errors}\n\n"
         )
     if dryrun_tracker.unsupported_ops:
         parsed_ops = "\n".join(
@@ -312,6 +321,16 @@ def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
         if is_torch_region_node(graph_module, node):
             region_id = node.meta["torch_tensorrt_region"]["id"]
             backend = node.meta["torch_tensorrt_region"].get("backend", "eager")
+            stand_in_error = node.meta["torch_tensorrt_region"].get("stand_in_error")
+            if stand_in_error is not None:
+                # A generated region that a dry run could give no plugin stand-in.
+                to_run_in_torch.append(
+                    f"Region: {region_id}, generated fused_kernel region shown as "
+                    "its PyTorch reference because no plugin can have its "
+                    f"boundaries ({stand_in_error}), "
+                    f"with layer location: {get_node_name(node)}"
+                )
+                continue
             to_run_in_torch.append(
                 f"Region: {region_id}, explicit execute_in_torch region, "
                 f"backend: {backend}, "
@@ -337,3 +356,14 @@ def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
                 f"with layer location: {get_node_name(node)}"
             )
     return to_run_in_torch
+
+
+def parse_region_errors(graph_module: torch.fx.GraphModule) -> List[str]:
+    """Lists the RegionErrors that a dry run logged instead of raising them"""
+    from torch_tensorrt.dynamo.region_compilation import get_region_records
+
+    return [
+        f"Region: {record.id}, {record.dryrun_error}"
+        for record in get_region_records(graph_module)
+        if record.dryrun_error is not None
+    ]

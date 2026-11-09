@@ -45,6 +45,14 @@ Five entry points share one registration funnel:
 * :func:`cutile_op` registers a ``@ct.kernel`` cuTile program, compiling it
   to PTX and deriving the AOT launch for you.
 
+:func:`triton_op`, :func:`cutedsl_op`, and :func:`cutile_op` take the same
+``pointer_alignment`` option: the byte alignment, a power of two from 1 to 256,
+that the compiled kernel may assume for its tensor pointers. The default,
+``None``, assumes only each pointer's element alignment, which every tensor of
+its dtype meets. A larger value, such as 16 for 128-bit loads and stores, is a
+promise about every buffer the engine binds, which a view at a smaller offset
+of a larger buffer breaks.
+
 Entry points
 ------------
 
@@ -273,7 +281,7 @@ a positive launch grid and a kernel that masks every load and store.
    that this Triton launch behavior has been validated on every earlier release.
 
 Measuring and tuning configurations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``tools/benchmark_triton_op.py`` compares a bounded set of block sizes and warp
 counts. It checks correctness at each shape and reports compilation,
@@ -286,11 +294,22 @@ JSON. Use a fresh Triton cache directory to measure cold compilation::
 
 The benchmark uses a fused elementwise kernel; repeat the measurements with
 your workload before choosing a configuration. One configuration remains fixed
-for each registered operator. No alignment or divisibility assumptions are
-added automatically: a dynamic shape or an offset input pointer can invalidate
-them. All embedded PTX is exactly Triton's compiler output, including its hidden
-zero-sized scratch parameters. Compilation may select a compatible PTX ISA,
-but no generated PTX text or parameter lists are rewritten.
+for each registered operator. Pointers are assumed 16-byte aligned only with
+``pointer_alignment=16`` or more, a promise that an offset input pointer, such
+as one input of a concatenation TensorRT eliminated, breaks; Triton specializes
+no smaller pointer alignment. An ``i32`` extra gets Triton's
+multiple-of-16 hint only where the engine fixes its value: TensorRT asks for
+the launch once, while it builds the engine, and an extra that is then a
+constant multiple of 16 selects PTX compiled with that hint. A dimension that
+the input profile lets vary stays symbolic there, so extras derived from it
+keep the registered PTX. All embedded PTX is exactly Triton's compiler output,
+including its hidden zero-sized scratch parameters, compiled without source
+line information, which shortens TensorRT's per-enqueue module load.
+Compilation may select a compatible PTX ISA, but no generated PTX text or
+parameter lists are rewritten. Registration rejects a kernel that needs more
+shared memory than a TensorRT plugin launch provides, the device's default
+per-block amount of 48 KiB, because TensorRT does not opt plugin kernels into
+more: its engine would build and then fail at every enqueue.
 
 The fast CI suite ``kernels-triton`` covers registration and GPU integration.
 Nightly kernel tests also run against Triton 3.5.0 in an isolated subprocess.
@@ -323,11 +342,15 @@ require a positive grid. Native tensor arguments, TMA descriptors, clusters,
 and compiler-added workspaces are unsupported; kernels may construct CuTe
 tensors internally from pointers.
 
-By default pointers assume only byte alignment, which is always safe but
-prevents vectorized memory access. Pass ``pointer_alignment=16`` (or a mapping
-from pointer names to byte alignments) to let CuTe emit 128-bit loads and
-stores; every buffer TensorRT binds must then meet that alignment, or the
-kernel faults. Like :func:`triton_op`, the op is not lowered into
+By default each pointer assumes the alignment of its element type, such as 4
+bytes for ``float32``: every tensor of that dtype meets it, and CuTe's
+vectorized copies need at least that much. Pass ``pointer_alignment=16`` (or a
+mapping from pointer names to byte alignments, where unlisted pointers keep
+their element size) to let CuTe emit 128-bit loads and stores; every buffer
+TensorRT binds must then meet that alignment, or the kernel faults. TensorRT
+can bind a plugin to a view at a smaller offset of a larger buffer, such as one
+input of an eliminated concatenation. ``pointer_alignment=1`` assumes only
+byte alignment. Like :func:`triton_op`, the op is not lowered into
 ``hardware_compatible=True`` engines, because its PTX targets the registering
 GPU's exact architecture.
 

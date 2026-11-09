@@ -34,6 +34,8 @@ class RegionRecord:
     plugin_key: int = -1
     operator_key: int = -1
     plugin_op: Any = field(default=None, repr=False)
+    # The RegionError that compiling would raise, which a dry run logs and reports.
+    dryrun_error: Optional[str] = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self.route not in ("torch", "plugin"):
@@ -90,7 +92,11 @@ def validate_region_settings(
     if not records:
         return True
     conflicts = []
-    torch_region = next((r for r in records if r.route == "torch"), None)
+    # A dry run can show a generated kernel region as its reference body, which
+    # a real compilation would place in TensorRT; it is not a PyTorch region.
+    torch_region = next(
+        (r for r in records if r.route == "torch" and r.plugin_key < 0), None
+    )
     if getattr(settings, "require_full_compilation", False) and torch_region:
         conflicts.append(
             f"require_full_compilation=True (region {torch_region.id!r} must run "

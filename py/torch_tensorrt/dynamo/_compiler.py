@@ -28,6 +28,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     PerSubgraphData,
     dryrun_stats_display,
     parse_non_trt_nodes,
+    parse_region_errors,
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
@@ -907,7 +908,12 @@ def compile(
     )
 
     validate_region_mutations(exported_program)
-    gm = materialize_regions(exported_program.module(), captured)
+    gm = materialize_regions(
+        exported_program.module(),
+        captured,
+        settings,
+        example_inputs=(arg_inputs, kwarg_inputs),
+    )
     if not validate_region_settings(gm, settings, region_hop_records(captured)):
         # Stop before lowering or offloading.
         _report_stopped_dryrun(gm, settings)
@@ -1345,10 +1351,12 @@ def _report_stopped_dryrun(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> None:
     """Report a dry run that a region settings conflict stopped."""
-    # No support or placement analysis ran, so report only the conflict.
+    # No support or placement analysis ran, so report only the conflict and
+    # the regions that compiling would reject.
     tracker = DryRunTracker(
         compilation_settings=settings,
         stop_reason=gm.meta["torch_tensorrt_region_conflicts"][0],
+        region_errors=parse_region_errors(gm),
     )
     parse_graph_io(gm, tracker)
     dryrun_stats_display(tracker, settings.dryrun)
@@ -1389,7 +1397,7 @@ def compile_module(
     from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
     assert_no_unresolved_regions(gm)
-    dryrun_tracker = DryRunTracker()
+    dryrun_tracker = DryRunTracker(region_errors=parse_region_errors(gm))
     region_records = get_region_records(gm)
     if region_records:
         # Audit before early returns or shortcuts can bypass partitioning.
