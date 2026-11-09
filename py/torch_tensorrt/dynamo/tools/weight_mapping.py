@@ -19,6 +19,7 @@ import ctypes
 import io
 import json
 import logging
+import math
 import mmap
 import os
 import struct
@@ -34,6 +35,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    NamedTuple,
     Optional,
     Set,
     Tuple,
@@ -41,6 +43,7 @@ from typing import (
 )
 
 import torch
+from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +81,20 @@ WeightSource = Callable[
     [str, torch.Tensor], Union[torch.Tensor, Iterable[torch.Tensor]]
 ]
 
-# Mapped files as (start address, size, weak reference to the mmap). A storage inside one is a mapped weight.
-# The weak reference keeps an entry exactly as long as some view keeps its mmap alive.
-_mappings: List[Tuple[int, int, "weakref.ReferenceType[mmap.mmap]"]] = []
+
+class _MappedFile(NamedTuple):
+    """A file mapped by ``map_weights``. A storage between ``base`` and ``base + size`` is a mapped weight."""
+
+    base: int
+    size: int
+    # Keeps the entry exactly as long as some view keeps the mmap alive.
+    mm: "weakref.ReferenceType[mmap.mmap]"
+    path: str
+    # (st_dev, st_ino, st_size, st_mtime_ns) when it was mapped.
+    file_id: Tuple[int, int, int, int]
+
+
+_mappings: List[_MappedFile] = []
 _lock = threading.Lock()
 
 
@@ -106,7 +120,9 @@ def _registrations(
 
 
 def _read_header(path: str) -> Tuple[Dict[str, Dict[str, object]], int]:
-    """The safetensors header (8-byte little-endian length, then JSON) and where the data starts."""
+    """The safetensors header (8-byte little-endian length, then JSON) and where the data starts, checked
+    against the file so a damaged one fails before anything is mapped. Only the header is read.
+    """
     if path.endswith(".json"):
         raise ValueError(
             f"{path} is the index of a sharded checkpoint, and map_weights maps one file. Write the "
@@ -125,7 +141,63 @@ def _read_header(path: str) -> Tuple[Dict[str, Dict[str, object]], int]:
     if not isinstance(header, dict):
         raise ValueError(f"{path}: the safetensors header is not a JSON object")
     header.pop("__metadata__", None)
+    _check_layout(path, header, size - 8 - n)
     return header, 8 + n
+
+
+def _check_layout(path: str, header: Dict[str, Any], data_size: int) -> None:
+    """Every entry's bytes must hold its dtype and shape, and the entries must cover the data exactly, one
+    after another, as the safetensors format requires: a truncated file, bytes after the last tensor and
+    overlapping or gapped tensors all fail. Tensors the module doesn't map are checked too.
+    """
+    spans = []
+    for name, entry in header.items():
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"{path}: invalid safetensors header entry for {name}: {entry!r}"
+            )
+        offsets, shape = entry.get("data_offsets"), entry.get("shape")
+        if not (
+            isinstance(offsets, list)
+            and len(offsets) == 2
+            and all(isinstance(o, int) and o >= 0 for o in offsets)
+            and offsets[0] <= offsets[1]
+        ):
+            raise ValueError(
+                f"{path}: {name}'s data_offsets {offsets} aren't two increasing byte offsets"
+            )
+        if not (
+            isinstance(shape, list)
+            and all(isinstance(d, int) and d >= 0 for d in shape)
+        ):
+            raise ValueError(f"{path}: {name}'s shape {shape} isn't a list of sizes")
+        dtype = _DTYPES.get(str(entry.get("dtype")))  # unsupported: checked if mapped
+        if (
+            dtype is not None
+            and offsets[1] - offsets[0] != math.prod(shape) * dtype.itemsize
+        ):
+            raise ValueError(
+                f"{path}: {name}'s data_offsets {offsets} don't hold {entry.get('dtype')} {shape}"
+            )
+        spans.append((offsets[0], offsets[1], name))
+    end = 0
+    for begin, span_end, name in sorted(spans):
+        if begin != end:
+            raise ValueError(
+                f"{path}: {name}'s data_offsets start at byte {begin}, where the tensor before it ends at "
+                f"{end}: tensors must follow each other with no gap or overlap"
+            )
+        end = span_end
+    if end != data_size:
+        raise ValueError(
+            f"{path}: the tensors' data_offsets end at byte {end} of the data, but the file holds "
+            f"{data_size}: "
+            + (
+                "it is truncated"
+                if end > data_size
+                else "something follows the last tensor"
+            )
+        )
 
 
 def _view(
@@ -182,10 +254,14 @@ def map_weights(
     invalidates them.
 
     Each tensor in the file must have the model's dtype and shape (``save_weights_for_mapping`` writes
-    such a file). Names missing from the file are listed in ``missing``. With ``strict=True``, the default,
+    such a file). The file is checked from its header before anything is mapped: a truncated file, bytes
+    after the last tensor, or tensors whose bytes overlap, leave gaps or don't hold their dtype and shape
+    raise, also for tensors the module doesn't have. The bytes themselves aren't read, so damage inside a
+    tensor isn't detected. Names missing from the file are listed in ``missing``. With ``strict=True``, the default,
     a parameter or persistent buffer missing from the file raises; non-persistent buffers, such as rotary
-    frequencies, are not required, and tensors in the file that the module doesn't have are ignored. If
-    anything raises, the module is unchanged.
+    frequencies, are not required, and tensors in the file that the module doesn't have are ignored. A
+    missing tensor on ``meta`` stays there, with no values, and a warning names it. If anything raises,
+    the module is unchanged.
 
     ``prefix`` is prepended to each name to find it in the file, as for ``load_state_dict``, so a submodule
     maps straight from a checkpoint of the whole model.
@@ -194,24 +270,27 @@ def map_weights(
     header, data_start = _read_header(path)
     with open(path, "rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_COPY)
+        stat = os.fstat(f.fileno())
+    file_id = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
     result = MappedWeights()
 
     # Make every view first, so an error leaves the module as it was. Keyed by the original tensor's id,
     # which the stored original keeps from being reused.
     views: Dict[int, Tuple[torch.Tensor, torch.Tensor]] = {}
-    absent: List[Tuple[str, int]] = []
+    absent: List[Tuple[str, torch.Tensor]] = []
     for name, table, key in _registrations(module):
         tensor = table[key]
         if id(tensor) in views:
             continue  # a tied weight, seen under another name
         if prefix + name not in header:
-            absent.append((name, id(tensor)))
+            absent.append((name, tensor))
             continue
         view = _view(mm, data_start, header[prefix + name], tensor, prefix + name)
         views[id(tensor)] = (tensor, view)
         result.mapped_bytes += view.nbytes
     # A tied weight the file stores under a later name is not missing.
-    result.missing = [name for name, tensor_id in absent if tensor_id not in views]
+    missing = [(name, tensor) for name, tensor in absent if id(tensor) not in views]
+    result.missing = [name for name, _ in missing]
     persistent = set(module.state_dict())
     required = [name for name in result.missing if name in persistent]
     if required and strict:
@@ -225,10 +304,18 @@ def map_weights(
             f"{len(required)} tensors are not in {path}: {required[:8]}.{hint}"
         )
     logger.info(f"Mapped {result.mapped_bytes / 2**20:.1f} MiB of weights from {path}")
-    if required:
+    on_meta = [name for name, tensor in missing if tensor.is_meta]
+    if on_meta:
         logger.warning(
-            f"{len(required)} parameters and persistent buffers are not in {path}, so they keep "
-            f"their values: {required[:8]}"
+            f"{len(on_meta)} tensors are not in {path} and stay on the meta device, with no values: "
+            f"{on_meta[:8]}. Write the file with save_weights_for_mapping, which includes non-persistent "
+            "buffers, or set them before using the module."
+        )
+    kept = [name for name in required if name not in on_meta]
+    if kept:
+        logger.warning(
+            f"{len(kept)} parameters and persistent buffers are not in {path}, so they keep "
+            f"their values: {kept[:8]}"
         )
 
     with torch.no_grad():
@@ -250,7 +337,9 @@ def map_weights(
             table[key] = replacements[id(tensor)]
 
     with _lock:
-        _mappings.append((_address(mm), len(mm), weakref.ref(mm)))
+        _mappings.append(
+            _MappedFile(_address(mm), len(mm), weakref.ref(mm), path, file_id)
+        )
     return result
 
 
@@ -270,19 +359,59 @@ def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
     ptr, nbytes = storage.data_ptr(), storage.nbytes()
     if not nbytes:
         return False
-    with _lock:
-        _mappings[:] = [m for m in _mappings if m[2]() is not None]
-        entries = list(_mappings)
-    for base, size, ref in entries:
-        mm = ref()
-        if mm is None or not (base <= ptr and ptr + nbytes <= base + size):
+    for mapped in _live_mappings():
+        mm = mapped.mm()
+        if mm is None or not (
+            mapped.base <= ptr and ptr + nbytes <= mapped.base + mapped.size
+        ):
             continue
         # Only pages entirely inside the storage: a page at either end may hold a neighbour's data.
         page = mmap.PAGESIZE
-        lo = -(-(ptr - base) // page) * page
-        hi = (ptr - base + nbytes) // page * page
+        lo = -(-(ptr - mapped.base) // page) * page
+        hi = (ptr - mapped.base + nbytes) // page * page
         return hi <= lo or _drop_pages(mm, lo, hi - lo)
     return False
+
+
+def _live_mappings() -> List[_MappedFile]:
+    with _lock:
+        _mappings[:] = [m for m in _mappings if m.mm() is not None]
+        return list(_mappings)
+
+
+def raise_if_mapped_files_changed(tensors: Iterable[torch.Tensor]) -> None:
+    """Raise if a file that one of ``tensors`` is mapped from was removed or changed since ``map_weights``
+    mapped it. A mapped weight is read when first used: from a file rewritten since, it reads the new
+    contents, and past the end of a file truncated since, the read kills the process with SIGBUS.
+    """
+    ptrs = {
+        t.untyped_storage().data_ptr()
+        for t in tensors
+        if not t.is_meta
+        and t.layout == torch.strided
+        and not is_traceable_wrapper_subclass(t)
+    }
+    for mapped in _live_mappings():
+        if not any(mapped.base <= p < mapped.base + mapped.size for p in ptrs):
+            continue
+        try:
+            stat = os.stat(mapped.path)
+        except FileNotFoundError:
+            raise ValueError(
+                f"The weights file {mapped.path} was removed after map_weights mapped it. Keep it in "
+                "place while the model is in use."
+            ) from None
+        if (
+            stat.st_dev,
+            stat.st_ino,
+            stat.st_size,
+            stat.st_mtime_ns,
+        ) != mapped.file_id:
+            raise ValueError(
+                f"The weights file {mapped.path} changed after map_weights mapped it: it is "
+                f"{stat.st_size} bytes, {mapped.file_id[2]} when mapped, and was modified or replaced "
+                "since. Its weights are read when compilation first uses them, so map them again."
+            )
 
 
 def _drop_pages(mm: mmap.mmap, start: int, length: int) -> bool:
@@ -413,36 +542,37 @@ def checkpoint_source(
     directory = os.path.dirname(path)
     files: Dict[str, Tuple[Any, Set[str]]] = {}  # each file open once, with its names
 
-    def not_stored(stored_name: str) -> ValueError:
+    def missing_tensor_error(stored_name: str) -> ValueError:
         return ValueError(
             f"{stored_name} is not in {path}. A buffer a checkpoint doesn't store, such as non-persistent "
             "rotary frequencies, must be a real tensor, not on meta: build the model with accelerate's "
             "init_empty_weights(), which keeps buffers real, or set the buffer before writing."
         )
 
-    def checkpoint_of(stored_name: str) -> Any:
+    def get_checkpoint_file(stored_name: str) -> Any:
+        """The open safetensors file that stores ``stored_name``."""
         if shard_of and stored_name not in shard_of:
-            raise not_stored(stored_name)
+            raise missing_tensor_error(stored_name)
         file = os.path.join(directory, shard_of[stored_name]) if shard_of else path
         if file not in files:
             handle = safe_open(file, framework="pt", device="cpu")
             files[file] = (handle, set(handle.keys()))
         handle, names = files[file]
         if stored_name not in names:
-            raise not_stored(stored_name)
+            raise missing_tensor_error(stored_name)
         return handle
 
-    def read(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:
+    def read_tensor_chunks(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:
         stored_name = key(name) if key is not None else name
-        checkpoint = checkpoint_of(stored_name)
-        stored = checkpoint.get_slice(stored_name)
+        checkpoint_file = get_checkpoint_file(stored_name)
+        stored = checkpoint_file.get_slice(stored_name)
         shape = list(stored.get_shape())
         if shape != list(like.shape):
             raise ValueError(
                 f"{name}: {stored_name} in {path} has shape {shape}, the model {list(like.shape)}"
             )
         if not shape:
-            return [checkpoint.get_tensor(stored_name)]
+            return [checkpoint_file.get_tensor(stored_name)]
         if stored.get_dtype() not in _DTYPES:
             raise ValueError(f"{name}: dtype {stored.get_dtype()} is not supported")
         row_bytes = _DTYPES[stored.get_dtype()].itemsize
@@ -451,4 +581,4 @@ def checkpoint_source(
         rows = max(1, chunk_bytes // max(1, row_bytes))
         return (stored[i : i + rows] for i in range(0, shape[0], rows))
 
-    return read
+    return read_tensor_chunks
