@@ -2807,6 +2807,34 @@ TEST_F(ExecutionGraphReplayTest, APooledCallWithAnotherContextCurrentMakesThePoo
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
+// The graphs of all green contexts share one record of the input shapes, so new shapes on one green context
+// start the other's graph over too, instead of letting it replay the old shapes.
+TEST_F(ExecutionGraphReplayTest, NewShapesOnOneGreenContextStartEveryGreenGraphOver) {
+  if (!green_contexts_supported()) {
+    GTEST_SKIP() << "Green contexts are not supported by this driver or GPU";
+  }
+  GreenStream first, second;
+  ASSERT_NO_FATAL_FAILURE(first.create());
+  ASSERT_NO_FATAL_FAILURE(second.create());
+  LoadedGraphEngine plain, graph;
+  ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
+  int seed = 0;
+  for (cudaStream_t stream : {first.stream, second.stream}) {
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 2, 8, seed++, stream));
+    }
+  }
+  CudaCalls calls;
+  for (cudaStream_t stream : {first.stream, second.stream}) {
+    for (int i = 0; i < 3; ++i) {
+      SCOPED_TRACE(seed);
+      ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, 4, 8, seed++, stream));
+    }
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>({first.stream, first.stream, second.stream, second.stream}));
+}
+
 // The driver often gives a new green context the handle of one just destroyed. The old graph lived in the
 // destroyed context, so the new one must record its own.
 TEST_F(ExecutionGraphReplayTest, AGreenContextOnADestroyedOnesHandleRecordsAgain) {
