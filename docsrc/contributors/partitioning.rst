@@ -181,7 +181,7 @@ It has two controls:
 
 * ``cpu_memory_budget``, the host memory the compilation may use. The partitioner derives
   the size of each engine from it.
-* ``resource_partition_engine_cap``, the size of each engine itself. It is a finer control
+* ``max_partition_size``, the size of each engine itself. It is a finer control
   over the same split; see `Fixing the Engine Size`_ below.
 
 .. code-block:: python
@@ -230,7 +230,7 @@ within each piece nearly as well as across the full subgraph.
 Fixing the Engine Size
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-``resource_partition_engine_cap`` sets the per-engine size of step 3 directly, in bytes of
+``max_partition_size`` sets the per-engine size of step 3 directly, in bytes of
 weights, instead of deriving it from ``cpu_memory_budget`` and the resident memory. Every
 other step stays the same:
 
@@ -239,7 +239,7 @@ other step stays the same:
     trt_gm = torch_tensorrt.compile(
         model,
         arg_inputs=inputs,
-        resource_partition_engine_cap=512 * 1024**2,  # 512 MiB of weights per engine
+        max_partition_size=512 * 1024**2,  # 512 MiB of weights per engine
     )
 
 Use it when:
@@ -263,9 +263,9 @@ How it combines with the budget:
 * It replaces ``cpu_memory_budget``, so setting both raises a ``ValueError``. The resident
   memory is not read.
 * Internally, the partitioner treats the size as a budget of
-  ``4 × resource_partition_engine_cap``, so the checks of step 4 follow from it: a model
+  ``4 × max_partition_size``, so the checks of step 4 follow from it: a model
   within the size stays one engine, and a size so small that the model is more than 50
-  times it fails with an error that names ``resource_partition_engine_cap``.
+  times it fails with an error that names ``max_partition_size``.
 
 What it does not bound:
 
@@ -335,7 +335,7 @@ All partitioning behaviour is controlled via ``CompilationSettings``:
    * - ``cpu_memory_budget``
      - ``None``
      - Host memory budget for the build; each engine gets ``(budget - RSS) / 4``. ``None`` uses available system memory.
-   * - ``resource_partition_engine_cap``
+   * - ``max_partition_size``
      - ``None``
      - Weight bytes per engine: a finer control than ``cpu_memory_budget``, which it replaces
        when set. The split then depends only on the model and this size.

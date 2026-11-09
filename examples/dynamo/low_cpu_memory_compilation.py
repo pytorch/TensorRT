@@ -22,7 +22,7 @@ Key notes:
 
 - The per-engine size depends on the host memory in use when partitioning
   starts, so the split can change from one run to the next. For finer
-  control, set the size directly with ``resource_partition_engine_cap``, in
+  control, set the size directly with ``max_partition_size``, in
   bytes of weights per engine, instead of ``cpu_memory_budget``. With
   ``200 * 1024**2`` this model splits into the same three engines on every
   run. ``320 * 1024**2`` puts both convolutions in one engine and the linear

@@ -47,14 +47,14 @@ def _engines(rss: int, **kwargs: int) -> int:
     return sum("_run_on_acc" in name for name, _ in gm.named_children())
 
 
-class TestResourcePartitionEngineCap(TestCase):
+class TestMaxPartitionSize(TestCase):
     def test_default_and_old_pickle(self) -> None:
-        self.assertIsNone(CompilationSettings().resource_partition_engine_cap)
+        self.assertIsNone(CompilationSettings().max_partition_size)
         state = CompilationSettings().__dict__.copy()
-        state.pop("resource_partition_engine_cap")
+        state.pop("max_partition_size")
         restored = CompilationSettings.__new__(CompilationSettings)
         restored.__setstate__(state)
-        self.assertIsNone(restored.resource_partition_engine_cap)
+        self.assertIsNone(restored.max_partition_size)
 
     def test_budget_split_depends_on_rss(self) -> None:
         budget = 64 * _MiB
@@ -63,47 +63,46 @@ class TestResourcePartitionEngineCap(TestCase):
             _engines(rss=budget - 32 * _MiB, cpu_memory_budget=budget),
         )
 
-    def test_cap_split_ignores_rss(self) -> None:
+    def test_size_split_ignores_rss(self) -> None:
         splits = {
-            _engines(rss=rss, cpu_memory_budget=None, engine_cap=2 * _MiB)
+            _engines(rss=rss, cpu_memory_budget=None, max_partition_size=2 * _MiB)
             for rss in (16 * _MiB, 1024 * _MiB, 64 * 1024 * _MiB)
         }
-        # Eight 1 MiB layers at a 2 MiB cap: four engines of 2 MiB.
+        # Eight 1 MiB layers at a 2 MiB size: four engines of 2 MiB.
         self.assertEqual(splits, {4})
 
-    def test_cap_takes_precedence_over_budget(self) -> None:
+    def test_size_takes_precedence_over_budget(self) -> None:
         self.assertEqual(_engines(rss=0, cpu_memory_budget=1024 * _MiB), 1)
         self.assertGreater(
-            _engines(rss=0, cpu_memory_budget=1024 * _MiB, engine_cap=2 * _MiB), 1
+            _engines(rss=0, cpu_memory_budget=1024 * _MiB, max_partition_size=2 * _MiB),
+            1,
         )
 
-    def test_cap_above_model_size_keeps_one_engine(self) -> None:
+    def test_size_above_model_size_keeps_one_engine(self) -> None:
         self.assertEqual(
-            _engines(rss=0, cpu_memory_budget=None, engine_cap=64 * _MiB), 1
+            _engines(rss=0, cpu_memory_budget=None, max_partition_size=64 * _MiB), 1
         )
 
-    def test_non_positive_cap_is_rejected(self) -> None:
-        for cap in (0, -1):
+    def test_non_positive_size_is_rejected(self) -> None:
+        for size in (0, -1):
             with self.assertRaisesRegex(ValueError, "positive"):
-                CompilationSettings(resource_partition_engine_cap=cap)
+                CompilationSettings(max_partition_size=size)
 
-    def test_cap_turns_resource_partitioning_on(self) -> None:
-        settings = CompilationSettings(resource_partition_engine_cap=_MiB)
+    def test_size_turns_resource_partitioning_on(self) -> None:
+        settings = CompilationSettings(max_partition_size=_MiB)
         self.assertTrue(settings.enable_resource_partitioning)
 
-    def test_cap_and_budget_together_are_rejected(self) -> None:
+    def test_size_and_budget_together_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "not both"):
             CompilationSettings(
-                resource_partition_engine_cap=_MiB, cpu_memory_budget=8 * 1024 * _MiB
+                max_partition_size=_MiB, cpu_memory_budget=8 * 1024 * _MiB
             )
 
-    def test_cap_too_small_names_the_setting_and_its_unit(self) -> None:
-        with self.assertRaisesRegex(
-            ValueError, r"resource_partition_engine_cap is 16384 bytes"
-        ):
-            _engines(rss=0, cpu_memory_budget=None, engine_cap=_MiB // 64)
+    def test_size_too_small_names_the_setting_and_its_unit(self) -> None:
+        with self.assertRaisesRegex(ValueError, r"max_partition_size is 16384 bytes"):
+            _engines(rss=0, cpu_memory_budget=None, max_partition_size=_MiB // 64)
 
-    def test_compile_with_cap(self) -> None:
+    def test_compile_with_max_partition_size(self) -> None:
         torch.manual_seed(0)
         model = _Chain().eval().cuda()
         x = torch.randn(4, 512).cuda()
@@ -111,7 +110,7 @@ class TestResourcePartitionEngineCap(TestCase):
             torch.export.export(model, (x,)),
             inputs=[x],
             min_block_size=1,
-            resource_partition_engine_cap=2 * _MiB,
+            max_partition_size=2 * _MiB,
         )
         engines = [n for n, _ in trt.named_children() if "_run_on_acc" in n]
         self.assertEqual(len(engines), 4)

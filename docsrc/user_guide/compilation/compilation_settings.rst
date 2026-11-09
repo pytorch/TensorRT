@@ -303,7 +303,7 @@ Memory and Resource Management
      - ``False``
      - Split oversized TRT subgraphs into engines of a bounded size, built one after
        another, to limit host memory during the build. The size is derived from
-       ``cpu_memory_budget``, or set directly with ``resource_partition_engine_cap``.
+       ``cpu_memory_budget``, or set directly with ``max_partition_size``.
        Prevents OOM errors on large models at the cost of more engines. See
        :ref:`partitioning` for details.
    * - ``cpu_memory_budget``
@@ -311,7 +311,7 @@ Memory and Resource Management
      - Host memory budget in bytes for the build, used by resource partitioning: each
        engine gets ``(cpu_memory_budget - process RSS) / 4``. ``None`` uses available
        system memory / 4 (reported by ``psutil``).
-   * - ``resource_partition_engine_cap``
+   * - ``max_partition_size``
      - ``None``
      - Weight bytes per engine for resource partitioning: a finer control than
        ``cpu_memory_budget``, which it replaces, so the two can't both be set. The split
