@@ -32,12 +32,22 @@ Functions
 Classes
 --------
 
+.. autoclass:: low_memory
+
+.. note::
+
+   ``low_memory`` is **experimental** in 2.15: its API will change in 2.16.
+
 .. autoclass:: CompilationSettings
 
 Tools
 -----
 
 Weight mapping: compile from a safetensors checkpoint's weights in place (see the resource management guide).
+
+.. note::
+
+   These tools are **experimental** in 2.15: their API will change in 2.16.
 
 .. currentmodule:: torch_tensorrt.dynamo.tools
 

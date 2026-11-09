@@ -463,6 +463,11 @@ def _get_live_mapped_files() -> List[_MappedFile]:
         return list(_mapped_files)
 
 
+def has_mapped_weights() -> bool:
+    """Whether a file mapped by ``map_weights`` is still in use."""
+    return bool(_get_live_mapped_files())
+
+
 def raise_if_mapped_files_changed(tensors: Iterable[torch.Tensor]) -> None:
     """Raise if a file that one of ``tensors`` is mapped from was removed or changed since ``map_weights``
     mapped it. A mapped weight is read when first used: from a file rewritten since, it reads the new

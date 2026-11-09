@@ -234,12 +234,15 @@ class MutableTorchTensorRTModule(object):
         self.exp_program: Any = None
         self.arg_inputs: tuple[Any, ...] = tuple()
         self.kwarg_inputs: dict[str, Any] = {}
-        self.additional_settings = kwargs
-        if kwargs.get("release_weights_after_build", False):
+        # It refits and recompiles from the source module's weights, which a user may update in place:
+        # releasing mapped weights would drop such updates.
+        if kwargs.get("release_weights_after_build") is True:
             raise ValueError(
                 "release_weights_after_build is not supported by MutableTorchTensorRTModule, "
                 "which refits and recompiles from the source module's weights."
             )
+        kwargs["release_weights_after_build"] = False
+        self.additional_settings = kwargs
         self.strict = strict
         self.prefer_deferred_runtime_asserts_over_guards = (
             prefer_deferred_runtime_asserts_over_guards
