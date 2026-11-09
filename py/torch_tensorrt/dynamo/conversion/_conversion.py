@@ -170,9 +170,19 @@ def pull_cached_engine(
         # refit the cached engine with the new graph module
         if not settings.strip_engine_weights:
             runtime = trt.Runtime(TRT_LOGGER)
-            engine = runtime.deserialize_cuda_engine(
-                serialized_engine
-            )  # weight-stripped engine
+            try:
+                engine = runtime.deserialize_cuda_engine(
+                    serialized_engine
+                )  # weight-stripped engine
+            except Exception:
+                engine = None
+            if engine is None:
+                # e.g. an entry written by another TensorRT version or for another GPU
+                logger.warning(
+                    f"Ignoring the cached engine with hash {hash_val}: TensorRT could "
+                    "not deserialize it. It will be rebuilt."
+                )
+                return None
 
             from torch_tensorrt.dynamo._refit import (
                 _refit_single_trt_engine_with_gm,

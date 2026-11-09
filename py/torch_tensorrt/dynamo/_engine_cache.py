@@ -12,9 +12,12 @@ import shutil
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch._inductor.codecache import sha256_hash
+from torch_tensorrt._enums import Platform
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import get_target_compute_capabilities
 from torch_tensorrt.dynamo._settings import (
     _SETTINGS_TO_BE_ENGINE_INVARIANT,
     CompilationSettings,
@@ -130,7 +133,7 @@ class BaseEngineCache(ABC):
         invariant_engine_specs = [
             _canonicalize_setting_value(getattr(settings, field))
             for field in sorted(_SETTINGS_TO_BE_ENGINE_INVARIANT)
-        ]
+        ] + BaseEngineCache._build_environment(settings)
         with io.BytesIO() as stream:
             engine_specs_data = pickle.dumps(invariant_engine_specs)
             engine_specs_data = pickletools.optimize(engine_specs_data)
@@ -139,6 +142,24 @@ class BaseEngineCache(ABC):
         hash_val: str = graph_hash + input_specs_hash + engine_specs_hash
 
         return hash_val
+
+    @staticmethod
+    def _build_environment(settings: CompilationSettings) -> List[str]:
+        """What, besides the graph and the settings, decides whether an engine loads.
+
+        A serialized engine only deserializes with the TensorRT version that built it,
+        on the platform and, unless it is hardware compatible, the GPU architecture it
+        was built for. Without these in the key, a cache directory shared between
+        hosts or kept across a TensorRT upgrade returns an engine that cannot be loaded.
+        """
+        environment = [
+            f"tensorrt={trt.__version__}",
+            f"platform={Platform.current_platform()}",
+        ]
+        if not settings.hardware_compatible:
+            capabilities = get_target_compute_capabilities(settings)
+            environment.append(f"compute_capabilities={sorted(set(capabilities))}")
+        return environment
 
     @staticmethod
     def pack(
