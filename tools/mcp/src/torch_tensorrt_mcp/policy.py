@@ -115,13 +115,20 @@ class Policy:
                 "invalid administrator configuration keys (" + "; ".join(details) + ")"
             )
         workspace = Path(data["workspace_root"]).resolve(strict=True)
-        output = Path(data["output_root"]).resolve(strict=True)
         if not workspace.is_dir():
             raise PolicyError(
                 f"workspace_root must be an existing directory: {workspace}"
             )
+        configured_output = Path(data["output_root"])
+        try:
+            configured_output.mkdir(mode=0o700, parents=True, exist_ok=True)
+            output = configured_output.resolve(strict=True)
+        except OSError as exc:
+            raise PolicyError(
+                f"output_root could not be created: {configured_output}"
+            ) from exc
         if not output.is_dir():
-            raise PolicyError(f"output_root must be an existing directory: {output}")
+            raise PolicyError(f"output_root must be a directory: {output}")
         if output == workspace or output in workspace.parents:
             raise PolicyError(
                 f"output_root {output} cannot equal or contain workspace_root {workspace}"

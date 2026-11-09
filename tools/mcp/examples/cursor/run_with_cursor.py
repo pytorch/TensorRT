@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_MCP_CONFIG = REPO_ROOT / ".cursor" / "mcp.json"
 
 
@@ -48,7 +48,7 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help=(
             "isolated MCP output directory; defaults to "
-            "mcp_example/sdk-runs/<date>_<time>_<8-character-id>"
+            ".mcp-runs/<date>_<time>_<8-character-id>"
         ),
     )
     parser.add_argument(
@@ -75,7 +75,7 @@ def _resolve_path(value: str, *, base: Path) -> Path:
 def _default_output_root() -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     run_id = uuid.uuid4().hex[:8]
-    return (REPO_ROOT / "mcp_example" / "sdk-runs" / f"{timestamp}_{run_id}").resolve()
+    return (REPO_ROOT / ".mcp-runs" / f"{timestamp}_{run_id}").resolve()
 
 
 def _prepare_mcp_server(
@@ -287,7 +287,7 @@ def main() -> int:
         print(
             "cursor-sdk is not installed; run "
             "'python -m pip install -r "
-            "mcp_example/requirements-cursor-sdk.txt'.",
+            "tools/mcp/examples/cursor/requirements.txt'.",
             file=sys.stderr,
         )
         return 1

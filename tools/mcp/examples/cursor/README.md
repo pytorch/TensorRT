@@ -1,12 +1,12 @@
 # Optimize Torch-TensorRT models with Cursor
 
-`run_torch_trt_mcp_with_cursor.py` starts a Cursor Local Agent, gives it access
+`run_with_cursor.py` starts a Cursor Local Agent, gives it access
 to the configured Torch-TensorRT MCP server, streams the Agent's response, and
 reports the token usage for that SDK run.
 
 The script can ask the MCP server to analyze, compile, validate, or benchmark
 models allowlisted in `admin-config.json`. Each invocation gets an isolated
-run directory under `mcp_example/sdk-runs/` by default. Its name contains
+run directory under `.mcp-runs/` by default. Its name contains
 the UTC start time and an eight-character random identifier, for example
 `20261105_011204_e04a1d83`. This keeps runs sortable and unique without sharing
 the MCP job-manager lock used by the Cursor IDE.
@@ -22,7 +22,7 @@ the MCP job-manager lock used by the Cursor IDE.
 Install the Cursor SDK from the repository root:
 
 ```bash
-python -m pip install -r mcp_example/requirements-cursor-sdk.txt
+python -m pip install -r tools/mcp/examples/cursor/requirements.txt
 ```
 
 The script is tested with `cursor-sdk 1.3.1`. Check the installed version with:
@@ -44,7 +44,7 @@ The default MCP configuration is `.cursor/mcp.json`. Its server name must be
       "command": "/absolute/path/to/bin/torch-tensorrt-mcp",
       "args": [
         "--config",
-        "/absolute/path/to/mcp_example/admin-config.json"
+        "/absolute/path/to/TensorRT/tools/mcp/examples/cursor/admin-config.json"
       ],
       "env": {
         "LD_LIBRARY_PATH": "/absolute/path/to/TensorRT/lib"
@@ -59,7 +59,11 @@ by the worker, including `libnvinfer.so` and `libnvonnxparser.so`. The SDK
 starts a new MCP process and passes this configured environment to it; do not
 assume it will use the environment of an already-running Cursor IDE MCP server.
 
-Models and input factories must be allowlisted in `mcp_example/admin-config.json`.
+Models and input factories must be allowlisted in
+`tools/mcp/examples/cursor/admin-config.json`. Update its repository paths
+before launching the server. The configured `workspace_root` must exist; the
+server creates `output_root` if needed. Generated `.mcp-runs/` artifacts are
+ignored by Git.
 The included example defines the model and input name `add`.
 
 ## Set the Cursor API key
@@ -96,7 +100,7 @@ Pass one of the returned IDs explicitly with `--model`.
 From the repository root:
 
 ```bash
-python mcp_example/run_torch_trt_mcp_with_cursor.py \
+python tools/mcp/examples/cursor/run_with_cursor.py \
   "Analyze the add model with min_block_size=1. Only run analyze; do not compile, validate, or benchmark." \
   --model composer-2.5
 ```
@@ -109,7 +113,7 @@ The Agent decides which MCP tools to call from the task. State every required
 stage and setting explicitly:
 
 ```bash
-python mcp_example/run_torch_trt_mcp_with_cursor.py \
+python tools/mcp/examples/cursor/run_with_cursor.py \
   "Compile the add model with min_block_size=1, validate the compiled artifact, and benchmark it with 10 warmup iterations and 100 measured iterations." \
   --model composer-2.5
 ```
@@ -117,7 +121,7 @@ python mcp_example/run_torch_trt_mcp_with_cursor.py \
 For a multiline task, read the prompt from standard input:
 
 ```bash
-cat <<'EOF' | python mcp_example/run_torch_trt_mcp_with_cursor.py - --model composer-2.5
+cat <<'EOF' | python tools/mcp/examples/cursor/run_with_cursor.py - --model composer-2.5
 Analyze the add model with min_block_size=1.
 Only run analyze.
 Report the job ID, node coverage, and partition assignment.
@@ -129,7 +133,7 @@ EOF
 The command prints the isolated SDK run directory before starting:
 
 ```text
-MCP artifacts: .../mcp_example/sdk-runs/YYYYMMDD_HHMMSS_<8-character-id>
+MCP artifacts: .../.mcp-runs/YYYYMMDD_HHMMSS_<8-character-id>
 ```
 
 At completion it prints the SDK run status and runtime-reported token usage:

@@ -8,9 +8,14 @@ Install this package into a **previously provisioned Torch/TensorRT/Torch-Tensor
 python -m pip install ./tools/mcp
 ```
 
+For a complete Cursor Agent integration, see
+[`examples/cursor/README.md`](examples/cursor/README.md).
+
 The default package dependencies contain MCP, Pydantic, and Packaging. They do not contain Torch, TensorRT, or Torch-TensorRT, so the package resolver cannot replace those packages. An explicit `[core]` extra exists for new-environment provisioning. Jobs verify the installed core distribution is `>=2.16.0.dev0` and requires the new public reporting/verification APIs; installations in that range without those APIs fail with retained diagnostics. The launch command never installs dependencies or alters the environment.
 
-Create both configured roots before launch. Example administrator configuration:
+Create `workspace_root` before launch. The adapter creates `output_root`,
+including missing parent directories, when it loads the configuration. Example
+administrator configuration:
 
 ```json
 {
