@@ -21,6 +21,8 @@ Functions
 
 .. autofunction:: save
 
+.. autofunction:: compile_and_save
+
 .. autofunction:: load
 
 Classes
