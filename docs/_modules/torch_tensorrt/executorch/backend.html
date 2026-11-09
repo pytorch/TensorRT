@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../../../_static/documentation_options.js?v=d985c49d"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -507,12 +507,14 @@ document.write(`
     <span class="n">HW_COMPATIBLE_IDX</span><span class="p">,</span>
     <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
     <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
-    <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">,</span>
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TARGET_PLATFORM_IDX</span><span class="p">,</span>
     <span class="n">deserialize_aliased_io</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_BYTES_ATTR</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ENGINE_BYTES_ATTR</span><span class="p">,</span>
+    <span class="n">validate_engine_info</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">TensorRTBlobMetadata</span><span class="p">,</span>
     <span class="n">TensorRTIOBinding</span><span class="p">,</span>
@@ -721,14 +723,7 @@ document.write(`
             <span class="s2">"TensorRT ExecuTorch backend received incomplete engine "</span>
             <span class="s2">"serialization info."</span>
         <span class="p">)</span>
-    <span class="k">if</span> <span class="p">(</span>
-        <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span>
-        <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">])</span> <span class="o">==</span> <span class="s2">"1"</span>
-    <span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"ExecuTorch export does not support TensorRT engines that require "</span>
-            <span class="s2">"an output allocator (data-dependent output shapes)."</span>
-        <span class="p">)</span>
+    <span class="n">validate_engine_info</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_split_binding_names</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>

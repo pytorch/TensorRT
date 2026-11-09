@@ -68,6 +68,14 @@ if [[ ${PLATFORM} == win32 ]]; then
     done
     # pin-check: no-nightly -- Windows installs only the main wheel, without the Linux companion.
     python -m pip install ${wheels} || exit 1
+
+    # The runner image copies its own cuDNN into the CUDA toolkit, and torch also loads DLLs from
+    # there. When torch moves to a newer cuDNN than the image has, the older copy gets loaded and
+    # torch rejects it. Replace it with the cuDNN that pip installed for torch.
+    CUDNN_DLL_DIR="${SITE_PACKAGES}/nvidia/cudnn/bin"
+    if [[ -n "${CUDA_HOME:-}" && -d "${CUDNN_DLL_DIR}" ]]; then
+        cp -f "${CUDNN_DLL_DIR}"/cudnn*.dll "${CUDA_HOME}/bin/" || exit 1
+    fi
 else
     # Every built wheel except the companion. Installing the companion here is what forced a
     # nightly index onto release jobs; the ExecuTorch workflow installs it instead, naming the

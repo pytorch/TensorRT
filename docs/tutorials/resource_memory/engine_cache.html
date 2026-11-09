@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../../_static/documentation_options.js?v=d985c49d"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -676,7 +676,7 @@ The following changes always require a cache miss (engine rebuild):</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">engine_capability</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code> / <code class="docutils literal notranslate"><span class="pre">refit_identical_engine_weights</span></code> / <code class="docutils literal notranslate"><span class="pre">enable_weight_streaming</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">tiling_optimization_level</span></code> / <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code></p></li>
-<li><p>All <code class="docutils literal notranslate"><span class="pre">autocast_*</span></code> settings</p></li>
+<li><p>All <code class="docutils literal notranslate"><span class="pre">autocast_*</span></code> settings except <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></li>
 </ul>
 <p>Changes to <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code>, <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>,
 <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>, etc. do <strong>not</strong> invalidate cached engines.</p>

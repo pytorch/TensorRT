@@ -250,6 +250,10 @@ cc_test(
 cc_test(
     name = "test_unaligned_io",
     srcs = ["test_unaligned_io.cpp"],
+    # Counts the 2-D copies that reorder an input.
+    linkopts = ["-Wl,--wrap=cudaMemcpy2DAsync"],
+    # The wrapper needs the backend's CUDA reference at this executable's link.
+    linkstatic = True,
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
         "//cpp:sbsa": [],

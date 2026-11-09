@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import copy
+import threading
+import types
 import unittest
 from unittest import mock
 
@@ -9,8 +11,14 @@ import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering.passes import complex_decomposition_adapter
+from torch_tensorrt.dynamo.lowering.passes import (
+    complex_decomposition_adapter,
+    constant_folding,
+)
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
+
+# PyTorch before 2.9, as on JetPack, has only the older allow_tf32 flags.
+_HAS_FP32_PRECISION = hasattr(torch.backends.cuda.matmul, "fp32_precision")
 
 
 class _Permute(torch.nn.Module):
@@ -124,6 +132,130 @@ class TestConstantFolding(TestCase):
                 self.assertEqual(len(frozen), 3)
                 torch.testing.assert_close(gm(example_input), model(example_input))
 
+    @unittest.skipIf(
+        not torch.cuda.is_available() or torch.cuda.get_device_capability() < (8, 0),
+        "TF32 needs an Ampere or newer GPU",
+    )
+    @unittest.skipUnless(_HAS_FP32_PRECISION, "needs the fp32_precision flags")
+    def test_float32_folds_follow_disable_tf32(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("position", torch.randn(1, 64, 32, 32))
+                self.proj = torch.nn.Conv2d(64, 96, 1)
+                self.register_buffer("table", torch.randn(32, 64))
+                self.register_buffer("mix", torch.randn(64, 32))
+
+            def forward(self, x):
+                return x + self.proj(self.position) + self.table @ self.mix
+
+        torch.manual_seed(0)
+        model = Model().cuda().eval()
+        example_input = torch.randn(1, 96, 32, 32, device="cuda")
+        expected_conv = torch.nn.functional.conv2d(
+            model.position.double(),
+            model.proj.weight.double(),
+            model.proj.bias.double(),
+        )
+        expected_matmul = model.table.double() @ model.mix.double()
+        conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
+        saved = conv.fp32_precision, matmul.fp32_precision
+        for disable_tf32 in (True, False):
+            with self.subTest(disable_tf32=disable_tf32):
+                conv.fp32_precision = matmul.fp32_precision = "tf32"
+                try:
+                    with mock.patch.object(
+                        constant_folding,
+                        "_ieee_float32",
+                        wraps=constant_folding._ieee_float32,
+                    ) as ieee_float32:
+                        gm = constant_fold(
+                            torch.export.export(model, (example_input,)).module(),
+                            CompilationSettings(disable_tf32=disable_tf32),
+                        )
+                    # With TF32 allowed, folding keeps the caller's settings.
+                    self.assertEqual(ieee_float32.called, disable_tf32)
+                    self.assertEqual(
+                        (conv.fp32_precision, matmul.fp32_precision), ("tf32", "tf32")
+                    )
+                finally:
+                    conv.fp32_precision, matmul.fp32_precision = saved
+                if not disable_tf32:
+                    continue
+                folded = {
+                    tuple(p.shape): p
+                    for n, p in gm.named_parameters()
+                    if n.startswith("_frozen_param")
+                }
+                for expected in (expected_conv, expected_matmul):
+                    error = (folded[tuple(expected.shape)].double() - expected).abs()
+                    self.assertLess(error.max().item(), 1e-5)
+
+    def test_float32_folding_works_without_fp32_precision(self):
+        # As before PyTorch 2.9: no fp32_precision flags, and matmul.allow_tf32 reads True for
+        # both "high" and "medium" and sets "high".
+        state = {"matmul": "medium"}
+
+        class LegacyMatmul:
+            @property
+            def allow_tf32(self):
+                return state["matmul"] != "highest"
+
+            @allow_tf32.setter
+            def allow_tf32(self, value):
+                state["matmul"] = "high" if value else "highest"
+
+        cudnn = types.SimpleNamespace(allow_tf32=True)
+        with (
+            mock.patch.object(torch.backends, "cudnn", cudnn),
+            mock.patch.object(torch.backends.cuda, "matmul", LegacyMatmul()),
+            mock.patch.object(
+                torch, "get_float32_matmul_precision", lambda: state["matmul"]
+            ),
+            mock.patch.object(
+                torch, "set_float32_matmul_precision", lambda p: state.update(matmul=p)
+            ),
+        ):
+            with constant_folding._ieee_float32():
+                self.assertEqual(
+                    (cudnn.allow_tf32, state["matmul"]), (False, "highest")
+                )
+        self.assertEqual((cudnn.allow_tf32, state["matmul"]), (True, "medium"))
+
+    @unittest.skipUnless(_HAS_FP32_PRECISION, "needs the fp32_precision flags")
+    def test_overlapping_float32_folds_wait_for_each_other(self):
+        conv, matmul = torch.backends.cudnn.conv, torch.backends.cuda.matmul
+        saved = conv.fp32_precision, matmul.fp32_precision
+        inside, release = threading.Event(), threading.Event()
+
+        def first():
+            with constant_folding._ieee_float32():
+                inside.set()
+                release.wait(10)
+
+        def second():
+            with constant_folding._ieee_float32():
+                pass
+
+        threads = [threading.Thread(target=first), threading.Thread(target=second)]
+        conv.fp32_precision = matmul.fp32_precision = "tf32"
+        try:
+            threads[0].start()
+            inside.wait(10)
+            threads[1].start()
+            threads[1].join(0.5)
+            # The second fold must not start while the first one holds the flags.
+            self.assertTrue(threads[1].is_alive())
+            release.set()
+            for t in threads:
+                t.join(10)
+            self.assertEqual(
+                (conv.fp32_precision, matmul.fp32_precision), ("tf32", "tf32")
+            )
+        finally:
+            release.set()
+            conv.fp32_precision, matmul.fp32_precision = saved
+
     def test_only_converter_safe_aliased_ops_skip_install(self):
         permute_gm = self._export_and_fold(_Permute(), torch.randn(1, 513, 512))
         self.assertIn(
@@ -193,7 +325,8 @@ class TestConstantFolding(TestCase):
     )
     def test_offloaded_constants_reach_the_complex_decomposition(self):
         # offload_module_to_cpu leaves folded constants on the CPU; the complex
-        # decomposition retraces the graph and must not fall back over them.
+        # decomposition retraces the graph and folds it again, and must neither
+        # fall back over them nor mix them with the device tensors it adds.
         class Rotary(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -203,11 +336,19 @@ class TestConstantFolding(TestCase):
                 )
                 # Read only by constant folding, so the retraced module drops it.
                 self.scale = torch.nn.Parameter(torch.ones(4))
+                self.register_buffer("causal", torch.ones(8, 8).tril())
 
             def forward(self, x):
                 freqs = self.freqs[: x.shape[0]] * self.scale.mean()
                 z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
-                return torch.view_as_real(z * freqs).flatten(1)
+                y = torch.view_as_real(z * freqs).flatten(1)
+                q = y[None, None]
+                # The retrace expands the attention, turning the folded mask into
+                # a bias with scalars it creates on the device.
+                attended = torch.nn.functional.scaled_dot_product_attention(
+                    q, q, q, attn_mask=self.causal > 0
+                )
+                return y, attended
 
         model = Rotary().eval().cuda()
         example_input = torch.randn(8, 8, device="cuda")
@@ -229,8 +370,44 @@ class TestConstantFolding(TestCase):
             )
             actual = compiled_model(example_input)
 
-        torch.testing.assert_close(actual, expected)
+        torch.testing.assert_close(actual[0], expected[0])
+        # TensorRT may run the attention's matrix multiplies in TF32.
+        torch.testing.assert_close(actual[1], expected[1], rtol=0.02, atol=0.02)
         self.assertEqual(model.scale.device.type, "cpu")
+
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+    def test_offloaded_constant_moves_to_its_device_only_for_an_op_that_fails(
+        self,
+    ):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("c", torch.randn(4096))
+                self.register_buffer("d", torch.randn(4096))
+
+            def forward(self, x):
+                # Fails with c on the CPU next to a scalar on the device.
+                shifted = self.c + torch.zeros((), device=x.device)
+                # Takes a source on another device and keeps the device of c.
+                copied = torch.ops.aten.copy.default(self.c, self.d)
+                return x * self.c.sin() + shifted + copied.sin()
+
+        example_input = torch.randn(4096, device="cuda")
+        gm = torch.export.export(Model().cuda(), (example_input,)).module()
+        # What an earlier fold leaves with offload_module_to_cpu: the value on the
+        # CPU, its metadata on the device.
+        c = gm.c.cpu()
+        gm.c = c
+        d = gm.d.cpu()
+        gm = constant_fold(gm, CompilationSettings(offload_module_to_cpu=True))
+
+        folded = [
+            getattr(gm, n.target).cpu() for n in gm.graph.nodes if n.op == "get_attr"
+        ]
+        self.assertTrue(any(torch.equal(t, c) for t in folded))
+        # sin rounds differently on the GPU, so these show both still ran on the CPU.
+        self.assertTrue(any(torch.equal(t, c.sin()) for t in folded))
+        self.assertTrue(any(torch.equal(t, d.sin()) for t in folded))
 
     @unittest.skipIf(
         not torch.cuda.is_available()

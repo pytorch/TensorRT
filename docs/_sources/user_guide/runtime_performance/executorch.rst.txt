@@ -74,7 +74,8 @@ A wheel you build yourself does not bring the delegate. Build it as well, as the
 README shows.
 
 The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
-On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+On aarch64 the delegate needs glibc 2.35 or newer, and the Torch-TensorRT wheel glibc 2.39
+(for example Ubuntu 24.04).
 The JetPack, TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
 need a CUDA toolkit, because ExecuTorch's CUDA backend compiles the leftover operators with
 ``nvcc``.
@@ -165,6 +166,35 @@ in `Run from Python`_ and `Run from C++`_. If the CUDA part has weights, loading
     Every coalesced export names its weight file ``aoti_cuda_blob.ptd``, so a second export into
     the same directory overwrites the first one's weights. The first model can then return wrong
     answers with no error, or fail to load. Save each model into its own directory.
+
+Keep plugins that run PyTorch out of the engine
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some converters build a TensorRT plugin that runs PyTorch when the engine runs: ``aten.index_put``
+with ``accumulate=True`` uses Torch-TensorRT's ScatterAdd plugin, and a plugin made with
+``torch_tensorrt.dynamo.conversion.plugins.custom_op`` that does not use an AOT kernel runs the
+PyTorch op from Python. The ExecuTorch runtime does not load PyTorch, so ``save()`` refuses such an
+engine and names the operators. It finds them through converters registered with
+``requires_pytorch_plugin=True``, so a custom converter that adds such a plugin must set that flag.
+``save()`` also refuses an engine that does not record this. If an older Torch-TensorRT saved it,
+compile the model again. If you wrapped it in ``TorchTensorRTModule`` yourself, pass
+``pytorch_plugin_ops`` (``[]`` for an engine built with ``fallback_pytorch_plugin_ops=True``). Compile with ``fallback_pytorch_plugin_ops=True`` to keep those
+operators out of TensorRT. A ``torch.cond`` with one of them in a branch then runs in PyTorch too.
+With the setting, an accumulating ``index_put`` with one 1-D index stays in TensorRT instead,
+through TensorRT's own ScatterElements plugin, which needs no PyTorch. This needs float32, float16,
+bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the
+indexed dimension set to the index length) must stay under ``2**31`` elements, so every dynamic size needs an upper bound in the exported program, such as
+``torch.export.Dim(max=...)``, that keeps them there. Otherwise the operator runs in PyTorch.
+TensorRT cannot check index values inside the engine, so an out-of-range index is not reported
+there, where PyTorch raises.
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=example_inputs,
+        fallback_pytorch_plugin_ops=True,
+    )
 
 Keep inputs and outputs on the GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -687,6 +717,8 @@ In ``examples/torchtrt_executorch_example/``:
 * ``export_device_resident.py`` does the same with no copies at the edges of the program.
 * ``export_kv_cache_decode.py`` exports a decoder step whose KV cache stays in memory you own.
 * ``export_multi_profile.py`` exports one engine with two optimization profiles.
+* ``export_lerobot_pi05.py`` deploys a robot policy: LeRobot's pi0.5, a vision-language-action
+  model with 3.6 billion parameters, as one program that predicts a chunk of 50 actions.
 
 ``examples/executorch_reference_runner/`` loads and runs a ``.pte`` from Python and from C++,
 including optimization profiles and the green context option.

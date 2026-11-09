@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <NvInfer.h>
+#include <NvInferPlugin.h>
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
@@ -133,26 +134,29 @@ Error report_load_error(const char* operation) {
 // TensorRT reads an engine only with the version that built it, unless it was built version
 // compatible, and its own error then names internal serialization tags rather than versions.
 void log_tensorrt_versions(const std::string& exported_version) {
-  // TensorRT 10 and later encode the version as major * 10000 + minor * 100 + patch.
-  const int32_t version = getInferLibVersion();
-  const int major = version / 10000;
-  const int minor = version / 100 % 100;
-  const int patch = version % 100;
+  // The exporter records tensorrt.__version__, which includes the build number, so print the
+  // runtime's build number too. Otherwise equal versions read as different.
+  const int major = getInferLibMajorVersion();
+  const int minor = getInferLibMinorVersion();
+  const int patch = getInferLibPatchVersion();
+  const int build = getInferLibBuildVersion();
   if (exported_version.empty()) {
     ET_LOG(
         Error,
-        "TensorRTBackend::init: this runtime is TensorRT %d.%d.%d, and the program does not record which TensorRT exported the engine",
+        "TensorRTBackend::init: this runtime is TensorRT %d.%d.%d.%d, and the program does not record which TensorRT exported the engine",
         major,
         minor,
-        patch);
+        patch,
+        build);
   } else {
     ET_LOG(
         Error,
-        "TensorRTBackend::init: the engine was exported with TensorRT %s, and this runtime is TensorRT %d.%d.%d",
+        "TensorRTBackend::init: the engine was exported with TensorRT %s, and this runtime is TensorRT %d.%d.%d.%d",
         exported_version.c_str(),
         major,
         minor,
-        patch);
+        patch,
+        build);
   }
 }
 
@@ -293,6 +297,9 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
     }
     if (logger == nullptr) {
       logger = new TRTLogger();
+      // Engines can use TensorRT's standard plugins, such as ScatterElements for an
+      // accumulating index_put, and their creators are only registered on request.
+      initLibNvInferPlugins(logger, "");
     }
     runtime = nvinfer1::createInferRuntime(*logger);
     if (runtime != nullptr) {
@@ -740,6 +747,67 @@ bool is_tensor_address_aligned(const void* ptr) {
   return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
 }
 
+// Size-1 dims are skipped, since they move no element, and a tensor built without strides is row-major.
+int innermost_non_row_major_dim(const exec_aten::Tensor& t) {
+  const auto strides = t.strides();
+  if (strides.data() == nullptr) {
+    return -1;
+  }
+  int64_t row_major_stride = 1;
+  for (int d = static_cast<int>(t.dim()) - 1; d >= 0; --d) {
+    if (t.size(d) != 1 && strides[d] != row_major_stride) {
+      return d;
+    }
+    row_major_stride *= t.size(d);
+  }
+  return -1;
+}
+
+// Each row of the 2-D copies is a run of the row-major inner dims, so no CUDA kernel is needed. An outer dim whose
+// stride spans all the rows so far joins them, so channels-last costs one copy per channel, not one per image row.
+cudaError_t copy_to_row_major(void* dst, const exec_aten::Tensor& src, cudaStream_t stream) {
+  const int dim = innermost_non_row_major_dim(src);
+  const size_t element_size = static_cast<size_t>(src.element_size());
+  size_t row_bytes = element_size;
+  for (int d = dim + 1; d < src.dim(); ++d) {
+    row_bytes *= static_cast<size_t>(src.size(d));
+  }
+  const size_t pitch = static_cast<size_t>(src.strides()[dim]);
+  size_t rows = static_cast<size_t>(src.size(dim));
+  int top = dim;
+  while (top > 0 && static_cast<size_t>(src.strides()[top - 1]) == rows * pitch) {
+    rows *= static_cast<size_t>(src.size(--top));
+  }
+  size_t blocks = 1;
+  for (int d = 0; d < top; ++d) {
+    blocks *= static_cast<size_t>(src.size(d));
+  }
+  const auto* src_bytes = static_cast<const uint8_t*>(src.const_data_ptr());
+  auto* dst_bytes = static_cast<uint8_t*>(dst);
+  for (size_t block = 0; block < blocks; ++block) {
+    size_t src_offset = 0;
+    size_t index = block;
+    for (int d = top - 1; d >= 0; --d) {
+      const size_t size = static_cast<size_t>(src.size(d));
+      src_offset += index % size * static_cast<size_t>(src.strides()[d]);
+      index /= size;
+    }
+    const cudaError_t err = cudaMemcpy2DAsync(
+        dst_bytes + block * rows * row_bytes,
+        row_bytes,
+        src_bytes + src_offset * element_size,
+        pitch * element_size,
+        row_bytes,
+        rows,
+        cudaMemcpyDefault,
+        stream);
+    if (err != cudaSuccess) {
+      return err;
+    }
+  }
+  return cudaSuccess;
+}
+
 bool is_cuda_accessible_ptr(const void* ptr) {
   if (ptr == nullptr) {
     return false;
@@ -837,6 +905,13 @@ class SharedScratchClaim {
     disposal_stream_ = disposal_stream;
   }
 
+  // Records a growth for release() to log once the lock is dropped: a log sink can
+  // block, and every pooled engine on this device waits for this lock meanwhile.
+  void note_growth(size_t bytes, bool first_buffer) {
+    grown_bytes_ = bytes;
+    first_buffer_ = first_buffer;
+  }
+
   // Drops the lock, and the device pointer with it so device() cannot hand out a
   // pointer this claim no longer holds the lock for. Then disposes of whatever a
   // growth displaced, after the unlock, because that disposal waits for an enqueue
@@ -880,6 +955,15 @@ class SharedScratchClaim {
       lock_.unlock();
     }
     dev_ = nullptr;
+    if (grown_bytes_ != 0) {
+      ET_LOG(
+          Info,
+          "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
+          device_id_,
+          first_buffer_ ? "allocated" : "grew to",
+          grown_bytes_);
+      grown_bytes_ = 0;
+    }
     if (retired == nullptr) {
       return true;
     }
@@ -984,6 +1068,8 @@ class SharedScratchClaim {
   void* retired_ = nullptr;
   cudaEvent_t retired_wait_ = nullptr;
   cudaStream_t disposal_stream_ = nullptr;
+  size_t grown_bytes_ = 0;
+  bool first_buffer_ = false;
 };
 
 // What a call needing no activation scratch is given when the pool holds nothing
@@ -1127,18 +1213,13 @@ Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need
   void* const buffer = shared_scratch_get_or_grow(
       dev,
       need,
-      [device_id, first_buffer](size_t bytes) -> void* {
+      [&claim, first_buffer](size_t bytes) -> void* {
         void* p = nullptr;
         if (cudaMalloc(&p, bytes) != cudaSuccess) {
           cudaGetLastError();
           return nullptr;
         }
-        ET_LOG(
-            Info,
-            "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
-            device_id,
-            first_buffer ? "allocated" : "grew to",
-            bytes);
+        claim.note_growth(bytes, first_buffer);
         return p;
       },
       retired);
@@ -1898,6 +1979,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           name.c_str());
       return Error::InvalidArgument;
     }
+    // TensorRT reads row-major, and ExecuTorch can plan another dim order, such as efficient attention's output.
+    const bool row_major = innermost_non_row_major_dim(et_in) < 0;
+    if (engine->input_is_alias_target[i] && !row_major) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: aliased input '%s' must be row-major, because the engine updates it in place",
+          name.c_str());
+      return Error::InvalidArgument;
+    }
 
     void* bind_ptr = nullptr;
     if (et_in.nbytes() == 0) {
@@ -1909,11 +1999,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (device_reachable && is_tensor_address_aligned(et_in.const_data_ptr())) {
+    } else if (device_reachable && row_major && is_tensor_address_aligned(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
-      if (device_reachable) {
+      if (device_reachable && row_major) {
         report_unaligned(name, et_in.const_data_ptr());
+      } else if (!row_major && !engine->reordered_input_reported) {
+        engine->reordered_input_reported = true;
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: input '%s' is not in row-major dim order, and TensorRT reads row-major, so "
+            "it is copied into row-major order on every call (reported once per engine)",
+            name.c_str());
       }
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
@@ -1929,7 +2026,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream);
+      cuda_err = row_major ? cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream)
+                           : copy_to_row_major(bind_ptr, et_in, stream);
       drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(

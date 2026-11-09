@@ -8,7 +8,6 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt
-from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 
 if importlib.util.find_spec("transformers"):
     import transformers
@@ -30,14 +29,11 @@ if importlib.util.find_spec("transformers"):
     "dynamic head dimension HF GQA test is not supported on Windows",
 )
 def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
-    if (
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
-        and not is_tensorrt_rtx_version_supported("1.7")
-    ):
+    if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+        # Accuracy issues persist in TensorRT-RTX 1.7. Re-enable once RTX fixes them.
         pytest.skip(
-            "TensorRT-RTX >= 1.7 is required because it fixed some accuracy issues for FP16"
+            "Dynamic head dimension HF GQA accuracy issues remain unresolved in TensorRT-RTX"
         )
-        return
 
     from transformers import AutoModelForCausalLM
 
