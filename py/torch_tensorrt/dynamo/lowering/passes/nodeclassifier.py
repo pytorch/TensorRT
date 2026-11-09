@@ -48,13 +48,13 @@ class NodeRuleBase:
 
 
 class DisabledNodeNameRegexRule(NodeRuleBase):
-    """Rule for keeping nodes with matching user-specified names in high precision."""
+    """Rule for keeping nodes in high precision whose module path matches a user regex."""
 
     def __init__(self, disabled_node_name_regex):
         """Initialize the rule.
 
         Args:
-            disabled_node_name_regex: List of regex patterns for user-specified node names to keep in high precision.
+            disabled_node_name_regex: List of regex patterns for the paths of the modules whose nodes to keep in high precision.
         """
         self.disabled_node_name_regex = disabled_node_name_regex
 
@@ -70,6 +70,21 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
         return any(
             re.match(regex, node_name) for regex in self.disabled_node_name_regex
         )
+
+
+class NodeNameRegexRule(NodeRuleBase):
+    """Rule for keeping nodes in high precision whose name in the graph matches a user regex."""
+
+    def __init__(self, node_name_regex: Collection[str]) -> None:
+        """Initialize the rule.
+
+        Args:
+            node_name_regex: Collection of regex patterns for the names of the nodes to keep in high precision.
+        """
+        self.node_name_regex = node_name_regex
+
+    def _check_inner(self, node: torch.fx.Node) -> bool:
+        return any(re.match(regex, node.name) for regex in self.node_name_regex)
 
 
 class NodeNameSetRule(NodeRuleBase):
@@ -252,6 +267,7 @@ class NodeClassifier:
         self,
         nodes,
         excluded_nodes: Collection[str] | None = None,
+        excluded_node_names: Collection[str] | None = None,
         excluded_ops: Collection[torch.fx.node.Target] | None = None,
         custom_rule: NodeRuleBase | None = None,
         max_output_threshold: float | None = 512,
@@ -261,14 +277,16 @@ class NodeClassifier:
 
         Args:
             nodes: The nodes to classify.
-            nodes_to_exclude: Collection of regex patterns for node names to keep in high precision.
-            targets_to_exclude: Collection of targets to keep in high precision.
+            excluded_nodes: Collection of regex patterns for the module paths of the nodes to keep in high precision.
+            excluded_node_names: Collection of regex patterns for the names of the nodes to keep in high precision.
+            excluded_ops: Collection of targets to keep in high precision.
             custom_rule: Optional custom classification rule.
             max_output_threshold: Maximum absolute value allowed for node I/O.
             max_depth_of_reduction: Maximum depth of reduction allowed in low precision.
         """
         self.nodes = nodes
         self.excluded_nodes = excluded_nodes
+        self.excluded_node_names = excluded_node_names
         self.excluded_ops = excluded_ops
         self.custom_rule = custom_rule
         self.max_output_threshold = max_output_threshold
@@ -287,6 +305,8 @@ class NodeClassifier:
         block_node_rules: list[NodeRuleBase] = []
         if self.excluded_nodes:
             block_node_rules.append(DisabledNodeNameRegexRule(self.excluded_nodes))
+        if self.excluded_node_names:
+            block_node_rules.append(NodeNameRegexRule(self.excluded_node_names))
         if self.excluded_ops:
             block_node_rules.append(DisabledOpTypes(self.excluded_ops))
         if reference_magnitudes:

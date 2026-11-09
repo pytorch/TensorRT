@@ -192,9 +192,18 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        ``enable_autocast=True``).
    * - ``autocast_excluded_nodes``
      - ``set()``
-     - Set of **regex patterns** matched against node names. Nodes whose names match
-       any pattern are kept in FP32. Example: ``{".*layer_norm.*"}`` keeps all
-       LayerNorm ops in FP32.
+     - Set of **regex patterns** matched against the path of the module that owns each
+       node, such as ``block.norm``. The ops of modules whose paths match any pattern
+       are kept in FP32. Example: ``{".*norm$"}`` keeps the ops of every module whose
+       name ends in ``norm`` in FP32.
+   * - ``autocast_excluded_node_names``
+     - ``set()``
+     - Set of **regex patterns** matched against the names of the nodes in the exported
+       graph, such as ``layer_norm_1``. Nodes whose names match any pattern are kept in
+       FP32. This can pick out an op that shares its module with others. Example:
+       ``{".*layer_norm.*"}`` keeps all LayerNorm ops in FP32. A pattern matches from
+       the start of a name, so ``{"layer_norm_1$"}`` keeps ``layer_norm_1`` and not
+       ``layer_norm_10``.
    * - ``autocast_excluded_ops``
      - ``set()``
      - Set of ``torch.ops`` targets always kept in FP32 regardless of other autocast
@@ -510,8 +519,9 @@ rebuilt from scratch:
 ``refit_identical_engine_weights``,
 ``immutable_weights``, ``enable_weight_streaming``, ``tiling_optimization_level``,
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
-``autocast_excluded_nodes``, ``autocast_excluded_ops``,
-``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
+``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
+``autocast_excluded_ops``, ``autocast_max_output_threshold``,
+``autocast_max_depth_of_reduction``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,

@@ -1182,6 +1182,44 @@ def test_autocast_excluded_ops_accepts_op_overloads():
 
 
 @pytest.mark.unit
+def test_autocast_excluded_node_names():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+            self.norm = nn.LayerNorm(16)
+
+        def forward(self, x):
+            y = self.norm(self.linear(x)) * 2.0
+            return nn.functional.layer_norm(y, (16,))
+
+    x = torch.randn(4, 16, device="cuda")
+
+    def dtypes(**kwargs):
+        settings = CompilationSettings(
+            enable_autocast=True, autocast_low_precision_type=torch.float16, **kwargs
+        )
+        ep = pre_export_lowering(
+            torch.export.export(Model().cuda().eval(), (x,)), settings
+        )
+        return {
+            n.name: n.meta["val"].dtype
+            for n in ep.graph.nodes
+            if n.op == "call_function" and isinstance(n.meta.get("val"), torch.Tensor)
+        }
+
+    # The nodes layer_norm and layer_norm_1, whose modules are norm and the model.
+    by_name = dtypes(autocast_excluded_node_names={".*layer_norm.*"})
+    assert by_name["layer_norm"] == by_name["layer_norm_1"] == torch.float32
+    assert by_name["linear"] == by_name["mul"] == torch.float16
+    # A single pattern given as a string is one pattern, not one per character.
+    assert dtypes(autocast_excluded_node_names=".*layer_norm.*") == by_name
+    # autocast_excluded_nodes matches only module paths, which here are norm and "".
+    by_path = dtypes(autocast_excluded_nodes={".*layer_norm.*"})
+    assert by_path["layer_norm"] == by_path["layer_norm_1"] == torch.float16
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 @pytest.mark.parametrize(
     "factory",

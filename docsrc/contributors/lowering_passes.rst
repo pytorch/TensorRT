@@ -167,8 +167,9 @@ cast nodes into the graph based on a set of rules:
 2. **Reduction depth check** — nodes with reduction depth exceeding
    ``autocast_max_depth_of_reduction`` are kept in FP32 (guarded against accumulated
    error). Needs calibration data (step 5).
-3. **Name exclusions** — nodes matching any pattern in ``autocast_excluded_nodes`` are
-   kept in FP32.
+3. **Name exclusions** — nodes whose module path matches a pattern in
+   ``autocast_excluded_nodes``, or whose name matches a pattern in
+   ``autocast_excluded_node_names``, are kept in FP32.
 4. **Op exclusions** — nodes with targets in ``autocast_excluded_ops`` are kept in FP32.
 5. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
    ranges are measured by running the model on calibration data before applying the

@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
+    AUTOCAST_EXCLUDED_NODE_NAMES,
     AUTOCAST_EXCLUDED_NODES,
     AUTOCAST_EXCLUDED_OPS,
     AUTOCAST_LOW_PRECISION_TYPE,
@@ -165,7 +166,8 @@ class CompilationSettings:
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_autocast (bool): Whether to enable autocast.
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
-        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns for the paths of the modules, such as "block.norm", whose nodes should remain in FP32. Default is [].
+        autocast_excluded_node_names (Collection[str]): The set of regex patterns for the names of the nodes in the exported graph, such as "layer_norm_1", that should remain in FP32. A pattern matches from the start of a name, so "layer_norm_1$" matches layer_norm_1 and not layer_norm_10. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
@@ -267,6 +269,9 @@ class CompilationSettings:
     autocast_excluded_nodes: Collection[str] = field(
         default_factory=lambda: AUTOCAST_EXCLUDED_NODES
     )
+    autocast_excluded_node_names: Collection[str] = field(
+        default_factory=lambda: AUTOCAST_EXCLUDED_NODE_NAMES
+    )
     autocast_excluded_ops: Collection[Target] = field(
         default_factory=lambda: AUTOCAST_EXCLUDED_OPS
     )
@@ -336,6 +341,8 @@ class CompilationSettings:
         # None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".
         if self.release_weights_after_build is not None:
             self.release_weights_after_build = bool(self.release_weights_after_build)
+        if isinstance(self.autocast_excluded_node_names, str):
+            self.autocast_excluded_node_names = {self.autocast_excluded_node_names}
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -392,6 +399,7 @@ class CompilationSettings:
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
         state.setdefault("max_partition_size", MAX_PARTITION_SIZE)
+        state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
@@ -414,6 +422,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enable_autocast",
     "autocast_low_precision_type",
     "autocast_excluded_nodes",
+    "autocast_excluded_node_names",
     "autocast_excluded_ops",
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",

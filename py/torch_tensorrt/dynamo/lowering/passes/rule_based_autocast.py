@@ -200,6 +200,7 @@ def rule_based_autocast(
     node_classifier = NodeClassifier(
         gm.graph.nodes,
         excluded_nodes=autocast_excluded_nodes,
+        excluded_node_names=settings.autocast_excluded_node_names,
         excluded_ops=autocast_excluded_ops,
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
