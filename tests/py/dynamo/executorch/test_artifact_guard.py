@@ -1522,3 +1522,36 @@ def test_a_tensorrt_without_its_plugin_library_stops_at_configure(
     # Past this check the configure still fails for want of ExecuTorch and CUDA, which is fine here.
     refused = "nvinfer_plugin),whichwas" in "".join(result.stderr.split())
     assert refused is not plugin, result.stderr
+
+
+@pytest.mark.parametrize("lean_library", [False, True])
+def test_a_lean_build_without_the_lean_library_stops_at_configure(
+    tmp_path, native_tools, lean_library
+):
+    # A lean build needs no plugin library, so this TensorRT has none.
+    trt = tmp_path / "tensorrt"
+    (trt / "include").mkdir(parents=True)
+    (trt / "lib").mkdir()
+    (trt / "include/NvInfer.h").write_text(
+        "#define NV_TENSORRT_MAJOR 11\n#define NV_TENSORRT_MINOR 4\n#define NV_TENSORRT_PATCH 0\n"
+    )
+    (trt / "lib/libnvinfer.so").write_bytes(b"")
+    if lean_library:
+        (trt / "lib/libnvinfer_lean.so").write_bytes(b"")
+    result = subprocess.run(
+        [
+            native_tools["cmake"],
+            "-S",
+            str(_ROOT / "py/torch-tensorrt-executorch-runtime/native"),
+            "-B",
+            str(tmp_path / "build"),
+            f"-DTORCH_TENSORRT_SOURCE_DIR={_ROOT}",
+            f"-DTensorRT_ROOT={trt}",
+            "-DTORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME=ON",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    stderr = "".join(result.stderr.split())
+    assert ("nvinfer_lean),whichwas" in stderr) is not lean_library, result.stderr
+    assert "nvinfer_plugin),whichwas" not in stderr, result.stderr

@@ -36,7 +36,9 @@
 #include <vector>
 
 #include <NvInfer.h>
+#ifndef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
 #include <NvInferPlugin.h>
+#endif
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
@@ -356,9 +358,12 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
     }
     if (logger == nullptr) {
       logger = new TRTLogger();
+#ifndef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
       // Engines can use TensorRT's standard plugins, such as ScatterElements for an
       // accumulating index_put, and their creators are only registered on request.
+      // The lean library has no plugins, so a lean build cannot load such an engine.
       initLibNvInferPlugins(logger, "");
+#endif
     }
     runtime = nvinfer1::createInferRuntime(*logger);
     if (runtime != nullptr) {
@@ -567,6 +572,11 @@ Error load_engine(
     const Error err = report_load_error("deserialize TensorRT engine");
     if (err != Error::MemoryAllocationFailed) {
       log_tensorrt_versions(exported_version);
+#ifdef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: this delegate links TensorRT's lean library, which loads only engines compiled with version_compatible=True that use no TensorRT plugin");
+#endif
     }
     return err;
   }
