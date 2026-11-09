@@ -898,7 +898,8 @@ cudaError_t grow_kept_buffer(const EngineHandle& engine, void*& buffer, size_t& 
   return cudaSuccess;
 }
 
-// Size-1 dims are skipped, since they move no element, and a tensor built without strides is row-major.
+// Size-1 dims are skipped, since they move no element. ExecuTorch requires strides, but the version pinned here
+// returns none for a tensor built without them instead of asserting, so such a tensor reads as row-major.
 int innermost_non_row_major_dim(const exec_aten::Tensor& t) {
   const auto strides = t.strides();
   if (strides.data() == nullptr) {

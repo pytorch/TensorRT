@@ -145,8 +145,10 @@ class BindingTypesTest : public ::testing::Test {
 
   Error execute(ScalarType input_type, ScalarType output_type) {
     SizesType sizes[] = {kElements};
-    TensorImpl in(input_type, 1, sizes, input_);
-    TensorImpl out(output_type, 1, sizes, output_);
+    DimOrderType dim_order[] = {0};
+    StridesType strides[] = {1};
+    TensorImpl in(input_type, 1, sizes, input_, dim_order, strides);
+    TensorImpl out(output_type, 1, sizes, output_, dim_order, strides);
     EValue in_value{Tensor(&in)};
     EValue out_value{Tensor(&out)};
     EValue* args[] = {&in_value, &out_value};
@@ -207,8 +209,10 @@ TEST_F(BindingTypesTest, ABindingWithNoExecuTorchTypeRefusesEveryTensor) {
   for (const ScalarType type : {ScalarType::Byte, ScalarType::Char, ScalarType::Float}) {
     SCOPED_TRACE(::executorch::runtime::toString(type));
     SizesType sizes[] = {kElements};
-    TensorImpl in(type, 1, sizes, input_);
-    TensorImpl out(type, 1, sizes, output_);
+    DimOrderType dim_order[] = {0};
+    StridesType strides[] = {1};
+    TensorImpl in(type, 1, sizes, input_, dim_order, strides);
+    TensorImpl out(type, 1, sizes, output_, dim_order, strides);
     EValue in_value{Tensor(&in)};
     EValue out_value{Tensor(&out)};
     EValue* args[] = {&in_value, &out_value};
@@ -306,8 +310,10 @@ TEST_F(BindingTypesTest, EachMappedBindingTypeAcceptsOnlyItsOwnType) {
     ASSERT_EQ(cudaMemcpy(input_, pattern.data(), bytes, cudaMemcpyHostToDevice), cudaSuccess);
     const auto run = [&](ScalarType input_type, ScalarType output_type) {
       SizesType sizes[] = {kElements};
-      TensorImpl in(input_type, 1, sizes, input_);
-      TensorImpl out(output_type, 1, sizes, output_);
+      DimOrderType dim_order[] = {0};
+      StridesType strides[] = {1};
+      TensorImpl in(input_type, 1, sizes, input_, dim_order, strides);
+      TensorImpl out(output_type, 1, sizes, output_, dim_order, strides);
       EValue in_value{Tensor(&in)};
       EValue out_value{Tensor(&out)};
       EValue* args[] = {&in_value, &out_value};
@@ -349,8 +355,10 @@ TEST_F(BindingTypesTest, AnAliasBetweenBindingsOfDifferentTypesIsRefusedAtLoad) 
   ASSERT_TRUE(handle.ok());
   const auto run = [&](ScalarType output_type) {
     SizesType sizes[] = {kElements};
-    TensorImpl in(ScalarType::Float, 1, sizes, input_);
-    TensorImpl out(output_type, 1, sizes, output_);
+    DimOrderType dim_order[] = {0};
+    StridesType strides[] = {1};
+    TensorImpl in(ScalarType::Float, 1, sizes, input_, dim_order, strides);
+    TensorImpl out(output_type, 1, sizes, output_, dim_order, strides);
     EValue in_value{Tensor(&in)};
     EValue out_value{Tensor(&out)};
     EValue* args[] = {&in_value, &out_value};

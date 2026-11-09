@@ -303,8 +303,11 @@ class LoadedGraphEngine {
       std::optional<cudaStream_t> stream = std::nullopt) {
     SizesType input_sizes[] = {rows, cols};
     SizesType output_sizes[] = {rows, cols};
-    TensorImpl input_impl(ScalarType::Float, 2, input_sizes, input);
-    TensorImpl output_impl(ScalarType::Float, 2, output_sizes, output);
+    DimOrderType dim_order[] = {0, 1};
+    StridesType input_strides[] = {cols, 1};
+    StridesType output_strides[] = {cols, 1};
+    TensorImpl input_impl(ScalarType::Float, 2, input_sizes, input, dim_order, input_strides);
+    TensorImpl output_impl(ScalarType::Float, 2, output_sizes, output, dim_order, output_strides);
     EValue input_value{Tensor(&input_impl)};
     EValue output_value{Tensor(&output_impl)};
     EValue* args[] = {&input_value, &output_value};
@@ -1122,8 +1125,10 @@ TEST_F(ExecutionGraphReplayTest, StridesWithoutADimOrderAreReadByTheirStrides) {
       SizesType input_sizes[] = {2, 8};
       SizesType output_sizes[] = {2, 8};
       StridesType input_strides[] = {1, 2};
+      DimOrderType output_order[] = {0, 1};
+      StridesType output_strides[] = {8, 1};
       TensorImpl input_impl(ScalarType::Float, 2, input_sizes, inputs_[0], nullptr, input_strides);
-      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0]);
+      TensorImpl output_impl(ScalarType::Float, 2, output_sizes, outputs_[0], output_order, output_strides);
       EValue input_value{Tensor(&input_impl)};
       EValue output_value{Tensor(&output_impl)};
       EValue* args[] = {&input_value, &output_value};
@@ -4151,10 +4156,13 @@ TEST_F(ExecutionGraphTest, KvAliasesKeepCallerStorageForThreadedAndElidedOutputs
           cudaMemcpyAsync(update_pointer, update, sizeof(update), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
       SizesType sizes[] = {1, 1, 4, 4};
       SizesType update_sizes[] = {1, 1, 1, 4};
-      TensorImpl cache_impl(ScalarType::Float, 4, sizes, inputs_[slot]);
-      TensorImpl update_impl(ScalarType::Float, 4, update_sizes, update_pointer);
-      TensorImpl reflected_impl(ScalarType::Float, 4, sizes, reference_output_);
-      TensorImpl output_impl(ScalarType::Float, 4, update_sizes, outputs_[slot]);
+      DimOrderType dim_order[] = {0, 1, 2, 3};
+      StridesType strides[] = {16, 16, 4, 1};
+      StridesType update_strides[] = {4, 4, 4, 1};
+      TensorImpl cache_impl(ScalarType::Float, 4, sizes, inputs_[slot], dim_order, strides);
+      TensorImpl update_impl(ScalarType::Float, 4, update_sizes, update_pointer, dim_order, update_strides);
+      TensorImpl reflected_impl(ScalarType::Float, 4, sizes, reference_output_, dim_order, strides);
+      TensorImpl output_impl(ScalarType::Float, 4, update_sizes, outputs_[slot], dim_order, update_strides);
       EValue cache_value{Tensor(&cache_impl)};
       EValue update_value{Tensor(&update_impl)};
       EValue reflected_value{Tensor(&reflected_impl)};
@@ -4223,6 +4231,40 @@ TEST_F(ExecutionGraphReplayTest, ExecuteAndDestroyRestoreAnotherCurrentDevice) {
   int current = -1;
   ASSERT_EQ(cudaGetDevice(&current), cudaSuccess);
   EXPECT_EQ(current, 1);
+}
+
+// ExecuTorch requires strides, but the version pinned here returns none for a tensor built without them, and the
+// delegate then reads the tensor as row-major instead of reading past an empty array. ExecuTorch 1.6 asserts on
+// such a tensor in a build without NDEBUG, so this runs in optimized builds only.
+TEST_F(ExecutionGraphTest, AnInputWithoutStridesReadsAsRowMajor) {
+#ifndef NDEBUG
+  GTEST_SKIP() << "ExecuTorch 1.6 asserts on a tensor without strides in a build without NDEBUG";
+#endif
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob_), Error::Ok);
+  const SizesType rows = 2;
+  const SizesType cols = 8;
+  const size_t count = static_cast<size_t>(rows) * cols;
+  std::vector<float> values(count);
+  for (size_t i = 0; i < count; ++i) {
+    values[i] = static_cast<float>(i) - 4.0f;
+  }
+  ASSERT_EQ(cudaMemcpy(inputs_[0], values.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+  ASSERT_EQ(engine.run(inputs_[0], outputs_[1], rows, cols, streams_[0]), Error::Ok);
+  SizesType sizes[] = {rows, cols};
+  DimOrderType dim_order[] = {0, 1};
+  StridesType output_strides[] = {cols, 1};
+  TensorImpl input_impl(ScalarType::Float, 2, sizes, inputs_[0], dim_order, nullptr);
+  TensorImpl output_impl(ScalarType::Float, 2, sizes, outputs_[0], dim_order, output_strides);
+  EValue input_value{Tensor(&input_impl)};
+  EValue output_value{Tensor(&output_impl)};
+  EValue* args[] = {&input_value, &output_value};
+  ASSERT_EQ(engine.run({args, 2}, streams_[0]), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  std::vector<float> expected(count), actual(count);
+  ASSERT_EQ(cudaMemcpy(expected.data(), outputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  EXPECT_EQ(actual, expected);
 }
 
 // A buffer on another device than the engine's is refused before the engine runs, as an input, as an output,

@@ -101,8 +101,10 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
+using ::executorch::aten::DimOrderType;
 using ::executorch::aten::ScalarType;
 using ::executorch::aten::SizesType;
+using ::executorch::aten::StridesType;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
@@ -638,9 +640,12 @@ class LoadedEngine {
     // inferred, which writes through whichever array that tensor was given.
     SizesType in_sizes[3] = {batch_, rows_, cols_};
     SizesType out_sizes[3] = {batch_, rows_, cols_};
-    ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 3, in_sizes, in_ptr);
+    DimOrderType dim_order[3] = {0, 1, 2};
+    StridesType in_strides[3] = {rows_ * cols_, cols_, 1};
+    StridesType out_strides[3] = {rows_ * cols_, cols_, 1};
+    ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 3, in_sizes, in_ptr, dim_order, in_strides);
     ::executorch::aten::TensorImpl out_impl(
-        ScalarType::Float, 3, out_sizes, out_ptr != nullptr ? out_ptr : device_out_);
+        ScalarType::Float, 3, out_sizes, out_ptr != nullptr ? out_ptr : device_out_, dim_order, out_strides);
     ::executorch::aten::Tensor in_tensor(&in_impl);
     ::executorch::aten::Tensor out_tensor(&out_impl);
     EValue in_value(in_tensor);
