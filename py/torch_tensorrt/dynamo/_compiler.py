@@ -66,6 +66,9 @@ from torch_tensorrt.dynamo.lowering.passes.restore_reshape import restore_reshap
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    defer_engine_setup_to_load,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -1470,12 +1473,22 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
+    # compile_and_save keeps them in their files for the save.
+    set_up_deferred_engines = (
+        settings.lazy_engine_init
+        and not settings.enable_cross_compile_for_windows
+        and not defer_engine_setup_to_load()
+    )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
-    # convert the lowered graph as a single engine. Mixed graphs still partition.
+    # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
+    # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
+        and not defer_engine_setup_to_load()
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1494,13 +1507,16 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        return convert_module(
+        trt_module = convert_module(
             gm,
             convert_inputs,
             settings=settings,
             name="_run_on_acc_0",
             engine_cache=engine_cache,
         )
+        if set_up_deferred_engines:
+            trt_module.setup_engine()
+        return trt_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1729,6 +1745,16 @@ def compile_module(
                 engine_cache=engine_cache,
             )
 
+            if (
+                (settings.lazy_engine_init or defer_engine_setup_to_load())
+                and _debugger_config
+                and (
+                    _debugger_config.save_engine_profile
+                    or _debugger_config.save_layer_info
+                )
+            ):
+                # Profiling and layer info need the engine.
+                trt_module.setup_engine()
             trt_modules[name] = trt_module
 
             if _debugger_config:
@@ -1773,7 +1799,7 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
+        if set_up_deferred_engines:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
@@ -1787,8 +1813,9 @@ def compile_module(
     # so the wrapper graph reflects the exact graph that will be executed/built.
     _insert_complex_io_adapters(partitioned_module, gm, settings)
 
-    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
-    if not settings.dryrun:
+    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist), and not for engines
+    # kept in their files, which have no engine to set it on and only matter to this runtime
+    if not settings.dryrun and not defer_engine_setup_to_load():
         output_node = list(partitioned_module.graph.nodes)[-1]
         for arg in output_node.args:
             # A single-output graph's output node arg is a bare Node rather
