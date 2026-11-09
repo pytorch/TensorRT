@@ -229,7 +229,10 @@ zero-copy views of a safetensors file:
   there's no GPU copy and no host copy of the weights.
 - **Checkpoints.** Any safetensors file maps if its tensors have the names, dtypes and shapes the model
   uses; a mismatch raises. A checkpoint stored in other dtypes than the model runs in, for example
-  float32 for a bfloat16 model, is converted once, as below.
+  float32 for a bfloat16 model, is converted once, as below. The file is checked from its header before
+  anything is mapped: a truncated file, bytes after the last tensor, or tensors whose bytes overlap, leave
+  gaps or don't hold their dtype and shape raise. Damage inside a tensor's bytes isn't detected, since
+  that would mean reading the whole file.
 - **Converting without loading.** ``save_weights_for_mapping(model, path, source=...)`` writes a model
   built on ``meta`` straight from a checkpoint. It writes one tensor at a time. For each meta tensor it
   calls ``source(name, tensor)``, which returns the data whole or in chunks along dimension 0, and it
@@ -256,10 +259,14 @@ zero-copy views of a safetensors file:
 - **Missing names** raise for any name in the model's ``state_dict``; non-persistent buffers, such as
   rotary frequencies, aren't required, so recompute those or write them with
   ``save_weights_for_mapping``. With ``strict=False``, missing names are listed in ``mapping.missing``
-  and left as they were (still on ``meta`` if the model was built there). On any error the model is left
-  unchanged.
+  and left as they were. A missing tensor on ``meta`` stays there, with no values, and a warning names
+  it. On any error the model is left unchanged.
 - **The file must stay in place and unchanged** while the model or its weights are in use: rewriting it
   changes or invalidates the weights. ``map_weights`` maps it copy-on-write and never writes to it.
+  Weights are read when compilation first uses them, so ``compile`` checks that the file of each mapped
+  weight the program reads is still the one mapped (same inode, size and modification time) and raises
+  otherwise; reading a weight past the end of a file truncated since would kill the process with
+  ``SIGBUS``.
 - **Releasing pages uses** ``madvise``: ``MADV_PAGEOUT`` on Linux 5.4 and later, which keeps writes made
   to a weight, else ``MADV_DONTNEED``, which discards them, so the weight reverts to the file's data. On
   Windows the mapping works, but pages stay resident until the file is unmapped, and a warning says so.

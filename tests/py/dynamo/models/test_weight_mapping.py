@@ -3,7 +3,9 @@
 
 import gc
 import json
+import logging
 import mmap
+import os
 import platform
 import struct
 import sys
@@ -43,8 +45,7 @@ def _reference(path, dtype=torch.float32):
 
 def _mapped(tensor):
     return any(
-        base <= tensor.data_ptr() < base + size
-        for base, size, _ in weight_mapping._mappings
+        m.base <= tensor.data_ptr() < m.base + m.size for m in weight_mapping._mappings
     )
 
 
@@ -143,7 +144,7 @@ def test_a_submodule_maps_from_the_whole_model_with_a_prefix(tmp_path):
     assert torch.equal(proj.bias, model.proj.bias)
 
 
-def test_missing_names_are_listed_or_raise_with_strict(tmp_path):
+def test_missing_names_are_listed_or_raise_with_strict(tmp_path, caplog):
     _reference(tmp_path / "w.safetensors")
     with torch.device("meta"):
         model = torch.nn.ModuleDict(
@@ -152,12 +153,18 @@ def test_missing_names_are_listed_or_raise_with_strict(tmp_path):
     with pytest.raises(ValueError, match="not in"):
         map_weights(model, tmp_path / "w.safetensors")  # strict by default
     assert model["proj"].weight.is_meta  # nothing changed
-    mapping = map_weights(model, tmp_path / "w.safetensors", strict=False)
+    with caplog.at_level(
+        logging.WARNING, logger="torch_tensorrt.dynamo.tools.weight_mapping"
+    ):
+        mapping = map_weights(model, tmp_path / "w.safetensors", strict=False)
     assert sorted(mapping.missing) == ["extra.bias", "extra.weight"]
     assert _mapped(model["proj"].weight) and model["extra"].weight.is_meta
+    # The missing tensors stay on meta, with no values, and the warning says so.
+    assert "stay on the meta device" in caplog.text and "extra.weight" in caplog.text
+    assert "keep their values" not in caplog.text
 
 
-def test_safetensors_state_dict_maps_with_strict(tmp_path):
+def test_safetensors_state_dict_maps_with_strict(tmp_path, caplog):
     safetensors_torch = pytest.importorskip("safetensors.torch")
     torch.manual_seed(0)
     ref = torch.nn.Linear(8, 8)
@@ -167,9 +174,14 @@ def test_safetensors_state_dict_maps_with_strict(tmp_path):
     with torch.device("meta"):
         model = torch.nn.Linear(8, 8)
         model.register_buffer("inv_freq", torch.empty(4), persistent=False)
-    mapping = map_weights(model, tmp_path / "sd.safetensors", strict=True)
+    with caplog.at_level(
+        logging.WARNING, logger="torch_tensorrt.dynamo.tools.weight_mapping"
+    ):
+        mapping = map_weights(model, tmp_path / "sd.safetensors", strict=True)
     assert mapping.missing == ["inv_freq"]  # non-persistent: not required
     torch.testing.assert_close(model.weight, ref.weight)
+    # It stays on meta, with no values; compile refuses it only if the graph reads it.
+    assert "stay on the meta device" in caplog.text and "inv_freq" in caplog.text
 
 
 def test_a_mismatch_raises_and_changes_nothing(tmp_path):
@@ -203,6 +215,30 @@ def test_malformed_headers_raise(tmp_path):
     with pytest.raises(ValueError, match="header length"):
         map_weights(model, tmp_path / "short.safetensors")
     assert model.w.is_meta
+
+
+def test_a_damaged_file_fails_before_mapping(tmp_path):
+    """The whole layout is checked from the header, also tensors the module doesn't map."""
+    with torch.device("meta"):
+        model = torch.nn.Module()
+        model.register_buffer("w", torch.empty(2))
+    w = {"dtype": "F32", "shape": [2], "data_offsets": [0, 8]}
+
+    def unused(shape, offsets):
+        return {"dtype": "F32", "shape": shape, "data_offsets": offsets}
+
+    damaged = [
+        ({"w": w, "unused": unused([2], [8, 16])}, 12, "it is truncated"),
+        ({"w": w}, 12, "something follows the last tensor"),
+        ({"w": w, "unused": unused([2], [4, 12])}, 12, "no gap or overlap"),
+        ({"w": w, "unused": unused([2], [12, 20])}, 20, "no gap or overlap"),
+        ({"w": w, "unused": unused([3], [8, 16])}, 16, "don't hold F32"),
+    ]
+    for header, data_bytes, message in damaged:
+        _write_raw(tmp_path / "bad.safetensors", header, b"\0" * data_bytes)
+        with pytest.raises(ValueError, match=message):
+            map_weights(model, tmp_path / "bad.safetensors")
+        assert model.w.is_meta
 
 
 def test_a_tie_stored_under_its_later_name_maps(tmp_path):
@@ -354,6 +390,28 @@ def test_release_storage_drops_pages_of_mapped_weights(tmp_path):
     torch.testing.assert_close(model.proj.weight, ref.proj.weight)
     plain = torch.ones(4).untyped_storage()
     assert release_storage(plain) == 16 and plain.nbytes() == 0  # resize_(0) as before
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_compile_refuses_a_weights_file_changed_after_mapping(tmp_path):
+    """Mapped weights are read during compilation, so their file must still be the one mapped: reading a
+    weight past the end of a file truncated since would kill the process with SIGBUS."""
+    path = tmp_path / "w.safetensors"
+    _reference(path)
+    with torch.device("meta"):
+        model = _Tied().eval()
+    map_weights(model, path)
+    x = torch.randn(3, 8)
+    ep = torch.export.export(model, (x,))
+    stat = path.stat()
+    # Rewritten in place: same size, later modification time.
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10**9))
+    with pytest.raises(ValueError, match="changed after map_weights mapped it"):
+        torch_tensorrt.dynamo.compile(ep, inputs=[x.cuda()], min_block_size=1)
+    path.unlink()
+    with pytest.raises(ValueError, match="was removed after map_weights mapped it"):
+        torch_tensorrt.dynamo.compile(ep, inputs=[x.cuda()], min_block_size=1)
 
 
 @pytest.mark.unit
