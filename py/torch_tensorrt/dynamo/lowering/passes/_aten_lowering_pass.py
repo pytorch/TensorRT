@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
 import logging
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
@@ -293,6 +294,17 @@ def _raise_if_weights_on_meta(weights: Dict[str, torch.Tensor]) -> None:
         )
 
 
+def _copy_program(ep: torch.export.ExportedProgram) -> torch.export.ExportedProgram:
+    """Copy the graph of an ExportedProgram, sharing its weights."""
+    gm = copy.deepcopy(ep.graph_module)
+    # The copy renames a node named like a Python builtin, such as input to input_1,
+    # which can move other nodes to new names too, such as max_1 to max_2. Give back
+    # the names, which the graph signature and autocast_excluded_node_names refer to.
+    for old, new in zip(ep.graph.nodes, gm.graph.nodes):
+        new.name = old.name
+    return ep._update(gm, copy.deepcopy(ep.graph_signature))
+
+
 def pre_export_lowering(
     ep: torch.export.ExportedProgram,
     settings: CompilationSettings = CompilationSettings(),
@@ -308,6 +320,9 @@ def pre_export_lowering(
 
     # Only for rule-based autocast to collect the intermediate node outputs
     if settings.enable_autocast:
+        # Autocast inserts casts and changes the dtypes of nodes, so it works on a
+        # copy, and the caller's program stays as it was.
+        ep = _copy_program(ep)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "

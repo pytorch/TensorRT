@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch_tensorrt
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import pre_export_lowering
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import _copy_program
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     trace_intermediate_node_outputs,
 )
@@ -1139,6 +1140,43 @@ def test_autocast_refuses_calibrated_precisions_for_another_graph():
         pre_export_lowering(
             torch.export.export(LinearModel().cuda().eval(), inputs), settings
         )
+
+
+@pytest.mark.unit
+def test_autocast_leaves_the_exported_program_unchanged():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 8, 3, padding=1)
+
+        # Named like a Python builtin, which a plain copy of the graph renames.
+        def forward(self, input):
+            return torch.relu(self.conv(input))
+
+    x = torch.randn(1, 3, 16, 16, device="cuda")
+    ep = torch.export.export(Model().cuda().eval(), (x,))
+    graph = ep.graph_module.print_readable(print_output=False)
+    torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    assert ep.graph_module.print_readable(print_output=False) == graph
+
+
+@pytest.mark.unit
+def test_copy_program_keeps_node_names():
+    class Model(nn.Module):
+        # Named like a Python builtin. A plain copy of the graph renames it to max_1,
+        # which moves the node of x.max() from max_1 to max_2.
+        def forward(self, x, max):
+            return torch.minimum(x, max) * x.max()
+
+    ep = torch.export.export(Model(), (torch.randn(4), torch.randn(4)))
+    names = [n.name for n in ep.graph.nodes]
+    assert [n.name for n in _copy_program(ep).graph.nodes] == names
 
 
 @pytest.mark.unit
