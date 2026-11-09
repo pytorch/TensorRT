@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../../_static/documentation_options.js?v=e2a1b49a"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -668,9 +668,18 @@ Disable only when you need strict IEEE FP32 semantics.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">True</span></code></p></td>
-<td><p>Whether the attn_bias in efficient SDPA is causal. Default is True. This can
-accelerate models from HF because attn_bias is always a causal mask in HF.
-If you want to use non-causal attn_bias, you can set this to False.</p></td>
+<td><p>Which attn_bias of efficient SDPA to replace with TensorRT’s built-in causal
+mask, which is faster and more accurate. <code class="docutils literal notranslate"><span class="pre">True</span></code>: a bias proven causal, one
+that depends on no graph input and holds 0 on and below the diagonal and -inf
+(or the dtype’s lowest value) above, and also a bias that cannot be proven,
+such as one built from an input, with a dynamic sequence length, or from a
+module buffer under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>; you assert that it is causal.
+<code class="docutils literal notranslate"><span class="pre">&quot;proven&quot;</span></code>: only a bias proven causal, for models whose input-built masks
+may not be causal, such as masks with padding. A bias that is computed and
+found not causal is always kept. A mask longer than 4096, or one whose check
+fails, is not proven: <code class="docutils literal notranslate"><span class="pre">True</span></code> replaces it and <code class="docutils literal notranslate"><span class="pre">&quot;proven&quot;</span></code> keeps it.
+<code class="docutils literal notranslate"><span class="pre">False</span></code>: never replace. A replaced bias is not read again, so refitting the
+weights it came from does not change the engine.</p></td>
 </tr>
 </tbody>
 </table>
@@ -727,6 +736,7 @@ numerically sensitive. Enable it with <code class="docutils literal notranslate"
     <span class="n">autocast_low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
     <span class="n">autocast_excluded_ops</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">softmax</span><span class="o">.</span><span class="n">int</span><span class="p">},</span>
     <span class="n">autocast_max_output_threshold</span><span class="o">=</span><span class="mf">1024.0</span><span class="p">,</span>
+    <span class="n">autocast_calibration_dataloader</span><span class="o">=</span><span class="n">calibration_dataloader</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -768,20 +778,22 @@ decisions. Example: <code class="docutils literal notranslate"><span class="pre"
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">512.0</span></code></p></td>
 <td><p>Nodes whose outputs exceed this absolute value are kept in FP32. Guards against
-overflow in activations with large dynamic range (e.g., unnormalized logits).</p></td>
+overflow in activations with large dynamic range (e.g., unnormalized logits).
+Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (∞)</p></td>
 <td><p>Maximum reduction depth allowed in low precision. Reduction depth measures how
 many reduction operations (sum, mean, etc.) feed into a node. Nodes with higher
-depth are kept in FP32 to prevent error accumulation. <code class="docutils literal notranslate"><span class="pre">None</span></code> means no limit.</p></td>
+depth are kept in FP32 to prevent error accumulation. <code class="docutils literal notranslate"><span class="pre">None</span></code> means no limit.
+Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
 <td><p>A <code class="docutils literal notranslate"><span class="pre">torch.utils.data.DataLoader</span></code> used to calibrate output statistics (e.g.,
-absolute max values) for each node. When provided, the autocast pass runs the
-model on calibration data to make per-node precision decisions based on
-observed ranges rather than static thresholds.</p></td>
+absolute max values) for each node. The autocast pass runs the model on this
+data to check <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code> and
+<code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>. Without it, both rules are skipped.</p></td>
 </tr>
 </tbody>
 </table>
@@ -990,6 +1002,34 @@ form produced by AOT tracing under <code class="docutils literal notranslate"><s
 <code class="docutils literal notranslate"><span class="pre">repeat_kv</span></code> style graphs. In the <code class="docutils literal notranslate"><span class="pre">bmm</span></code> form, broadcasting a single KV
 head with <code class="docutils literal notranslate"><span class="pre">enable_gqa=True</span></code> is not folded.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fallback_pytorch_plugin_ops</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Run operators whose converters insert a TensorRT plugin that runs PyTorch,
+such as an accumulating <code class="docutils literal notranslate"><span class="pre">aten.index_put</span></code> (Torch-TensorRT’s ScatterAdd
+plugin) or a generated plugin without an AOT kernel, in PyTorch instead of
+TensorRT. Set it for runtimes without PyTorch: ExecuTorch export refuses an
+engine that uses such a plugin.
+With it, an accumulating <code class="docutils literal notranslate"><span class="pre">index_put</span></code> with one 1-D index can stay in TensorRT
+through TensorRT’s ScatterElements plugin, which needs no PyTorch. The data
+type and size limits are in the ExecuTorch guide.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">collapse_high_rank_permutes</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Rewrite a reshape, permute, reshape chain over more than 8 dimensions
+(TensorRT’s limit) as reshapes and permutes of at most 8 dimensions that give
+the same values. Window and patch layouts, such as neighborhood attention and
+the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits
+the graph, and the partitioner can then hand many large tensors across one
+engine boundary. Only static shapes are rewritten. Fewer, larger engines can
+need much more time and memory to build and to run, so measure it.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">convert_antialiased_resize</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Run antialiased bilinear and bicubic resize (<code class="docutils literal notranslate"><span class="pre">F.interpolate</span></code> with
+<code class="docutils literal notranslate"><span class="pre">antialias=True</span></code>) in TensorRT instead of PyTorch, so it does not split the
+graph. Only static input and output heights and widths and floating-point
+inputs are converted. Some sizes run slower than in PyTorch, so measure it.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1115,13 +1155,18 @@ DRIVE platforms. Set <code class="docutils literal notranslate"><span class="pre
 rebuilt from scratch:</p>
 <p><code class="docutils literal notranslate"><span class="pre">max_aux_streams</span></code>, <code class="docutils literal notranslate"><span class="pre">version_compatible</span></code>,
 <code class="docutils literal notranslate"><span class="pre">optimization_level</span></code>, <code class="docutils literal notranslate"><span class="pre">disable_tf32</span></code>, <code class="docutils literal notranslate"><span class="pre">sparse_weights</span></code>,
-<code class="docutils literal notranslate"><span class="pre">engine_capability</span></code>, <code class="docutils literal notranslate"><span class="pre">hardware_compatible</span></code>, <code class="docutils literal notranslate"><span class="pre">refit_identical_engine_weights</span></code>,
+<code class="docutils literal notranslate"><span class="pre">engine_capability</span></code>, <code class="docutils literal notranslate"><span class="pre">hardware_compatible</span></code>, <code class="docutils literal notranslate"><span class="pre">target_compute_capabilities</span></code>,
+<code class="docutils literal notranslate"><span class="pre">refit_identical_engine_weights</span></code>,
 <code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_weight_streaming</span></code>, <code class="docutils literal notranslate"><span class="pre">tiling_optimization_level</span></code>,
 <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_autocast</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
-<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>,
+<code class="docutils literal notranslate"><span class="pre">disabled_constant_fold_exclusions</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">build_route</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fallback_pytorch_plugin_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">collapse_high_rank_permutes</span></code>,
+<code class="docutils literal notranslate"><span class="pre">convert_antialiased_resize</span></code>.
+On TensorRT older than 10.14, <code class="docutils literal notranslate"><span class="pre">strip_engine_weights</span></code> also invalidates cached engines.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>
 </section>

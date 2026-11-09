@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import gc
 import importlib
 import inspect
 import logging
@@ -74,12 +75,17 @@ if ENABLED_FEATURES.dynamo_frontend:
         get_dynamic_shapes_kwargs,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
     from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "compile",
+    "compile_and_save",
     "cross_compile_for_windows",
     "load_cross_compiled_exported_program",
     "convert_method_to_trt_engine",
@@ -1509,6 +1515,81 @@ def save(
                     )
 
 
+def compile_and_save(
+    exported_program: ExportedProgram,
+    file_path: Union[str, os.PathLike[str]],
+    *,
+    output_format: Literal[
+        "exported_program", "aot_inductor", "executorch"
+    ] = "exported_program",
+    arg_inputs: Optional[Sequence[Input | torch.Tensor]] = None,
+    kwarg_inputs: Optional[Dict[str, Any]] = None,
+    save_options: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> None:
+    """Compile an ExportedProgram with TensorRT and save it, keeping each engine on disk instead of in
+    memory from its build to the save.
+
+    Equivalent to::
+
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs
+        )
+        torch_tensorrt.save(trt_gm, file_path, output_format=output_format, **save_options)
+
+    but each engine is written to a file as soon as it is built, so no built engine is held on the GPU
+    or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever
+    loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).
+    The other formats save each engine from a loaded one, so their engines are loaded once all of them
+    are built, and their save needs as much memory as after ``compile``.
+
+    The files go to Torch-TensorRT's cache directory, ``torch_tensorrt_<user>/offloaded_engines`` in the
+    system temporary directory (``TMPDIR``), and are deleted when the call returns. It needs room for
+    every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take the memory this
+    saves. Linux only, since Windows can't delete a file while it is memory-mapped.
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): The program to compile
+        file_path (Union[str, os.PathLike]): Where to save the compiled program
+
+    Keyword Arguments:
+        output_format (str): ``exported_program``, ``aot_inductor`` or ``executorch``
+        arg_inputs (Sequence[Union[torch_tensorrt.Input, torch.Tensor]]): The program's inputs, as for
+            :func:`torch_tensorrt.dynamo.compile`. The formats other than ``executorch`` re-export the
+            compiled module to save it, so the save gets them too.
+        kwarg_inputs (dict[str, Any]): The program's keyword inputs, passed on like ``arg_inputs``
+        save_options (dict[str, Any]): Keyword arguments for :func:`torch_tensorrt.save`, such as
+            ``external_engine_data`` or ``retrace``
+        **kwargs: Compilation settings for :func:`torch_tensorrt.dynamo.compile`
+    """
+    if output_format not in ("exported_program", "aot_inductor", "executorch"):
+        raise ValueError(
+            f"compile_and_save saves exported_program, aot_inductor or executorch, not {output_format!r}"
+        )
+    if platform.system() == "Windows":
+        raise NotImplementedError(
+            "compile_and_save keeps each engine in a memory-mapped file, which Windows can't delete; "
+            "use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."
+        )
+    save_kwargs = dict(save_options or {})
+    if output_format != "executorch":
+        # These saves re-export the compiled module, so they need its inputs too.
+        save_kwargs.setdefault("arg_inputs", arg_inputs)
+        save_kwargs.setdefault("kwarg_inputs", kwarg_inputs)
+
+    with offload_engines_to_disk():
+        trt_gm = dynamo_compile(
+            exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs
+        )
+        if output_format != "executorch":
+            # Only an ExecuTorch save streams an engine from its file. The other formats save each
+            # engine from a loaded one.
+            for module in trt_gm.modules():
+                if isinstance(module, TorchTensorRTModule):
+                    module.setup_engine()
+        save(trt_gm, os.fspath(file_path), output_format=output_format, **save_kwargs)
+
+
 def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
     """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
@@ -1581,7 +1662,7 @@ def _with_tensorrt_alignment(backend_config: Any) -> Any:
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
     try:
-        from torch_tensorrt.executorch import (
+        from torch_tensorrt.executorch import (  # noqa: F401
             check_zero_copy_kv,
             export,
             zero_copy_backend_config,
@@ -1593,6 +1674,21 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
+    try:
+        _lower_and_write_executorch(exp_program, file_path, **kwargs)
+    finally:
+        _release_lowering_caches(exp_program)
+
+
+def _lower_and_write_executorch(
+    exp_program: Any, file_path: str, **kwargs: Any
+) -> None:
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
     for option in ("partitioners", "compile_specs"):
@@ -1654,6 +1750,51 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
         etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
         executorch_program.get_etrecord().save(etrecord_path)
+
+
+def _release_lowering_caches(exp_program: Any) -> None:
+    """Drop the cache entries that point at the lowered program once it is written, also when the save
+    failed.
+
+    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's
+    dispatch cache keys entries on the ``executorch_call_delegate`` arguments: in the class-wide
+    cache, or with symbolic shapes in the ShapeEnv of ``exp_program``'s fake mode, which the
+    compiled module keeps. They keep the lowered modules, and with them every serialized engine,
+    alive after save() returns, so each saved program stays resident until the process exits.
+    Clearing them frees nothing still in use; they refill on demand. The program is a web of
+    reference cycles (graph and nodes), so it is collected here rather than at some
+    later automatic collection, which can land in the middle of the next save. The freed
+    heap goes back to the system, which is what a Jetson shares with the GPU.
+    """
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from torch_tensorrt.dynamo.utils import trim_host_heap
+
+    # TODO: remove once ExecuTorch bounds or scopes the is_same_node memo (an unbounded lru_cache on FX
+    # nodes, exir/backend/utils.py), and PyTorch stops keying the negative cache entry it stores for
+    # executorch_call_delegate (registered skip_cache=True) on the lowered module itself.
+    try:
+        from executorch.exir.backend.utils import is_same_node
+
+        is_same_node.cache_clear()
+    except (ImportError, AttributeError):
+        logger.debug("ExecuTorch's is_same_node cache is gone; nothing to clear")
+    FakeTensorMode.cache_clear()
+    # The save may have failed on its arguments, so don't assume a program: an error here would hide that.
+    nodes = getattr(getattr(exp_program, "graph", None), "nodes", ())
+    shape_envs = {
+        id(env): env
+        for node in nodes
+        if (
+            env := getattr(
+                getattr(node.meta.get("val"), "fake_mode", None), "shape_env", None
+            )
+        )
+        is not None
+    }
+    for env in shape_envs.values():
+        getattr(env, "fake_tensor_cache", {}).clear()
+    gc.collect()
+    trim_host_heap()
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:

@@ -2,17 +2,39 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import math
 import operator
 from typing import Any
 
 import torch
+import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-from .nodeclassifier import NodeClassifier
+from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import clean_up_graph_after_modifications
 
 logger = logging.getLogger(__name__)
+
+# Ops such as index, embedding, gather and embedding_bag need these arguments as integers.
+_INDEX_ARGUMENTS = ("index", "indices", "offsets")
+
+# Arguments where a scalar is added to a tensor or bounds it, as an epsilon is.
+# The eps of layer_norm and batch_norm is a float attribute, not a constant.
+_EPSILON_ARGUMENTS: dict[Any, tuple[str, ...]] = {
+    torch.ops.aten.add.Tensor: ("other",),
+    torch.ops.aten.add.Scalar: ("other",),
+    torch.ops.aten.sub.Tensor: ("other",),
+    torch.ops.aten.sub.Scalar: ("other",),
+    torch.ops.aten.rsub.Tensor: ("other",),
+    torch.ops.aten.rsub.Scalar: ("other",),
+    torch.ops.aten.clamp.default: ("min", "max"),
+    torch.ops.aten.clamp.Tensor: ("min", "max"),
+    torch.ops.aten.clamp_min.default: ("min",),
+    torch.ops.aten.clamp_min.Tensor: ("min",),
+    torch.ops.aten.clamp_max.default: ("max",),
+    torch.ops.aten.clamp_max.Tensor: ("max",),
+}
 
 
 def is_tensor_node(n: torch.fx.Node) -> bool:
@@ -20,6 +42,72 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
+
+
+def _is_given_a_dtype(n: torch.fx.Node) -> bool:
+    if not isinstance(n.target, torch._ops.OpOverload):
+        return False
+    for i, a in enumerate(n.target._schema.arguments):
+        if a.name == "dtype":
+            given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
+            return given is not None
+    return False
+
+
+def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
+    tensors = [
+        v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(
+        t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
+    )
+
+
+def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
+    tensors = [
+        v
+        for m in (n, *n.all_input_nodes)
+        for v in pytree.tree_leaves(m.meta.get("val"))
+        if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
+
+
+def _retype_tensors(val: Any, target_dtype: torch.dtype) -> Any:
+    # Ops like chunk, split and unbind produce a list of tensors. A comparison
+    # still makes bool, and topk still makes integer indices.
+    return pytree.tree_map_only(
+        torch.Tensor,
+        lambda t: t.to(target_dtype) if t.is_floating_point() else t,
+        val,
+    )
+
+
+def _keep_tiny_constants_nonzero(
+    node: torch.fx.Node, target_dtype: torch.dtype
+) -> None:
+    # An epsilon such as the 1e-12 that F.normalize passes to clamp_min becomes
+    # a constant of the input's type. In float16 it rounds to 0, and then
+    # x / max(norm, eps) gives 0 / 0 for a zero vector, so use the smallest
+    # nonzero value of the type instead, as ModelOpt AutoCast does. Only where a
+    # scalar is added or is a bound: x * 1e-12 must still round to 0.
+    names = _EPSILON_ARGUMENTS.get(node.target)
+    if not names or not isinstance(node.target, torch._ops.OpOverload):
+        return
+    schema = [a.name for a in node.target._schema.arguments]
+    finfo = torch.finfo(target_dtype)
+    smallest = finfo.tiny * finfo.eps
+
+    def keep(v: Any) -> Any:
+        if isinstance(v, float) and 0 < abs(v) < smallest:
+            return math.copysign(smallest, v)
+        return v
+
+    node.args = tuple(
+        keep(v) if i < len(schema) and schema[i] in names else v
+        for i, v in enumerate(node.args)
+    )
+    node.kwargs = {k: keep(v) if k in names else v for k, v in node.kwargs.items()}
 
 
 def rule_based_autocast(
@@ -41,10 +129,33 @@ def rule_based_autocast(
     autocast_excluded_ops = settings.autocast_excluded_ops
     autocast_max_output_threshold = settings.autocast_max_output_threshold
     autocast_max_depth_of_reduction = settings.autocast_max_depth_of_reduction
-    reference_data: dict[str, torch.Tensor] = (
-        settings.autocast_intermediate_node_outputs
+    # pre_export_lowering sets this on the settings; a caller that skips it has none.
+    reference_data: dict[str, torch.Tensor] = vars(settings).pop(
+        "autocast_intermediate_node_outputs", {}
     )
-    del settings.autocast_intermediate_node_outputs
+    recorded_nodes = settings._autocast_calibrated_high_precision_nodes
+    replay_rule = None
+    if not reference_data and recorded_nodes is not None:
+        missing = recorded_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions it chose with calibration data, "
+                f"because these nodes are not in the graph: {sorted(missing)}. "
+                "Compile the model again with autocast_calibration_dataloader."
+            )
+        replay_rule = NodeNameSetRule(recorded_nodes)
+    elif not reference_data:
+        skipped, needs = "autocast_max_output_threshold is", "it needs"
+        if autocast_max_depth_of_reduction is not None:
+            skipped = (
+                "autocast_max_output_threshold and autocast_max_depth_of_reduction are"
+            )
+            needs = "they need"
+        logger.warning(
+            f"{skipped} not applied, because {needs} reference values from "
+            "autocast_calibration_dataloader and none was given. Nodes with large "
+            f"values may then run in {autocast_low_precision_type}."
+        )
 
     node_classifier = NodeClassifier(
         gm.graph.nodes,
@@ -52,8 +163,14 @@ def rule_based_autocast(
         excluded_ops=autocast_excluded_ops,
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
+        custom_rule=replay_rule,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(reference_data)
+    if reference_data:
+        # A saved program drops the calibration data, so refit reuses this.
+        settings._autocast_calibrated_high_precision_nodes = frozenset(
+            high_precision_nodes
+        )
 
     def _cast_all_tensor_args_to_dtype(
         node: torch.fx.Node, arg: Any, dtype: torch.dtype
@@ -71,7 +188,8 @@ def rule_based_autocast(
         if isinstance(arg, torch.fx.Node) and is_tensor_node(arg):
             val = arg.meta.get("val", None)
             if isinstance(val, torch.Tensor):
-                if val.dtype == dtype:
+                # A mask such as the condition of torch.where must stay bool.
+                if val.dtype == dtype or val.dtype == torch.bool:
                     return arg
                 else:
                     with gm.graph.inserting_before(node):
@@ -95,30 +213,86 @@ def rule_based_autocast(
         else:
             return arg
 
+    def _cast_tensor_args_to_dtype(node: torch.fx.Node, dtype: torch.dtype) -> None:
+        names = (
+            [a.name for a in node.target._schema.arguments]
+            if isinstance(node.target, torch._ops.OpOverload)
+            else []
+        )
+        node.args = tuple(
+            (
+                arg
+                if i < len(names) and names[i] in _INDEX_ARGUMENTS
+                else _cast_all_tensor_args_to_dtype(node, arg, dtype)
+            )
+            for i, arg in enumerate(node.args)
+        )
+        node.kwargs = {
+            k: (
+                v
+                if k in _INDEX_ARGUMENTS
+                else _cast_all_tensor_args_to_dtype(node, v, dtype)
+            )
+            for k, v in node.kwargs.items()
+        }
+
+    traced_dtypes = {
+        n: n.meta["val"].dtype
+        for n in gm.graph.nodes
+        if isinstance(n.meta.get("val"), torch.Tensor)
+    }
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
-            if (
-                node.target == torch.ops.higher_order.wrap_with_autocast
-                or node.target == operator.getitem
-            ):
+            if node.target == torch.ops.higher_order.wrap_with_autocast:
+                # The region keeps its own precision and checks the dtypes of
+                # its inputs, so give it the inputs it was traced with.
+                node.args = tuple(
+                    (
+                        _cast_all_tensor_args_to_dtype(node, a, traced_dtypes[a])
+                        if isinstance(a, torch.fx.Node) and a in traced_dtypes
+                        else a
+                    )
+                    for a in node.args
+                )
+                continue
+            if node.target == operator.getitem:
+                # Follow the retyped list, so users of this element cast it correctly.
+                src, idx = node.args
+                if isinstance(src.meta.get("val"), (list, tuple)):
+                    node.meta["val"] = src.meta["val"][idx]
+                continue
+            if not any(is_tensor_node(n) for n in node.all_input_nodes):
+                # A factory op such as torch.zeros has no inputs to cast, so its
+                # output keeps the dtype it was created with.
+                continue
+            if _is_given_a_dtype(node):
+                # An op such as x.float() or cumsum(dtype=torch.float32) makes the
+                # dtype it is given, whatever its inputs are.
+                continue
+            if _has_only_integer_outputs(node):
+                # An integer op such as ids % k must still make integers, for
+                # example when its result is used as an index.
+                continue
+            if _has_no_floating_point_tensors(node):
+                # A comparison such as ids != pad_id must compare the integers
+                # themselves; float16 rounds ids above 2048.
                 continue
 
             if node.name in low_precision_nodes:
-                node.args = _cast_all_tensor_args_to_dtype(
-                    node, node.args, autocast_low_precision_type
-                )
-                node.kwargs = _cast_all_tensor_args_to_dtype(
-                    node, node.kwargs, autocast_low_precision_type
-                )
-                node.meta["val"] = node.meta["val"].to(autocast_low_precision_type)
+                target_dtype = autocast_low_precision_type
             elif node.name in high_precision_nodes:
-                node.args = _cast_all_tensor_args_to_dtype(
-                    node, node.args, autocast_high_precision_type
-                )
-                node.kwargs = _cast_all_tensor_args_to_dtype(
-                    node, node.kwargs, autocast_high_precision_type
-                )
-                node.meta["val"] = node.meta["val"].to(autocast_high_precision_type)
+                target_dtype = autocast_high_precision_type
+            else:
+                continue
+            _cast_tensor_args_to_dtype(node, target_dtype)
+            if target_dtype == autocast_low_precision_type:
+                _keep_tiny_constants_nonzero(node, target_dtype)
+            if any(
+                getattr(n.meta.get("val"), "dtype", None) == target_dtype
+                for n in node.all_input_nodes
+            ):
+                # With only bool inputs, mask * 0.5 still makes float32.
+                node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

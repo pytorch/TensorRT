@@ -517,7 +517,10 @@ from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 
 
-@dynamo_tensorrt_converter(torch.ops.torchtrt_ex.triton_circular_pad.default)  # type: ignore
+# The plugin's enqueue runs PyTorch, so ExecuTorch export must refuse its engine.
+@dynamo_tensorrt_converter(
+    torch.ops.torchtrt_ex.triton_circular_pad.default, requires_pytorch_plugin=True
+)  # type: ignore
 # Recall the schema defined above:
 # torch.ops.torchtrt_ex.triton_circular_pad.default(Tensor x, IntList padding) -> Tensor
 def circular_padding_converter(

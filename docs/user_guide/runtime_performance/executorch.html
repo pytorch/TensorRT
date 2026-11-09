@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../../_static/documentation_options.js?v=e2a1b49a"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -598,7 +598,8 @@ you get that one rather than the newest.</p></li>
 <p>A wheel you build yourself does not bring the delegate. Build it as well, as the runtime wheel
 README shows.</p>
 <p>The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
-On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+On aarch64 the delegate needs glibc 2.35 or newer, and the Torch-TensorRT wheel glibc 2.39
+(for example Ubuntu 24.04).
 The JetPack, TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
 need a CUDA toolkit, because ExecuTorch’s CUDA backend compiles the leftover operators with
 <code class="docutils literal notranslate"><span class="pre">nvcc</span></code>.</p>
@@ -679,6 +680,33 @@ in <a class="reference internal" href="#run-from-python">Run from Python</a> and
 <p>Every coalesced export names its weight file <code class="docutils literal notranslate"><span class="pre">aoti_cuda_blob.ptd</span></code>, so a second export into
 the same directory overwrites the first one’s weights. The first model can then return wrong
 answers with no error, or fail to load. Save each model into its own directory.</p>
+</div>
+</section>
+<section id="keep-plugins-that-run-pytorch-out-of-the-engine">
+<h3>Keep plugins that run PyTorch out of the engine<a class="headerlink" href="#keep-plugins-that-run-pytorch-out-of-the-engine" title="Link to this heading">#</a></h3>
+<p>Some converters build a TensorRT plugin that runs PyTorch when the engine runs: <code class="docutils literal notranslate"><span class="pre">aten.index_put</span></code>
+with <code class="docutils literal notranslate"><span class="pre">accumulate=True</span></code> uses Torch-TensorRT’s ScatterAdd plugin, and a plugin made with
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.plugins.custom_op</span></code> that does not use an AOT kernel runs the
+PyTorch op from Python. The ExecuTorch runtime does not load PyTorch, so <code class="docutils literal notranslate"><span class="pre">save()</span></code> refuses such an
+engine and names the operators. It finds them through converters registered with
+<code class="docutils literal notranslate"><span class="pre">requires_pytorch_plugin=True</span></code>, so a custom converter that adds such a plugin must set that flag.
+<code class="docutils literal notranslate"><span class="pre">save()</span></code> also refuses an engine that does not record this. If an older Torch-TensorRT saved it,
+compile the model again. If you wrapped it in <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> yourself, pass
+<code class="docutils literal notranslate"><span class="pre">pytorch_plugin_ops</span></code> (<code class="docutils literal notranslate"><span class="pre">[]</span></code> for an engine built with <code class="docutils literal notranslate"><span class="pre">fallback_pytorch_plugin_ops=True</span></code>). Compile with <code class="docutils literal notranslate"><span class="pre">fallback_pytorch_plugin_ops=True</span></code> to keep those
+operators out of TensorRT. A <code class="docutils literal notranslate"><span class="pre">torch.cond</span></code> with one of them in a branch then runs in PyTorch too.
+With the setting, an accumulating <code class="docutils literal notranslate"><span class="pre">index_put</span></code> with one 1-D index stays in TensorRT instead,
+through TensorRT’s own ScatterElements plugin, which needs no PyTorch. This needs float32, float16,
+bfloat16, int32 or int64 data. The input and the values it receives (the input’s shape with the
+indexed dimension set to the index length) must stay under <code class="docutils literal notranslate"><span class="pre">2**31</span></code> elements, so every dynamic size needs an upper bound in the exported program, such as
+<code class="docutils literal notranslate"><span class="pre">torch.export.Dim(max=...)</span></code>, that keeps them there. Otherwise the operator runs in PyTorch.
+TensorRT cannot check index values inside the engine, so an out-of-range index is not reported
+there, where PyTorch raises.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exported</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
+    <span class="n">fallback_pytorch_plugin_ops</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
 </div>
 </section>
 <section id="keep-inputs-and-outputs-on-the-gpu">
@@ -1148,6 +1176,8 @@ PyTorch’s ahead-of-time compiler, packages the whole model, and <a class="refe
 <li><p><code class="docutils literal notranslate"><span class="pre">export_device_resident.py</span></code> does the same with no copies at the edges of the program.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">export_kv_cache_decode.py</span></code> exports a decoder step whose KV cache stays in memory you own.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">export_multi_profile.py</span></code> exports one engine with two optimization profiles.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">export_lerobot_pi05.py</span></code> deploys a robot policy: LeRobot’s pi0.5, a vision-language-action
+model with 3.6 billion parameters, as one program that predicts a chunk of 50 actions.</p></li>
 </ul>
 <p><code class="docutils literal notranslate"><span class="pre">examples/executorch_reference_runner/</span></code> loads and runs a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> from Python and from C++,
 including optimization profiles and the green context option.</p>
@@ -1208,6 +1238,7 @@ including optimization profiles and the green context option.</p>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#export-a-model">Export a Model</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#run-the-leftover-operators-on-the-cuda-backend">Run the leftover operators on the CUDA backend</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#keep-plugins-that-run-pytorch-out-of-the-engine">Keep plugins that run PyTorch out of the engine</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#keep-inputs-and-outputs-on-the-gpu">Keep inputs and outputs on the GPU</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#keep-the-engines-in-a-separate-file">Keep the engines in a separate file</a></li>
 </ul>

@@ -130,6 +130,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
         num_user_outputs: Optional[int] = None,
+        pytorch_plugin_ops: Optional[List[str]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -150,6 +151,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
+            pytorch_plugin_ops (List[str]): Operators the engine runs with TensorRT plugins whose kernels run PyTorch, ``[]`` if none. ExecuTorch export refuses an engine that does not set it, because it cannot tell whether the engine needs PyTorch
 
         Example:
 
@@ -209,6 +211,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
         self.num_user_outputs = num_user_outputs
+        self.pytorch_plugin_ops: Optional[List[str]] = (
+            None if pytorch_plugin_ops is None else list(pytorch_plugin_ops)
+        )
         self.target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -228,12 +233,13 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)
         # engines — creating a new execution context during copy can crash at
         # destruction time.  Since the exporter only reads the engine (never
-        # executes it), sharing the same C++ object is safe.
+        # executes it), sharing the same C++ object is safe. A plan is never modified either,
+        # and copying a memory-mapped one (compile_and_save) would read it in.
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k == "engine":
+            if k in ("engine", "_serialized_engine"):
                 object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
             else:
                 object.__setattr__(result, k, copy.deepcopy(v, memo))
@@ -280,6 +286,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
             "num_user_outputs": self.num_user_outputs,
+            "pytorch_plugin_ops": self.pytorch_plugin_ops,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
@@ -585,6 +592,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
             self.num_user_outputs = metadata.get("num_user_outputs")
+            self.pytorch_plugin_ops = metadata.get("pytorch_plugin_ops")
             self.aliased_io = deserialize_aliased_io(
                 str(serialized_engine_info[ALIASED_IO_IDX])
             )
@@ -712,6 +720,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         state.setdefault("_serialized_engine", None)
         state.setdefault("_runtime_settings", RuntimeSettings(runtime_cache=None))
         state.setdefault("_implicit_cache_handle", None)
+        # A module saved before the mark existed keeps it unknown (None), so the
+        # ExecuTorch save check asks for a recompile instead of guessing.
+        state.setdefault("pytorch_plugin_ops", None)
         set_state = getattr(super(), "__setstate__", None)
         if set_state is not None:
             set_state(state)

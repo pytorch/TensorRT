@@ -697,8 +697,17 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
             f"{name}.dist-info/METADATA",
             "Metadata-Version: 2.1\nName: torch-tensorrt-executorch-runtime\nVersion: 0.1.0\n",
         )
-    standard = dist / f"torch_tensorrt-2.15.0-cp312-cp312-linux_{arch}.whl"
-    standard.touch()
+    standard_name = "torch_tensorrt-2.15.0"
+    standard = dist / f"{standard_name}-cp312-cp312-linux_{arch}.whl"
+    with WheelFile(standard, "w") as archive:
+        archive.writestr(
+            f"{standard_name}.dist-info/WHEEL",
+            f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\nTag: cp312-cp312-linux_{arch}\n",
+        )
+        archive.writestr(
+            f"{standard_name}.dist-info/METADATA",
+            "Metadata-Version: 2.1\nName: torch-tensorrt\nVersion: 2.15.0\n",
+        )
     repair = tmp_path / "test-infra/.github/scripts/repair_manylinux_2_28.sh"
     repair.parent.mkdir(parents=True)
     repair.write_text('#!/bin/sh\nprintf "%s\\n" "$1" >> "$REPAIR_CALLS"\n')
@@ -715,7 +724,12 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
         for step in _runtime_build_steps()
         if step.get("name") == "Repair Manylinux_2_28 Wheel"
     )
-    script = step["run"].replace("${{ inputs.repository }}", str(tmp_path))
+    script = (
+        step["run"]
+        .replace("${{ inputs.repository }}", str(tmp_path))
+        .replace("${{ inputs.is-jetpack }}", "false")
+        .replace("${{ inputs.python-only }}", "false")
+    )
     result = subprocess.run(
         ["bash", "-c", script],
         cwd=tmp_path,
@@ -733,7 +747,14 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     (tmp_path / "stdout.log").write_text(result.stdout)
     (tmp_path / "stderr.log").write_text(result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert calls.read_text().splitlines() == [str(standard)]
+    if arch == "aarch64":
+        # Built in manylinux_2_39, the SBSA wheel needs that floor rather than 2_28.
+        assert not calls.exists()
+        assert (
+            dist / f"{standard_name}-cp312-cp312-manylinux_2_39_aarch64.whl"
+        ).exists()
+    else:
+        assert calls.read_text().splitlines() == [str(standard)]
     assert not wheel.exists()
     tag = f"py3-none-manylinux_{floor}_{arch}"
     with WheelFile(dist / f"{name}-{tag}.whl") as archive:

@@ -111,9 +111,18 @@ Optimization Tuning
        Disable only when you need strict IEEE FP32 semantics.
    * - ``attn_bias_is_causal``
      - ``True``
-     - Whether the attn_bias in efficient SDPA is causal. Default is True. This can 
-       accelerate models from HF because attn_bias is always a causal mask in HF. 
-       If you want to use non-causal attn_bias, you can set this to False.
+     - Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal
+       mask, which is faster and more accurate. ``True``: a bias proven causal, one
+       that depends on no graph input and holds 0 on and below the diagonal and -inf
+       (or the dtype's lowest value) above, and also a bias that cannot be proven,
+       such as one built from an input, with a dynamic sequence length, or from a
+       module buffer under ``torch.compile``; you assert that it is causal.
+       ``"proven"``: only a bias proven causal, for models whose input-built masks
+       may not be causal, such as masks with padding. A bias that is computed and
+       found not causal is always kept. A mask longer than 4096, or one whose check
+       fails, is not proven: ``True`` replaces it and ``"proven"`` keeps it.
+       ``False``: never replace. A replaced bias is not read again, so refitting the
+       weights it came from does not change the engine.
 
 ----
 
@@ -162,6 +171,7 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
         autocast_low_precision_type=torch.float16,
         autocast_excluded_ops={torch.ops.aten.softmax.int},
         autocast_max_output_threshold=1024.0,
+        autocast_calibration_dataloader=calibration_dataloader,
     )
 
 .. list-table::
@@ -193,17 +203,19 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
      - ``512.0``
      - Nodes whose outputs exceed this absolute value are kept in FP32. Guards against
        overflow in activations with large dynamic range (e.g., unnormalized logits).
+       Needs ``autocast_calibration_dataloader``; without it this rule is skipped.
    * - ``autocast_max_depth_of_reduction``
      - ``None`` (∞)
      - Maximum reduction depth allowed in low precision. Reduction depth measures how
        many reduction operations (sum, mean, etc.) feed into a node. Nodes with higher
        depth are kept in FP32 to prevent error accumulation. ``None`` means no limit.
+       Needs ``autocast_calibration_dataloader``; without it this rule is skipped.
    * - ``autocast_calibration_dataloader``
      - ``None``
      - A ``torch.utils.data.DataLoader`` used to calibrate output statistics (e.g.,
-       absolute max values) for each node. When provided, the autocast pass runs the
-       model on calibration data to make per-node precision decisions based on
-       observed ranges rather than static thresholds.
+       absolute max values) for each node. The autocast pass runs the model on this
+       data to check ``autocast_max_output_threshold`` and
+       ``autocast_max_depth_of_reduction``. Without it, both rules are skipped.
 
 ----
 
@@ -374,6 +386,31 @@ Graph Partitioning
        form produced by AOT tracing under ``torch.compile`` are supported for
        ``repeat_kv`` style graphs. In the ``bmm`` form, broadcasting a single KV
        head with ``enable_gqa=True`` is not folded.
+   * - ``fallback_pytorch_plugin_ops``
+     - ``False``
+     - Run operators whose converters insert a TensorRT plugin that runs PyTorch,
+       such as an accumulating ``aten.index_put`` (Torch-TensorRT's ScatterAdd
+       plugin) or a generated plugin without an AOT kernel, in PyTorch instead of
+       TensorRT. Set it for runtimes without PyTorch: ExecuTorch export refuses an
+       engine that uses such a plugin.
+       With it, an accumulating ``index_put`` with one 1-D index can stay in TensorRT
+       through TensorRT's ScatterElements plugin, which needs no PyTorch. The data
+       type and size limits are in the ExecuTorch guide.
+   * - ``collapse_high_rank_permutes``
+     - ``False``
+     - Rewrite a reshape, permute, reshape chain over more than 8 dimensions
+       (TensorRT's limit) as reshapes and permutes of at most 8 dimensions that give
+       the same values. Window and patch layouts, such as neighborhood attention and
+       the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits
+       the graph, and the partitioner can then hand many large tensors across one
+       engine boundary. Only static shapes are rewritten. Fewer, larger engines can
+       need much more time and memory to build and to run, so measure it.
+   * - ``convert_antialiased_resize``
+     - ``False``
+     - Run antialiased bilinear and bicubic resize (``F.interpolate`` with
+       ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
+       graph. Only static input and output heights and widths and floating-point
+       inputs are converted. Some sizes run slower than in PyTorch, so measure it.
 
 ----
 
@@ -469,13 +506,18 @@ rebuilt from scratch:
 
 ``max_aux_streams``, ``version_compatible``,
 ``optimization_level``, ``disable_tf32``, ``sparse_weights``,
-``engine_capability``, ``hardware_compatible``, ``refit_identical_engine_weights``,
+``engine_capability``, ``hardware_compatible``, ``target_compute_capabilities``,
+``refit_identical_engine_weights``,
 ``immutable_weights``, ``enable_weight_streaming``, ``tiling_optimization_level``,
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
-``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``,
-``fold_shared_kv_attention``, ``deduplicate_weights``.
+``decompose_attention``,
+``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
+``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
+``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
+``convert_antialiased_resize``.
+On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

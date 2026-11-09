@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=28a5836a"></script>
+    <script src="../_static/documentation_options.js?v=e2a1b49a"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -645,16 +645,18 @@ simplification enables the direct <code class="docutils literal notranslate"><sp
 cast nodes into the graph based on a set of rules:</p>
 <ol class="arabic simple">
 <li><p><strong>Output range check</strong> — nodes whose outputs exceed <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>
-are kept in FP32 (guarded against overflow).</p></li>
+are kept in FP32 (guarded against overflow). Needs calibration data (step 5).</p></li>
 <li><p><strong>Reduction depth check</strong> — nodes with reduction depth exceeding
 <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code> are kept in FP32 (guarded against accumulated
-error).</p></li>
+error). Needs calibration data (step 5).</p></li>
 <li><p><strong>Name exclusions</strong> — nodes matching any pattern in <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code> are
 kept in FP32.</p></li>
 <li><p><strong>Op exclusions</strong> — nodes with targets in <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code> are kept in FP32.</p></li>
 <li><p><strong>Calibration</strong> — if <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code> is provided, actual output
 ranges are measured by running the model on calibration data before applying the
-threshold check.</p></li>
+threshold check. Without a dataloader, the range and depth checks are skipped and
+a warning is logged. Refit instead reuses the precisions that the dataloader chose
+at compile time, and raises an error if one of those nodes is gone.</p></li>
 </ol>
 <p>The pass inserts explicit <code class="docutils literal notranslate"><span class="pre">aten._to_copy</span></code> cast nodes around qualified operations to
 reduce them to <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code> (FP16 or BF16).</p>

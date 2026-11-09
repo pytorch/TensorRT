@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 import torch
 import torch.utils._pytree as pytree
 from torch._export.non_strict_utils import make_constraints
+from torch._export.utils import _detect_fake_mode_from_gm
 from torch._guards import detect_fake_mode
 from torch._library.fake_class_registry import FakeScriptObject
 from torch.export import ExportedProgram, ExportGraphSignature
@@ -26,6 +27,7 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
     plan_buffer,
@@ -159,9 +161,9 @@ def lift(
     state_dict = gm.state_dict()
     constants = {}
 
-    fake_mode = detect_fake_mode(
-        tuple(node.meta["val"] for node in gm.graph.nodes if node.op == "placeholder")
-    )
+    # When no input is a tensor (no inputs, or only ints), the fake mode comes from
+    # the other nodes.
+    fake_mode = _detect_fake_mode_from_gm(gm)
     assert fake_mode is not None
 
     # This map stores the names of outputs (old to new)
@@ -187,6 +189,7 @@ def lift(
     # codegen emits the target, so lifting that target twice yields a forward() with
     # a duplicated argument that fails to compile.
     lifted_placeholders: Dict[str, torch.fx.Node] = {}
+    last_lifted: Optional[torch.fx.Node] = None
     for node in gm.graph.nodes:
         if node.op == "get_attr":
             existing = lifted_placeholders.get(node.target)
@@ -229,8 +232,14 @@ def lift(
 
             assert lift_val is not None and input_kind is not None
 
-            # Replace get_attr nodes with placeholder nodes and copy metadata.
-            with gm.graph.inserting_before(first_user_input):
+            # Replace get_attr nodes with placeholder nodes and copy metadata. Chaining
+            # each one after the previous one keeps the order of input_specs, also when
+            # there is no user input.
+            with (
+                gm.graph.inserting_after(last_lifted)
+                if last_lifted is not None
+                else gm.graph.inserting_before(first_user_input)
+            ):
                 # Ensure name doesn't contain period as it is used for submodules
                 const_placeholder_name = node.target.replace(".", "_")
                 const_placeholder_node = gm.graph.placeholder(const_placeholder_name)
@@ -251,6 +260,7 @@ def lift(
 
                 node.replace_all_uses_with(const_placeholder_node)
                 lifted_placeholders[node.target] = const_placeholder_node
+                last_lifted = const_placeholder_node
                 gm.graph.erase_node(node)
 
                 # Verify if the const_placeholder being added is one of the output nodes
@@ -584,13 +594,9 @@ def create_trt_exp_program(
     #      symbol from tensor shapes and scalar placeholder values, then look up
     #      its bound directly in the shape_env.  This is the retrace=False path where the
     #      caller didn't supply inputs.
-    fake_mode = detect_fake_mode(
-        tuple(
-            node.meta["val"]
-            for node in gm.graph.nodes
-            if node.op == "placeholder" and "val" in node.meta
-        )
-    )
+    # Falls back to the other nodes, so a program whose inputs are all ints keeps
+    # their ranges.
+    fake_mode = _detect_fake_mode_from_gm(gm)
     range_constraints: Dict[Any, Any] = {}
     if fake_mode is not None and fake_mode.shape_env is not None:
         has_inputs = (arg_inputs is not None and len(arg_inputs) > 0) or bool(
@@ -1033,6 +1039,37 @@ def inline_trt_modules(
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (tuple(engine_inputs), *engine_info),
+                )
+            elif trt_module.engine is None and get_offloaded_engine_path(
+                trt_module._plan_buffer()
+            ):
+                # compile_and_save to ExecuTorch, the only save that keeps the engine in its file. It is
+                # passed as a uint8 buffer mapped from the file, the form the ExecuTorch backend packs,
+                # and the backend streams the file itself into the program.
+                # A Python-only build registers the placeholder op only with meta_ops.
+                import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
+
+                engine_info = trt_module._pack_engine_info()
+                engine_tensor = engine_info[ENGINE_IDX]
+                buffer_name = f"{name}_engine"
+                gm.register_buffer(buffer_name, engine_tensor)
+                engine_node = gm.graph.get_attr(buffer_name)
+                engine_node.meta["val"] = (
+                    fake_mode.from_tensor(engine_tensor)
+                    if fake_mode is not None
+                    else torch.empty(
+                        engine_tensor.shape, dtype=torch.uint8, device="meta"
+                    )
+                )
+                str_args = [str(value) for value in engine_info]
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+                    (
+                        tuple(engine_inputs),
+                        *str_args[:ENGINE_IDX],
+                        engine_node,
+                        *str_args[ENGINE_IDX + 1 :],
+                    ),
                 )
             else:
                 engine_name = f"{name}_engine"

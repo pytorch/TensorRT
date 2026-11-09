@@ -27,10 +27,14 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
-from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
+from torch_tensorrt.dynamo.partitioning.common import (
+    get_node_module_types,
+    node_in_torch_executed_module,
+)
 from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -108,6 +112,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
             self._record_fallback(node, node_name, "complex tensor dtype")
+            return False
+
+        if makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
             return False
 
         if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
@@ -509,7 +521,7 @@ def partition(
         all_module_types = {
             module_type
             for node in gm.graph.nodes
-            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+            for module_type in get_node_module_types(node)
         }
         unmatched = set(torch_executed_modules) - all_module_types
         if unmatched:
