@@ -101,10 +101,7 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
-using ::executorch::aten::DimOrderType;
-using ::executorch::aten::ScalarType;
-using ::executorch::aten::SizesType;
-using ::executorch::aten::StridesType;
+using namespace ::executorch::aten;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;

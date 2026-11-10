@@ -51,8 +51,7 @@
 namespace torch_tensorrt {
 namespace executorch_backend {
 
-using ::executorch::aten::ScalarType;
-using ::executorch::aten::SizesType;
+using namespace ::executorch::aten;
 using ::executorch::backends::cuda::CudaAllocator;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
@@ -175,10 +174,6 @@ Error check_registration() {
 thread_local ProfileRequest g_profile_request = ProfileRequest::kUnset;
 thread_local int32_t g_profile_index = 0;
 
-bool same_dims(const nvinfer1::Dims& a, const nvinfer1::Dims& b) {
-  return a.nbDims == b.nbDims && std::equal(a.d, a.d + std::max(a.nbDims, 0), b.d);
-}
-
 } // namespace
 
 OptimizationProfileGuard::OptimizationProfileGuard(int32_t profile_index)
@@ -230,7 +225,7 @@ void EngineHandle::forget_bound_addresses() {
 
 bool EngineHandle::bind_input_shape(size_t index, const nvinfer1::Dims& dims, bool again) {
   nvinfer1::Dims& bound = bound_input_dims[index];
-  const bool same = same_dims(bound, dims);
+  const bool same = bound.nbDims == dims.nbDims && std::equal(bound.d, bound.d + std::max(bound.nbDims, 0), dims.d);
   if (same && !again) {
     return true;
   }
