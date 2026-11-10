@@ -370,6 +370,12 @@ def _pretraced_backend(
                     "strip_engine_weights=True is not supported for torch.compile(). It will be set to False automatically."
                 )
                 settings.strip_engine_weights = False
+            if settings.release_weights_after_build:
+                logger.warning(
+                    "release_weights_after_build=True is not supported for torch.compile(), which runs the "
+                    "graph in PyTorch if a build fails. It will be set to False automatically."
+                )
+                settings.release_weights_after_build = False
 
             trt_compiled = compile_module(
                 gm,
