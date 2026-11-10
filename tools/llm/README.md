@@ -567,9 +567,300 @@ python run_llm.py --model meta-llama/Llama-3.1-8B --quant_format fp8 --prompt "W
 ### Caching Strategies
 
 - **Static Cache v1/v2:** Adds static KV cache tensors as model inputs/outputs for efficient reuse.
+- **Static Cache v3** (`static_cache_v3.py`): a shape-static, single-token decode engine for batch 1.
+  v1/v2 slice the cache to the current length, so TensorRT synchronizes with the host twice per
+  layer and step and the engine cannot be captured in a CUDA graph. v3 writes the new key and value
+  in place (`index_copy`, lowered to `IKVCacheUpdateLayer`) and attends over the whole cache with a
+  position mask and native grouped-query attention. Prefill runs one token at a time. Used by the
+  agentic decode workload below.
 - **No Cache:** Standard autoregressive decoding.
 
 Please read our tutorial on how static cache is implemented.
+
+### Fused decoder-block kernels (Qwen3)
+
+`qwen3_regions.py` runs whole Qwen3 decoder blocks as fused Triton kernels inside the
+TensorRT decode engine, through `torch_tensorrt.region.fused_kernel` (`qwen3_kernels.py` holds
+the kernels). Each block replaces several small TensorRT kernels and the gaps between them:
+
+| Block | Fuses |
+|---|---|
+| `attn_in` | [residual add +] input RMSNorm + q/k/v GEMVs (three outputs) |
+| `qk_rope` | q/k per-head RMSNorm + RoPE, with the softmax scale folded into q |
+| `attn_out` | o_proj GEMV + residual add |
+| `mlp_in` | [residual add +] post-attention RMSNorm + gate/up GEMVs + SiLU(gate) * up |
+| `mlp_out` | down GEMV + residual add |
+| `final` | final RMSNorm + lm_head GEMV |
+
+```python
+import qwen3_regions
+
+qwen3_regions.patch_qwen3(model, qwen3_regions.PRESETS["layers"])  # a loaded FP16 Qwen3ForCausalLM
+decode = qwen3_regions.compile_decode(model, max_seq_len=192, device=torch.device("cuda:0"))
+torch_tensorrt.runtime.set_cudagraphs_mode(True)  # required, see below
+```
+
+The KV-cache write and attention stay in TensorRT (`static_cache_v3`). The kernels accumulate in
+FP32 and round each output once. On an RTX 5090 (FP16, batch 1, CUDA graphs) the `layers` preset
+decodes Qwen3-0.6B in 1.02-1.03 ms/token against 1.18 ms/token without regions (339 to 202
+kernels per token), with top-1 agreement 1.0 and half the KL divergence. The `final` block is
+neutral: TensorRT's lm_head GEMV already runs at DRAM bandwidth. Constraints:
+
+- Run under CUDA graphs: TensorRT 11.4 reloads a QDP plugin's module on every enqueue otherwise.
+- Batch 1, single-token decode, FP16 weights, Qwen3 (no q/k/v biases) with a power-of-two hidden
+  size and head size (Qwen3-0.6B, 1.7B and 8B; not 4B, 14B or 32B); `BLOCK_N` and `BLOCK_K` are
+  powers of two that divide each GEMV's rows and columns.
+- Regions build with `offload_module_to_cpu=False`: release the PyTorch weights after compiling
+  (`torch_tensorrt.dynamo.utils.deallocate_module(model)`), as `agentic_decode.py` does; the engine
+  holds its own copy.
+- Loads carry `tl.multiple_of(..., 16)` hints (the plugin compile path drops Triton's alignment
+  specialization) and an L2 `evict_first` policy for weights (otherwise the streamed weights
+  evict the KV cache and slow TensorRT's own kernels).
+
+### Auto-Tuner sessions: decode
+
+`run_agentic_decode.py` runs an Auto-Tuner session (`torch_tensorrt.autotune`) on batch-1 decode
+(see the `torch_tensorrt.autotune` documentation). The workload (`agentic_decode.py`) measures
+milliseconds per decoded token; decoding is teacher-forced on a fixed public-domain text, and every
+step's logits are checked against an FP32 eager reference (top-1 agreement >= 0.97 and mean KL
+divergence <= 0.005 by default). The session starts from the documented configuration (FP16,
+`static_v2`) and searches the KV cache lowering, precision, FP32 accumulation, TensorRT build
+routes and builder levels, the runtime modes (CUDA graphs per engine, or one CUDA graph for the
+whole decode step with `runtime.step_graph`) and, for Qwen3 models, the fused decoder blocks and
+Inductor's kernels (`kernels.inductor`, see [Hybrid kernels](#hybrid-kernels-inductors-kernels-in-tensorrt-configs)),
+one validated change at a time.
+
+```bash
+python run_agentic_decode.py --session /tmp/qwen3-decode --max-trials 8
+python run_agentic_decode.py --session /tmp/qwen3-decode-llm --max-trials 8 --planner llm
+python -m torch_tensorrt.autotune status /tmp/qwen3-decode
+```
+
+Each trial runs in a fresh process; rerunning a command resumes its session. The session
+directory holds every trial's results, the report (`report.md`) and the exported decode engine
+(`artifact/decode.ep` with the winner's `config.json`).
+
+#### Results: Qwen3-0.6B decode on an RTX 5090
+
+Batch 1, 128 prompt tokens, 64 decoded tokens per measured call; TensorRT 11.4, Torch-TensorRT
+Python runtime, driver 610.57, a GPU shared with another process. All sessions started from the
+documented configuration (FP16, `static_v2`) and checked every candidate against FP32 eager logits.
+They ran the code before the rename (`torch_tensorrt.agentic`, the same steps under older names).
+Sessions A and B ran before `kernels.decode_blocks`, the build routes, noise runs and
+head-to-head pairs existed; session C had all of them.
+
+| Session | Planner | Trials | Baseline | Best | Final check | Best config |
+|---|---|---|---|---|---|---|
+| A | rule-based | 10 | 2.922 ms/token | 1.251 ms/token | +56.9% (2.34x tokens/s) | `static_v3`, `use_fp32_acc=False` |
+| B | LLM (`claude`) | 6, then the planner stopped | 2.923 ms/token | 1.235 ms/token | +57.1% (2.37x tokens/s) | `static_v3`, CUDA graphs, `use_fp32_acc=False` |
+| C | LLM (`claude`) with guidance | 5, then the planner stopped | 2.947 ms/token | 1.031 ms/token | +64.7% (2.86x tokens/s) | `static_v3`, CUDA graphs, `kernels.decode_blocks=all` |
+
+Top-1 agreement stayed 1.0 (mean KL 1.9e-5 to 4.5e-5). "Final check" is the median of two fresh
+baseline/best worker pairs. Process GPU memory fell from 2160 MB to about 2020 MB. (Session C
+recorded 3176 MB for the fused blocks: the workload left the PyTorch weights on the GPU, since
+region builds cannot offload them; it now releases them, and a fused build measures 2018 MB.)
+
+Session C, step by step: three fresh-process runs of the baseline moved 0.8%, so the noise
+threshold stayed at the 2% minimum. The LLM planner paired `static_v3` with CUDA graphs (1.29 ms/token,
++55.5% in two head-to-head pairs), then chose the fused decoder blocks (1.031 ms/token, +20.5% in its
+head-to-head; 73% of memory-bandwidth-bound speed). Two edits of the blocks' launch settings (edited
+file `decode_launch`) and one attention build route measured 0.3-1.4% slower and were rejected; the
+planner then stopped, judging that the remaining gap in its slowest kernel was worth at most about 6%.
+
+What the sessions measured:
+
+- The baseline spends 31% of each token waiting on the host: `static_v2` makes TensorRT copy
+  data-dependent sizes to the host twice per layer and step (58 device-to-host copies per token).
+  Both planners chose `static_v3` first (about 1.38-1.41 ms/token, no host copies).
+- Turning off FP32 accumulation for FP16 matrix multiplications gained another 9-12% within the
+  accuracy bounds.
+- No gain beyond noise: CUDA graphs (decode is GPU-bound after `static_v3`), pre-allocated outputs,
+  builder optimization levels 4 and 5. Slower: BF16 (8-21%), FP32 (50%). TensorRT 11.4 failed to
+  build the engine with tiling optimization (`moderate`, `fast`); the sessions recorded the error.
+- Without the fused blocks, about 70% of the remaining GPU time is cuBLAS GEMV over FP16 weights
+  and the rest is many small kernels (norms, residual adds, RoPE, SiLU). With them (session C),
+  the Triton block kernels take about 85% of GPU time at 1.2-1.7 TB/s and TensorRT's decode
+  attention 11%. The remaining levers are programmatic dependent launch between kernels, fusing the
+  KV-cache write and attention into the q/k block, and weight quantization (ModelOpt).
+- The exported `decode.ep` reloads in a fresh process with the same accuracy. Called through
+  `torch_tensorrt.load(...).module()` it decoded at 1.50 ms/token, 0.25 ms more than in the
+  session, because the loaded program checks its 58 inputs on every call.
+
+### Auto-Tuner sessions on other workloads: `run_agentic.py`
+
+`run_agentic.py` runs a session on any workload factory, `path/to/file.py:function` called with
+JSON keyword arguments, so it serves every workload below (`run_agentic_decode.py` keeps the
+decode workload's own options). Both are `python -m torch_tensorrt.autotune run` with a default
+budget of 10 trials, and take its options. Rerunning a command resumes its session.
+
+```bash
+python tools/llm/run_agentic.py --session /tmp/gemma3-prefill-2k \
+    --workload tools/llm/agentic_prefill.py:create_case \
+    --args '{"model": "unsloth/gemma-3-1b-it", "length": 2048}' \
+    --planner llm --provider claude --guidance my_guidance.md --max-trials 8 --patience 4
+python -m torch_tensorrt.autotune status /tmp/gemma3-prefill-2k
+```
+
+- Planner: `--planner rule-based` (the default; no LLM needed) or `--planner llm`, which asks
+  the logged-in `claude` CLI (`--provider claude`, or `codex`, or a `module:attribute` callable;
+  `--llm-model` picks the model) to choose each experiment. `--guidance FILE` gives the LLM
+  planner Markdown guidance, kept as `guidance.md` in the session. Keep measured results of
+  candidate configs out of guidance: the planner tends to take them as given instead of
+  measuring them.
+- Goal and limits: `--metric latency_ms|throughput`, `--min-improvement`, `--target`,
+  `--accuracy METRIC OP VALUE` (repeatable; other metrics keep the workload's defaults),
+  `--max-memory-mb`, and `--baseline CONFIG` (JSON knob changes) to start from a config instead
+  of the workload's baseline.
+- Budget: `--max-trials`, `--max-time-s` (bounds the search; the final check and the export run
+  after it), `--patience` (consecutive trials without an accepted change), `--trial-timeout-s`
+  (kills a worker that builds or measures for longer) and `--prepare-timeout-s` (the same for
+  preparing a generated value's kernels).
+- Measurement: `--noise-runs` (fresh-process runs of the baseline that measure the noise),
+  `--head-to-head-pairs` and `--final-check-pairs` (fresh best/candidate pairs before a change is
+  accepted, and baseline/winner pairs at the end), `--quiet-gpu-s` (how long each worker may wait for an idle GPU; 0 turns the wait
+  off), `--max-spread` and `--retries` (when a measurement counts as stable).
+
+The workloads:
+
+| Workload | Factory | Unit | Knobs besides the standard engine and runtime ones |
+|---|---|---|---|
+| Causal-LM decode (`agentic_decode.py`) | `create_case(model, isl, osl, prompt, prefill, kernel_cache)` | one decoded token, teacher-forced after an untimed prefill | `workload.cache`, `engine.precision`, `engine.use_fp32_acc`, `engine.build_route`, `runtime.step_graph`; Qwen3: `kernels.decode_blocks`, `kernels.inductor`; edited files `decode_launch`, `decode_kernels` |
+| Causal-LM prefill (`agentic_prefill.py`; Gemma 3, Qwen3) | `create_case(model, length, positions, prompt, kernel_cache)` | one prefill, logits at `positions` evenly spaced positions | `workload.masks`, `workload.global_attention`, `workload.local_attention`, `engine.precision`, `engine.build_route`, `kernels.inductor`, `kernels.generated` |
+| Encoder forward (`agentic_encoder.py`; ModernBERT) | `create_case(model, length, kernel_cache)` | one forward, `last_hidden_state` | `workload.local_attention` (banded), `graph.fold_attention_masks`, `engine.decompose_attention`, `engine.precision`, `engine.use_fp32_acc`, `engine.build_route`, `kernels.inductor`, `kernels.generated` |
+| Qwen3.5 prefill (`qwen35_prefill.py`, Gated DeltaNet in `qwen35_gdn.py`) | `create_case(model, length, positions, kernel_cache)` | one prefill, logits at `positions` positions | `workload.gdn` (Hugging Face's fallback or a functional rewrite), `workload.conv`, `workload.chunk_size`, `kernels.gdn_scan` (a hand-written or generated Triton scan in the engine), `workload.attention`, `engine.precision`, `engine.use_fp32_acc`, `engine.disable_tf32`, `engine.decompose_attention`, `kernels.inductor`; edited file `gdn` |
+| Nemotron-H decode (`nemotron_decode.py`; Mamba-2 hybrid) | `create_case(model, isl, osl, kernel_cache)` | one decoded token | `engine.precision`, `engine.use_fp32_acc`, `workload.ssm_state`, `workload.state_update`, `engine.build_route`, `runtime.cudagraphs`, `kernels.inductor`, `kernels.generated`; edited file `decode_step` |
+| Nemotron-H prefill (`nemotron_decode.py`) | `create_prefill_case(model, length, positions)` | one prefill | `engine.precision`, `engine.use_fp32_acc`, `engine.tf32`, `workload.ssd`, `workload.chunk_size`, `kernels.inductor` |
+
+Every factory also takes a `baseline` config. Every workload checks each candidate against an
+FP32 eager reference, with default limits (`accuracy_defaults`) that correct builds pass and
+deliberately broken ones fail (the guidance files in `agentic_bench/briefs` give the calibration),
+and its module docstring describes its knobs and its baseline, a plain Torch-TensorRT compile (the
+documented `tools/llm` configuration where there is one). Every workload also accepts the
+head-to-head driver's `bench.*` values (below), which are not knobs: a session never sets
+them.
+
+### Hybrid kernels: Inductor's kernels in TensorRT configs
+
+`kernels.inductor` (default `none`, so existing configs build as before) hands chosen
+operations of a TensorRT config to the kernels PyTorch Inductor generates for them, in one of
+two ways:
+
+- **Hosted Inductor kernels** (`torch_tensorrt.region.fused_kernel`). At build time
+  `torch.compile` compiles the subgraph for the workload's shapes, and the Triton kernel
+  Inductor generates runs unchanged inside the TensorRT engine as a QDP plugin, with the launch
+  settings Inductor's autotuner chose. Before the engine is built, the build launches the
+  kernel once through Triton, with the plugin's arguments and launch settings, and checks its
+  outputs against Inductor's own (or eager) results. That check runs Triton's compilation of
+  the kernel, not the plugin's ahead-of-time binary, which only the candidate's accuracy check
+  covers. The engine stays whole, but TensorRT cannot fuse across a plugin.
+  Values: decode `attention-flex` (Inductor's flex-decoding kernels), prefill `rope-plugin` (q/k
+  RMSNorm and RoPE) and encoder `rope-kernel` and `rope-kernel-eager-numerics` (the QKV split and
+  RoPE).
+- **Inductor regions** (`torch_tensorrt.region.execute_in_torch(backend="inductor")`). The
+  scope stays out of TensorRT and Inductor compiles it at its first call, which the build makes.
+  Every region ends one engine and starts the next (two boundaries per region), and the whole
+  program, engines and regions, is captured in one CUDA graph (except with Nemotron prefill's
+  `mamba-inductor`, which the host calls engine by engine). Values: decode `lm-head`,
+  `attention` and `attention-math`; prefill `attention-inductor*` and `attention-rope-inductor*`;
+  encoder `inductor-regions`; Qwen3.5 `attention`, `prologue`, `prologue-decay` and their
+  combinations; Nemotron `lm-head` and `mlp-inductor` (decode) and `mamba-inductor` and
+  `mamba-inductor-graph` (prefill).
+
+The prefill workload's `attention-fa2-*` values run PyTorch's flash-attention operator (the
+kernel Inductor calls for attention) between engines, without a region.
+
+Requirements, which the knobs enforce before anything is built (a planner's change brings
+them along; the decode knob lists them per value):
+
+| Workload | Values | Require |
+|---|---|---|
+| Decode | `attention-flex` | `workload.cache=static_v3`, `engine.precision=fp16`, `runtime.cudagraphs` |
+| Decode | `lm-head`, `attention`, `attention-math` | the same and `runtime.step_graph`: per-engine CUDA graphs would run the regions eagerly between engines |
+| Prefill, encoder | every value | `runtime.cudagraphs` |
+| Qwen3.5 | every value | `workload.gdn=functional`, `workload.attention=causal`, `runtime.cudagraphs` |
+| Nemotron decode | every value | `workload.state_update=inplace`, `runtime.cudagraphs` (the workload records the whole step as one CUDA graph) |
+| Nemotron prefill | none | `mamba-inductor-graph` records the forward as one CUDA graph itself |
+
+Limits:
+
+- Region builds cannot be saved: `torch_tensorrt.save` refuses `execute_in_torch` regions whose
+  backend is `inductor`. Their candidates' export raises `NotImplementedError`, so a session that
+  keeps one records the export as unsupported and writes its config but no artifact; rebuild the
+  config instead.
+- Both ways compile through strict export (`torch_tensorrt.compile(..., ir="dynamo",
+  strict=True)`) without module offloading, so the model stays on the GPU during the build;
+  Inductor's compilation and autotuning lengthen it.
+- TensorRT 11.4 QDP plugins need CUDA graph replay (outside it, every enqueue reloads the plugin
+  module) and at most 48 KB of shared memory.
+- The hosted kernels read Inductor's generated code and launch settings through private
+  Inductor internals; a shape that Inductor compiles differently is refused at build.
+- More engines and regions need more GPU memory: each engine reserves its own activation memory,
+  and the tensors that cross a boundary stay allocated (see each knob's description).
+- Under the head-to-head's PyTorch backends (`bench.backend` `eager` or `inductor`) the prefill,
+  encoder, Qwen3.5 and Nemotron prefill workloads refuse the knob. The two decode workloads
+  build the PyTorch model from `engine.precision` and the `bench.*` values alone there and
+  ignore every other knob, `kernels.inductor` included; they also ignore `bench.*` keys they do
+  not know, which the other workloads refuse. Check a spec's PyTorch configurations against the
+  workload's docstring.
+- A session records its workload's knobs (each with its description), its editable files'
+  sources and the workload's files, and refuses to resume after any of them changed. That
+  includes a session created before its workload had the knob, or with an earlier description
+  of it: start such sessions in a new directory.
+
+### Generated kernels: regions whose kernel an LLM writes
+
+Some regions can also run a kernel that PR 4914's `torch_tensorrt.region.KernelGenerator`
+writes during the build: `fused_kernel(generator=...)` around the region's PyTorch code. The
+generator has an LLM author (the `claude` CLI) propose Triton kernels, checks each against the
+region's code, times it against TensorRT's own build of the region, and keeps one only if it is
+at least as fast; the kernel then runs inside the engine as a QDP plugin. So the same region can
+run TensorRT's kernels (the knob's default), a hand-written or Inductor-generated kernel (the
+values above, and `kernels.gdn_scan=triton*`), or a generated one:
+
+| Workload | Value | Regions (inputs) | Requires |
+|---|---|---|---|
+| Decode (Qwen3) | `kernels.decode_blocks=generated` | the `layers` blocks (see [Fused decoder-block kernels](#fused-decoder-block-kernels-qwen3)) | `workload.cache=static_v3`, `engine.precision=fp16`, `runtime.cudagraphs` |
+| Encoder (ModernBERT) | `kernels.generated=split-rope` | `split_rope_<layer>`: each layer's QKV split + RoPE (`qkv`, `inv_freq`) | `runtime.cudagraphs`, `kernels.inductor=none` |
+| Prefill (Gemma 3, Qwen3) | `kernels.generated=qk-norm-rope` | `q_norm_rope.<layer>`, `k_norm_rope.<layer>`: q/k RMSNorm + RoPE (`qkv`, the norm's weight, `cos`, `sin`) | `runtime.cudagraphs`, `kernels.inductor=none` |
+| Qwen3.5 | `kernels.gdn_scan=generated` | `gdn_scan`: each layer's state scan (`w`, `u`, `k_decayed`, `gamma`) | `workload.gdn=functional`, `runtime.cudagraphs` |
+| Nemotron decode | `kernels.generated=mlp` | `mlp_in_<layer>`: RMSNorm + up GEMV + ReLU² (`hidden`, the norm's weight, `up_proj.weight`); `mlp_out_<layer>`: down GEMV + residual add (the activation, `down_proj.weight`, `hidden`) | `runtime.cudagraphs`, `kernels.inductor=none` |
+
+Every workload builds its generator with the same settings (`region_generation.py`:
+`make_generator`), plus a notes file of measured facts about its regions where one applies
+(`*_kernel_notes.md`); Qwen3.5's scan also accepts the error that its FP32 products have with
+TF32, the precision `triton-tf32` runs at. Identical regions of one build share one kernel.
+Accepted kernels are cached in the workload's `kernel_cache` directory (the factory argument,
+else `$TORCHTRT_KERNEL_CACHE`, else `/dev/shm/exp/kcache`), keyed by the region, the generator's
+settings and notes, and the compilation's engine options (precision, accumulation, TF32,
+optimization level, build route...): a build reuses a cached kernel only with the same options,
+and otherwise generates one, for up to 30 minutes per distinct region. Generate kernels with
+the build that will use them, the workload's own: an Auto-Tuner session prepares each generated
+value once, before its search (the knobs' `prepare`), and pins later runs to those kernels; for a
+head-to-head, run the configuration once with `bench_compare.py run` first (see
+[`agentic_bench/`](agentic_bench/README.md), section 6).
+
+### Head-to-head benchmarks and the reproduction kit
+
+`bench_compare.py` measures configurations of one workload, TensorRT configs and the same model
+run eagerly or compiled by Inductor (the `bench.*` values: `bench.backend`, `bench.mode`,
+`bench.attn`, `bench.inductor` and workload-specific keys), with the evaluator the sessions use.
+Every run is a fresh process with cold compiler caches; rounds run the configurations in
+balanced orders; each run waits for an idle GPU under a GPU lock that it inherits (`--lock`,
+`$BENCH_GPU_LOCK`, and `--quiet-command`, `$BENCH_GPU_QUIET`, are configurable) and stops with
+the driver; and every run is checked against the same FP32 reference outputs. `--session DIR`
+measures the config an Auto-Tuner session chose.
+
+```bash
+python tools/llm/bench_compare.py all tools/llm/agentic_bench/specs/qwen3-decode-8k.json \
+    /tmp/h2h/qwen3-decode-8k --session /tmp/sessions/qwen3-decode-8k --rounds 4
+python tools/llm/bench_compare.py summary /tmp/h2h/qwen3-decode-8k
+```
+
+[`agentic_bench/`](agentic_bench/README.md) is the reproduction kit of the benchmark of Auto-Tuner
+sessions on eight workloads (Qwen3-0.6B decode at 8k context, Gemma 3 1B prefill at 2k and 8k
+tokens, ModernBERT-base at 512 and 8k tokens, Qwen3.5-0.8B prefill and Nemotron-3-Nano-4B decode
+and prefill): the guidance each session read, byte for byte, the guidance of the hybrid
+follow-up sessions, the head-to-head and hybrid head-to-head specs, and the exact commands.
 
 ## Extension
 

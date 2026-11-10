@@ -1,18 +1,30 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Iterable, List, Optional, Tuple, Union
 
-import tensorrt
 import torch
-import torch_tensorrt
 from torch._export.utils import _detect_fake_mode_from_gm
 from torch._ops import OpOverloadPacket
 from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
 from torch.fx import Graph, GraphModule, Node
-from torch.fx.node import Target
+from torch.fx.graph import _PyTreeCodeGen
 from torch.fx.passes.shape_prop import _extract_tensor_metadata
-from torch.utils._pytree import _LEAF_SPEC
+from torch.utils._pytree import _LEAF_SPEC, TreeSpec
+
+
+def set_output_spec(gm: GraphModule, out_spec: TreeSpec) -> None:
+    """Make ``gm`` return the outputs that ``out_spec`` describes.
+
+    The exported program's pytree codegen survives lowering and decides how
+    the compiled module unflattens its results, so it must learn the added
+    KV cache outputs too; ``_out_spec`` alone is ignored while it is present.
+    """
+    gm._out_spec = out_spec
+    codegen = gm.graph._codegen
+    if isinstance(codegen, _PyTreeCodeGen):
+        codegen.pytree_info = codegen.pytree_info._replace(out_spec=out_spec)
+        gm.recompile()
 
 
 def get_kv_nodes(gm):

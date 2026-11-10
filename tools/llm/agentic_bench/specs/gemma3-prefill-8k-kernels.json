@@ -1,0 +1,69 @@
+{
+  "description": "Gemma 3 1B batch-1 prefill of 8192 tokens: where the q/k RMSNorm + RoPE kernels come from. TensorRT alone (the session recipe with CUDA graphs), the best hybrid with Inductor's kernels, the same q/k RMSNorm + RoPE regions with kernels written by PR 4914's KernelGenerator on the TensorRT-alone base, and the strongest Inductor configuration",
+  "workload": "tools/llm/agentic_prefill.py:create_case",
+  "args": {
+    "model": "unsloth/gemma-3-1b-it",
+    "length": 8192
+  },
+  "reference": "reference.pt",
+  "timeout_s": 7200,
+  "head_to_head": [
+    "trt-alone",
+    "trt-hybrid-attention-rope-inductor",
+    "trt-generated-qk-norm-rope",
+    "inductor-fp16-fp16acc-max-autotune-torchflash"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.global_attention": "causal",
+        "workload.masks": "positions"
+      }
+    },
+    "trt-alone": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-rope-inductor": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.inductor": "attention-rope-inductor"
+      }
+    },
+    "trt-generated-qk-norm-rope": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.generated": "qk-norm-rope"
+      }
+    },
+    "inductor-fp16-fp16acc-max-autotune-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash",
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "trt-hybrid-rope-plugin": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.inductor": "rope-plugin"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected (not run by default). --session DIR replaces it with the recipe the session in DIR selected, and every TensorRT configuration here follows it",
+    "trt-alone": "TensorRT alone: the session recipe with runtime.cudagraphs, the base of the hybrid and generated configurations; TensorRT's own kernels run the q/k RMSNorm + RoPE",
+    "trt-hybrid-attention-rope-inductor": "The best hybrid of the hybrid head-to-head: trt-alone with kernels.inductor set to the value the name gives",
+    "trt-generated-qk-norm-rope": "trt-alone with kernels.generated=qk-norm-rope: the q and k RMSNorm + RoPE of every layer as kernels PR 4914's KernelGenerator writes, hosted in the engine where rope-plugin hosts Inductor's kernels. Generated kernels come from the workload's kernel cache (its kernel_cache argument, else $TORCHTRT_KERNEL_CACHE, else the default directory), keyed by the region and the engine options; a build that finds none for its options generates them, so run the generated configuration once before timing it (bench_compare.py run, which has no time limit) or leave timeout_s room for the generator's 1800 s per distinct region, which it does",
+    "inductor-fp16-fp16acc-max-autotune-torchflash": "The strongest Inductor configuration of the hybrid head-to-head",
+    "trt-hybrid-rope-plugin": "Not run by default: trt-alone with Inductor's own q/k RMSNorm + RoPE kernels hosted in the same regions (kernels.inductor=rope-plugin), the hosted counterpart of trt-generated-qk-norm-rope"
+  }
+}

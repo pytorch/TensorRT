@@ -1,0 +1,229 @@
+{
+  "description": "Qwen3-0.6B batch-1 decode after an 8192-token prompt: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/agentic_decode.py:create_case",
+  "args": {
+    "model": "Qwen/Qwen3-0.6B",
+    "isl": 8192,
+    "osl": 64,
+    "prompt": "recall",
+    "prefill": "eager"
+  },
+  "reference": "reference.pt",
+  "timeout_s": 2400,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-max-autotune-flex",
+    "inductor-max-autotune-flex-cdt"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "kernels.decode_blocks": "all",
+        "runtime.cudagraphs": true,
+        "workload.cache": "static_v3"
+      }
+    },
+    "trt-static_v3": {
+      "recipe": {
+        "workload.cache": "static_v3"
+      }
+    },
+    "trt-static_v3-fp16acc": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false
+      }
+    },
+    "trt-static_v3-cudagraphs": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-static_v3-graphs": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-static_v3-graphs-prealloc": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "runtime.pre_allocated_outputs": true
+      }
+    },
+    "trt-static_v3-graphs-route-lower_fc": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-kgen:lower_fc:all=on"
+      }
+    },
+    "trt-static_v3-graphs-route-fp16_acc_off": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-cask_fusion:fp16_acc=off"
+      }
+    },
+    "trt-static_v3-graphs-route-match_gemv_mha": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-peep:match_gemv_mha=on"
+      }
+    },
+    "trt-static_v3-graphs-route-gemv_mha_v1": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-mha_fusion:gemv_mha_v2=off"
+      }
+    },
+    "trt-static_v3-graphs-route-splitk_off": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-tactic:splitk=off"
+      }
+    },
+    "trt-static_v3-graphs-route-late_h_fusion_off": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-late_h_fusion=off"
+      }
+    },
+    "trt-static_v3-graphs-opt4": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.optimization_level": 4
+      }
+    },
+    "trt-static_v3-graphs-opt5": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "engine.optimization_level": 5
+      }
+    },
+    "trt-static_v3-bf16": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.precision": "bf16"
+      }
+    },
+    "trt-static_v3-fp32": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.precision": "fp32"
+      }
+    },
+    "trt-static_v1": {
+      "recipe": {
+        "workload.cache": "static_v1"
+      }
+    },
+    "trt-static_v2-prealloc": {
+      "recipe": {
+        "runtime.pre_allocated_outputs": true
+      }
+    },
+    "trt-static_v2-route-match_gemv_mha": {
+      "recipe": {
+        "engine.build_route": "-peep:match_gemv_mha=on"
+      }
+    },
+    "trt-blocks": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "all"
+      }
+    },
+    "trt-blocks-layers": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "layers"
+      }
+    },
+    "trt-blocks-mlp+attn": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "mlp+attn"
+      }
+    },
+    "trt-blocks-mlp": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "engine.use_fp32_acc": false,
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "mlp"
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-reduce-overhead": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-flex-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected"
+  }
+}

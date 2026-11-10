@@ -1,0 +1,66 @@
+{
+  "description": "Nemotron-3-Nano-4B batch-1 decode after a 128-token prompt: where the MLP blocks' kernels come from. TensorRT alone (the session recipe with CUDA graphs), the best hybrid with an Inductor region, the MLP blocks with kernels written by PR 4914's KernelGenerator on the TensorRT-alone base, and the strongest Inductor configuration",
+  "workload": "tools/llm/nemotron_decode.py:create_case",
+  "args": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "isl": 128,
+    "osl": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 7200,
+  "head_to_head": [
+    "trt-alone",
+    "trt-hybrid-lm-head",
+    "trt-generated-mlp",
+    "inductor-max-autotune-flex"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.build_route": "-kgen:lower_fc:all=on",
+        "runtime.cudagraphs": true,
+        "workload.ssm_state": "bf16",
+        "workload.state_update": "inplace"
+      }
+    },
+    "trt-alone": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-lm-head": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.inductor": "lm-head"
+      }
+    },
+    "trt-generated-mlp": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.generated": "mlp"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "trt-hybrid-mlp-inductor": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.inductor": "mlp-inductor"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected (not run by default). --session DIR replaces it with the recipe the session in DIR selected, and every TensorRT configuration here follows it",
+    "trt-alone": "TensorRT alone: the session recipe with CUDA graphs (each engine replays its own graph), the base of the hybrid and generated configurations; TensorRT's own kernels run the MLP blocks",
+    "trt-hybrid-lm-head": "The best hybrid of the hybrid head-to-head: trt-alone with the final RMSNorm and LM head in an Inductor region (kernels.inductor=lm-head), captured as one whole-step CUDA graph",
+    "trt-generated-mlp": "trt-alone with kernels.generated=mlp: each MLP block as two regions (RMSNorm + up GEMV + ReLU^2, down GEMV + residual add) with kernels PR 4914's KernelGenerator writes, hosted in the one engine. Generated kernels come from the workload's kernel cache (its kernel_cache argument, else $TORCHTRT_KERNEL_CACHE, else the default directory), keyed by the region and the engine options; a build that finds none for its options generates them, so run the generated configuration once before timing it (bench_compare.py run, which has no time limit) or leave timeout_s room for the generator's 1800 s per distinct region, which it does",
+    "inductor-max-autotune-flex": "The strongest Inductor configuration of the hybrid head-to-head",
+    "trt-hybrid-mlp-inductor": "Not run by default: trt-alone with every MLP block in an Inductor region (kernels.inductor=mlp-inductor), Inductor's kernels for the same blocks"
+  }
+}

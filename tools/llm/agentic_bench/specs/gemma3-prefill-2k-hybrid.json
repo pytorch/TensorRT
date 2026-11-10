@@ -1,0 +1,111 @@
+{
+  "description": "Gemma 3 1B batch-1 prefill of 2048 tokens. TensorRT with Inductor's kernels: the session recipe, its CUDA-graph control, the kernels.inductor variants on top of the session recipe, and the strongest Inductor configurations",
+  "workload": "tools/llm/agentic_prefill.py:create_case",
+  "args": {
+    "model": "unsloth/gemma-3-1b-it",
+    "length": 2048
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-session",
+    "trt-session-cudagraphs",
+    "trt-hybrid-attention-fa2-global",
+    "trt-hybrid-rope-plugin",
+    "inductor-fp16-fp16acc-max-autotune-torchflash-cdt"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.global_attention": "causal",
+        "workload.masks": "positions"
+      }
+    },
+    "trt-session-cudagraphs": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-fa2-global": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-fa2-global",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-fa2-all": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-fa2-all",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-inductor-global": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-inductor-global",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-inductor": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-inductor",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-rope-inductor-global": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-rope-inductor-global",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-attention-rope-inductor": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-rope-inductor",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-rope-plugin": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "rope-plugin",
+        "runtime.cudagraphs": true
+      }
+    },
+    "inductor-fp16-fp16acc-max-autotune-torchflash-cdt": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash",
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true,
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-max-autotune-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-session-cudagraphs": "Control: the session recipe with runtime.cudagraphs, which every kernels.inductor value requires",
+    "trt-hybrid-*": "The session recipe with kernels.inductor set to the value the name gives, and runtime.cudagraphs, its requirement"
+  }
+}

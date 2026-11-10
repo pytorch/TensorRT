@@ -1,0 +1,50 @@
+{
+  "description": "Qwen3-0.6B batch-1 decode: where the decoder-block kernels come from, with the kernels an Auto-Tuner session prepared. TensorRT's own kernels (static_v3 + CUDA graphs), the hand-written fused blocks, and the same five blocks with the kernels PR 4914's KernelGenerator wrote in that session (run with TORCHTRT_KERNEL_CACHE set to the session's kernel cache and TORCH_TENSORRT_REGION_GENERATION=0, so that every build loads them and none is generated), against the default build and the best Inductor setup",
+  "workload": "tools/llm/agentic_decode.py:create_case",
+  "args": {
+    "model": "Qwen/Qwen3-0.6B",
+    "isl": 128,
+    "osl": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 1800,
+  "head_to_head": [
+    "trt-default",
+    "trt-static_v3-graphs",
+    "trt-blocks-handwritten",
+    "trt-blocks-generated",
+    "inductor-max-autotune-flex"
+  ],
+  "configs": {
+    "trt-default": {
+      "recipe": {}
+    },
+    "trt-static_v3-graphs": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-blocks-handwritten": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "layers"
+      }
+    },
+    "trt-blocks-generated": {
+      "recipe": {
+        "workload.cache": "static_v3",
+        "runtime.cudagraphs": true,
+        "kernels.decode_blocks": "generated"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    }
+  }
+}

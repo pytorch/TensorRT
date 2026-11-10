@@ -1,0 +1,91 @@
+{
+  "description": "Qwen3.5-0.8B batch-1 prefill of 2048 tokens. TensorRT with Inductor regions: the session recipe, the kernels.inductor variants on top of it, and the strongest Inductor configurations",
+  "workload": "tools/llm/qwen35_prefill.py:create_case",
+  "args": {
+    "model": "Qwen/Qwen3.5-0.8B",
+    "length": 2048,
+    "positions": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-session",
+    "trt-hybrid-attention",
+    "trt-hybrid-attention+prologue-decay",
+    "inductor-functional-causal-tf32-fp16-fp16acc-default"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false,
+        "kernels.gdn_scan": "triton-tf32",
+        "runtime.cudagraphs": true,
+        "workload.attention": "causal",
+        "workload.conv": "shifts",
+        "workload.gdn": "functional"
+      }
+    },
+    "trt-hybrid-attention": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention"
+      }
+    },
+    "trt-hybrid-prologue": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "prologue"
+      }
+    },
+    "trt-hybrid-prologue-decay": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "prologue-decay"
+      }
+    },
+    "trt-hybrid-attention+prologue": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention+prologue"
+      }
+    },
+    "trt-hybrid-attention+prologue-decay": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention+prologue-decay"
+      }
+    },
+    "inductor-functional-causal-tf32-fp16-fp16acc-default": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal",
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-functional-causal-max-autotune": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-hybrid-*": "The session recipe with kernels.inductor set to the value the name gives; the session recipe already meets the tool's requirements (workload.gdn=functional, workload.attention=causal, runtime.cudagraphs)",
+    "inductor-*": "The Inductor configurations of the main head-to-head"
+  }
+}

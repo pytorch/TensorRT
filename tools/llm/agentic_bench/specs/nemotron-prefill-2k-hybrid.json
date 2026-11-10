@@ -1,0 +1,77 @@
+{
+  "description": "Nemotron-3-Nano-4B batch-1 prefill of 2048 tokens. TensorRT with Inductor regions: the session recipe, the kernels.inductor variants on top of it, and the Inductor configurations",
+  "workload": "tools/llm/nemotron_decode.py:create_prefill_case",
+  "args": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "length": 2048,
+    "positions": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-session",
+    "trt-hybrid-mamba-inductor",
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.tf32": true,
+        "workload.chunk_size": 128,
+        "workload.ssd": "grouped"
+      }
+    },
+    "trt-hybrid-mamba-inductor": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "mamba-inductor"
+      }
+    },
+    "trt-hybrid-mamba-inductor-graph": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "mamba-inductor-graph"
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc-ssd-grouped-chunk128": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-ssd-grouped": {
+      "recipe": {
+        "workload.ssd": "grouped"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.tf32": true,
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-hybrid-*": "The session recipe with kernels.inductor set to the value the name gives (mamba-inductor-graph: the same program recorded whole as one CUDA graph)",
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128": "Inductor with the TF32 allowance the session recipe uses (engine.tf32): the hybrid's regions also run their FP32 einsums with TF32"
+  }
+}

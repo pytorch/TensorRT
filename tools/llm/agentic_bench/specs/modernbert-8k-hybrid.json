@@ -1,0 +1,97 @@
+{
+  "description": "ModernBERT-base encoder forward over 8192 tokens. TensorRT with Inductor's kernels: the session recipe, the kernels.inductor variants on top of it, a decomposed-attention control with and without the hosted RoPE kernel, and the strongest Inductor configurations",
+  "workload": "tools/llm/agentic_encoder.py:create_case",
+  "args": {
+    "model": "answerdotai/ModernBERT-base",
+    "length": 8192
+  },
+  "reference": "reference.pt",
+  "timeout_s": 1800,
+  "head_to_head": [
+    "trt-session",
+    "trt-hybrid-rope-kernel",
+    "trt-decompose-cudagraphs",
+    "trt-decompose-hybrid-rope-kernel",
+    "inductor-max-autotune-flex-cdt-fp16acc"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "workload.local_attention": "banded128"
+      }
+    },
+    "trt-hybrid-rope-kernel": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "rope-kernel",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-rope-kernel-eager-numerics": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "rope-kernel-eager-numerics",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-inductor-regions": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "inductor-regions",
+        "runtime.cudagraphs": true
+      }
+    },
+    "inductor-max-autotune-flex-cdt-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        },
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "trt-session-cudagraphs": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-decompose-cudagraphs": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-decompose-hybrid-rope-kernel": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "runtime.cudagraphs": true,
+        "kernels.inductor": "rope-kernel"
+      }
+    },
+    "trt-decompose-hybrid-rope-kernel-eager-numerics": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "runtime.cudagraphs": true,
+        "kernels.inductor": "rope-kernel-eager-numerics"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-session-cudagraphs": "Control: the session recipe with CUDA graphs, no hybrid",
+    "trt-hybrid-*": "The session recipe with kernels.inductor set to the value the name gives, and runtime.cudagraphs, its requirement",
+    "trt-hybrid-rope-kernel-eager-numerics": "The hosted RoPE kernel generated under Inductor's emulate_precision_casts (Hugging Face's FP16 cos/sin rounding)",
+    "trt-decompose-*": "engine.decompose_attention alone, not the session recipe, with CUDA graphs: a control (trt-decompose-cudagraphs) and the hosted RoPE kernel on top of it; compare those two with each other",
+    "inductor-*": "The Inductor configurations of the main head-to-head"
+  }
+}

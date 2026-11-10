@@ -1,0 +1,322 @@
+{
+  "description": "Qwen3.5-0.8B batch-1 prefill of 2048 tokens: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/qwen35_prefill.py:create_case",
+  "args": {
+    "model": "Qwen/Qwen3.5-0.8B",
+    "length": 2048,
+    "positions": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-functional-causal-tf32-fp16-fp16acc-default",
+    "inductor-functional-causal-max-autotune"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false,
+        "kernels.gdn_scan": "triton-tf32",
+        "runtime.cudagraphs": true,
+        "workload.attention": "causal",
+        "workload.conv": "shifts",
+        "workload.gdn": "functional"
+      }
+    },
+    "trt-causal": {
+      "recipe": {
+        "workload.attention": "causal"
+      }
+    },
+    "trt-functional": {
+      "recipe": {
+        "workload.gdn": "functional"
+      }
+    },
+    "trt-functional-shifts": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts"
+      }
+    },
+    "trt-functional-shifts-causal": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal"
+      }
+    },
+    "trt-functional-shifts-decompose-attention": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.decompose_attention": true
+      }
+    },
+    "trt-functional-shifts-tf32": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.disable_tf32": false
+      }
+    },
+    "trt-functional-shifts-cudagraphs": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-functional-shifts-scan": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "kernels.gdn_scan": "triton",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-functional-shifts-scan-tf32": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "kernels.gdn_scan": "triton-tf32",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-functional-shifts-chunk32": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.chunk_size": 32
+      }
+    },
+    "trt-functional-shifts-chunk128": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.chunk_size": 128
+      }
+    },
+    "trt-functional-shifts-chunk128-scan-tf32": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.chunk_size": 128,
+        "kernels.gdn_scan": "triton-tf32",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-functional-shifts-fp16": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.precision": "fp16"
+      }
+    },
+    "trt-functional-shifts-fp16-fp16acc": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false
+      }
+    },
+    "trt-functional-shifts-fp32": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.precision": "fp32"
+      }
+    },
+    "trt-functional-shifts-opt5": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.optimization_level": 5
+      }
+    },
+    "trt-functional-shifts-tiling-fast": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "engine.tiling_optimization_level": "fast"
+      }
+    },
+    "trt-functional-shifts-causal-tf32-fp16-fp16acc": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal",
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false
+      }
+    },
+    "trt-combined": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal",
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false,
+        "kernels.gdn_scan": "triton-tf32",
+        "runtime.cudagraphs": true
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-reduce-overhead": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-no-cudagraphs": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune-no-cudagraphs"
+      }
+    },
+    "inductor-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-max-autotune-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-causal-default": {
+      "recipe": {
+        "workload.attention": "causal"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-causal-max-autotune": {
+      "recipe": {
+        "workload.attention": "causal"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "eager-functional": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts"
+      },
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-functional-default": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-functional-max-autotune": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-functional-causal-default": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-functional-causal-max-autotune": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-functional-causal-tf32-fp16-fp16acc-default": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal",
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-functional-causal-tf32-fp16-fp16acc-max-autotune": {
+      "recipe": {
+        "workload.gdn": "functional",
+        "workload.conv": "shifts",
+        "workload.attention": "causal",
+        "engine.disable_tf32": false,
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": false
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected"
+  }
+}

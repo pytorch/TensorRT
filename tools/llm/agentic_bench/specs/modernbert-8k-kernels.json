@@ -1,0 +1,80 @@
+{
+  "description": "ModernBERT-base encoder forward over 8192 tokens: where the kernel of each layer's QKV split and rotary embedding comes from. TensorRT alone (decomposed attention with CUDA graphs, the base of the best hybrid), that hybrid (Inductor's generated kernel hosted in the engine), the same regions with a kernel written by PR 4914's KernelGenerator on the same base, and the strongest Inductor configuration",
+  "workload": "tools/llm/agentic_encoder.py:create_case",
+  "args": {
+    "model": "answerdotai/ModernBERT-base",
+    "length": 8192
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-alone",
+    "trt-decompose-hybrid-rope-kernel",
+    "trt-decompose-generated-split-rope",
+    "inductor-max-autotune-flex-cdt-fp16acc"
+  ],
+  "configs": {
+    "trt-alone": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-decompose-hybrid-rope-kernel": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.inductor": "rope-kernel"
+      }
+    },
+    "trt-decompose-generated-split-rope": {
+      "extends": "trt-alone",
+      "recipe": {
+        "kernels.generated": "split-rope"
+      }
+    },
+    "inductor-max-autotune-flex-cdt-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        },
+        "fp16_accumulation": true
+      }
+    },
+    "trt-session": {
+      "recipe": {
+        "workload.local_attention": "banded128"
+      }
+    },
+    "trt-session-cudagraphs": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-hybrid-rope-kernel": {
+      "extends": "trt-session-cudagraphs",
+      "recipe": {
+        "kernels.inductor": "rope-kernel"
+      }
+    },
+    "trt-generated-split-rope": {
+      "extends": "trt-session-cudagraphs",
+      "recipe": {
+        "kernels.generated": "split-rope"
+      }
+    }
+  },
+  "notes": {
+    "trt-alone": "TensorRT alone: engine.decompose_attention with runtime.cudagraphs, the base of the best hybrid of the hybrid head-to-head (its trt-decompose-cudagraphs); TensorRT's own kernels run each layer's QKV split and RoPE",
+    "trt-decompose-hybrid-rope-kernel": "The best hybrid of the hybrid head-to-head: trt-alone with Inductor's generated split + RoPE kernel hosted in the engine (kernels.inductor=rope-kernel)",
+    "trt-decompose-generated-split-rope": "trt-alone with kernels.generated=split-rope: the same split_rope regions with a kernel PR 4914's KernelGenerator writes. Generated kernels come from the workload's kernel cache (its kernel_cache argument, else $TORCHTRT_KERNEL_CACHE, else the default directory), keyed by the region and the engine options; a build that finds none for its options generates them, so run the generated configuration once before timing it (bench_compare.py run, which has no time limit) or leave timeout_s room for the generator's 1800 s per distinct region, which it does",
+    "inductor-max-autotune-flex-cdt-fp16acc": "The strongest Inductor configuration of the hybrid head-to-head",
+    "trt-session": "Not run by default: the recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected; the trt-session-* configurations and those extending them follow it",
+    "trt-session-cudagraphs": "Not run by default: the session recipe with CUDA graphs, TensorRT alone on the session's base",
+    "trt-hybrid-rope-kernel": "Not run by default: the session recipe with CUDA graphs and kernels.inductor=rope-kernel",
+    "trt-generated-split-rope": "Not run by default: the session recipe with CUDA graphs and kernels.generated=split-rope"
+  }
+}

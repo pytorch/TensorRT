@@ -1,0 +1,283 @@
+{
+  "description": "Gemma 3 1B batch-1 prefill of 8192 tokens: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/agentic_prefill.py:create_case",
+  "args": {
+    "model": "unsloth/gemma-3-1b-it",
+    "length": 8192
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-fp16-fp16acc-max-autotune-torchflash",
+    "inductor-max-autotune-torchflash"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.global_attention": "causal",
+        "workload.masks": "positions"
+      }
+    },
+    "trt-positions": {
+      "recipe": {
+        "workload.masks": "positions"
+      }
+    },
+    "trt-positions-causal": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal"
+      }
+    },
+    "trt-banded128-causal": {
+      "recipe": {
+        "workload.global_attention": "causal",
+        "workload.local_attention": "banded-128"
+      }
+    },
+    "trt-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash"
+      }
+    },
+    "trt-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      }
+    },
+    "trt-fp16-positions-causal": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16"
+      }
+    },
+    "trt-fp16-torchflash-cudagraphs": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash",
+        "engine.precision": "fp16",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-fp16-fp32acc-positions-causal": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.build_route": "-cask:fp16_acc=off"
+      }
+    },
+    "trt-fp16-positions-causal-opt4": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.optimization_level": 4
+      }
+    },
+    "trt-fp16-positions-causal-opt5": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.optimization_level": 5
+      }
+    },
+    "trt-fp16-positions-causal-tiling-moderate": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.tiling_optimization_level": "moderate"
+      }
+    },
+    "trt-fp16-positions-causal-tiling-fast": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.tiling_optimization_level": "fast"
+      }
+    },
+    "trt-fp16-positions-causal-tiling-full": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "engine.tiling_optimization_level": "full"
+      }
+    },
+    "trt-fp16-positions-causal-cudagraphs": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-fp16-positions-causal-prealloc": {
+      "recipe": {
+        "workload.masks": "positions",
+        "workload.global_attention": "causal",
+        "engine.precision": "fp16",
+        "runtime.pre_allocated_outputs": true
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "eager-flex": {
+      "bench": {
+        "backend": "eager",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-no-cudagraphs": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune-no-cudagraphs"
+      }
+    },
+    "inductor-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-flex-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-flex-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-flex-max-autotune-no-cudagraphs": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune-no-cudagraphs",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-flex-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "eager-fp16-fp16acc": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "eager",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-fp16-fp16acc-max-autotune": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-fp16-fp16acc-flex-max-autotune": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "fp16_accumulation": true
+      }
+    },
+    "eager-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash"
+      },
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-max-autotune-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-fp16-fp16acc-max-autotune-torchflash": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash",
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-fp16-fp16acc-max-autotune-torchflash-cdt": {
+      "recipe": {
+        "workload.global_attention": "torch-flash",
+        "workload.local_attention": "torch-flash",
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true,
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected"
+  }
+}

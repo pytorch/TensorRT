@@ -1,0 +1,63 @@
+{
+  "description": "Nemotron-3-Nano-4B batch-1 decode after a 128-token prompt. TensorRT with Inductor regions: the session recipe, the whole-step CUDA-graph control, the kernels.inductor variants on top of the session recipe, and the strongest Inductor configurations",
+  "workload": "tools/llm/nemotron_decode.py:create_case",
+  "args": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "isl": 128,
+    "osl": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-session",
+    "trt-session-whole-graph",
+    "trt-hybrid-lm-head",
+    "inductor-max-autotune-flex"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "engine.build_route": "-kgen:lower_fc:all=on",
+        "runtime.cudagraphs": true,
+        "workload.ssm_state": "bf16",
+        "workload.state_update": "inplace"
+      }
+    },
+    "trt-hybrid-lm-head": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "lm-head"
+      }
+    },
+    "trt-hybrid-mlp-inductor": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "mlp-inductor"
+      }
+    },
+    "trt-session-whole-graph": {
+      "extends": "trt-session",
+      "bench": {
+        "whole_graph": true
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-session-whole-graph": "Control: the session engine captured as one whole-step CUDA graph by the workload (bench.whole_graph), the capture the hybrid variants use, instead of the runtime's per-engine graphs",
+    "trt-hybrid-*": "The session recipe with kernels.inductor set to the value the name gives"
+  }
+}

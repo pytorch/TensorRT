@@ -1,0 +1,95 @@
+{
+  "description": "Qwen3-0.6B batch-1 decode after an 8192-token prompt. TensorRT with Inductor's kernels: the session recipe, the step-graph control, the kernels.inductor variants on top of the session recipe, and the strongest Inductor configuration. The 29-engine region variants (trt-hybrid-attention, trt-hybrid-attention-math) have run at one of two launch-gap levels per process with identical kernels and graphs: judge them over several rounds",
+  "workload": "tools/llm/agentic_decode.py:create_case",
+  "args": {
+    "model": "Qwen/Qwen3-0.6B",
+    "isl": 8192,
+    "osl": 64,
+    "prompt": "recall",
+    "prefill": "eager"
+  },
+  "reference": "reference.pt",
+  "timeout_s": 2400,
+  "head_to_head": [
+    "trt-session",
+    "trt-session-step-graph",
+    "trt-hybrid-attention-flex",
+    "trt-hybrid-attention",
+    "inductor-max-autotune-flex"
+  ],
+  "configs": {
+    "trt-session": {
+      "recipe": {
+        "kernels.decode_blocks": "all",
+        "runtime.cudagraphs": true,
+        "workload.cache": "static_v3"
+      }
+    },
+    "trt-session-step-graph": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.step_graph": true
+      }
+    },
+    "trt-hybrid-attention-flex": {
+      "extends": "trt-session",
+      "recipe": {
+        "kernels.inductor": "attention-flex"
+      }
+    },
+    "trt-hybrid-attention-flex-step-graph": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.step_graph": true,
+        "kernels.inductor": "attention-flex"
+      }
+    },
+    "trt-hybrid-lm-head": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.step_graph": true,
+        "kernels.inductor": "lm-head"
+      }
+    },
+    "trt-hybrid-attention": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.step_graph": true,
+        "kernels.inductor": "attention"
+      }
+    },
+    "trt-hybrid-attention-math": {
+      "extends": "trt-session",
+      "recipe": {
+        "runtime.step_graph": true,
+        "kernels.inductor": "attention-math"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-flex-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "trt-session-step-graph": "Control: the session recipe captured as one whole-step CUDA graph (runtime.step_graph), the capture the region variants need",
+    "trt-hybrid-attention-flex": "kernels.inductor=attention-flex: Inductor's generated flex-decoding kernels (a split-KV template and two combine reductions) hosted in the engine as fused_kernel plugins, no engine boundary, under the session's per-engine CUDA graphs",
+    "trt-hybrid-attention-flex-step-graph": "attention-flex under the whole-step CUDA graph (compare with trt-session-step-graph)",
+    "trt-hybrid-lm-head": "The final RMSNorm and lm_head as one execute_in_torch(backend='inductor') region (one engine boundary); requires the step graph",
+    "trt-hybrid-attention": "Every layer's decode attention as an Inductor region running flex-decoding through the opaque custom operator qwen3_regions::flex_decode (28 regions, 29 engines, 56 boundaries); requires the step graph",
+    "trt-hybrid-attention-math": "The same 28 regions with plain attention math compiled by Inductor (QK^T matmul, masked FP32 softmax over FP16 scores, PV matmul); requires the step graph"
+  }
+}

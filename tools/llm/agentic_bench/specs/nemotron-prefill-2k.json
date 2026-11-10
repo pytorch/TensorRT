@@ -1,0 +1,193 @@
+{
+  "description": "Nemotron-3-Nano-4B batch-1 prefill of 2048 tokens: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/nemotron_decode.py:create_prefill_case",
+  "args": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "length": 2048,
+    "positions": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128",
+    "inductor-max-autotune-fp16-fp16acc-ssd-grouped-chunk128",
+    "inductor-max-autotune-ssd-grouped"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.tf32": true,
+        "workload.chunk_size": 128,
+        "workload.ssd": "grouped"
+      }
+    },
+    "trt-tf32": {
+      "recipe": {
+        "engine.tf32": true
+      }
+    },
+    "trt-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      }
+    },
+    "trt-fp16-fp32acc": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": true
+      }
+    },
+    "trt-ssd-segsum": {
+      "recipe": {
+        "workload.ssd": "segsum"
+      }
+    },
+    "trt-ssd-grouped": {
+      "recipe": {
+        "workload.ssd": "grouped"
+      }
+    },
+    "trt-chunk128": {
+      "recipe": {
+        "workload.chunk_size": 128
+      }
+    },
+    "trt-chunk64": {
+      "recipe": {
+        "workload.chunk_size": 64
+      }
+    },
+    "trt-fp16-ssd-grouped": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.ssd": "grouped"
+      }
+    },
+    "trt-ssd-grouped-chunk128": {
+      "recipe": {
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      }
+    },
+    "trt-fp16-ssd-grouped-chunk128": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-reduce-overhead": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-default-ssd-grouped": {
+      "recipe": {
+        "workload.ssd": "grouped"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-max-autotune-ssd-grouped": {
+      "recipe": {
+        "workload.ssd": "grouped"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc-ssd-grouped": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.ssd": "grouped"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc-ssd-grouped-chunk128": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.tf32": true,
+        "workload.ssd": "grouped",
+        "workload.chunk_size": 128
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected",
+    "inductor-max-autotune-fp16-fp16acc-tf32-ssd-grouped-chunk128": "Inductor with the TF32 allowance the session recipe uses (engine.tf32) and FP16 accumulation: the precision-matched comparison"
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "description": "ModernBERT-base encoder forward over 512 tokens: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/agentic_encoder.py:create_case",
+  "args": {
+    "model": "answerdotai/ModernBERT-base",
+    "length": 512
+  },
+  "reference": "reference.pt",
+  "timeout_s": 1800,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-max-autotune-flex-fp16acc",
+    "inductor-max-autotune-flex-cdt"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "graph.fold_attention_masks": true,
+        "workload.local_attention": "banded128"
+      }
+    },
+    "trt-cudagraphs": {
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-pre-alloc": {
+      "recipe": {
+        "runtime.pre_allocated_outputs": true
+      }
+    },
+    "trt-opt5": {
+      "recipe": {
+        "engine.optimization_level": 5
+      }
+    },
+    "trt-fold-masks": {
+      "recipe": {
+        "graph.fold_attention_masks": true
+      }
+    },
+    "trt-decompose": {
+      "recipe": {
+        "engine.decompose_attention": true
+      }
+    },
+    "trt-decompose-cudagraphs": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-decompose-opt5": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "engine.optimization_level": 5
+      }
+    },
+    "trt-decompose-route-splitk-off": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "engine.build_route": "-tactic:splitk=off"
+      }
+    },
+    "trt-banded64": {
+      "recipe": {
+        "workload.local_attention": "banded64"
+      }
+    },
+    "trt-banded128": {
+      "recipe": {
+        "workload.local_attention": "banded128"
+      }
+    },
+    "trt-banded256": {
+      "recipe": {
+        "workload.local_attention": "banded256"
+      }
+    },
+    "trt-banded128-cudagraphs": {
+      "recipe": {
+        "workload.local_attention": "banded128",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-banded128-decompose": {
+      "recipe": {
+        "workload.local_attention": "banded128",
+        "engine.decompose_attention": true
+      }
+    },
+    "trt-route-splitk-off": {
+      "recipe": {
+        "engine.build_route": "-tactic:splitk=off"
+      }
+    },
+    "trt-route-cask-fp16acc-off": {
+      "recipe": {
+        "engine.build_route": "-cask:fp16_acc=off"
+      }
+    },
+    "trt-decompose-route-cask-fp16acc-off": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "engine.build_route": "-cask:fp16_acc=off"
+      }
+    },
+    "trt-banded128-route-cask-fp16acc-off": {
+      "recipe": {
+        "workload.local_attention": "banded128",
+        "engine.build_route": "-cask:fp16_acc=off"
+      }
+    },
+    "trt-route-cask-all-fp16acc-off": {
+      "recipe": {
+        "engine.build_route": "-cask:fp16_acc=off -cask_fusion:fp16_acc=off"
+      }
+    },
+    "trt-decompose-route-cask-all-fp16acc-off": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "engine.build_route": "-cask:fp16_acc=off -cask_fusion:fp16_acc=off"
+      }
+    },
+    "trt-fp32acc": {
+      "recipe": {
+        "engine.use_fp32_acc": true
+      }
+    },
+    "trt-banded128-fp32acc": {
+      "recipe": {
+        "workload.local_attention": "banded128",
+        "engine.use_fp32_acc": true
+      }
+    },
+    "trt-decompose-fp32acc": {
+      "recipe": {
+        "engine.decompose_attention": true,
+        "engine.use_fp32_acc": true
+      }
+    },
+    "trt-fp32": {
+      "recipe": {
+        "engine.precision": "fp32"
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-reduce-overhead": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-no-cudagraphs": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune-no-cudagraphs"
+      }
+    },
+    "inductor-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-default-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-no-cudagraphs-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune-no-cudagraphs",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-flex-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "eager-fp16acc": {
+      "bench": {
+        "backend": "eager",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-default-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-default-flex-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default",
+        "attn": "flex_attention",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-flex-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-flex-cdt-fp16acc": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        },
+        "fp16_accumulation": true
+      }
+    },
+    "inductor-max-autotune-banded128": {
+      "recipe": {
+        "workload.local_attention": "banded128"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-banded128-fp16acc": {
+      "recipe": {
+        "workload.local_attention": "banded128"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "fp16_accumulation": true
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected"
+  }
+}

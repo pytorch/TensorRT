@@ -1,0 +1,183 @@
+{
+  "description": "Nemotron-3-Nano-4B batch-1 decode after a 128-token prompt: the TensorRT baseline, the recipe the agent session selected and the strongest Inductor configurations (head_to_head); the other configs are the menu they were chosen from",
+  "workload": "tools/llm/nemotron_decode.py:create_case",
+  "args": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+    "isl": 128,
+    "osl": 64
+  },
+  "reference": "reference.pt",
+  "timeout_s": 3600,
+  "head_to_head": [
+    "trt-baseline",
+    "trt-session",
+    "inductor-max-autotune-flex",
+    "inductor-max-autotune"
+  ],
+  "configs": {
+    "trt-baseline": {
+      "recipe": {}
+    },
+    "trt-session": {
+      "recipe": {
+        "engine.build_route": "-kgen:lower_fc:all=on",
+        "runtime.cudagraphs": true,
+        "workload.ssm_state": "bf16",
+        "workload.state_update": "inplace"
+      }
+    },
+    "trt-cudagraphs": {
+      "recipe": {
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-inplace": {
+      "recipe": {
+        "workload.state_update": "inplace"
+      }
+    },
+    "trt-inplace-cudagraphs": {
+      "recipe": {
+        "workload.state_update": "inplace",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-ssm-bf16": {
+      "recipe": {
+        "workload.ssm_state": "bf16"
+      }
+    },
+    "trt-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      }
+    },
+    "trt-fp16-fp32acc": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": true
+      }
+    },
+    "trt-route-kgen-lower-fc": {
+      "recipe": {
+        "engine.build_route": "-kgen:lower_fc:all=on"
+      }
+    },
+    "trt-route-splitk-off": {
+      "recipe": {
+        "engine.build_route": "-tactic:splitk=off"
+      }
+    },
+    "trt-inplace-ssm-bf16": {
+      "recipe": {
+        "workload.state_update": "inplace",
+        "workload.ssm_state": "bf16"
+      }
+    },
+    "trt-inplace-cudagraphs-ssm-bf16": {
+      "recipe": {
+        "workload.state_update": "inplace",
+        "workload.ssm_state": "bf16",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-fp16-fp32acc-kgen": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": true,
+        "engine.build_route": "-kgen:lower_fc:all=on"
+      }
+    },
+    "trt-inplace-cudagraphs-kgen": {
+      "recipe": {
+        "workload.state_update": "inplace",
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-kgen:lower_fc:all=on"
+      }
+    },
+    "trt-fp16-fp32acc-inplace-cudagraphs": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": true,
+        "workload.state_update": "inplace",
+        "runtime.cudagraphs": true
+      }
+    },
+    "trt-fp16-fp32acc-inplace-cudagraphs-kgen": {
+      "recipe": {
+        "engine.precision": "fp16",
+        "engine.use_fp32_acc": true,
+        "workload.state_update": "inplace",
+        "runtime.cudagraphs": true,
+        "engine.build_route": "-kgen:lower_fc:all=on"
+      }
+    },
+    "eager": {
+      "bench": {
+        "backend": "eager"
+      }
+    },
+    "inductor-default": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "default"
+      }
+    },
+    "inductor-reduce-overhead": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    },
+    "inductor-max-autotune-cdt": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "inductor": {
+          "coordinate_descent_tuning": true
+        }
+      }
+    },
+    "inductor-reduce-overhead-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-max-autotune-flex": {
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune",
+        "attn": "flex_attention"
+      }
+    },
+    "inductor-reduce-overhead-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "reduce-overhead"
+      }
+    },
+    "inductor-max-autotune-fp16": {
+      "recipe": {
+        "engine.precision": "fp16"
+      },
+      "bench": {
+        "backend": "inductor",
+        "mode": "max-autotune"
+      }
+    }
+  },
+  "notes": {
+    "trt-session": "The recipe the published agent session selected. --session DIR replaces it with the recipe the session in DIR selected"
+  }
+}
