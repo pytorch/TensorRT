@@ -376,6 +376,16 @@ _GUARD_GOOD_RUNPATH = (
     "$ORIGIN:$ORIGIN/../../executorch/lib:$ORIGIN/../../tensorrt_libs"
     ":$ORIGIN/../../nvidia/cu13/lib"
 )
+# The same for a TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME build, which also reaches TensorRT's lean wheel.
+_GUARD_LEAN_RUNPATH = (
+    "$ORIGIN:$ORIGIN/../../executorch/lib:$ORIGIN/../../tensorrt_lean_libs"
+    ":$ORIGIN/../../tensorrt_libs:$ORIGIN/../../nvidia/cu13/lib"
+)
+_GUARD_LEAN_CASES = {
+    "lean_runtime",
+    "lean_build_links_libnvinfer",
+    "lean_runtime_without_build_runpath",
+}
 # Cases kept on the 3-argument invocation so the fallback branch (the elif in the guard that
 # spot-checks for '$ORIGIN/../../executorch/lib' when no expected RUNPATH is passed) and the
 # absolute-entry check below it stay covered. Everything else runs with the fourth argument the
@@ -385,6 +395,7 @@ _THREE_ARG_CASES = {
     "runpath_missing_executorch",
     "absolute_runpath",
     "runpath_fallback_reaches_executorch",
+    "lean_runtime_without_build_runpath",
 }
 
 
@@ -1586,6 +1597,13 @@ def _assert_the_checker_is_reachable(prologue: str) -> None:
         ("no_needed_libstdcxx", False),
         ("cuda_12_runtime", False),
         ("cuda_13_runtime", True),
+        # A build with TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME links libnvinfer_lean instead, and only
+        # such a build may.
+        ("lean_runtime", True),
+        ("lean_build_links_libnvinfer", False),
+        ("lean_library_in_default_build", False),
+        # Lean is read from the library's own RUNPATH, so this passes on 3 arguments.
+        ("lean_runtime_without_build_runpath", True),
         ("runtime_only_imports_register_backend", False),
         ("runtime_exports_a_near_miss", False),
         ("elfutils_bare_rpath", False),
@@ -1642,7 +1660,9 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         "dt_rpath": _GUARD_GOOD_RUNPATH,
         "elfutils_bare_rpath": _GUARD_GOOD_RUNPATH,
     }
-    default_runpath = _GUARD_GOOD_RUNPATH
+    default_runpath = (
+        _GUARD_LEAN_RUNPATH if case in _GUARD_LEAN_CASES else _GUARD_GOOD_RUNPATH
+    )
     tag = "RPATH" if case == "dt_rpath" else "RUNPATH"
     # No DT_NEEDED on the runtime means the delegate resolves register_backend from nowhere. This
     # case drops only this line and keeps the extension_cuda line below, so the libexecutorch.so
@@ -1671,6 +1691,15 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         dyn += " 0x0000000000000001 (NEEDED) Shared library: [libcudart.so.12]\n"
     if case == "cuda_13_runtime":
         dyn += " 0x0000000000000001 (NEEDED) Shared library: [libcudart.so.13]\n"
+    if case in (
+        "lean_runtime",
+        "lean_build_links_libnvinfer",
+        "lean_library_in_default_build",
+        "lean_runtime_without_build_runpath",
+    ):
+        dyn += " 0x0000000000000001 (NEEDED) Shared library: [libnvinfer_lean.so.11]\n"
+    if case == "lean_build_links_libnvinfer":
+        dyn += " 0x0000000000000001 (NEEDED) Shared library: [libnvinfer.so.11]\n"
     rp = runpaths.get(case, default_runpath)
     if rp:
         if case == "elfutils_bare_rpath":
@@ -1823,7 +1852,7 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
     # fallback so it stays covered too.
     argv = ["sh", str(guard), str(stub), str(target), str(runtime)]
     if case not in _THREE_ARG_CASES:
-        argv.append(_GUARD_GOOD_RUNPATH)
+        argv.append(default_runpath)
         # The manylinux tag the row ships under. Without it the guard skips the symbol version
         # ceiling entirely, so every ceiling case would pass for the wrong reason.
         argv.append("manylinux_2_28_x86_64")
@@ -1846,6 +1875,8 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         "no_needed_extension_cuda": "has no DT_NEEDED on libexecutorch_extension_cuda.so",
         "no_needed_libstdcxx": "has no DT_NEEDED on libstdc++",
         "cuda_12_runtime": "this delegate requires CUDA 13",
+        "lean_build_links_libnvinfer": "is a lean build but links",
+        "lean_library_in_default_build": "which only a lean build may link",
         "readelf_broken": "could not inspect",
         "readelf_v_broken": "could not read symbol versions of",
         "unversioned_cxx_undef": "unversioned undefined C++ runtime symbols",

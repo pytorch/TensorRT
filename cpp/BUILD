@@ -229,10 +229,10 @@ cc_library(
     strip_include_prefix = "src",
 )
 
-# The one internal entry point of :tensorrt_executorch_backend that its test calls
-# directly. Under src/ for the same reason as the pool header above: it is an
-# implementation detail of execute(), and an installed header declaring it would
-# make it API from the next release.
+# Internal steps of :tensorrt_executorch_backend, split out so its test can call
+# install_pooled_scratch directly. Under src/ for the same reason as the pool
+# header above: they are implementation details of execute(), and an installed
+# header declaring them would make them API from the next release.
 #
 # It carries the definition and not only the declaration, so the target stands on
 # its own: a header target whose symbol another target defines links only for a
