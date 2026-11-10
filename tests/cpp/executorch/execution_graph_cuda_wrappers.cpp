@@ -5,13 +5,101 @@
 
 #include "execution_graph_cuda_wrappers.h"
 
+#include <cudaTypedefs.h>
+
+#include <chrono>
 #include <cstring>
+#include <thread>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
 namespace testing {
 
 thread_local CudaCalls* active_calls = nullptr;
+std::atomic<int> primary_context_retains{0};
+std::atomic<int> primary_context_releases{0};
+std::atomic<int> fail_flag_writes{0};
+
+namespace {
+PFN_cuCtxGetId_v12000 real_context_id = nullptr;
+PFN_cuCtxFromGreenCtx_v12040 real_from_green = nullptr;
+std::atomic<bool> slow_green_calls{false};
+std::atomic<int> green_calls_inside{0};
+std::atomic<int> most_green_calls_inside{0};
+
+CUresult slow_from_green(CUcontext* context, CUgreenCtx green) {
+  const int inside = ++green_calls_inside;
+  int most = most_green_calls_inside.load();
+  while (inside > most && !most_green_calls_inside.compare_exchange_weak(most, inside)) {
+  }
+  if (slow_green_calls) {
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+  }
+  const CUresult result = real_from_green(context, green);
+  --green_calls_inside;
+  return result;
+}
+std::atomic<unsigned long long> context_id_offset{0};
+PFN_cuDevicePrimaryCtxRetain_v7000 real_retain = nullptr;
+PFN_cuDevicePrimaryCtxRelease_v11000 real_release = nullptr;
+PFN_cuStreamWriteValue64_v11070 real_write_value = nullptr;
+
+CUresult renewable_context_id(CUcontext context, unsigned long long* id) {
+  const CUresult result = real_context_id(context, id);
+  if (result == CUDA_SUCCESS) {
+    *id += context_id_offset.load();
+  }
+  return result;
+}
+
+CUresult counting_retain(CUcontext* context, CUdevice device) {
+  const CUresult result = real_retain(context, device);
+  if (result == CUDA_SUCCESS) {
+    ++primary_context_retains;
+  }
+  return result;
+}
+
+CUresult counting_release(CUdevice device) {
+  const CUresult result = real_release(device);
+  if (result == CUDA_SUCCESS) {
+    ++primary_context_releases;
+  }
+  return result;
+}
+
+CUresult failing_write_value(CUstream stream, CUdeviceptr address, cuuint64_t value, unsigned int flags) {
+  int pending = fail_flag_writes.load();
+  while (pending > 0) {
+    if (fail_flag_writes.compare_exchange_weak(pending, pending - 1)) {
+      return CUDA_ERROR_INVALID_VALUE;
+    }
+  }
+  return real_write_value(stream, address, value, flags);
+}
+} // namespace
+
+// Far above any id the driver hands out in one process, since it counts them up from 1.
+RenewedContextIds::RenewedContextIds() {
+  context_id_offset = 1ull << 40;
+}
+
+RenewedContextIds::~RenewedContextIds() {
+  context_id_offset = 0;
+}
+
+SlowGreenContextCalls::SlowGreenContextCalls() {
+  most_green_calls_inside = 0;
+  slow_green_calls = true;
+}
+
+SlowGreenContextCalls::~SlowGreenContextCalls() {
+  slow_green_calls = false;
+}
+
+int SlowGreenContextCalls::most_at_once() const {
+  return most_green_calls_inside.load();
+}
 
 CudaCalls::CudaCalls() : previous_(active_calls) {
   active_calls = this;
@@ -33,9 +121,15 @@ cudaError_t __real_cudaFree(void*);
 cudaError_t __real_cudaFreeAsync(void*, cudaStream_t);
 cudaError_t __real_cudaMemcpyAsync(void*, const void*, size_t, cudaMemcpyKind, cudaStream_t);
 cudaError_t __real_cudaStreamBeginCapture(cudaStream_t, cudaStreamCaptureMode);
+cudaError_t __real_cudaStreamEndCapture(cudaStream_t, cudaGraph_t*);
 cudaError_t __real_cudaGraphLaunch(cudaGraphExec_t, cudaStream_t);
 cudaError_t __real_cudaDeviceGetAttribute(int*, cudaDeviceAttr, int);
 cudaError_t __real_cudaStreamSynchronize(cudaStream_t);
+cudaError_t __real_cudaStreamDestroy(cudaStream_t);
+cudaError_t __real_cudaEventRecord(cudaEvent_t, cudaStream_t);
+cudaError_t __real_cudaEventCreateWithFlags(cudaEvent_t*, unsigned int);
+cudaError_t __real_cudaStreamWaitEvent(cudaStream_t, cudaEvent_t, unsigned int);
+cudaError_t __real_cudaGraphExecDestroy(cudaGraphExec_t);
 cudaError_t __real_cudaGetDriverEntryPointByVersion(
     const char*,
     void**,
@@ -56,7 +150,27 @@ cudaError_t __wrap_cudaGetDriverEntryPointByVersion(
       return cudaErrorNotSupported;
     }
   }
-  return __real_cudaGetDriverEntryPointByVersion(name, entry, version, flags, status);
+  const auto result = __real_cudaGetDriverEntryPointByVersion(name, entry, version, flags, status);
+  if (result != cudaSuccess || *entry == nullptr) {
+    return result;
+  }
+  if (std::strcmp(name, "cuCtxFromGreenCtx") == 0) {
+    real_from_green = reinterpret_cast<PFN_cuCtxFromGreenCtx_v12040>(*entry);
+    *entry = reinterpret_cast<void*>(&slow_from_green);
+  } else if (std::strcmp(name, "cuCtxGetId") == 0) {
+    real_context_id = reinterpret_cast<PFN_cuCtxGetId_v12000>(*entry);
+    *entry = reinterpret_cast<void*>(&renewable_context_id);
+  } else if (std::strcmp(name, "cuDevicePrimaryCtxRetain") == 0) {
+    real_retain = reinterpret_cast<PFN_cuDevicePrimaryCtxRetain_v7000>(*entry);
+    *entry = reinterpret_cast<void*>(&counting_retain);
+  } else if (std::strcmp(name, "cuDevicePrimaryCtxRelease") == 0) {
+    real_release = reinterpret_cast<PFN_cuDevicePrimaryCtxRelease_v11000>(*entry);
+    *entry = reinterpret_cast<void*>(&counting_release);
+  } else if (std::strcmp(name, "cuStreamWriteValue64") == 0) {
+    real_write_value = reinterpret_cast<PFN_cuStreamWriteValue64_v11070>(*entry);
+    *entry = reinterpret_cast<void*>(&failing_write_value);
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaDeviceGetAttribute(int* value, cudaDeviceAttr attribute, int device) {
@@ -75,7 +189,26 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
     *pointer = nullptr;
     return cudaErrorMemoryAllocation;
   }
-  return __real_cudaMalloc(pointer, bytes);
+  const auto result = __real_cudaMalloc(pointer, bytes);
+  if (result == cudaSuccess && active_calls && active_calls->fill_allocations_with >= 0) {
+    // On a stream of its own and waited for, so the fill is done before the caller sees the memory and
+    // waits for nothing else on the device.
+    cudaStream_t fill_stream = nullptr;
+    cudaError_t fill = cudaStreamCreateWithFlags(&fill_stream, cudaStreamNonBlocking);
+    if (fill == cudaSuccess) {
+      fill = cudaMemsetAsync(*pointer, active_calls->fill_allocations_with, bytes, fill_stream);
+      const cudaError_t synced = __real_cudaStreamSynchronize(fill_stream);
+      fill = fill == cudaSuccess ? synced : fill;
+      (void)__real_cudaStreamDestroy(fill_stream);
+    }
+    // Memory that missed its fill may already hold the bytes a test expects the code under test to write.
+    if (fill != cudaSuccess) {
+      (void)__real_cudaFree(*pointer);
+      *pointer = nullptr;
+      return fill;
+    }
+  }
+  return result;
 }
 
 cudaError_t __wrap_cudaFree(void* pointer) {
@@ -123,6 +256,14 @@ cudaError_t __wrap_cudaStreamBeginCapture(cudaStream_t stream, cudaStreamCapture
   return result;
 }
 
+cudaError_t __wrap_cudaStreamEndCapture(cudaStream_t stream, cudaGraph_t* graph) {
+  const auto result = __real_cudaStreamEndCapture(stream, graph);
+  if (result == cudaSuccess && active_calls && active_calls->after_capture) {
+    active_calls->after_capture(*graph);
+  }
+  return result;
+}
+
 cudaError_t __wrap_cudaGraphLaunch(cudaGraphExec_t graph, cudaStream_t stream) {
   if (active_calls) {
     active_calls->launches.push_back(stream);
@@ -146,5 +287,47 @@ cudaError_t __wrap_cudaStreamSynchronize(cudaStream_t stream) {
     }
   }
   return __real_cudaStreamSynchronize(stream);
+}
+
+cudaError_t __wrap_cudaEventCreateWithFlags(cudaEvent_t* event, unsigned int flags) {
+  if (active_calls && active_calls->fail_event_creates > 0) {
+    --active_calls->fail_event_creates;
+    return cudaErrorMemoryAllocation;
+  }
+  return __real_cudaEventCreateWithFlags(event, flags);
+}
+
+cudaError_t __wrap_cudaEventRecord(cudaEvent_t event, cudaStream_t stream) {
+  if (active_calls && ++active_calls->event_record_calls == active_calls->fail_event_record_call) {
+    return cudaErrorInvalidResourceHandle;
+  }
+  return __real_cudaEventRecord(event, stream);
+}
+
+cudaError_t __wrap_cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags) {
+  if (active_calls && active_calls->drop_stream_waits) {
+    ++active_calls->dropped_stream_waits;
+    return cudaSuccess;
+  }
+  return __real_cudaStreamWaitEvent(stream, event, flags);
+}
+
+cudaError_t __wrap_cudaStreamDestroy(cudaStream_t stream) {
+  if (active_calls) {
+    active_calls->destroyed_streams.push_back(stream);
+  }
+  return __real_cudaStreamDestroy(stream);
+}
+
+cudaError_t __wrap_cudaGraphExecDestroy(cudaGraphExec_t graph) {
+  auto result = __real_cudaGraphExecDestroy(graph);
+  if (active_calls && active_calls->fail_graph_exec_destroys) {
+    // An invalid device fails without changing the current one, and leaves its error for cudaGetLastError.
+    result = cudaSetDevice(-1);
+  }
+  if (active_calls) {
+    active_calls->graph_exec_destroys.push_back(result);
+  }
+  return result;
 }
 }

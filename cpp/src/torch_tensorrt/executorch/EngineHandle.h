@@ -17,6 +17,7 @@
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 
 #include <NvInfer.h>
+#include <cuda.h>
 
 #include <cstdint>
 #include <memory>
@@ -44,8 +45,23 @@ struct EngineHandle {
   std::vector<size_t> cached_input_sizes;
   std::vector<void*> cached_output_ptrs;
   std::vector<size_t> cached_output_sizes;
+  // What exec_ctx holds, so execute() skips the TensorRT call when a shape or an address is the one it
+  // already gave. Setting an unchanged input shape still costs about half a microsecond, and an address
+  // or inferShapes tens of nanoseconds, and most callers pass the same ones every time. An unknown shape
+  // has nbDims -1 and an unknown address is null. Only this delegate may set shapes, addresses or the
+  // profile on exec_ctx, or these go stale.
+  std::vector<nvinfer1::Dims> bound_input_dims;
+  std::vector<void*> bound_addresses;
+  // Changes whenever exec_ctx's input shapes or optimization profile may have changed, so a recorded
+  // CUDA graph can tell that the shapes it was recorded under are gone.
+  uint64_t shape_epoch = 0;
+  // Whether inferShapes has succeeded since the shapes or the profile last changed.
+  bool shapes_inferred = false;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
+  // The ExecuTorch type of each binding, inputs then outputs, read once at init so execute() checks each
+  // tensor without a TensorRT call. Undefined where ExecuTorch has no such type, so no tensor matches it.
+  std::vector<::executorch::aten::ScalarType> binding_types;
   // Per output binding [0..num_outputs): index into input_binding_names of the
   // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
   // Built at init from the blob's aliased_io. Either way execute() binds the
@@ -66,6 +82,16 @@ struct EngineHandle {
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
+  // The regular CUDA context current when exec_ctx was created. It owns the engine and the buffers execute()
+  // keeps across calls; a call on a green context stream still runs in that green context. With a driver older
+  // than CUDA 12.5, a green context current at load is recorded here instead.
+  CUcontext context = nullptr;
+  // That context's id, zero when the driver cannot report it. The driver can give a destroyed context's
+  // handle to a new one, but never its id.
+  unsigned long long context_id = 0;
+  // The device's primary context, retained when a green context was current at load, so that context is
+  // the one current while the engine and exec_ctx are created. Released when this handle is destroyed.
+  CUcontext retained_primary = nullptr;
   // Whether this device can reach pageable host memory through shared host page tables, which is the
   // question the uses of this flag ask. A discrete card answers no: it can reach pageable memory, but
   // only by faulting pages in one at a time, so it takes the staged-copy path instead.
@@ -81,7 +107,8 @@ struct EngineHandle {
   // needing activation scratch under some shape; a handle loaded with the option
   // off keeps this false and says nothing about what its engine needs, because it
   // has its own kSTATIC scratch either way. It is a predicate and not a size
-  // because the size is never the right amount to install: enqueueV3 refuses a
+  // because the size is not the amount to install while TensorRT can size the
+  // bound shapes (pooled_scratch_bytes_for_shapes): enqueueV3 refuses a
   // kUSER_MANAGED context with no device memory once the engine needs any, however
   // little the shapes bound to a given call need, so execute() must hand such a
   // call some buffer -- but the engine's own figure covers every shape in the
@@ -96,6 +123,16 @@ struct EngineHandle {
   bool unaligned_io_reported = false;
   // And a program gives an input the same dim order on every call.
   bool reordered_input_reported = false;
+
+  // setTensorAddress for binding `index`, inputs then outputs, unless exec_ctx already holds `address`.
+  bool bind_address(size_t index, void* address);
+  // setInputShape for input `index`, unless exec_ctx already holds `dims` and `again` is false.
+  bool bind_input_shape(size_t index, const nvinfer1::Dims& dims, bool again = false);
+  // setOptimizationProfileAsync, after forgetting every shape and address exec_ctx holds and the active profile.
+  bool switch_profile(int32_t profile, cudaStream_t stream);
+  // Clears the record of bound addresses. Call it when exec_ctx may hold other addresses, so the next
+  // bind_address sets each.
+  void forget_bound_addresses();
 
   ~EngineHandle();
 };

@@ -243,6 +243,14 @@ class UnalignedIoTest : public ::testing::Test {
     dim_order_ = dim_order;
     strides_.resize(sizes_.size());
     EXPECT_EQ(dim_order_to_stride(sizes_.data(), dim_order_.data(), sizes_.size(), strides_.data()), Error::Ok);
+    row_major_order_.resize(sizes_.size());
+    for (size_t d = 0; d < sizes_.size(); ++d) {
+      row_major_order_[d] = static_cast<DimOrderType>(d);
+    }
+    row_major_strides_.resize(sizes_.size());
+    EXPECT_EQ(
+        dim_order_to_stride(sizes_.data(), row_major_order_.data(), sizes_.size(), row_major_strides_.data()),
+        Error::Ok);
   }
 
   size_t numel() const {
@@ -278,7 +286,8 @@ class UnalignedIoTest : public ::testing::Test {
 
   Error execute(float* input, float* output) {
     TensorImpl in(ScalarType::Float, sizes_.size(), sizes_.data(), input, dim_order_.data(), strides_.data());
-    TensorImpl out(ScalarType::Float, sizes_.size(), sizes_.data(), output);
+    TensorImpl out(
+        ScalarType::Float, sizes_.size(), sizes_.data(), output, row_major_order_.data(), row_major_strides_.data());
     EValue in_value{Tensor(&in)};
     EValue out_value{Tensor(&out)};
     EValue* args[] = {&in_value, &out_value};
@@ -289,10 +298,20 @@ class UnalignedIoTest : public ::testing::Test {
   // Elides the aliased output when `aliased_slot` is null, which is how a zero-copy KV program calls.
   Error execute_aliased(float* buffer, float* aliased_slot) {
     SizesType side_sizes[] = {1, 1};
+    DimOrderType side_order[] = {0, 1};
+    StridesType side_in_strides[] = {1, 1};
+    StridesType side_out_strides[] = {1, 1};
     TensorImpl in(ScalarType::Float, sizes_.size(), sizes_.data(), buffer, dim_order_.data(), strides_.data());
-    TensorImpl side_in(ScalarType::Float, 2, side_sizes, side_);
-    TensorImpl slot(ScalarType::Float, sizes_.size(), sizes_.data(), aliased_slot);
-    TensorImpl side_out(ScalarType::Float, 2, side_sizes, static_cast<uint8_t*>(side_) + 256);
+    TensorImpl side_in(ScalarType::Float, 2, side_sizes, side_, side_order, side_in_strides);
+    TensorImpl slot(
+        ScalarType::Float,
+        sizes_.size(),
+        sizes_.data(),
+        aliased_slot,
+        row_major_order_.data(),
+        row_major_strides_.data());
+    TensorImpl side_out(
+        ScalarType::Float, 2, side_sizes, static_cast<uint8_t*>(side_) + 256, side_order, side_out_strides);
     EValue in_value{Tensor(&in)};
     EValue side_in_value{Tensor(&side_in)};
     EValue slot_value{Tensor(&slot)};
@@ -333,6 +352,8 @@ class UnalignedIoTest : public ::testing::Test {
   std::vector<SizesType> sizes_{kRows, kCols};
   std::vector<DimOrderType> dim_order_{0, 1};
   std::vector<StridesType> strides_{kCols, 1};
+  std::vector<DimOrderType> row_major_order_{0, 1};
+  std::vector<StridesType> row_major_strides_{kCols, 1};
 };
 
 std::vector<uint8_t> UnalignedIoTest::blob_;
