@@ -23,11 +23,32 @@ def _has_side_effect(node: torch.fx.Node) -> bool:
     calls as impure, so plain dead-code elimination deletes them, and the vmap they
     bracket then fails to decompose ("tensor may have escaped from inside a
     function being vmapped").
+
+    A block such as torch.autocast or torch.no_grad is a call of a higher order op on
+    a submodule. When the only effect of the block is an in-place write, such as
+    h.add_(1.0) with a view of h that is read after the block, nothing uses the call
+    either.
     """
-    return node.is_impure() or (
+    if node.is_impure() or (
         node.op == "call_function"
         and getattr(node.target, "__module__", None) == "torch._functorch.predispatch"
-    )
+    ):
+        return True
+    if node.op != "call_function" or not isinstance(
+        node.target, torch._ops.HigherOrderOperator
+    ):
+        return False
+    for arg in node.args:
+        if not isinstance(arg, torch.fx.Node) or arg.op != "get_attr":
+            continue
+        sub: Any = node.graph.owning_module
+        for atom in str(arg.target).split("."):
+            sub = getattr(sub, atom, None)
+        if isinstance(sub, torch.fx.GraphModule) and any(
+            n.op == "call_function" and _has_side_effect(n) for n in sub.graph.nodes
+        ):
+            return True
+    return False
 
 
 def set_defer_graph_cleanup(enabled: bool) -> None:

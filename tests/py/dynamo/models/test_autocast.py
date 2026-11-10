@@ -1742,6 +1742,12 @@ def _double_after_a_block(y, bits):
     y.mul_(2)
 
 
+def _add_one_to_a_row_under_autocast(y, bits):
+    # The block writes y only through y[0], so it returns nothing and nothing uses it.
+    with torch.autocast(y.device.type, dtype=torch.float16):
+        y[0].add_(1.0)
+
+
 @pytest.mark.unit
 @pytest.mark.critical
 @pytest.mark.parametrize(
@@ -1763,6 +1769,7 @@ def _double_after_a_block(y, bits):
         lambda y, bits: torch._foreach_add_([y], 1.0),
         # y * 2 runs in float16, and _foreach_lerp_ needs it in the dtype of y.
         lambda y, bits: torch._foreach_lerp_([y], [y * 2], 0.5),
+        _add_one_to_a_row_under_autocast,
     ],
     ids=[
         "view",
@@ -1776,6 +1783,7 @@ def _double_after_a_block(y, bits):
         "after_block",
         "list",
         "list_with_a_source",
+        "write_only_block",
     ],
 )
 def test_autocast_keeps_writes_into_the_memory_of_a_dtype_view(write):
