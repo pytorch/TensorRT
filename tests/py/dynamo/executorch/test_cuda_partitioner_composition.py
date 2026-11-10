@@ -208,6 +208,59 @@ def test_weighted_partition_persists_external_data(tmp_path):
     ), f"external .ptd data file is empty: {ptd_files}"
 
 
+@pytest.mark.parametrize("entry_point", ["save", "executorch.export"])
+def test_low_memory_cuda_partition_keeps_the_compiled_modules_weights(
+    entry_point, tmp_path
+):
+    """In low_memory_mode the CUDA backend frees the tensors it lowers. A weight that is
+    already on the GPU is moved without a copy, so the program handed to ExecuTorch has
+    to own its weights, or the save frees the compiled module's."""
+    import torch_tensorrt
+    import torch_tensorrt.executorch
+    from executorch.backends.cuda.cuda_backend import CudaBackend
+    from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+
+    class WeightedModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.w = torch.nn.Parameter(torch.randn(64, 64))
+
+        def forward(self, x):
+            return torch.cos(torch.tanh(torch.mm(x, self.w)))
+
+    model = WeightedModel().eval().to("cuda")
+    inputs = (torch.randn(64, 64, device="cuda"),)
+    with torch.no_grad():
+        expected = model(*inputs)
+    trt_gm = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        inputs=list(inputs),
+        min_block_size=1,
+        torch_executed_ops={"torch.ops.aten.mm.default"},
+    )
+    partitioner = CudaPartitioner(
+        [
+            CudaBackend.generate_method_name_compile_spec("forward"),
+            CompileSpec("low_memory_mode", b"ON"),
+        ]
+    )
+    if entry_point == "save":
+        torch_tensorrt.save(
+            trt_gm,
+            str(tmp_path / "low_memory.pte"),
+            output_format="executorch",
+            arg_inputs=list(inputs),
+            partitioners=[partitioner],
+        )
+    else:
+        torch_tensorrt.executorch.export(trt_gm, partitioners=[partitioner])
+
+    assert model.w.untyped_storage().nbytes() == model.w.nbytes
+    with torch.no_grad():
+        torch.testing.assert_close(trt_gm(*inputs), expected, rtol=1e-2, atol=1e-2)
+
+
 def test_multimethod_trt_export_preserves_methods(tmp_path):
     """Independent TRT programs remain separate delegated methods after lowering."""
     import torch_tensorrt
