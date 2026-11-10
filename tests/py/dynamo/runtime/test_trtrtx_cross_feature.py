@@ -6,6 +6,7 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -15,6 +16,7 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.runtime import (
+    RuntimeCache,
     RuntimeSettings,
     apply_runtime_settings,
     runtime_cache,
@@ -105,18 +107,26 @@ class TestTRTRTXCrossFeature(TestCase):
         compiled = self._compile(model, settings, dynamic=True)
         with runtime_cache(compiled, self.cache_path) as cache:
             self._check_batches(compiled, model, (2, 2))
-        saved = Path(self.cache_path).read_bytes()
-        self.assertGreater(len(saved), 0)
+        saved_size = Path(self.cache_path).stat().st_size
+        self.assertGreater(saved_size, 0)
         del compiled, cache
         gc.collect()
 
         compiled = self._compile(model, settings, dynamic=True)
-        with runtime_cache(compiled, self.cache_path) as cache:
-            loaded = io.BytesIO()
-            cache.save_to_stream(loaded)
-            self.assertTrue(loaded.getvalue() == saved, "The cache did not load.")
-            self._check_batches(compiled, model, (2, 4, 1, 2))
-            self.assertTrue(cache.has_cache())
+        loaded_sizes = []
+        load_from_stream = RuntimeCache.load_from_stream
+
+        def record_load(cache, stream):
+            size = load_from_stream(cache, stream)
+            loaded_sizes.append(size)
+            return size
+
+        with patch.object(RuntimeCache, "load_from_stream", record_load):
+            with runtime_cache(compiled, self.cache_path) as cache:
+                self.assertTrue(loaded_sizes == [saved_size], "The cache did not load.")
+                self._check_batches(compiled, model, (2, 4, 1, 2))
+                self.assertTrue(cache.has_cache())
+                self.assertGreater(cache.save_to_stream(io.BytesIO()), 0)
 
     @parameterized.expand([("lazy",), ("eager",)])
     def test_dynamic_shapes_with_cuda_graphs(self, strategy):

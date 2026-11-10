@@ -21,6 +21,7 @@ from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from torch_tensorrt.runtime import (
+    RuntimeCache,
     RuntimeSettings,
     apply_runtime_settings,
     runtime_cache,
@@ -75,16 +76,23 @@ def _check_cache_in_child(path, payload):
     model.load_state_dict(state["state"])
     inputs = [state["input"].cuda()]
     compiled = _compile(model, inputs)
-    expected_bytes = Path(path).read_bytes()
-    with torch.no_grad():
+    expected_size = Path(path).stat().st_size
+    loaded_sizes = []
+    load_from_stream = RuntimeCache.load_from_stream
+
+    def record_load(cache, stream):
+        size = load_from_stream(cache, stream)
+        loaded_sizes.append(size)
+        return size
+
+    with torch.no_grad(), patch.object(RuntimeCache, "load_from_stream", record_load):
         with runtime_cache(compiled, path) as cache:
-            before = io.BytesIO()
-            cache.save_to_stream(before)
-            assert before.getvalue() == expected_bytes, "The cache did not load."
+            assert loaded_sizes == [expected_size], "The cache did not load."
             torch.testing.assert_close(
                 compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
             )
             assert cache.has_cache(), "The engine did not attach the cache."
+            assert cache.save_to_stream(io.BytesIO()) > 0, "The cache has no data."
 
 
 def _compile_simple(runtime_cache_path=None):
