@@ -90,6 +90,10 @@ class _InputBindingInfo(NamedTuple):
     is_aliased_input: bool
 
 
+class _InputShapeRefusedError(RuntimeError):
+    pass
+
+
 def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
     """Map strategy string to TRT enum. Only meaningful on TensorRT-RTX builds."""
     return {
@@ -1110,9 +1114,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def infer_outputs(self, input_shapes: List[Any]) -> List[Any]:
         """Return output shapes inferred for the given input shapes."""
         results = []
-        for i, input_name in enumerate(self.in_binding_names):
-            if i < len(input_shapes):
-                self.context.set_input_shape(input_name, tuple(input_shapes[i]))
+        # TensorRT accepts a shape that fits any optimization profile, not only the
+        # active one, so this needs no profile selection.
+        for i, binding in enumerate(self._input_binding_infos):
+            # Like the run path, skip shape tensors. Their shape is fixed in the
+            # engine and can differ from the input's (a scalar is declared [1]).
+            if i < len(input_shapes) and not binding.is_shape_tensor:
+                self._set_input_shape(binding.name, tuple(input_shapes[i]))
         for output_name in self.out_binding_names:
             results.append(tuple(self.context.get_tensor_shape(output_name)))
         return results
@@ -1184,6 +1192,16 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 f"TensorRT failed to run engine {self.name}, see the TensorRT error above"
             )
 
+    def _set_input_shape(self, name: str, shape: Tuple[int, ...]) -> None:
+        # TensorRT keeps the previous shape when it refuses one, so going on
+        # would run the engine on stale shapes and return wrong outputs.
+        if not self.context.set_input_shape(name, shape):
+            raise _InputShapeRefusedError(
+                f"TensorRT refused shape {list(shape)} for input {name} of engine "
+                f"{self.name}, the engine declares "
+                f"{list(self.cuda_engine.get_tensor_shape(name))}"
+            )
+
     def setup_input_tensors(
         self,
         contiguous_inputs: List[torch.Tensor],
@@ -1216,9 +1234,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 self._shape_input_buffers.append(inputs_cpu)
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                self.context.set_input_shape(
-                    input_name, tuple(contiguous_inputs[i].shape)
-                )
+                self._set_input_shape(input_name, tuple(contiguous_inputs[i].shape))
                 tensor_to_bind = contiguous_inputs[i]
                 if cudagraphs_enabled and not binding.is_aliased_input:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
@@ -1630,6 +1646,9 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
         input_shapes = [list(t.shape) for t in input_tensors]
         try:
             output_shapes = engine.infer_outputs(input_shapes)
+        except _InputShapeRefusedError:
+            # Running would fail on this shape too, so report it instead of guessing.
+            raise
         except Exception:
             # Fall back to the statically-stored shapes when shape inference is
             # unavailable (e.g. engine context not yet initialised in meta mode).
