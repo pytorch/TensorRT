@@ -58,6 +58,17 @@ if(NOT TensorRT_nvinfer_plugin_LIBRARY)
   endforeach()
 endif()
 
+if(NOT WIN32 AND NOT TensorRT_nvinfer_lean_LIBRARY)
+  # Look beside libnvinfer first. TensorRT_LIBRARY may be outside the paths below.
+  if(TensorRT_LIBRARY)
+    get_filename_component(_TensorRT_LIBRARY_DIR "${TensorRT_LIBRARY}" DIRECTORY)
+    find_library(TensorRT_nvinfer_lean_LIBRARY NAMES nvinfer_lean PATHS "${_TensorRT_LIBRARY_DIR}" NO_DEFAULT_PATH)
+  endif()
+  foreach(search ${_TensorRT_SEARCHES})
+    find_library(TensorRT_nvinfer_lean_LIBRARY NAMES nvinfer_lean ${${search}} PATH_SUFFIXES lib)
+  endforeach()
+endif()
+
 mark_as_advanced(TensorRT_INCLUDE_DIR)
 
 if(TensorRT_INCLUDE_DIR AND EXISTS "${TensorRT_INCLUDE_DIR}/NvInfer.h")
@@ -137,5 +148,14 @@ if(TensorRT_FOUND)
       )
     endif()
     target_link_libraries(TensorRT INTERFACE TensorRT::nvinfer_plugin)
+  endif()
+
+  # Not part of TensorRT::TensorRT: a program links either the lean library or libnvinfer, not both.
+  if(NOT TARGET TensorRT::nvinfer_lean AND TensorRT_nvinfer_lean_LIBRARY)
+    add_library(TensorRT::nvinfer_lean SHARED IMPORTED)
+    set_target_properties(TensorRT::nvinfer_lean PROPERTIES
+      INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
+      IMPORTED_LOCATION "${TensorRT_nvinfer_lean_LIBRARY}"
+    )
   endif()
 endif()

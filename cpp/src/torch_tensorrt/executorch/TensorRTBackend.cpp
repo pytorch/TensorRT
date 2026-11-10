@@ -575,7 +575,7 @@ Error load_engine(
 #ifdef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
       ET_LOG(
           Error,
-          "TensorRTBackend::init: this delegate links TensorRT's lean library, which loads only engines compiled with version_compatible=True that use no TensorRT plugin");
+          "TensorRTBackend::init: this delegate links TensorRT's lean library, which supports only engines compiled with version_compatible=True that use no TensorRT plugin");
 #endif
     }
     return err;
