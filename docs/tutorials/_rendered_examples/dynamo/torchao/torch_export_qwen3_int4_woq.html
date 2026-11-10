@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=fbf8fac9"></script>
+    <script src="../../../../_static/documentation_options.js?v=099eaa42"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -191,6 +191,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../advanced_usage.html">
     Advanced Usage
   </a>
@@ -203,19 +210,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../../debugging/index.html">
     Debugging
@@ -332,6 +339,13 @@ document.write(`
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -545,7 +559,7 @@ document.write(`
 <p>This example loads <a class="reference external" href="https://huggingface.co/pytorch/Qwen3-8B-INT4">pytorch/Qwen3-8B-INT4</a>, converts Hub HQQ / tile-packed INT4 into TensorRT-compatible <strong>symmetric</strong> group-wise Int4Tensor weights, exports a logits-only wrapper, and compiles with the Torch-TensorRT Dynamo backend.</p>
 <p>Hub checkpoints are often asymmetric and may use Int4TilePackedTo4dTensor. Those layouts are dequantized to dense BF16, then re-packed with quantize_linear_int4_symmetric so IDequantizeLayer sees a zero zero-point and group-wise INT4 storage.</p>
 <p>The compiled engine is fixed to SEQ_LEN. Greedy decode pads or windows the growing sequence into that length (no KV cache), matching other Torch-TensorRT LLM examples.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>torchao<span class="w"> </span>transformers<span class="w"> </span>accelerate
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torchao&gt;=0.17"</span><span class="w"> </span>transformers<span class="w"> </span>accelerate
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">QWEN3_INT4_MODEL</span><span class="o">=</span>pytorch/Qwen3-8B-INT4
 python<span class="w"> </span>torch_export_qwen3_int4_woq.py
@@ -572,7 +586,18 @@ if sys.path and Path(sys.path[0]).resolve() == Path(_EXAMPLE_DIR):
 
 import torch
 import torch_tensorrt as torchtrt
+import torchao
 from transformers import AutoConfig, AutoTokenizer, Qwen3ForCausalLM
+
+from packaging import version
+
+# The Hub config is rewritten onto Int4WeightOnlyConfig.int4_tile_packed_ntile,
+# which was added in torchao 0.17.
+if version.parse(torchao.__version__).release &lt; (0, 17):
+    raise RuntimeError(
+        f"This example requires torchao&gt;=0.17 (found {torchao.__version__}). "
+        'Install it with: pip install "torchao&gt;=0.17"'
+    )
 
 sys.path.insert(0, _EXAMPLE_DIR)
 from int4_utils import convert_hub_int4_to_symmetric_trt, pre_process_model_for_export
