@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=099eaa42"></script>
+    <script src="../../../_static/documentation_options.js?v=e1e4275e"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -500,7 +500,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sympy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -532,6 +532,11 @@ document.write(`
     <span class="n">stage_start</span><span class="p">,</span>
     <span class="n">tag_source_nodes</span><span class="p">,</span>
     <span class="n">with_compiler_lock</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._weight_release</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">WeightReleaser</span><span class="p">,</span>
+    <span class="n">report_released_weights_on_failure</span><span class="p">,</span>
+    <span class="n">weight_storages</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CompilationSettings</span><span class="p">,</span>
@@ -571,6 +576,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._offloaded_engines</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">defer_engine_setup_to_load</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.tools.weight_mapping</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_mapped_weights</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">deallocate_module</span><span class="p">,</span>
     <span class="n">get_cpu_memory_usage</span><span class="p">,</span>
@@ -579,6 +585,7 @@ document.write(`
     <span class="n">parse_graph_io</span><span class="p">,</span>
     <span class="n">pin_torch_executed_state</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
+    <span class="n">release_host_and_device_memory</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
     <span class="n">validate_optimization_profiles</span><span class="p">,</span>
@@ -1055,6 +1062,7 @@ document.write(`
     <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
+    <span class="n">release_weights_after_build</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RELEASE_WEIGHTS_AFTER_BUILD</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
         <span class="nb">str</span>
@@ -1169,6 +1177,13 @@ document.write(`
 <span class="sd">        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.</span>
 <span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
+<span class="sd">        release_weights_after_build (Optional[bool]): Release the memory of each model weight once the last TensorRT engine that reads it is built,</span>
+<span class="sd">            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. ``None`` (default)</span>
+<span class="sd">            releases only weights mapped by ``map_weights``: their pages are dropped and read back if used again, so the source module keeps</span>
+<span class="sd">            working. ``True`` also frees ordinary weights; the source module, and any tensor sharing storage with its weights, must not be used</span>
+<span class="sd">            afterwards, even if compilation fails. ``False`` releases nothing. Weights read by subgraphs that run in PyTorch are kept. Applies to</span>
+<span class="sd">            ``torch_tensorrt.dynamo.compile``; ``True`` is turned off, with a warning, under ``torch.compile``. ``MutableTorchTensorRTModule``</span>
+<span class="sd">            uses ``False``.</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
@@ -1389,6 +1404,7 @@ document.write(`
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
         <span class="s2">"max_partition_size"</span><span class="p">:</span> <span class="n">max_partition_size</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
+        <span class="s2">"release_weights_after_build"</span><span class="p">:</span> <span class="n">release_weights_after_build</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
         <span class="s2">"attn_bias_is_causal"</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
@@ -1860,6 +1876,18 @@ document.write(`
     <span class="k">return</span> <span class="n">user_symbol_bounds</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_warn_if_refit_source_released</span><span class="p">(</span><span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span>
+        <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">strip_engine_weights</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">immutable_weights</span>
+    <span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"release_weights_after_build releases the source weights; engines built with "</span>
+            <span class="s2">"strip_engine_weights must be refit from a freshly loaded checkpoint."</span>
+        <span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_placeholders_are_engine_bindings</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
@@ -2014,6 +2042,17 @@ document.write(`
             <span class="s2">"Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."</span>
         <span class="p">)</span>
 
+    <span class="n">weight_releaser</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># None releases only mapped weights: with none mapped, compile runs as without the setting.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">has_mapped_weights</span><span class="p">())</span>
+    <span class="p">):</span>
+        <span class="n">_warn_if_refit_source_released</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+        <span class="n">weight_releaser</span> <span class="o">=</span> <span class="n">WeightReleaser</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">mapped_only</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">)</span>
+
     <span class="c1"># Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless</span>
     <span class="c1"># compile_and_save keeps them in their files for the save.</span>
     <span class="n">set_up_deferred_engines</span> <span class="o">=</span> <span class="p">(</span>
@@ -2069,15 +2108,27 @@ document.write(`
             <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
             <span class="n">example_tensors</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="n">read</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">weight_releaser</span><span class="o">.</span><span class="n">count_readers</span><span class="p">([</span><span class="n">gm</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_unread_storages</span><span class="p">():</span>
+                <span class="n">release_host_and_device_memory</span><span class="p">()</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">weight_storages</span><span class="p">(</span><span class="n">gm</span><span class="p">))</span>
         <span class="n">record_partition_inputs</span><span class="p">(</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span> <span class="n">convert_inputs</span><span class="p">)</span>
-        <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
-            <span class="n">convert_module</span><span class="p">,</span>
-            <span class="n">gm</span><span class="p">,</span>
-            <span class="n">convert_inputs</span><span class="p">,</span>
-            <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
-            <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
-            <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="k">with</span> <span class="n">report_released_weights_on_failure</span><span class="p">(</span><span class="n">weight_releaser</span><span class="p">,</span> <span class="s2">"_run_on_acc_0"</span><span class="p">):</span>
+            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
+                <span class="n">convert_module</span><span class="p">,</span>
+                <span class="n">gm</span><span class="p">,</span>
+                <span class="n">convert_inputs</span><span class="p">,</span>
+                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
+                <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_storages_after_build</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="s2">"_run_on_acc_0"</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">release_host_and_device_memory</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">set_up_deferred_engines</span><span class="p">:</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">trt_module</span>
@@ -2213,6 +2264,20 @@ document.write(`
     <span class="c1"># Iterate over all components that can be accelerated</span>
     <span class="c1"># Generate the corresponding TRT Module for those</span>
 
+    <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.</span>
+        <span class="n">weight_releaser</span><span class="o">.</span><span class="n">count_readers</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">partitioned_module</span><span class="p">]</span>
+            <span class="o">+</span> <span class="p">[</span>
+                <span class="n">sub</span>
+                <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+        <span class="c1"># The lowered module still holds weights no partition reads (for example a model head the</span>
+        <span class="c1"># traced function never calls); nothing needs them once partitioning is done.</span>
+        <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_unread_storages</span><span class="p">()</span>
+
     <span class="c1"># Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.</span>
     <span class="c1"># This is done to release CPU memory. The global partitioner leaves PyTorch</span>
     <span class="c1"># nodes in this graph, so keep the frozen parameters they still read.</span>
@@ -2318,14 +2383,22 @@ document.write(`
             <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
         <span class="c1"># Create TRT engines from submodule</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
-            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
-                <span class="n">convert_module</span><span class="p">,</span>
-                <span class="n">submodule</span><span class="p">,</span>
-                <span class="n">submodule_inputs</span><span class="p">,</span>
-                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
-                <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+            <span class="c1"># Collected before conversion, which deletes the submodule's frozen parameters. Only the keys:</span>
+            <span class="c1"># holding the storages would keep those frozen parameters alive after conversion frees them.</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">set</span><span class="p">(</span><span class="n">weight_storages</span><span class="p">(</span><span class="n">submodule</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
             <span class="p">)</span>
+            <span class="k">with</span> <span class="n">report_released_weights_on_failure</span><span class="p">(</span><span class="n">weight_releaser</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+                <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
+                    <span class="n">convert_module</span><span class="p">,</span>
+                    <span class="n">submodule</span><span class="p">,</span>
+                    <span class="n">submodule_inputs</span><span class="p">,</span>
+                    <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+                <span class="p">)</span>
 
             <span class="k">if</span> <span class="p">(</span>
                 <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span> <span class="ow">or</span> <span class="n">defer_engine_setup_to_load</span><span class="p">())</span>
@@ -2338,6 +2411,11 @@ document.write(`
                 <span class="c1"># Profiling and layer info need the engine.</span>
                 <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
             <span class="n">trt_modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_storages_after_build</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="n">release_host_and_device_memory</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="n">_debugger_config</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_engine_profile</span><span class="p">:</span>

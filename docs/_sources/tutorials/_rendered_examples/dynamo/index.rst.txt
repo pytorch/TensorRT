@@ -442,6 +442,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="To compile a model, its weights normally have to be loaded into host memory first, all of them,...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_compile_from_mapped_weights_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_compile_from_mapped_weights.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling from Memory-Mapped Weights</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i...">
 
 .. only:: html
@@ -845,6 +862,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/autocast_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
+   /tutorials/_rendered_examples/dynamo/compile_from_mapped_weights
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
    /tutorials/_rendered_examples/dynamo/aliased_io_kv_attention
    /tutorials/_rendered_examples/dynamo/converter_overloading
