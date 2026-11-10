@@ -42,6 +42,12 @@ oracle on those outputs and boundary/empty cases. These are historical results
 on the October 2026 authoring stack, not a new hardware run of this rebased
 branch. No real driving-sequence or nuScenes mAP/NDS result is established.
 
+## Recorded-camera visualization
+
+See [RECORDED_DEMO.md](RECORDED_DEMO.md) for dataset downloads, recorded-input
+preparation, native sequence validation and camera/BEV rendering. The rendering
+utilities have CPU tests; a real-camera run on DRIVE remains to be completed.
+
 ## Files and data
 
 | File | Purpose |
