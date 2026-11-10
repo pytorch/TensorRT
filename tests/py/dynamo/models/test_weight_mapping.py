@@ -577,6 +577,8 @@ def test_compile_refuses_a_weights_file_changed_after_mapping(tmp_path):
     os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10**9))
     with pytest.raises(ValueError, match="changed after map_weights mapped it"):
         torch_tensorrt.dynamo.compile(ep, inputs=[x.cuda()], min_block_size=1)
+    if sys.platform == "win32":
+        return  # Windows doesn't let a mapped file be removed
     path.unlink()
     with pytest.raises(ValueError, match="was removed after map_weights mapped it"):
         torch_tensorrt.dynamo.compile(ep, inputs=[x.cuda()], min_block_size=1)
