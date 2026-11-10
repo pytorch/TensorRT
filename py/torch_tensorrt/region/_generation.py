@@ -1,15 +1,21 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Configuration for compile-time, agent-authored region kernels."""
+"""Configuration for compile-time, agent-authored region kernels.
+
+Also the records of the kernels that generation registered in this process
+(:func:`generated_kernels`) and of the regions whose kernel it could not
+provide with generation off (:func:`missing_kernels`).
+"""
 
 from __future__ import annotations
 
 import json
 import math
 import re
+import threading
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -331,7 +337,12 @@ class KernelGenerator:
             fails compilation with a :class:`RegionError` before any provider
             call, as CI or production builds may require; setting the
             environment variable ``TORCH_TENSORRT_REGION_GENERATION=0`` does
-            the same for every generator. Requires ``use_cache=True``.
+            the same for every generator, except that it revalidates a cached
+            kernel for correctness only: its speed was measured when it was
+            accepted, so a busy GPU cannot fail the build. Builds pinned to
+            kernels prepared earlier, as the Auto-Tuner makes them, use it.
+            Either way, a region whose kernel is missing from the cache is
+            recorded (:func:`missing_kernels`). Requires ``use_cache=True``.
         validation_inputs: Real model inputs to validate candidates on: a
             reusable iterable of batches, such as a list or a
             ``torch.utils.data.DataLoader``. Each batch is a tensor or a tuple
@@ -486,3 +497,211 @@ class KernelGenerator:
             )
 
             validate_tuning_space(self.backend, self.search.tuning)
+
+
+#: How a generated region got its kernel: ``"new"`` (a search in this process
+#: accepted it), ``"cached"`` (a cached kernel passed its revalidation) or
+#: ``"shared"`` (an identical region of the same compilation registered it).
+KERNEL_ORIGINS = ("new", "cached", "shared")
+
+
+@dataclass(frozen=True)
+class GeneratedKernel:
+    """A region kernel that a :class:`KernelGenerator` registered in this process.
+
+    Compilation records one for every generated region whose kernel it
+    registers; :func:`generated_kernels` lists them. The measurement is the
+    one the kernel was accepted with, from its ``accepted.json``: the final
+    validation of the kernel alone, on the region's inputs, against the
+    region's baseline.
+
+    Args:
+        region: The region's name, as given to ``fused_kernel(name=...)``
+            (``"region"`` when it has none).
+        region_id: The region's id in its compilation, ``"<name>#<index>"``.
+            The index counts every region of the compiled graph, so it can
+            change when other regions are added or removed.
+        task_sha256: The digest of the generation task, which is the kernel
+            cache key: the captured computation, its inputs and outputs, the
+            backend, the GPU and the settings that change how a kernel is
+            validated, such as engine build options.
+        kernel_sha256: The digest of the kernel, its source and launch
+            settings, as ``accepted.json`` records it.
+        backend: The kernel language, such as ``"triton"``.
+        provider: The provider that wrote the kernel, from its
+            ``accepted.json``.
+        model: The provider's model, when one was named.
+        origin: One of :data:`KERNEL_ORIGINS`: ``"new"``, ``"cached"`` or
+            ``"shared"``.
+        generation_s: Seconds this region's kernel took in this process:
+            waiting for another process generating it, revalidation and any
+            search.
+        latency_ms: The kernel's median time in its final validation, or
+            ``None`` when unknown.
+        baseline: What ``baseline_latency_ms`` timed: ``"tensorrt"``, a
+            TensorRT engine of the region (``objective="tensorrt"``), or
+            ``"eager"``, the captured PyTorch region.
+        baseline_latency_ms: The baseline's median time in that validation.
+        speedup: ``baseline_latency_ms / latency_ms``; above 1 when the kernel
+            runs the region faster than its baseline.
+        manifest: The ``accepted.json`` the provider and the measurement come
+            from, or ``None`` when none was found.
+    """
+
+    region: str
+    region_id: str
+    task_sha256: str
+    kernel_sha256: str
+    backend: str
+    provider: str | None = None
+    model: str | None = None
+    origin: str = "new"
+    generation_s: float = 0.0
+    latency_ms: float | None = None
+    baseline: str | None = None
+    baseline_latency_ms: float | None = None
+    speedup: float | None = None
+    manifest: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("region", "region_id", "task_sha256", "kernel_sha256", "backend"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name):
+                raise ValueError(
+                    f"GeneratedKernel {name} must be a nonempty string; got "
+                    f"{getattr(self, name)!r}"
+                )
+        if self.origin not in KERNEL_ORIGINS:
+            raise ValueError(
+                f"GeneratedKernel origin must be one of {KERNEL_ORIGINS}; got "
+                f"{self.origin!r}"
+            )
+
+    def to_json(self) -> dict[str, Any]:
+        """The record as JSON data."""
+        return asdict(self)
+
+
+# The kernels registered in this process, oldest first. Compilations may run
+# in threads, and final_registration replaces records in place.
+_GENERATED_KERNELS: list[GeneratedKernel] = []
+_GENERATED_KERNELS_LOCK = threading.Lock()
+
+
+def generated_kernels() -> tuple[GeneratedKernel, ...]:
+    """The region kernels that :class:`KernelGenerator` registered in this process.
+
+    Oldest first, one :class:`GeneratedKernel` per generated region of every
+    compilation, whether a search accepted its kernel, a cached kernel passed
+    its revalidation, or it shares the kernel of an identical region. A
+    region whose kernel a later identical region's search replaced shows the
+    kernel it finally uses. A compilation that fails keeps the records of the
+    regions it registered before the failure. Take ``len(generated_kernels())``
+    before a compilation to tell its kernels apart from earlier ones.
+    """
+    with _GENERATED_KERNELS_LOCK:
+        return tuple(_GENERATED_KERNELS)
+
+
+def record_generated_kernel(kernel: GeneratedKernel) -> None:
+    """Add ``kernel`` to :func:`generated_kernels`.
+
+    Compilation calls it for every region kernel that a
+    :class:`KernelGenerator` registers. Code that provides region kernels in
+    another way may call it too, so that tools reading
+    :func:`generated_kernels` see those kernels as well.
+    """
+    if not isinstance(kernel, GeneratedKernel):
+        raise TypeError(f"Expected a GeneratedKernel; got {type(kernel).__name__}")
+    with _GENERATED_KERNELS_LOCK:
+        _GENERATED_KERNELS.append(kernel)
+
+
+def _share_generated_kernel(
+    old: GeneratedKernel, source: GeneratedKernel
+) -> GeneratedKernel | None:
+    """Make the record ``old`` name the kernel of the record ``source``.
+
+    A later identical region's search can replace the kernel that an earlier
+    region of the same compilation registered; that region then shares the
+    new kernel, whose record ``source`` gives its provider and measurement.
+    Records are replaced by identity, so the caller's compilation, which
+    holds both records, is the only one affected. Returns the new record, or
+    None when ``old`` is no longer listed.
+    """
+    new = replace(
+        source,
+        region=old.region,
+        region_id=old.region_id,
+        origin="shared",
+        generation_s=old.generation_s,
+    )
+    with _GENERATED_KERNELS_LOCK:
+        for index, kernel in enumerate(_GENERATED_KERNELS):
+            if kernel is old:
+                _GENERATED_KERNELS[index] = new
+                return new
+    return None
+
+
+@dataclass(frozen=True)
+class MissingKernel:
+    """A generated region whose kernel could not be provided in this process.
+
+    Kernel generation was off (``allow_generation=False`` or
+    ``TORCH_TENSORRT_REGION_GENERATION=0``) and no cached kernel for the
+    region's task was usable, so the compilation failed with a
+    :class:`RegionError`; :func:`missing_kernels` lists these.
+
+    Args:
+        region: The region's name, as in :class:`GeneratedKernel`.
+        region_id: The region's id in its compilation, ``"<name>#<index>"``.
+        task_sha256: The digest of the generation task whose kernel is
+            missing, the kernel cache key.
+        reason: Why no cached kernel could be used, such as that none is
+            cached for the task or that the cached one failed revalidation.
+    """
+
+    region: str
+    region_id: str
+    task_sha256: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        for name in ("region", "region_id", "task_sha256"):
+            if not isinstance(getattr(self, name), str) or not getattr(self, name):
+                raise ValueError(
+                    f"MissingKernel {name} must be a nonempty string; got "
+                    f"{getattr(self, name)!r}"
+                )
+
+    def to_json(self) -> dict[str, Any]:
+        """The record as JSON data."""
+        return asdict(self)
+
+
+_MISSING_KERNELS: list[MissingKernel] = []
+
+
+def missing_kernels() -> tuple[MissingKernel, ...]:
+    """The generated regions whose kernel could not be provided in this process.
+
+    Oldest first, one :class:`MissingKernel` per region that a compilation
+    with generation off found no usable cached kernel for. Take
+    ``len(missing_kernels())`` before a compilation to tell its records apart
+    from earlier ones.
+    """
+    with _GENERATED_KERNELS_LOCK:
+        return tuple(_MISSING_KERNELS)
+
+
+def record_missing_kernel(kernel: MissingKernel) -> None:
+    """Add ``kernel`` to :func:`missing_kernels`.
+
+    Compilation calls it before it fails for a region whose kernel is
+    missing. Code that provides region kernels in another way may call it
+    too.
+    """
+    if not isinstance(kernel, MissingKernel):
+        raise TypeError(f"Expected a MissingKernel; got {type(kernel).__name__}")
+    with _GENERATED_KERNELS_LOCK:
+        _MISSING_KERNELS.append(kernel)

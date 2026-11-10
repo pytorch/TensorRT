@@ -84,6 +84,29 @@ describes every option.
 
 .. autoclass:: SearchPolicy
 
+What a compilation generated or loaded
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Every kernel the generator registers in a process, newly generated, loaded
+from the cache or shared by identical regions, is recorded with its region,
+task and kernel digests, provider, generation time and the region-level
+measurement from its ``accepted.json``; a cache-only build that finds no
+usable kernel records the region and task it missed. The Auto-Tuner uses
+these records to prepare generated kernels once and to check that every
+later run loads the same ones. Recording never fails a compilation.
+
+.. autoclass:: GeneratedKernel
+
+.. autofunction:: generated_kernels
+
+.. autofunction:: record_generated_kernel
+
+.. autoclass:: MissingKernel
+
+.. autofunction:: missing_kernels
+
+.. autofunction:: record_missing_kernel
+
 Validating on real inputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -324,7 +347,10 @@ variable ``TORCH_TENSORRT_REGION_GENERATION=0`` to apply it to every generator
 without code changes (any value other than ``0`` or ``1`` is an error).
 Compilation then reuses a cached kernel after revalidating it, and a cache
 miss or a failed revalidation raises ``RegionError`` without calling the
-provider. Generate the kernel first by compiling once with generation allowed,
+provider. Under the environment variable, revalidation checks correctness
+only: the kernel's speed was measured when it was accepted, and a busy GPU
+cannot fail the build. ``allow_generation=False`` revalidates fully, speed
+included (see below). Generate the kernel first by compiling once with generation allowed,
 on the same GPU type with the same toolchain and settings,
 and give the cache-only build that ``cache_dir``.
 
@@ -336,7 +362,8 @@ cache-only build never creates a missing ``cache_dir``.
 
 Revalidation repeats the final check, so under ``objective="eager"`` or
 ``"tensorrt"`` it also remeasures the speedup, which a busy GPU can push below
-``min_speedup``. The error explains a refusal: after a cache miss it names the
+``min_speedup`` (except under ``TORCH_TENSORRT_REGION_GENERATION=0``, which
+checks correctness only). The error explains a refusal: after a cache miss it names the
 ``task.json`` fields in which a kernel cached for the same captured computation
 differs, such as ``target`` after a GPU or toolchain change, or
 ``search.tuning`` after a change of the tuning choices; after a failed

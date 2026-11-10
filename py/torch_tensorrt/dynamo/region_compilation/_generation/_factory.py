@@ -23,10 +23,17 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 import torch
 from filelock import FileLock, Timeout
-
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.kernels import KernelSpec
-from torch_tensorrt.region import KernelGenerator, RegionError
+from torch_tensorrt.region import (
+    GeneratedKernel,
+    KernelGenerator,
+    MissingKernel,
+    RegionError,
+    record_generated_kernel,
+    record_missing_kernel,
+)
+from torch_tensorrt.region._generation import _share_generated_kernel
 
 from .._capture import _SAMPLING_SWITCHES, _draws_random_numbers
 from .._plugins import _boundaries
@@ -68,6 +75,10 @@ _VERSION = 5
 # "0" forbids generation for every KernelGenerator, as allow_generation=False
 # does for one, so CI can use only cached kernels without code changes.
 _GENERATION_ENV = "TORCH_TENSORRT_REGION_GENERATION"
+# What _generation_block reports when that switch forbids generation. Builds
+# pinned to earlier-prepared kernels use it, so a cached kernel is then
+# revalidated for correctness only: its speed was measured when accepted.
+_SWITCHED_OFF = f"{_GENERATION_ENV}=0"
 # Starting the worker or an author CLI alone takes about a second, so a shorter
 # time slice can only expire; the controller stops instead of launching it.
 _MIN_SLICE_S = 1.0
@@ -174,6 +185,9 @@ class _Shared:
     # Each input's values that the kernel's checks on those samples covered,
     # the union of the samples' own ranges (see coverage); None without samples.
     covered: list[Coverage] | None = None
+    # Each region's record in generated_kernels, by region id: final_registration
+    # updates this compilation's records only.
+    records: dict[str, GeneratedKernel] = field(default_factory=dict)
 
 
 def _random_operation(target: torch._ops.OpOverload) -> str:
@@ -973,19 +987,143 @@ def final_registration(
     A later identical region's search may have replaced the kernel this region
     was generated with by one that also passed this region's samples. The
     lookup uses the task each region had when it was generated, so it never
-    searches, whatever changed since.
+    searches, whatever changed since. The region's record in
+    generated_kernels then names that kernel.
     """
     for shared in memo.values():
         if region_id in shared.regions:
             input_specs, output_specs = _boundaries(child, region_id)
-            return make_registration(
+            registration = make_registration(
                 shared.candidate,
                 with_options(get_backend(config.backend), _codegen(config)),
                 input_specs,
                 output_specs,
                 shared.run,
             )
+            _share_final_kernel(shared, region_id)
+            return registration
     return None
+
+
+def _share_final_kernel(shared: _Shared, region_id: str) -> None:
+    """Make the record of ``region_id`` name its group's final kernel.
+
+    Both the region's record and the record of the region whose search found
+    the final kernel come from this compilation's memo, so another
+    compilation's records are never changed. A record that cannot be updated
+    is logged; it never fails the compilation.
+    """
+    try:
+        old = shared.records.get(region_id)
+        final = digest(shared.candidate)
+        if old is None or old.kernel_sha256 == final:
+            return
+        source = next(
+            (
+                record
+                for record in shared.records.values()
+                if record.kernel_sha256 == final
+            ),
+            None,
+        )
+        if source is None:
+            return
+        new = _share_generated_kernel(old, source)
+        if new is not None:
+            shared.records[region_id] = new
+    except Exception as error:  # noqa: BLE001 - a record never fails compilation
+        _LOGGER.warning(
+            "Could not update the kernel record of region %r in generated_kernels: %s",
+            region_id,
+            error,
+        )
+
+
+def _region_measurement(
+    report: dict[str, Any], objective: str
+) -> tuple[float | None, str | None, float | None, float | None]:
+    """A validation report's kernel time, baseline, baseline time and speedup.
+
+    The baseline is the TensorRT engine of the region under the ``tensorrt``
+    objective, otherwise the captured PyTorch region run eagerly.
+    """
+    latency: Any = report.get("latency_ms")
+    if not _positive(latency):
+        return None, None, None, None
+    baseline, baseline_ms = "eager", report.get("reference_latency_ms")
+    if objective == "tensorrt" and _positive(report.get("baseline_latency_ms")):
+        baseline, baseline_ms = "tensorrt", report["baseline_latency_ms"]
+    if not _positive(baseline_ms):
+        return float(latency), None, None, None
+    measured: Any = baseline_ms
+    return float(latency), baseline, float(measured), float(measured) / float(latency)
+
+
+def _record_kernel(
+    region_id: str,
+    key: str,
+    candidate: dict[str, Any],
+    config: KernelGenerator,
+    *,
+    origin: str,
+    started: float,
+    manifests: Sequence[Path],
+) -> GeneratedKernel | None:
+    """Record the kernel registered for ``region_id`` in generated_kernels.
+
+    The provider, the model and the measurement come from the first of
+    ``manifests`` that accepted this very kernel. Returns the record. A
+    record that cannot be made is logged and None returned; it never fails
+    the compilation.
+    """
+    try:
+        kernel_sha256 = digest(candidate)
+        accepted: dict[str, Any] = {}
+        found = None
+        for path in manifests:
+            try:
+                stored = read_json_object(path)
+            except (OSError, ValueError):
+                continue
+            if stored.get("candidate_sha256") == kernel_sha256:
+                accepted, found = stored, path
+                break
+        report = accepted.get("validation")
+        report = report if isinstance(report, dict) else {}
+        latency, baseline, baseline_ms, speedup = _region_measurement(
+            report, str(report.get("objective") or config.objective)
+        )
+        record = GeneratedKernel(
+            region=_region_name(region_id),
+            region_id=region_id,
+            task_sha256=key,
+            kernel_sha256=kernel_sha256,
+            backend=config.backend,
+            provider=accepted.get("provider", config.provider),
+            model=accepted.get("model", config.model),
+            origin=origin,
+            generation_s=time.monotonic() - started,
+            latency_ms=latency,
+            baseline=baseline,
+            baseline_latency_ms=baseline_ms,
+            speedup=speedup,
+            manifest=None if found is None else str(found),
+        )
+        record_generated_kernel(record)
+        return record
+    except Exception as error:  # noqa: BLE001 - a record never fails compilation
+        _LOGGER.warning(
+            "Could not record the kernel of region %r in generated_kernels: %s",
+            region_id,
+            error,
+        )
+        return None
+
+
+def _region_name(region_id: str) -> str:
+    """The name of the region with id ``<name>#<index>``."""
+    name, separator, _ = region_id.rpartition("#")
+    return name if separator else region_id
 
 
 def _generate(
@@ -999,7 +1137,11 @@ def _generate(
     samples: Sequence[tuple[torch.Tensor, ...]] | None = None,
     implicit_samples: bool = False,
 ) -> tuple[KernelSpec | partial[None], Path]:
-    """Return a registration and the exact run containing its validation evidence."""
+    """Return a registration and the exact run containing its validation evidence.
+
+    The registered kernel is recorded in generated_kernels.
+    """
+    started = time.monotonic()
     cache: Path | None = None
     try:
         (
@@ -1084,12 +1226,24 @@ def _generate(
             or (implicit_samples and covers(shared.covered, samples or ()))
         ):
             shared.regions.add(region_id)
-            return (
-                make_registration(
-                    shared.candidate, backend, input_specs, output_specs, shared.run
-                ),
-                shared.run,
+            registration = make_registration(
+                shared.candidate, backend, input_specs, output_specs, shared.run
             )
+            record = _record_kernel(
+                region_id,
+                key,
+                shared.candidate,
+                config,
+                origin="shared",
+                started=started,
+                manifests=(
+                    shared.run / "accepted.json",
+                    _cache_root(config) / key / "accepted.json",
+                ),
+            )
+            if record is not None:
+                shared.records[region_id] = record
+            return registration, shared.run
         root = _cache_root(config)
         cache = private_directory(root) / key
         private_directory(cache)
@@ -1114,6 +1268,20 @@ def _generate(
                 shared=shared,
             )
             candidate, registration = search.generate()
+        record = _record_kernel(
+            region_id,
+            key,
+            candidate,
+            config,
+            origin=search.origin,
+            started=started,
+            # Only the manifest that accepted this very kernel counts.
+            manifests=(
+                search.run / "accepted.json",
+                *([shared.run / "accepted.json"] if shared is not None else []),
+                search.cache / "accepted.json",
+            ),
+        )
         if memo is not None:
             # The kernel passed this region's samples. It is the shared one, or
             # a search also checked it on every identical region's samples.
@@ -1133,6 +1301,10 @@ def _generate(
                     if kept
                     else coverage(everything)
                 ),
+                records={
+                    **previous.records,
+                    **({region_id: record} if record is not None else {}),
+                },
             )
         return registration, search.run
     except RegionError:
@@ -1178,6 +1350,8 @@ class _Search:
         self.inconclusive = self.slow = False
         # Whether evaluating that cached kernel again could change the outcome.
         self.retryable = True
+        # How the kernel generate() returns was found (see KERNEL_ORIGINS).
+        self.origin = "new"
         self.task, self.key, self.config, self.policy = task, key, config, config.search
         self.backend, self.instructions = backend, instructions
         self.input_specs, self.output_specs = input_specs, output_specs
@@ -1266,6 +1440,7 @@ class _Search:
         """Return the accepted candidate and its registration, or raise RegionError."""
         cached = self.from_cache()
         if cached is not None:
+            self.origin = "shared" if self.shared is not None else "cached"
             return cached
         if self.blocked is not None:
             generate = (
@@ -1293,10 +1468,11 @@ class _Search:
                     "kernel for this region; later compilations reuse it without "
                     "an agent"
                 )
+            reason = self.cache_miss or self.uncached()
+            self.record_missing(reason)
             raise RegionError(
                 f"Kernel generation for region {self.region_id!r} is disabled by "
-                f"{self.blocked}, and {self.cache_miss or self.uncached()}. "
-                f"{advice}. Artifacts: {self.run}"
+                f"{self.blocked}, and {reason}. {advice}. Artifacts: {self.run}"
             )
         self.prepare_search()
         if self.policy.resume:
@@ -1365,7 +1541,30 @@ class _Search:
             _LOGGER.warning("Ignoring invalid agent region cache: %s", error)
             self.cache_miss = f"its cached kernel entry is invalid ({error})"
             return None
-        return self.recheck(candidate, self.run)
+        # A build that the environment switch keeps from generating, such as
+        # a build pinned to kernels prepared earlier, only rechecks
+        # correctness: the kernel's speed was measured when it was accepted.
+        return self.recheck(
+            candidate, self.run, correctness_only=self.blocked == _SWITCHED_OFF
+        )
+
+    def record_missing(self, reason: str) -> None:
+        """Record this region in missing_kernels; a failure to record is logged."""
+        try:
+            record_missing_kernel(
+                MissingKernel(
+                    region=_region_name(self.region_id),
+                    region_id=self.region_id,
+                    task_sha256=self.key,
+                    reason=reason,
+                )
+            )
+        except Exception as error:  # noqa: BLE001 - a record never changes the error
+            _LOGGER.warning(
+                "Could not record the missing kernel of region %r: %s",
+                self.region_id,
+                error,
+            )
 
     def recheck(
         self, candidate: dict[str, Any], directory: Path, correctness_only: bool = False

@@ -248,6 +248,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     as a Python custom op pointing to :func:`execute_engine`.
     """
 
+    # State of the QDP AOT plugin reload warning (see ``_check_plugin_reloads``).
+    # The engine counts its own runs, so ``TorchTensorRTModule`` leaves the
+    # check to it. As class attributes they also cover unpickled engines.
+    _tracks_plugin_reloads = True
+    _plugin_reload_check_pending = True
+    _plugin_reload_layers: Optional[List[str]] = None
+    _plugin_reload_calls = 0
+
     # --- construction / teardown ---
 
     def __init__(
@@ -1533,9 +1541,25 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             return outputs[0]
         return tuple(outputs)
 
+    def _check_plugin_reloads(self) -> None:
+        """Count this run toward the QDP AOT plugin reload warning.
+
+        ``execute`` calls this until it clears ``_plugin_reload_check_pending``.
+        Every call of ``execute`` runs the engine, so a program that calls
+        ``tensorrt::execute_engine`` without a ``TorchTensorRTModule``, such as
+        an exported program loaded with ``torch_tensorrt.load``, is checked too.
+        """
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            _track_plugin_reloads,
+        )
+
+        _track_plugin_reloads(self, self.name, self.get_engine_layer_info)
+
     def execute(
         self, inputs: Sequence[torch.Tensor]
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        if self._plugin_reload_check_pending:
+            self._check_plugin_reloads()
         contiguous_inputs = [tensor.contiguous() for tensor in inputs]
 
         if self._has_nccl_ops and self._nccl_comm is None:

@@ -53,6 +53,28 @@ its dtype meets. A larger value, such as 16 for 128-bit loads and stores, is a
 promise about every buffer the engine binds, which a view at a smaller offset
 of a larger buffer breaks.
 
+Run engines that contain AOT plugins under CUDA graphs, for example with
+``torch_tensorrt.runtime.set_cudagraphs_mode(True)``,
+``torch_tensorrt.runtime.enable_cudagraphs(module)`` or a ``torch.cuda.graph``
+capture. Outside a CUDA graph, TensorRT 11.4 loads each AOT plugin's CUDA
+module again on every execution, which costs host time, waits for the GPU work
+queued before it and never frees the module.
+
+Torch-TensorRT logs a warning, once per engine, when an engine with such
+plugins has run 32 times outside CUDA graphs (except with TensorRT-RTX, which
+is not known to reload plugins). Which runs are counted depends on the
+runtime:
+
+* Python runtime: every run of the engine, including runs of an exported
+  program loaded with ``torch_tensorrt.load``.
+* C++ runtime: only eager calls of a ``TorchTensorRTModule``, such as the
+  submodules of the module that ``torch_tensorrt.compile`` returns. Engines
+  run from loaded exported programs, TorchScript or AOTInductor packages, or
+  inside ``torch.compile``, are not checked.
+
+An engine that has run inside a CUDA graph once is assumed to keep doing so
+and is not checked again.
+
 Entry points
 ------------
 
