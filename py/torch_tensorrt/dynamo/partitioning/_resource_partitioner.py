@@ -100,7 +100,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     - an original `torch.fx.GraphModule` (`module`)
     - a capability-partitioned `GraphModule` (`partitioned_module`) containing
       submodules that delineate accelerated vs non-accelerated regions
-    - a CPU memory budget in bytes (`cpu_memory_budget`)
+    - a CPU memory budget in bytes (`cpu_memory_budget`), or a fixed per-engine size (`max_partition_size`)
 
     It maps nodes from `module` into subgraphs according to `partitioned_module`
     and then splits oversized accelerated subgraphs so that each resulting TRT
@@ -113,18 +113,26 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         module: torch.fx.GraphModule,
         cpu_memory_budget: Optional[int],
         submodule_name: str,
+        max_partition_size: Optional[int] = None,
     ):
 
         assert isinstance(module, torch.fx.GraphModule)
 
         self.module = module
-        used_rss: int = psutil.Process().memory_info().rss
-        self.remaining_memory_budget = (
-            cpu_memory_budget - used_rss
-            if cpu_memory_budget is not None
-            else psutil.virtual_memory().available
-        )
-        self.not_set_limit = cpu_memory_budget is None
+        self.max_partition_size = max_partition_size
+        if max_partition_size is not None:
+            # A fixed per-engine size: the split no longer depends on the process's resident memory.
+            self.remaining_memory_budget = (
+                max_partition_size * ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER
+            )
+        else:
+            used_rss: int = psutil.Process().memory_info().rss
+            self.remaining_memory_budget = (
+                cpu_memory_budget - used_rss
+                if cpu_memory_budget is not None
+                else psutil.virtual_memory().available
+            )
+        self.not_set_limit = cpu_memory_budget is None and max_partition_size is None
         self.resource_split_count = 0
         self.submodule_name = submodule_name
 
@@ -159,6 +167,17 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         if len(subgraphs) == 1:
             return self.module
+
+        engine_sizes = [
+            size
+            for subgraph, size in zip(subgraphs, self.size_of_subgraphs(subgraphs))
+            if subgraph.is_acc
+        ]
+        logger.info(
+            f"Resource partitioning split {self.submodule_name} into {len(engine_sizes)} TensorRT engines "
+            + "with these weights, in MiB: "
+            + ", ".join(f"{size / 2**20:.1f}" for size in engine_sizes)
+        )
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
@@ -212,8 +231,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     ) -> int:
         """Compute the per-engine size budget in bytes.
 
-        Uses explicit `cpu_memory_budget` minus used RSS
-        divided by a safety multiplier.
+        Uses explicit `cpu_memory_budget` minus used RSS (or available memory without a budget)
+        divided by a safety multiplier; with `max_partition_size` set, this is that size.
 
         Args:
             engine_compilation_memory_usage_multiplier: Safety divisor applied to
@@ -259,6 +278,12 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if self.not_set_limit:
                 raise ValueError(
                     "The system memory is too constrained to compile the model without severe perf degradation. Consider setting offload_module_to_cpu=False to save more CPU memory."
+                )
+            elif self.max_partition_size is not None:
+                raise ValueError(
+                    f"max_partition_size is {self.max_partition_size} bytes, but {self.submodule_name} "
+                    + f"has {sum(sizes) / 2**20:.2f} MiB of weights, more than {MAX_NUM_OF_ENGINES} times "
+                    + "that size. The size is in bytes; set a larger value."
                 )
             else:
                 raise ValueError(
@@ -638,7 +663,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
 def resource_partition(
     gm: torch.fx.GraphModule,
-    cpu_memory_budget: int,
+    cpu_memory_budget: Optional[int],
+    max_partition_size: Optional[int] = None,
 ) -> torch.fx.GraphModule:
     """Resource-aware partitioning entry point.
 
@@ -652,7 +678,10 @@ def resource_partition(
         partitioned_module: Capability-partitioned `GraphModule` indicating
             accelerated vs non-accelerated regions.
         cpu_memory_budget: CPU memory budget in bytes for engine compilation.
-            Use -1 to base the budget on currently available system memory.
+            Use None to base the budget on currently available system memory.
+        max_partition_size: The weight bytes per engine to split to. When set, it is used
+            instead of ``cpu_memory_budget`` minus the process's resident memory, so
+            the split does not depend on what the process happens to hold.
 
     Returns:
         torch.fx.GraphModule: Final graph with resource-constrained subgraphs.
@@ -670,6 +699,7 @@ def resource_partition(
             submodule,
             submodule_name=name,
             cpu_memory_budget=cpu_memory_budget,
+            max_partition_size=max_partition_size,
         )
 
         partitioned_graph = partitioner.partition_graph()
