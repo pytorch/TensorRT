@@ -9,7 +9,7 @@ import operator
 import os
 import platform
 import warnings
-from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import sympy
 import torch
@@ -31,6 +31,11 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._weight_release import (
+    WeightReleaser,
+    report_released_weights_on_failure,
+    weight_storages,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -77,6 +82,7 @@ from torch_tensorrt.dynamo.utils import (
     parse_graph_io,
     pin_torch_executed_state,
     prepare_inputs,
+    release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
     validate_optimization_profiles,
@@ -546,6 +552,7 @@ def compile(
     max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    release_weights_after_build: bool = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -660,6 +667,11 @@ def compile(
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
+            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
+            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
+            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
+            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -880,6 +892,7 @@ def compile(
         "cpu_memory_budget": cpu_memory_budget,
         "max_partition_size": max_partition_size,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "release_weights_after_build": release_weights_after_build,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1348,6 +1361,14 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
+    if settings.strip_engine_weights and not settings.immutable_weights:
+        logger.warning(
+            "release_weights_after_build releases the source weights; engines built with "
+            "strip_engine_weights must be refit from a freshly loaded checkpoint."
+        )
+
+
 def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
     for node in gm.graph.nodes:
         if node.op == "placeholder" and "val" in node.meta:
@@ -1489,6 +1510,11 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    weight_releaser = None
+    if settings.release_weights_after_build and not settings.dryrun:
+        _warn_if_refit_source_released(settings)
+        weight_releaser = WeightReleaser(gm)
+
     # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
     # compile_and_save keeps them in their files for the save.
     set_up_deferred_engines = (
@@ -1526,13 +1552,25 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        trt_module = convert_module(
-            gm,
-            convert_inputs,
-            settings=settings,
-            name="_run_on_acc_0",
-            engine_cache=engine_cache,
-        )
+        read: Set[int] = set()
+        if weight_releaser is not None:
+            weight_releaser.count_readers([gm])
+            if weight_releaser.release_unread_storages():
+                release_host_and_device_memory()
+            read = set(weight_storages(gm))
+        with report_released_weights_on_failure(weight_releaser, "_run_on_acc_0"):
+            trt_module = convert_module(
+                gm,
+                convert_inputs,
+                settings=settings,
+                name="_run_on_acc_0",
+                engine_cache=engine_cache,
+            )
+        if (
+            weight_releaser is not None
+            and weight_releaser.release_storages_after_build(read, "_run_on_acc_0")
+        ):
+            release_host_and_device_memory()
         if set_up_deferred_engines:
             trt_module.setup_engine()
         return trt_module
@@ -1655,6 +1693,20 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
+    if weight_releaser is not None:
+        # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
+        weight_releaser.count_readers(
+            [partitioned_module]
+            + [
+                sub
+                for _, sub in partitioned_module.named_children()
+                if isinstance(sub, torch.fx.GraphModule)
+            ]
+        )
+        # The lowered module still holds weights no partition reads (for example a model head the
+        # traced function never calls); nothing needs them once partitioning is done.
+        weight_releaser.release_unread_storages()
+
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
     # the ones they still read.
@@ -1757,13 +1809,21 @@ def compile_module(
         torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
+            # Collected before conversion, which deletes the submodule's frozen parameters. Only the keys:
+            # holding the storages would keep those frozen parameters alive after conversion frees them.
+            read = (
+                set(weight_storages(submodule))
+                if weight_releaser is not None
+                else set()
             )
+            with report_released_weights_on_failure(weight_releaser, name):
+                trt_module = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
 
             if (
                 (settings.lazy_engine_init or defer_engine_setup_to_load())
@@ -1776,6 +1836,11 @@ def compile_module(
                 # Profiling and layer info need the engine.
                 trt_module.setup_engine()
             trt_modules[name] = trt_module
+            if (
+                weight_releaser is not None
+                and weight_releaser.release_storages_after_build(read, name)
+            ):
+                release_host_and_device_memory()
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
