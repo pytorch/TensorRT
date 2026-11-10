@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=e2a1b49a"></script>
+    <script src="../../../_static/documentation_options.js?v=099eaa42"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -185,6 +185,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -197,19 +204,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
     Debugging
@@ -324,6 +331,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -526,6 +540,7 @@ document.write(`
     <span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
+    <span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
@@ -646,6 +661,10 @@ document.write(`
 <span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.</span>
 <span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
+<span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner</span>
+<span class="sd">            splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The</span>
+<span class="sd">            size is then not derived from the budget and the process's resident memory, so the same model and size always</span>
+<span class="sd">            give the same split. Setting it turns resource partitioning on. Default is None.</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
@@ -743,6 +762,7 @@ document.write(`
     <span class="p">)</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_RESOURCE_PARTITIONING</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
+    <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_PARTITION_SIZE</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
     <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
@@ -774,6 +794,18 @@ document.write(`
                 <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"max_partition_size must be a positive number of bytes, "</span>
+                    <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpu_memory_budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Set max_partition_size or cpu_memory_budget, not both: the size replaces "</span>
+                    <span class="s2">"the budget as the size the resource partitioner splits to."</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">enable_resource_partitioning</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attn_bias_is_causal</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"proven"</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s1">'attn_bias_is_causal must be True, False or "proven", got '</span>
@@ -834,6 +866,7 @@ document.write(`
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_algorithm"</span><span class="p">,</span> <span class="n">ACCURACY_ALGORITHM</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_atol"</span><span class="p">,</span> <span class="n">ACCURACY_ATOL</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_rtol"</span><span class="p">,</span> <span class="n">ACCURACY_RTOL</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"max_partition_size"</span><span class="p">,</span> <span class="n">MAX_PARTITION_SIZE</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_autocast_calibrated_high_precision_nodes"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
