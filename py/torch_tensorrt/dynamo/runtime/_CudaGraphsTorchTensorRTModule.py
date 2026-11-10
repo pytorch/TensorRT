@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt
@@ -46,6 +46,52 @@ def _unflatten_inputs(
     return processed_inputs[0], processed_inputs[1]
 
 
+def _inputs_updated_in_place(compiled_module: torch.fx.GraphModule) -> Set[int]:
+    """
+    Find the inputs the module updates in place (e.g. a KV cache): those written by
+    a PyTorch op or aliased by a TensorRT engine's output
+
+    Args:
+        compiled_module: The compiled GraphModule
+
+    Returns:
+        Positions of those inputs among the module's flattened inputs
+    """
+
+    def written(gm: torch.fx.GraphModule) -> Set[torch.fx.Node]:
+        nodes = set()
+        for node in gm.graph.nodes:
+            if not isinstance(node.target, torch._ops.OpOverload):
+                continue
+            for i, arg in enumerate(node.target._schema.arguments):
+                if arg.alias_info is not None and arg.alias_info.is_write:
+                    value = (
+                        node.args[i]
+                        if i < len(node.args)
+                        else node.kwargs.get(arg.name)
+                    )
+                    if isinstance(value, torch.fx.Node):
+                        nodes.add(value)
+        return nodes
+
+    targets = written(compiled_module)
+    for node in compiled_module.graph.find_nodes(op="call_module"):
+        submodule = compiled_module.get_submodule(node.target)
+        if isinstance(submodule, torch.fx.GraphModule):
+            sub_targets = written(submodule)
+            sub_inputs = submodule.graph.find_nodes(op="placeholder")
+            targets.update(a for a, p in zip(node.args, sub_inputs) if p in sub_targets)
+        elif getattr(submodule, "aliased_io", None):
+            aliased = {name for name, _ in submodule.aliased_io.values()}
+            targets.update(
+                a
+                for a, name in zip(node.args, submodule.input_binding_names)
+                if name in aliased
+            )
+    placeholders = compiled_module.graph.find_nodes(op="placeholder")
+    return {i for i, p in enumerate(placeholders) if p in targets}
+
+
 class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """This Wrapper runtime module is to record/replay whole cuda graph in sub modules
 
@@ -62,6 +108,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
         self.inputs = partitioning.construct_submodule_inputs(compiled_module)
+        self._inputs_updated_in_place = _inputs_updated_in_place(compiled_module)
         self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []
@@ -111,6 +158,14 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Shapes are concatenated as so:
         # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
         new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
+        # An input updated in place is recorded as the caller's tensor when it is
+        # contiguous, so the graph writes to that address: a new one needs a new graph
+        new_shape_key += str(
+            [
+                (inputs[i].data_ptr(), inputs[i].is_contiguous())
+                for i in sorted(self._inputs_updated_in_place)
+            ]
+        )
 
         if new_shape_key != self.shape_key:
             logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
@@ -244,7 +299,15 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     contiguous_inputs[i].dtype == inputs[i].dtype
                 ), f"Dtype mismatch for {i}th input. Expect {inputs[i].dtype}, got {contiguous_inputs[i].dtype}."
 
-                if need_cudagraphs_record:
+                if (
+                    i in self._inputs_updated_in_place
+                    and contiguous_inputs[i] is inputs[i]
+                ):
+                    # The graph updates this input in place (e.g. a KV cache): record it
+                    # as the caller's tensor, so the updates land there as they would
+                    # without CUDA graphs, with no copies
+                    self._input_buffers[i] = inputs[i]
+                elif need_cudagraphs_record:
                     # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
                     # Clone is required to avoid re-using user-provided GPU memory
                     self._input_buffers[i] = contiguous_inputs[i].clone()
@@ -272,11 +335,30 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if caller_on_default:
                 self._caller_stream.wait_stream(self._engine_stream)
 
+            # An input updated in place that is not contiguous or not on the GPU was
+            # recorded as a copy: write the update back
+            for i in self._inputs_updated_in_place:
+                if self._input_buffers[i] is not inputs[i]:
+                    inputs[i].copy_(self._input_buffers[i])
+            in_place = {
+                inputs[i].untyped_storage().data_ptr()
+                for i in self._inputs_updated_in_place
+                if self._input_buffers[i] is inputs[i]
+            }
+
             if isinstance(self._output_buffers, (list, tuple)):
                 output_buffers = self._output_buffers
             else:
                 output_buffers = [self._output_buffers]
-            outputs = [output.clone() for output in output_buffers]
+            # An output in an input updated in place is the caller's tensor already
+            outputs = [
+                (
+                    output
+                    if output.untyped_storage().data_ptr() in in_place
+                    else output.clone()
+                )
+                for output in output_buffers
+            ]
             if len(outputs) == 1:
                 return outputs[0]
             return outputs
