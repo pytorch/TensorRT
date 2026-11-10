@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=e2a1b49a"></script>
+    <script src="../_static/documentation_options.js?v=099eaa42"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -188,6 +188,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -586,7 +600,7 @@ document.write(`
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend14kCudaGraphsKeyE">
 <span class="target" id="TensorRTBackend_8h_1a27092406344aaf7c875381e8b55088b0"></span><span class="k"><span class="pre">constexpr</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="sig-prename descclassname"><span class="n"><span class="pre">torch_tensorrt</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch_backend</span></span><span class="p"><span class="pre">::</span></span></span><span class="sig-name descname"><span class="n"><span class="pre">kCudaGraphsKey</span></span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="s"><span class="pre">&quot;use_cuda_graphs&quot;</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend14kCudaGraphsKeyE" title="Link to this definition">#</a><br /></dt>
 <dd><p>Records each eligible engine as a CUDA graph and replays it. </p>
-<p>Read when an engine loads, from the load option of this name, a boolean passed to Module::load, which overrides everything else. Otherwise an explicit process option of false refuses recording. Then the program’s compile spec, b”1” or b”0”, overrides the process default, which is false unless set. Any other compile spec value, or the key twice, fails the load. Engines with aliased outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5 keep ordinary enqueueV3. An engine on the shared activation scratch pool drops its recorded graph whenever the pool hands it a different buffer, and pays the same stable I/O buffers and copies as any other replaying engine. Caller streams in the current ordinary context can replay, as can a call with no caller stream. Green context and other context streams take the plain path, and the graph is kept unless the scratch buffer, the shapes, or the optimization profile changed. </p>
+<p>Read when an engine loads, from the load option of this name, a boolean passed to Module::load, which overrides everything else. Otherwise an explicit process option of false refuses recording. Then the program’s compile spec, b”1” or b”0”, overrides the process default, which is false unless set. Any other compile spec value, or the key twice, fails the load. Engines with aliased outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5 keep ordinary enqueueV3. A replay reads and writes the buffers it was recorded on, so keep each input and output in the same device buffer from call to call, and replays copy nothing. A graph goes on the caller’s buffers once a call brings the buffers of the call before it, and on buffers of its own until then. When the buffers under a graph on the caller’s buffers move, that call records again on the new ones. When they move a second time, for any shapes, that graph records on buffers of its own and copies the inputs in and the outputs out on every call, also after the shapes or the optimization profile change. The plain graph and the graph of each green context count their own moves. Host buffers on a GPU that does not read host memory directly, buffers off a 256-byte boundary, inputs that are not row-major, and outputs that share memory with an input are still copied on every call. An engine on the shared activation scratch pool records again whenever the pool hands it a different buffer. Streams of the current regular context, green context streams of the engine’s device, and calls with no caller stream replay; the backend README covers the green context and other regular context cases. The engine keeps the graphs it records on green contexts, so destroy it before any green context it ran on. A stream of another device fails. An engine on the shared activation scratch pool also fails on a stream of another regular context; see kSharedActivationScratchKey. </p>
 </dd></dl>
 
 </section>

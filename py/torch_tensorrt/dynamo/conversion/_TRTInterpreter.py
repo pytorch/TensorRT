@@ -19,6 +19,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -38,7 +39,10 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     CallingConvention,
 )
-from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
+from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import (
+    EventBuilderMonitor,
+    TRTBulderMonitor,
+)
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     UINT8_COMPARISONS,
     UINT8_DATA_MOVEMENT_OPS,
@@ -60,8 +64,7 @@ from torch_tensorrt.dynamo.utils import (
     validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
+from torch_tensorrt.reporting import current_emitter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -337,6 +340,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
+        elif current_emitter() is not None:
+            builder_config.progress_monitor = EventBuilderMonitor()
 
         if self.compilation_settings.workspace_size != 0:
             builder_config.set_memory_pool_limit(
@@ -578,6 +583,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.debug(
             f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
         )
+
+        # Report graph-to-network conversion separately from TensorRT engine build.
+        # Import lazily to keep conversion usable without activating report collection.
+        from torch_tensorrt.dynamo._reporting import (
+            current_collector,
+            stage_end,
+            stage_start,
+        )
+        from torch_tensorrt.reporting import Stage
+
+        if current_collector() is not None:
+            stage_end(Stage.CONVERSION)
+            stage_start(Stage.BUILD)
 
         if self.compilation_settings.offload_module_to_cpu:
             deallocate_module(self.module)

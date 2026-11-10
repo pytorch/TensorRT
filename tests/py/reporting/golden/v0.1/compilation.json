@@ -1,0 +1,95 @@
+{
+  "analysis": {
+    "capture_performed": false,
+    "checks": [
+      {
+        "detail": "",
+        "name": "converter_validator",
+        "status": "passed"
+      },
+      {
+        "detail": "Analysis does not build engines",
+        "name": "engine_build",
+        "status": "skipped"
+      }
+    ],
+    "coverage": {
+      "assigned": 1,
+      "below_min_block_size": 0,
+      "eligible": 1,
+      "excluded": 0,
+      "parameters": 0,
+      "structural": 0,
+      "total": 1,
+      "unsupported": 0
+    },
+    "created_at": "2026-10-12T00:00:00Z",
+    "diagnostics": [],
+    "failure": null,
+    "graph_stage": "lowered",
+    "job_id": "example-job",
+    "model_execution_performed": false,
+    "nodes": [
+      {
+        "assignment": "tensorrt",
+        "confidence": "confirmed",
+        "eligible": true,
+        "kind": "computational",
+        "node_id": "relu",
+        "operator": "torch.ops.aten.relu.default",
+        "reason_codes": [],
+        "source_node_ids": [
+          "source_relu"
+        ]
+      }
+    ],
+    "partitions": [
+      {
+        "input_profiles": [
+          {
+            "shape": [
+              2,
+              3
+            ]
+          }
+        ],
+        "kind": "tensorrt",
+        "metadata": {},
+        "node_ids": [
+          "relu"
+        ],
+        "partition_id": "engine-0"
+      }
+    ],
+    "report_type": "analysis",
+    "requested_settings_satisfiable": true,
+    "schema_version": "0.1",
+    "settings": {
+      "min_block_size": 1
+    },
+    "status": "succeeded"
+  },
+  "artifact_ids": [
+    "artifacts/compiled.pt2"
+  ],
+  "created_at": "2026-10-12T00:00:00Z",
+  "diagnostics": [],
+  "engines": [
+    {
+      "cache_hit": false,
+      "elapsed_seconds": 0.25,
+      "engine_id": "engine-0",
+      "metadata": {},
+      "partition_id": "engine-0",
+      "status": "succeeded"
+    }
+  ],
+  "failure": null,
+  "job_id": "example-job",
+  "report_type": "compilation",
+  "schema_version": "0.1",
+  "settings": {
+    "min_block_size": 1
+  },
+  "status": "succeeded"
+}
