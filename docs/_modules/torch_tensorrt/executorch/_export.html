@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -560,6 +560,7 @@ document.write(`
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">share_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_device</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span> <span class="k">as</span> <span class="n">export_graph_module</span>
@@ -601,6 +602,7 @@ document.write(`
         <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torch_keyword_arguments</span><span class="p">,</span>
         <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
         <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="ow">not</span> <span class="n">retrace</span><span class="p">,</span>
+        <span class="n">share_tensors</span><span class="o">=</span><span class="n">share_tensors</span><span class="p">,</span>
     <span class="p">)</span>
 
 
@@ -634,6 +636,7 @@ document.write(`
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">share_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ExportedProgram</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""Normalize the source into the programs to export and their method names.</span>
 
@@ -662,6 +665,7 @@ document.write(`
             <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
             <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
             <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span> <span class="k">if</span> <span class="n">retrace</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">retrace</span><span class="p">,</span>
+            <span class="n">share_tensors</span><span class="o">=</span><span class="n">share_tensors</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">program</span><span class="p">,</span> <span class="p">(</span><span class="s2">"forward"</span><span class="p">,)</span>
 
@@ -1152,6 +1156,14 @@ document.write(`
         <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
         <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
         <span class="n">retrace</span><span class="o">=</span><span class="n">retrace</span><span class="p">,</span>
+        <span class="c1"># A GraphModule's program is discarded after lowering, so it can share the</span>
+        <span class="c1"># module's tensors, unless a caller's partitioner lowers them: its backend may</span>
+        <span class="c1"># free what it lowers, as CudaBackend's low_memory_mode does.</span>
+        <span class="n">share_tensors</span><span class="o">=</span><span class="ow">not</span> <span class="p">(</span>
+            <span class="nb">any</span><span class="p">(</span><span class="n">partitioners</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">partitioners</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">)</span>
+            <span class="k">else</span> <span class="n">partitioners</span>
+        <span class="p">),</span>
     <span class="p">)</span>
     <span class="n">program_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"forward"</span><span class="p">:</span> <span class="n">programs</span><span class="p">}</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">programs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">programs</span>
     <span class="n">copyback_by_method</span> <span class="o">=</span> <span class="n">_copyback_buffers_by_method</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">method_names</span><span class="p">)</span>

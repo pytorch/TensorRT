@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -492,6 +492,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir._serialize._cord</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileBackedData</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir._serialize._named_data_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">NamedDataStore</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.backend_details</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">BackendDetails</span><span class="p">,</span>
@@ -500,6 +501,7 @@ document.write(`
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.exported_program</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_lifted_custom_obj</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._offloaded_engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_offloaded_engine_path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
     <span class="n">DEVICE_IDX</span><span class="p">,</span>
@@ -1073,8 +1075,11 @@ document.write(`
         <span class="c1"># ExecuTorch writes named data only from `bytes`, and an engine can be several</span>
         <span class="c1"># gigabytes, so reuse the `bytes` the export staged the engine from</span>
         <span class="c1"># (engine_bytes_tensor) and copy only a tensor that did not come from one.</span>
+        <span class="c1"># An engine still in its file (compile_and_save) is streamed from the file into</span>
+        <span class="c1"># the .pte, never read into memory.</span>
+        <span class="n">engine_file</span> <span class="o">=</span> <span class="n">get_offloaded_engine_path</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
         <span class="n">engine_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">ENGINE_BYTES_ATTR</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">engine_file</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
                 <span class="n">_warn_engine_copy</span><span class="p">()</span>
                 <span class="c1"># `bytes(storage)` looks equivalent but iterates element by element in</span>
@@ -1132,6 +1137,14 @@ document.write(`
                 <span class="s2">"a mutated buffer."</span>
             <span class="p">)</span>
 
+        <span class="n">engine_data</span><span class="p">:</span> <span class="n">Any</span>
+        <span class="k">if</span> <span class="n">engine_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">engine_data</span> <span class="o">=</span> <span class="n">FileBackedData</span><span class="p">(</span><span class="n">engine_file</span><span class="p">)</span>
+            <span class="n">engine_data_sha256</span> <span class="o">=</span> <span class="n">engine_data</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="n">engine_data</span> <span class="o">=</span> <span class="n">engine_bytes</span>
+            <span class="n">engine_data_sha256</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">TensorRTBlobMetadata</span><span class="p">(</span>
             <span class="n">io_bindings</span><span class="o">=</span><span class="n">io_bindings</span><span class="p">,</span>
             <span class="n">aliased_io</span><span class="o">=</span><span class="n">aliased_io</span><span class="p">,</span>
@@ -1142,7 +1155,7 @@ document.write(`
             <span class="n">tensorrt_version</span><span class="o">=</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">__version__</span><span class="p">,</span>
             <span class="c1"># Content-keyed, so identical engines in different methods share one</span>
             <span class="c1"># entry and different engines can never collide on a key.</span>
-            <span class="n">engine_key</span><span class="o">=</span><span class="s2">"tensorrt_engine_"</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">(),</span>
+            <span class="n">engine_key</span><span class="o">=</span><span class="s2">"tensorrt_engine_"</span> <span class="o">+</span> <span class="n">engine_data_sha256</span><span class="o">.</span><span class="n">hex</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="c1"># The engine goes to named data by reference and is streamed into the .pte, or</span>
         <span class="c1"># into &lt;external_engine_data&gt;.ptd when set, so the delegate blob holds only the</span>
@@ -1150,7 +1163,7 @@ document.write(`
         <span class="n">named_data</span> <span class="o">=</span> <span class="n">NamedDataStore</span><span class="p">()</span>
         <span class="n">named_data</span><span class="o">.</span><span class="n">add_named_data</span><span class="p">(</span>
             <span class="n">metadata</span><span class="o">.</span><span class="n">engine_key</span><span class="p">,</span>
-            <span class="n">engine_bytes</span><span class="p">,</span>
+            <span class="n">engine_data</span><span class="p">,</span>
             <span class="n">alignment</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
             <span class="n">external_tag</span><span class="o">=</span><span class="n">_external_engine_tag</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">),</span>
         <span class="p">)</span>

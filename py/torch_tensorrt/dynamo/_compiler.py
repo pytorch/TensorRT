@@ -66,6 +66,9 @@ from torch_tensorrt.dynamo.lowering.passes.restore_reshape import restore_reshap
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    defer_engine_setup_to_load,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -132,6 +135,7 @@ def cross_compile_for_windows(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
@@ -221,7 +225,8 @@ def cross_compile_for_windows(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
-        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
+        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -395,6 +400,7 @@ def cross_compile_for_windows(
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "max_partition_size": max_partition_size,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
@@ -537,6 +543,7 @@ def compile(
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
@@ -650,7 +657,8 @@ def compile(
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
-        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
+        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -870,6 +878,7 @@ def compile(
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "max_partition_size": max_partition_size,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
@@ -1470,12 +1479,22 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
+    # compile_and_save keeps them in their files for the save.
+    set_up_deferred_engines = (
+        settings.lazy_engine_init
+        and not settings.enable_cross_compile_for_windows
+        and not defer_engine_setup_to_load()
+    )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
-    # convert the lowered graph as a single engine. Mixed graphs still partition.
+    # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
+    # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
+        and not defer_engine_setup_to_load()
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1494,13 +1513,16 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        return convert_module(
+        trt_module = convert_module(
             gm,
             convert_inputs,
             settings=settings,
             name="_run_on_acc_0",
             engine_cache=engine_cache,
         )
+        if set_up_deferred_engines:
+            trt_module.setup_engine()
+        return trt_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1568,6 +1590,7 @@ def compile_module(
         partitioned_module = resource_partition(
             partitioned_module,
             cpu_memory_budget=settings.cpu_memory_budget,
+            max_partition_size=settings.max_partition_size,
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
@@ -1729,6 +1752,16 @@ def compile_module(
                 engine_cache=engine_cache,
             )
 
+            if (
+                (settings.lazy_engine_init or defer_engine_setup_to_load())
+                and _debugger_config
+                and (
+                    _debugger_config.save_engine_profile
+                    or _debugger_config.save_layer_info
+                )
+            ):
+                # Profiling and layer info need the engine.
+                trt_module.setup_engine()
             trt_modules[name] = trt_module
 
             if _debugger_config:
@@ -1773,7 +1806,7 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
+        if set_up_deferred_engines:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
@@ -1787,8 +1820,9 @@ def compile_module(
     # so the wrapper graph reflects the exact graph that will be executed/built.
     _insert_complex_io_adapters(partitioned_module, gm, settings)
 
-    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
-    if not settings.dryrun:
+    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist), and not for engines
+    # kept in their files, which have no engine to set it on and only matter to this runtime
+    if not settings.dryrun and not defer_engine_setup_to_load():
         output_node = list(partitioned_module.graph.nodes)[-1]
         for arg in output_node.args:
             # A single-output graph's output node arg is a bare Node rather

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -908,26 +908,36 @@ runtime, lazy engine init, and engine caching. See
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">enable_resource_partitioning</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Split oversized TRT subgraphs so each piece fits within <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>
-during engine build. Prevents OOM errors on large models at the cost of
-slightly more engines. See <a class="reference internal" href="../../contributors/partitioning.html#partitioning"><span class="std std-ref">Partitioning Phase</span></a> for details.</p></td>
+<td><p>Split oversized TRT subgraphs into engines of a bounded size, built one after
+another, to limit host memory during the build. The size is derived from
+<code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>, or set directly with <code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code>.
+Prevents OOM errors on large models at the cost of more engines. See
+<a class="reference internal" href="../../contributors/partitioning.html#partitioning"><span class="std std-ref">Partitioning Phase</span></a> for details.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
-<td><p>Byte budget per TRT engine during build, used by resource partitioning. <code class="docutils literal notranslate"><span class="pre">None</span></code>
-uses available system memory (reported by <code class="docutils literal notranslate"><span class="pre">psutil</span></code>).</p></td>
+<td><p>Host memory budget in bytes for the build, used by resource partitioning: each
+engine gets <code class="docutils literal notranslate"><span class="pre">(cpu_memory_budget</span> <span class="pre">-</span> <span class="pre">process</span> <span class="pre">RSS)</span> <span class="pre">/</span> <span class="pre">4</span></code>. <code class="docutils literal notranslate"><span class="pre">None</span></code> uses available
+system memory / 4 (reported by <code class="docutils literal notranslate"><span class="pre">psutil</span></code>).</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Weight bytes per engine for resource partitioning: a finer control than
+<code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>, which it replaces, so the two can’t both be set. The split
+then depends only on the model and this size, so it is the same on every run.
+Setting it turns resource partitioning on.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Move the model weights to CPU RAM before compilation to reduce GPU memory
 pressure during the build phase. Weights are loaded back to GPU at runtime.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dynamically_allocate_resources</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dynamically_allocate_resources</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Let TRT dynamically allocate memory for intermediate tensors at runtime rather
 than pre-allocating. Can reduce peak memory footprint at a small runtime cost.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
 <td><p>Add a weight that several layers read to the TRT network once instead of once
 per layer, and give the linear layers that share a weight one transposed copy

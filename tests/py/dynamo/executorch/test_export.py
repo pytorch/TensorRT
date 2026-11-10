@@ -877,6 +877,32 @@ def test_python_only_build_can_export_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(
+    torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="specifically validates a Python-only wheel",
+)
+def test_python_only_build_saves_engines_from_their_files(tmp_path):
+    """With compile_and_save the exporter emits the placeholder op itself, which a
+    Python-only build registers only through meta_ops."""
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    output = tmp_path / "python-only-engine-files.pte"
+    torch_tensorrt.compile_and_save(
+        torch.export.export(AddOne().eval().cuda(), example),
+        output,
+        output_format="executorch",
+        arg_inputs=example,
+        min_block_size=1,
+    )
+
+    assert output.stat().st_size > 0
+
+
+@pytest.mark.unit
 def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
     """The boolean mask selection has a data-dependent shape, the engine output does not."""
 
@@ -1539,6 +1565,7 @@ def test_export_prepares_compiled_graph_module(monkeypatch):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
     assert lower.call_args.args == (("rewritten", prepared),)
 
@@ -1561,6 +1588,7 @@ def test_export_forwards_input_alias(monkeypatch, input_option):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
 
 

@@ -50,6 +50,7 @@ from torch_tensorrt.dynamo._defaults import (
     L2_LIMIT_FOR_TILING,
     LAZY_ENGINE_INIT,
     MAX_AUX_STREAMS,
+    MAX_PARTITION_SIZE,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OFFLOAD_MODULE_TO_CPU,
@@ -168,6 +169,10 @@ class CompilationSettings:
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner
+            splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The
+            size is then not derived from the budget and the process's resident memory, so the same model and size always
+            give the same split. Setting it turns resource partitioning on. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
@@ -265,6 +270,7 @@ class CompilationSettings:
     )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
+    max_partition_size: Optional[int] = MAX_PARTITION_SIZE
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
     decompose_attention: bool = DECOMPOSE_ATTENTION
     disabled_constant_fold_exclusions: Collection[str] = (
@@ -296,6 +302,18 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        if self.max_partition_size is not None:
+            if self.max_partition_size <= 0:
+                raise ValueError(
+                    "max_partition_size must be a positive number of bytes, "
+                    f"got {self.max_partition_size}"
+                )
+            if self.cpu_memory_budget is not None:
+                raise ValueError(
+                    "Set max_partition_size or cpu_memory_budget, not both: the size replaces "
+                    "the budget as the size the resource partitioner splits to."
+                )
+            self.enable_resource_partitioning = True
         if self.attn_bias_is_causal not in (True, False, "proven"):
             raise ValueError(
                 'attn_bias_is_causal must be True, False or "proven", got '
@@ -356,6 +374,7 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("max_partition_size", MAX_PARTITION_SIZE)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 

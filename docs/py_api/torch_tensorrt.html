@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -831,6 +831,49 @@ program in a directory its own name, for example
 has a CUDA backend part needs its own directory and
 <code class="docutils literal notranslate"><span class="pre">external_engine_data=&quot;aoti_cuda_blob&quot;</span></code> instead. See
 <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.compile_and_save">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">compile_and_save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exported_program</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExportedProgram</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">PathLike</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'exported_program'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'aot_inductor'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'executorch'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'exported_program'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt._Input.Input"><span class="pre">Input</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#compile_and_save"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.compile_and_save" title="Link to this definition">#</a></dt>
+<dd><p>Compile an ExportedProgram with TensorRT and save it, keeping each engine on disk instead of in
+memory from its build to the save.</p>
+<p>Equivalent to:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">dynamo</span><span class="p">.</span><span class="n">compile</span><span class="p">(</span>
+<span class="w">    </span><span class="n">exported_program</span><span class="p">,</span><span class="w"> </span><span class="n">arg_inputs</span><span class="o">=</span><span class="n">arg_inputs</span><span class="p">,</span><span class="w"> </span><span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span><span class="w"> </span><span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span><span class="w"> </span><span class="n">file_path</span><span class="p">,</span><span class="w"> </span><span class="n">output_format</span><span class="o">=</span><span class="n">output_format</span><span class="p">,</span><span class="w"> </span><span class="o">**</span><span class="n">save_options</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>but each engine is written to a file as soon as it is built, so no built engine is held on the GPU
+or in host memory while the next ones build. With <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code> no engine is ever
+loaded: the save streams each file into the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> (or the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> with <code class="docutils literal notranslate"><span class="pre">external_engine_data</span></code>).
+The other formats save each engine from a loaded one, so their engines are loaded once all of them
+are built, and their save needs as much memory as after <code class="docutils literal notranslate"><span class="pre">compile</span></code>.</p>
+<p>The files go to Torch-TensorRT’s cache directory, <code class="docutils literal notranslate"><span class="pre">torch_tensorrt_&lt;user&gt;/offloaded_engines</span></code> in the
+system temporary directory (<code class="docutils literal notranslate"><span class="pre">TMPDIR</span></code>), and are deleted when the call returns. It needs room for
+every engine at once, and must be on a disk: on a RAM-backed <code class="docutils literal notranslate"><span class="pre">tmpfs</span></code> the files take the memory this
+saves. Linux only, since Windows can’t delete a file while it is memory-mapped.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>exported_program</strong> (<em>torch.export.ExportedProgram</em>) – The program to compile</p></li>
+<li><p><strong>file_path</strong> (<em>Union</em><em>[</em><em>str</em><em>, </em><em>os.PathLike</em><em>]</em>) – Where to save the compiled program</p></li>
+</ul>
+</dd>
+<dt class="field-even">Keyword Arguments<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>output_format</strong> (<em>str</em>) – <code class="docutils literal notranslate"><span class="pre">exported_program</span></code>, <code class="docutils literal notranslate"><span class="pre">aot_inductor</span></code> or <code class="docutils literal notranslate"><span class="pre">executorch</span></code></p></li>
+<li><p><strong>arg_inputs</strong> (<em>Sequence</em><em>[</em><em>Union</em><em>[</em><a class="reference internal" href="#torch_tensorrt.Input" title="torch_tensorrt.Input"><em>Input</em></a><em>, </em><em>torch.Tensor</em><em>]</em><em>]</em>) – The program’s inputs, as for
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code>. The formats other than <code class="docutils literal notranslate"><span class="pre">executorch</span></code> re-export the
+compiled module to save it, so the save gets them too.</p></li>
+<li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – The program’s keyword inputs, passed on like <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code></p></li>
+<li><p><strong>save_options</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – Keyword arguments for <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code>, such as
+<code class="docutils literal notranslate"><span class="pre">external_engine_data</span></code> or <code class="docutils literal notranslate"><span class="pre">retrace</span></code></p></li>
+<li><p><strong>**kwargs</strong> – Compilation settings for <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code></p></li>
 </ul>
 </dd>
 </dl>
@@ -1926,6 +1969,7 @@ If  <code class="docutils literal notranslate"><span class="pre">self</span></co
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.cross_compile_for_windows"><code class="docutils literal notranslate"><span class="pre">cross_compile_for_windows()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.load_cross_compiled_exported_program"><code class="docutils literal notranslate"><span class="pre">load_cross_compiled_exported_program()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.save"><code class="docutils literal notranslate"><span class="pre">save()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.compile_and_save"><code class="docutils literal notranslate"><span class="pre">compile_and_save()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
 </ul>
 </li>

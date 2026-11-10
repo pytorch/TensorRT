@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -551,12 +551,17 @@ document.write(`
         <span class="n">get_dynamic_shapes_kwargs</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="n">trace</span> <span class="k">as</span> <span class="n">dynamo_trace</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._offloaded_engines</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">offload_engines_to_disk</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_torch_inputs</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">"compile"</span><span class="p">,</span>
+    <span class="s2">"compile_and_save"</span><span class="p">,</span>
     <span class="s2">"cross_compile_for_windows"</span><span class="p">,</span>
     <span class="s2">"load_cross_compiled_exported_program"</span><span class="p">,</span>
     <span class="s2">"convert_method_to_trt_engine"</span><span class="p">,</span>
@@ -1774,6 +1779,14 @@ document.write(`
             <span class="c1">#</span>
             <span class="c1"># Copy-back is gated per-branch below: the legacy exporter declares it</span>
             <span class="c1"># itself and consumes the trailing values while doing so.</span>
+            <span class="c1">#</span>
+            <span class="c1"># The program is discarded once saved, so it can share the module's</span>
+            <span class="c1"># tensors instead of copying every weight. Not with a caller's partitioner:</span>
+            <span class="c1"># its backend may free what it lowers, as CudaBackend's low_memory_mode</span>
+            <span class="c1"># does, and that would free the module's weights.</span>
+            <span class="n">share_tensors</span> <span class="o">=</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span> <span class="ow">or</span> <span class="p">(</span>
+                <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">executorch_partitioners</span>
+            <span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
@@ -1793,6 +1806,7 @@ document.write(`
                     <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_tensors</span><span class="p">,</span>
                     <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
                     <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
+                    <span class="n">share_tensors</span><span class="o">=</span><span class="n">share_tensors</span><span class="p">,</span>
                 <span class="p">)</span>
 
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -1901,6 +1915,7 @@ document.write(`
                         <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_tensors</span><span class="p">,</span>
                         <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
                         <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
+                        <span class="n">share_tensors</span><span class="o">=</span><span class="n">share_tensors</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="c1"># Regular GraphModule or no dynamic shapes - retrace normally</span>
@@ -1998,6 +2013,84 @@ document.write(`
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
                         <span class="s2">"Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"</span>
                     <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="compile_and_save">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.compile_and_save">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compile_and_save</span><span class="p">(</span>
+    <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+    <span class="n">file_path</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">output_format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span>
+        <span class="s2">"exported_program"</span><span class="p">,</span> <span class="s2">"aot_inductor"</span><span class="p">,</span> <span class="s2">"executorch"</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="s2">"exported_program"</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">save_options</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Compile an ExportedProgram with TensorRT and save it, keeping each engine on disk instead of in</span>
+<span class="sd">    memory from its build to the save.</span>
+
+<span class="sd">    Equivalent to::</span>
+
+<span class="sd">        trt_gm = torch_tensorrt.dynamo.compile(</span>
+<span class="sd">            exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs</span>
+<span class="sd">        )</span>
+<span class="sd">        torch_tensorrt.save(trt_gm, file_path, output_format=output_format, **save_options)</span>
+
+<span class="sd">    but each engine is written to a file as soon as it is built, so no built engine is held on the GPU</span>
+<span class="sd">    or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever</span>
+<span class="sd">    loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).</span>
+<span class="sd">    The other formats save each engine from a loaded one, so their engines are loaded once all of them</span>
+<span class="sd">    are built, and their save needs as much memory as after ``compile``.</span>
+
+<span class="sd">    The files go to Torch-TensorRT's cache directory, ``torch_tensorrt_&lt;user&gt;/offloaded_engines`` in the</span>
+<span class="sd">    system temporary directory (``TMPDIR``), and are deleted when the call returns. It needs room for</span>
+<span class="sd">    every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take the memory this</span>
+<span class="sd">    saves. Linux only, since Windows can't delete a file while it is memory-mapped.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        exported_program (torch.export.ExportedProgram): The program to compile</span>
+<span class="sd">        file_path (Union[str, os.PathLike]): Where to save the compiled program</span>
+
+<span class="sd">    Keyword Arguments:</span>
+<span class="sd">        output_format (str): ``exported_program``, ``aot_inductor`` or ``executorch``</span>
+<span class="sd">        arg_inputs (Sequence[Union[torch_tensorrt.Input, torch.Tensor]]): The program's inputs, as for</span>
+<span class="sd">            :func:`torch_tensorrt.dynamo.compile`. The formats other than ``executorch`` re-export the</span>
+<span class="sd">            compiled module to save it, so the save gets them too.</span>
+<span class="sd">        kwarg_inputs (dict[str, Any]): The program's keyword inputs, passed on like ``arg_inputs``</span>
+<span class="sd">        save_options (dict[str, Any]): Keyword arguments for :func:`torch_tensorrt.save`, such as</span>
+<span class="sd">            ``external_engine_data`` or ``retrace``</span>
+<span class="sd">        **kwargs: Compilation settings for :func:`torch_tensorrt.dynamo.compile`</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"exported_program"</span><span class="p">,</span> <span class="s2">"aot_inductor"</span><span class="p">,</span> <span class="s2">"executorch"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"compile_and_save saves exported_program, aot_inductor or executorch, not </span><span class="si">{</span><span class="n">output_format</span><span class="si">!r}</span><span class="s2">"</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Windows"</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">"compile_and_save keeps each engine in a memory-mapped file, which Windows can't delete; "</span>
+            <span class="s2">"use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."</span>
+        <span class="p">)</span>
+    <span class="n">save_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">save_options</span> <span class="ow">or</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="c1"># These saves re-export the compiled module, so they need its inputs too.</span>
+        <span class="n">save_kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"arg_inputs"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">)</span>
+        <span class="n">save_kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"kwarg_inputs"</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">offload_engines_to_disk</span><span class="p">():</span>
+        <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
+            <span class="n">exported_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+            <span class="c1"># Only an ExecuTorch save streams an engine from its file. The other formats save each</span>
+            <span class="c1"># engine from a loaded one.</span>
+            <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">trt_gm</span><span class="o">.</span><span class="n">modules</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
+                    <span class="n">module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
+        <span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">fspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">),</span> <span class="n">output_format</span><span class="o">=</span><span class="n">output_format</span><span class="p">,</span> <span class="o">**</span><span class="n">save_kwargs</span><span class="p">)</span></div>
 
 
 

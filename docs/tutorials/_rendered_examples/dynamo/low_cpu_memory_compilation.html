@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d985c49d"></script>
+    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -605,6 +605,7 @@ document.write(`
 <p>This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch-TensorRT Dynamo. Limiting host RAM use is helpful on memory-constrained machines or when compiling very large models.</p>
 <p>Key notes: - The toy model below has roughly 430 MB of parameters. We set the CPU memory budget to 2 GiB. At compile time, only about 900 MB of host RAM may remain available. Building an engine can take up to four times its weights, so each engine may hold about 900 / 4 = 225 MB. The model is partitioned into three subgraphs: one for each convolution (about 150 MB each) and one for the linear layer (about 130 MB).</p>
 <ul class="simple">
+<li><p>The per-engine size depends on the host memory in use when partitioning starts, so the split can change from one run to the next. For finer control, set the size directly with <code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code>, in bytes of weights per engine, instead of <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>. With <code class="docutils literal notranslate"><span class="pre">200</span> <span class="pre">*</span> <span class="pre">1024**2</span></code> this model splits into the same three engines on every run. <code class="docutils literal notranslate"><span class="pre">320</span> <span class="pre">*</span> <span class="pre">1024**2</span></code> puts both convolutions in one engine and the linear layer in another, and a size above the model’s 430 MB keeps one engine.</p></li>
 <li><p>Performance impact varies by model. When the number of TensorRT engines created is small, the impact is typically minimal.</p></li>
 </ul>
 <div class="nbinput nblast docutils container">

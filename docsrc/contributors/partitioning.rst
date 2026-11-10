@@ -174,8 +174,15 @@ Resource Partitioning
 
 Large models can exhaust CPU RAM during TensorRT engine building because TensorRT holds
 multiple copies of the graph in memory during optimization. **Resource partitioning**
-splits oversized TRT subgraphs into smaller pieces to stay within a memory budget,
-running them sequentially through the builder.
+splits oversized TRT subgraphs into smaller pieces and builds them one after another, so
+each build holds only part of the model.
+
+It has two controls:
+
+* ``cpu_memory_budget``, the host memory the compilation may use. The partitioner derives
+  the size of each engine from it.
+* ``max_partition_size``, the size of each engine itself. It is a finer control
+  over the same split; see `Fixing the Engine Size`_ below.
 
 .. code-block:: python
 
@@ -195,22 +202,81 @@ Or set it via ``CompilationSettings``:
         cpu_memory_budget=8 * 1024**3,
     )
 
-How the budget is computed:
+How the split is computed:
 
-1. ``ResourcePartitioner`` queries available system memory via ``psutil``.
-2. It estimates the parameter footprint of each TRT subgraph by summing ``get_attr``
-   tensor byte sizes.
-3. The per-engine budget is ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``
-   (default multiplier: 4, accounting for TensorRT's internal copies during build).
-4. Any subgraph whose estimated footprint exceeds this budget is split iteratively
-   until all pieces fit.
+1. ``ResourcePartitioner`` reads the process's resident memory (RSS) via ``psutil``, or the
+   available system memory when ``cpu_memory_budget`` is not set.
+2. It estimates the size of each TRT subgraph as the bytes of the weights (``get_attr``
+   tensors) its nodes read. A weight read by two subgraphs counts in both, because each
+   engine stores its own copy.
+3. The per-engine size is ``(cpu_memory_budget - RSS) // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``,
+   or ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER`` without a budget
+   (default multiplier: 4, the assumption that building an engine takes about 4 times its
+   weights in host memory).
+4. If the whole model is within that size, nothing is split. A model more than
+   ``MAX_NUM_OF_ENGINES`` (50) times that size fails with an error instead.
+5. Otherwise, each larger subgraph is split from the front, in graph order. Nodes move into
+   a new engine in steps; a step that would take the engine over the size is undone and
+   retried with fewer nodes. A single node larger than the size gets an engine of its own,
+   which is then larger than the size.
 
 The splitter keeps **atomic subgraphs** (operator fusions) intact. It will not split a
-fused ``conv → bn → relu`` pattern across a boundary, migrating the whole fusion to
-whichever side contains the most of its nodes.
+fused ``conv → bn → relu`` pattern across a boundary: it moves the whole fusion, and the
+producers it needs, into the earlier engine.
 
 Empirically, resource partitioning has negligible runtime cost — TRT can optimise
 within each piece nearly as well as across the full subgraph.
+
+Fixing the Engine Size
+^^^^^^^^^^^^^^^^^^^^^^^
+
+``max_partition_size`` sets the per-engine size of step 3 directly, in bytes of
+weights, instead of deriving it from ``cpu_memory_budget`` and the resident memory. Every
+other step stays the same:
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.compile(
+        model,
+        arg_inputs=inputs,
+        max_partition_size=512 * 1024**2,  # 512 MiB of weights per engine
+    )
+
+Use it when:
+
+* **The split must be the same on every run.** The size derived from the budget changes
+  with the process's resident memory when partitioning starts, which depends on things
+  unrelated to the model: what the caller still holds, the allocator, and weights that are
+  memory-mapped and not yet read. With the same budget, a 3.6-billion-parameter robot
+  policy split into 27 engines in one run and 13 in another. With a fixed size, the split
+  depends only on the model and the size.
+* **Programs need different sizes.** Each ``compile`` call takes its own size, so an
+  application that compiles several programs can split a large one finely and keep a
+  small one in a single engine.
+* **You want to choose the trade-off yourself.** A smaller size lowers the memory peak of
+  each build, at the cost of more engines.
+
+How it combines with the budget:
+
+* Setting it turns resource partitioning on, so ``enable_resource_partitioning`` need not
+  be set.
+* It replaces ``cpu_memory_budget``, so setting both raises a ``ValueError``. The resident
+  memory is not read.
+* Internally, the partitioner treats the size as a budget of
+  ``4 × max_partition_size``, so the checks of step 4 follow from it: a model
+  within the size stays one engine, and a size so small that the model is more than 50
+  times it fails with an error that names ``max_partition_size``.
+
+What it does not bound:
+
+* **The memory of a build.** The size counts an engine's weights. The memory TensorRT
+  takes to build that engine is a multiple of it, which the factor of 4 only estimates;
+  builds have been measured at 3 to 10 times their weights. Check the peak of a first
+  compile, and lower the size if it is too high. Each split logs its engines' weights at
+  ``INFO`` level.
+* **Layers larger than the size.** A single layer larger than the size still gets an
+  engine of its own, larger than the size. Lowering the size below the largest layer
+  doesn't make that layer's engine any smaller.
 
 Atomic Subgraphs and Fusion Preservation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -268,7 +334,11 @@ All partitioning behaviour is controlled via ``CompilationSettings``:
      - Run resource partitioning after capability partitioning.
    * - ``cpu_memory_budget``
      - ``None``
-     - Byte budget per TRT engine during build. ``None`` uses available system memory.
+     - Host memory budget for the build; each engine gets ``(budget - RSS) / 4``. ``None`` uses available system memory.
+   * - ``max_partition_size``
+     - ``None``
+     - Weight bytes per engine: a finer control than ``cpu_memory_budget``, which it replaces
+       when set. The split then depends only on the model and this size.
 
 ----
 
