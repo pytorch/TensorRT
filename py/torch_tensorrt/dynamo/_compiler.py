@@ -86,6 +86,7 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
 from torch_tensorrt.dynamo.runtime._offloaded_engines import (
     defer_engine_setup_to_load,
 )
+from torch_tensorrt.dynamo.tools.weight_mapping import has_mapped_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -569,7 +570,7 @@ def compile(
     max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
-    release_weights_after_build: bool = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
+    release_weights_after_build: Optional[bool] = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -684,11 +685,13 @@ def compile(
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
-        release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
-            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
-            module, and any tensor sharing storage with its weights, must not be used afterwards, even if compilation fails. Weights read
-            by subgraphs that run in PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; turned off, with a warning, under
-            ``torch.compile``, and not supported by ``MutableTorchTensorRTModule``.
+        release_weights_after_build (Optional[bool]): Release the memory of each model weight once the last TensorRT engine that reads it is built,
+            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. ``None`` (default)
+            releases only weights mapped by ``map_weights``: their pages are dropped and read back if used again, so the source module keeps
+            working. ``True`` also frees ordinary weights; the source module, and any tensor sharing storage with its weights, must not be used
+            afterwards, even if compilation fails. ``False`` releases nothing. Weights read by subgraphs that run in PyTorch are kept. Applies to
+            ``torch_tensorrt.dynamo.compile``; ``True`` is turned off, with a warning, under ``torch.compile``. ``MutableTorchTensorRTModule``
+            uses ``False``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -1381,7 +1384,11 @@ def _build_user_symbol_bounds(
 
 
 def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
-    if settings.strip_engine_weights and not settings.immutable_weights:
+    if (
+        settings.release_weights_after_build
+        and settings.strip_engine_weights
+        and not settings.immutable_weights
+    ):
         logger.warning(
             "release_weights_after_build releases the source weights; engines built with "
             "strip_engine_weights must be refit from a freshly loaded checkpoint."
@@ -1543,9 +1550,15 @@ def compile_module(
         )
 
     weight_releaser = None
-    if settings.release_weights_after_build and not settings.dryrun:
+    # None releases only mapped weights: with none mapped, compile runs as without the setting.
+    if not settings.dryrun and (
+        settings.release_weights_after_build
+        or (settings.release_weights_after_build is None and has_mapped_weights())
+    ):
         _warn_if_refit_source_released(settings)
-        weight_releaser = WeightReleaser(gm)
+        weight_releaser = WeightReleaser(
+            gm, mapped_only=settings.release_weights_after_build is None
+        )
 
     # Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless
     # compile_and_save keeps them in their files for the save.
