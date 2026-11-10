@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=e2a1b49a"></script>
+    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -611,6 +611,7 @@ document.write(`
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
+    <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
@@ -700,7 +701,8 @@ document.write(`
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
-<span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
+<span class="sd">        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.</span>
+<span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
@@ -874,6 +876,7 @@ document.write(`
         <span class="s2">"use_distributed_mode_trace"</span><span class="p">:</span> <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
         <span class="s2">"enable_resource_partitioning"</span><span class="p">:</span> <span class="n">enable_resource_partitioning</span><span class="p">,</span>
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
+        <span class="s2">"max_partition_size"</span><span class="p">:</span> <span class="n">max_partition_size</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
@@ -1018,6 +1021,7 @@ document.write(`
         <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
+    <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
@@ -1131,7 +1135,8 @@ document.write(`
 <span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
-<span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
+<span class="sd">        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.</span>
+<span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
@@ -1351,6 +1356,7 @@ document.write(`
         <span class="s2">"autocast_calibration_dataloader"</span><span class="p">:</span> <span class="n">autocast_calibration_dataloader</span><span class="p">,</span>
         <span class="s2">"enable_resource_partitioning"</span><span class="p">:</span> <span class="n">enable_resource_partitioning</span><span class="p">,</span>
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
+        <span class="s2">"max_partition_size"</span><span class="p">:</span> <span class="n">max_partition_size</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
@@ -2063,6 +2069,7 @@ document.write(`
         <span class="n">partitioned_module</span> <span class="o">=</span> <span class="n">resource_partition</span><span class="p">(</span>
             <span class="n">partitioned_module</span><span class="p">,</span>
             <span class="n">cpu_memory_budget</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">cpu_memory_budget</span><span class="p">,</span>
+            <span class="n">max_partition_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">max_partition_size</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">supported_ops</span><span class="o">.</span><span class="n">fallback_operators</span>

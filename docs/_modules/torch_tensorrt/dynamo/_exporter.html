@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=e2a1b49a"></script>
+    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -544,6 +544,24 @@ document.write(`
     <span class="k">return</span> <span class="n">obj</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">deepcopy_memo_sharing_tensors</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">types</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,)</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""A ``copy.deepcopy`` memo that shares the objects of ``types`` that ``module`` and its submodules hold:</span>
+<span class="sd">    parameters, buffers and plain attributes (constants kept as attributes, an engine's plan). Deep-copying</span>
+<span class="sd">    the module with it copies only the structure around them."""</span>
+    <span class="n">memo</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">submodule</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">modules</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="o">*</span><span class="n">submodule</span><span class="o">.</span><span class="n">parameters</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="o">*</span><span class="n">submodule</span><span class="o">.</span><span class="n">buffers</span><span class="p">(</span><span class="n">recurse</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="o">*</span><span class="n">submodule</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">types</span><span class="p">):</span>
+                <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">value</span><span class="p">)]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">return</span> <span class="n">memo</span>
+
+
 <div class="viewcode-block" id="export">
 <a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.export">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">export</span><span class="p">(</span>
@@ -554,6 +572,7 @@ document.write(`
     <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">use_legacy_exporter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">share_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Export the result of TensorRT compilation into the desired output format.</span>
 
@@ -561,9 +580,16 @@ document.write(`
 <span class="sd">        gm (torch.fx.GraphModule): Compiled Torch-TensorRT module, generated by ``torch_tensorrt.dynamo.compile``</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
 <span class="sd">        cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
+<span class="sd">        share_tensors (bool): Give the program ``gm``'s parameters, buffers and constants instead of copies of</span>
+<span class="sd">            them, which saves holding every weight twice. Only for a program that is read and then discarded:</span>
+<span class="sd">            a write into the program's tensors, or a backend that frees them after lowering, changes ``gm``</span>
+<span class="sd">            too, and an in-place refit of ``gm`` changes the program's PyTorch weights but not its engines.</span>
 <span class="sd">    """</span>
     <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">,</span> <span class="n">expose_aliased_mutations</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">use_legacy_exporter</span><span class="p">)</span>
+        <span class="n">gm</span><span class="p">,</span>
+        <span class="n">cross_compile_module</span><span class="p">,</span>
+        <span class="n">expose_aliased_mutations</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">use_legacy_exporter</span><span class="p">),</span>
+        <span class="n">share_tensors</span><span class="o">=</span><span class="n">share_tensors</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">use_legacy_exporter</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="p">()</span>
@@ -591,6 +617,7 @@ document.write(`
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">expose_aliased_mutations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">share_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Transforms the graphmodule by inlining Pytorch and TensorRT submodules.</span>
@@ -601,12 +628,15 @@ document.write(`
 <span class="sd">        gm (torch.fx.GraphModule): Compiled Torch-TensorRT module, generated by ``torch_tensorrt.dynamo.compile``</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
 <span class="sd">        cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
+<span class="sd">        share_tensors (bool): Keep ``gm``'s tensors in the result instead of copies, see ``export``</span>
 
 <span class="sd">    Returns an inlined torch.fx.GraphModule</span>
 <span class="sd">    """</span>
     <span class="c1"># Make a copy the graph since this function transforms the input graph and changes it's attributes.</span>
     <span class="c1"># This transformed graph is meant to be consumed by `create_trt_exp_program`</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span>
+        <span class="n">gm</span><span class="p">,</span> <span class="n">memo</span><span class="o">=</span><span class="n">deepcopy_memo_sharing_tensors</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span> <span class="k">if</span> <span class="n">share_tensors</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
 
     <span class="c1"># Inline TensorRT submodules</span>
     <span class="n">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">,</span> <span class="n">expose_aliased_mutations</span><span class="p">)</span>
