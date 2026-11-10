@@ -30,7 +30,7 @@ constexpr int kMaxCaptureAttempts = 3;
 constexpr size_t kMaxGreenGraphs = 4;
 
 // CUDA allows a green context handle on one CPU thread at a time, and engines that share a green context can run
-// on several threads.
+// on several threads. Never freed, as cuda_graph_capture_mutex is, since handles can outlive other static objects.
 std::mutex& green_context_mutex() {
   static auto* mutex = new std::mutex();
   return *mutex;
