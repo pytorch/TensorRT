@@ -301,13 +301,22 @@ Memory and Resource Management
      - Description
    * - ``enable_resource_partitioning``
      - ``False``
-     - Split oversized TRT subgraphs so each piece fits within ``cpu_memory_budget``
-       during engine build. Prevents OOM errors on large models at the cost of
-       slightly more engines. See :ref:`partitioning` for details.
+     - Split oversized TRT subgraphs into engines of a bounded size, built one after
+       another, to limit host memory during the build. The size is derived from
+       ``cpu_memory_budget``, or set directly with ``max_partition_size``.
+       Prevents OOM errors on large models at the cost of more engines. See
+       :ref:`partitioning` for details.
    * - ``cpu_memory_budget``
      - ``None``
-     - Byte budget per TRT engine during build, used by resource partitioning. ``None``
-       uses available system memory (reported by ``psutil``).
+     - Host memory budget in bytes for the build, used by resource partitioning: each
+       engine gets ``(cpu_memory_budget - process RSS) / 4``. ``None`` uses available
+       system memory / 4 (reported by ``psutil``).
+   * - ``max_partition_size``
+     - ``None``
+     - Weight bytes per engine for resource partitioning: a finer control than
+       ``cpu_memory_budget``, which it replaces, so the two can't both be set. The split
+       then depends only on the model and this size, so it is the same on every run.
+       Setting it turns resource partitioning on.
    * - ``offload_module_to_cpu``
      - ``False``
      - Move the model weights to CPU RAM before compilation to reduce GPU memory
