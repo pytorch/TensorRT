@@ -162,6 +162,22 @@ class TestIndexCopyFallback(TestCase):
         compiled = _compile(M().cuda(), (x, index, y))
         torch.testing.assert_close(compiled(x, index, y), M()(x, index, y))
 
+    def test_negative_dim_uses_fallback(self):
+        class M(torch.nn.Module):
+            def forward(self, x, index, update):
+                return torch.ops.aten.index_copy.default(x, -1, index, update)
+
+        x = torch.zeros(2, 3, device="cuda")
+        index = torch.tensor([2, 0], dtype=torch.int64, device="cuda")
+        update = torch.tensor([[1.0, 2.0], [3.0, 4.0]], device="cuda")
+
+        compiled = _compile(M().cuda(), (x.clone(), index, update))
+        self.assertEqual(_aliased_io(compiled), {})
+
+        out = compiled(x.clone(), index, update)
+        eager = torch.ops.aten.index_copy.default(x.clone(), -1, index, update)
+        torch.testing.assert_close(out, eager)
+
 
 if __name__ == "__main__":
     run_tests()

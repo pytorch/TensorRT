@@ -34,7 +34,10 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_positive_dim,
+)
 from torch_tensorrt.dynamo.conversion.impl import select
 from torch_tensorrt.dynamo.conversion.impl.shuffle import reshape
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
@@ -121,6 +124,7 @@ def index_copy_fallback(
         return select.scatter(
             ctx, target, source_ir, name + "_fallback_scatter", input, dim, index, src
         )
+    dim = get_positive_dim(dim, rank)
     # A 0-d source next to a 1-D input is one element too, as a source of shape (1,).
     if len(src.shape) == 0:
         src = reshape(ctx, target, source_ir, name + "_src_1d", src, (1,))
