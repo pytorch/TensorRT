@@ -1565,6 +1565,7 @@ def test_export_prepares_compiled_graph_module(monkeypatch):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
     assert lower.call_args.args == (("rewritten", prepared),)
 
@@ -1587,6 +1588,7 @@ def test_export_forwards_input_alias(monkeypatch, input_option):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
 
 

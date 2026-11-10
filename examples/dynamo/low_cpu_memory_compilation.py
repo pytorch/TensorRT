@@ -20,6 +20,14 @@ Key notes:
   partitioned into three subgraphs: one for each convolution (about 150 MB
   each) and one for the linear layer (about 130 MB).
 
+- The per-engine size depends on the host memory in use when partitioning
+  starts, so the split can change from one run to the next. For finer
+  control, set the size directly with ``max_partition_size``, in
+  bytes of weights per engine, instead of ``cpu_memory_budget``. With
+  ``200 * 1024**2`` this model splits into the same three engines on every
+  run. ``320 * 1024**2`` puts both convolutions in one engine and the linear
+  layer in another, and a size above the model's 430 MB keeps one engine.
+
 - Performance impact varies by model. When the number of TensorRT engines
   created is small, the impact is typically minimal.
 

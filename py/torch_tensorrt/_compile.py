@@ -1289,6 +1289,14 @@ def save(
             #
             # Copy-back is gated per-branch below: the legacy exporter declares it
             # itself and consumes the trailing values while doing so.
+            #
+            # The program is discarded once saved, so it can share the module's
+            # tensors instead of copying every weight. Not with a caller's partitioner:
+            # its backend may free what it lowers, as CudaBackend's low_memory_mode
+            # does, and that would free the module's weights.
+            share_tensors = output_format == "exported_program" or (
+                output_format == "executorch" and not executorch_partitioners
+            )
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1308,6 +1316,7 @@ def save(
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
+                    share_tensors=share_tensors,
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1416,6 +1425,7 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
+                        share_tensors=share_tensors,
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally
