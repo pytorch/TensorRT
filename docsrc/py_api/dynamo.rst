@@ -36,7 +36,8 @@ Classes
 
 .. note::
 
-   ``low_memory`` is **experimental** in 2.15: its API will change in 2.16.
+   ``low_memory`` is **experimental**. In 2.16 it takes the loaded model and writes its weights to a file
+   itself; in 2.15 it took a function that builds the model and a weights file.
 
 .. autoclass:: CompilationSettings
 

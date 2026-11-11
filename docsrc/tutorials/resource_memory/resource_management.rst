@@ -196,8 +196,9 @@ Compiling from Memory-Mapped Weights
 
 .. note::
 
-   ``map_weights``, ``save_weights_for_mapping``, ``checkpoint_source`` and ``low_memory`` are
-   **experimental** in 2.15: their API will change in 2.16.
+   ``low_memory``, ``map_weights``, ``save_weights_for_mapping`` and ``checkpoint_source`` are
+   **experimental**. In 2.16, ``low_memory`` takes the loaded model; in 2.15 it took a function that
+   builds the model and a weights file.
 
 To compile, a model's weights normally have to be loaded into host memory first, all of them, before
 the first engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's weights at
@@ -208,24 +209,24 @@ zero-copy views of a safetensors file:
 - The pages are dropped again once the last engine that reads the weight is built. A mapped weight stays
   valid; its pages are read back if it is used again.
 
-``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
-building it allocates no weights, maps them, and drops their pages when the block ends, unless
-``release_weights_after_build=False``. Its ``compile_settings`` turn the resource partitioner on, so the
-model is built as several engines, each small enough to build within ``cpu_memory_budget`` (or the
-available memory without one), so only about one engine's weights are resident at a time. They also give a
-part of the model that runs in PyTorch its weights on the GPU after compilation
-(``offload_module_to_cpu``). Pass them to ``compile``:
+``torch_tensorrt.dynamo.low_memory`` does all of it for a model you have loaded: it writes the model's
+weights to a file, points the model's own tensors at the file, which frees the loaded copy, and drops
+their pages when the block ends, unless ``release_weights_after_build=False``. Its ``compile_settings``
+turn the resource partitioner on, so the model is built as several engines, each small enough to build
+within ``cpu_memory_budget`` (or the available memory without one), so only about one engine's weights are
+resident at a time. They also give a part of the model that runs in PyTorch its weights on the GPU after
+compilation (``offload_module_to_cpu``). Pass them to ``compile``:
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
 
-    # Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.
-    with torch_tensorrt.dynamo.low_memory(
-        lambda: MyModel().eval(), "model.safetensors", cpu_memory_budget=8 << 30
-    ) as low_mem:
-        print(f"{low_mem.report.mapped_bytes / 2**30:.2f} GiB mapped")
+    model = MyModel.from_pretrained("my-checkpoint").eval()  # loaded as usual
+
+    # Move its weights into a file, and build engines that fit an 8 GiB host memory budget.
+    with torch_tensorrt.dynamo.low_memory(model, cpu_memory_budget=8 << 30) as low_mem:
+        print(f"{low_mem.report.mapped_bytes / 2**30:.2f} GiB of weights in {low_mem.weights_file}")
         example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
         exported = torch.export.export(low_mem.model, (example,))
         trt_model = torch_tensorrt.dynamo.compile(
@@ -234,7 +235,7 @@ part of the model that runs in PyTorch its weights on the GPU after compilation
 
 ``cpu_memory_budget`` is the host memory the compiling process may use, counting what it already uses,
 and each engine gets up to a quarter of what's left. In :ref:`compile_from_mapped_weights`, a model with
-192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
+192 MiB of weights built this way as 12 engines had at most 16 MiB of its weights file resident while
 compiling, against all 192 MiB when built as one engine.
 
 ``low_memory`` takes the compile settings that lower memory during compilation:
@@ -243,7 +244,18 @@ compiling, against all 192 MiB when built as one engine.
 set. They apply only to the calls they're passed to: another model compiled inside the block keeps its own
 settings.
 
-``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
+The model has to fit in memory once, while it loads; its weights aren't added to the compilation's peak.
+On a model with 2 GiB of float32 weights built as 0.5 GiB engines, compiling it in the block peaked at
+5.58 GiB of host and GPU memory, the same as building the model on ``meta`` and mapping a weights file,
+against 7.33 GiB for compiling the loaded model. Anything else that still holds the loaded tensors, such as
+the autograd graph of a forward pass run with gradients, a ``state_dict`` copy or an optimizer, keeps them
+in memory, and a warning says how much. To compile a model that doesn't fit in memory at all, build it on
+``meta`` and map a weights file with ``map_weights``, as below.
+
+The file goes to Torch-TensorRT's per-user cache directory, ``<TMPDIR>/torch_tensorrt_<user>/offloaded_weights``,
+which must be on a disk: on a RAM-backed tmpfs the file takes the memory this frees. It is deleted once the
+model no longer uses it, or when Python exits, and a file a killed process left behind is deleted the next
+time. ``low_memory`` raises on Windows, which can't delete a memory-mapped file.
 
 **What to know:**
 
@@ -283,8 +295,8 @@ settings.
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** raise for any name in the model's ``state_dict``, in ``map_weights`` and so in
-  ``low_memory``; non-persistent buffers, such as rotary frequencies, aren't required, so recompute those
+- **Missing names:** ``map_weights`` raises for any name in the model's ``state_dict`` that the file
+  doesn't store. Non-persistent buffers, such as rotary frequencies, aren't required, so recompute those
   or write them with ``save_weights_for_mapping``. With ``strict=False``, ``map_weights`` lists missing
   names in its result's ``missing`` and leaves them as they were. A missing tensor on ``meta`` stays
   there, with no values, and a warning names it: a model that reads it can't be exported or compiled,
