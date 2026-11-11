@@ -1524,20 +1524,25 @@ def test_a_tensorrt_without_its_plugin_library_stops_at_configure(
     assert refused is not plugin, result.stderr
 
 
-@pytest.mark.parametrize("lean_library", [False, True])
-def test_a_lean_build_without_the_lean_library_stops_at_configure(
+@pytest.mark.parametrize("lean_library", [None, "11.4.0", "11.3.0", "11"])
+def test_a_lean_build_without_the_matching_lean_library_stops_at_configure(
     tmp_path, native_tools, lean_library
 ):
-    # A lean build needs no plugin library, so this TensorRT has none.
+    # A lean build needs no plugin library, so this TensorRT has none. Its libraries carry their version in
+    # the file name, as a TensorRT installation's do; "11" is the major-only name of the lean wheel's copy.
     trt = tmp_path / "tensorrt"
     (trt / "include").mkdir(parents=True)
     (trt / "lib").mkdir()
     (trt / "include/NvInfer.h").write_text(
         "#define NV_TENSORRT_MAJOR 11\n#define NV_TENSORRT_MINOR 4\n#define NV_TENSORRT_PATCH 0\n"
     )
-    (trt / "lib/libnvinfer.so").write_bytes(b"")
+    (trt / "lib/libnvinfer.so.11.4.0").write_bytes(b"")
+    (trt / "lib/libnvinfer.so").symlink_to("libnvinfer.so.11.4.0")
     if lean_library:
-        (trt / "lib/libnvinfer_lean.so").write_bytes(b"")
+        (trt / f"lib/libnvinfer_lean.so.{lean_library}").write_bytes(b"")
+        (trt / "lib/libnvinfer_lean.so").symlink_to(
+            f"libnvinfer_lean.so.{lean_library}"
+        )
     result = subprocess.run(
         [
             native_tools["cmake"],
@@ -1553,5 +1558,40 @@ def test_a_lean_build_without_the_lean_library_stops_at_configure(
         text=True,
     )
     stderr = "".join(result.stderr.split())
-    assert ("nvinfer_lean),whichwas" in stderr) is not lean_library, result.stderr
+    assert ("nvinfer_lean),whichwas" in stderr) is (lean_library is None), result.stderr
+    refused = "needsthelean libraryofthesameTensorRT".replace(" ", "") in stderr
+    assert refused is (lean_library in ("11.3.0", "11")), result.stderr
     assert "nvinfer_plugin),whichwas" not in stderr, result.stderr
+
+
+def test_a_lean_build_finds_the_lean_library_beside_an_explicit_tensorrt_library(
+    tmp_path, native_tools
+):
+    # A custom TensorRT chosen by its library and include directory instead of TensorRT_ROOT.
+    trt = tmp_path / "tensorrt"
+    (trt / "include").mkdir(parents=True)
+    (trt / "lib").mkdir()
+    (trt / "include/NvInfer.h").write_text(
+        "#define NV_TENSORRT_MAJOR 11\n#define NV_TENSORRT_MINOR 4\n#define NV_TENSORRT_PATCH 0\n"
+    )
+    for name in ("libnvinfer", "libnvinfer_lean"):
+        (trt / f"lib/{name}.so.11.4.0").write_bytes(b"")
+        (trt / f"lib/{name}.so").symlink_to(f"{name}.so.11.4.0")
+    result = subprocess.run(
+        [
+            native_tools["cmake"],
+            "-S",
+            str(_ROOT / "py/torch-tensorrt-executorch-runtime/native"),
+            "-B",
+            str(tmp_path / "build"),
+            f"-DTORCH_TENSORRT_SOURCE_DIR={_ROOT}",
+            f"-DTensorRT_LIBRARY={trt}/lib/libnvinfer.so",
+            f"-DTensorRT_INCLUDE_DIR={trt}/include",
+            "-DTORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME=ON",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    lean = trt / "lib/libnvinfer_lean.so"
+    cache = (tmp_path / "build/CMakeCache.txt").read_text()
+    assert f"TensorRT_nvinfer_lean_LIBRARY:FILEPATH={lean}\n" in cache, result.stderr

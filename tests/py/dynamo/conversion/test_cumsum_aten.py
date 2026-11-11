@@ -21,6 +21,7 @@ class TestCumsumConverter(DispatchTestCase):
             ((1,), 0),
             ((2,), 0),
             ((3,), -1),
+            ((), -1),
         ]
     )
     def test_cumsum_1D(self, shape, dim):

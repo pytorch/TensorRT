@@ -29,17 +29,20 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_positive_dim,
+)
 from torch_tensorrt.dynamo.conversion.impl import select
+from torch_tensorrt.dynamo.conversion.impl.shuffle import reshape
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
     emit_kv_cache_update_layer,
 )
-
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +119,15 @@ def index_copy_fallback(
     ``scatter``.
     """
     rank = len(input.shape)
+    # A 0-d input and source are one element each, which scatter takes as they are.
+    if rank == 0:
+        return select.scatter(
+            ctx, target, source_ir, name + "_fallback_scatter", input, dim, index, src
+        )
+    dim = get_positive_dim(dim, rank)
+    # A 0-d source next to a 1-D input is one element too, as a source of shape (1,).
+    if len(src.shape) == 0:
+        src = reshape(ctx, target, source_ir, name + "_src_1d", src, (1,))
     src_shape = tuple(src.shape)
 
     # Reshape `index` (1-D, length matches src.shape[dim]) so it broadcasts

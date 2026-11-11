@@ -56,6 +56,8 @@ struct CudaCalls {
 
   size_t malloc_calls = 0;
   size_t fail_malloc_call = 0;
+  // The next cudaMalloc of exactly this many bytes fails without allocating, unless 0.
+  size_t fail_malloc_bytes = 0;
   // Each allocation that succeeds is filled with this byte before it is handed back, unless negative.
   int fill_allocations_with = -1;
   size_t free_calls = 0;
@@ -72,6 +74,8 @@ struct CudaCalls {
   // Each cudaStreamWaitEvent returns success without being queued, as the driver bug the handoff flag guards against.
   bool drop_stream_waits = false;
   size_t dropped_stream_waits = 0;
+  // Called with its stream just before each cuStreamWriteValue64 this thread makes is queued.
+  std::function<void(cudaStream_t)> before_flag_write;
   bool disable_memory_pools = false;
   bool disable_stream_context = false;
   size_t stream_context_queries = 0;

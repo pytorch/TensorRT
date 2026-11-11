@@ -366,6 +366,39 @@ class TestPreDispatchSideEffects(TestCase):
             trt_module(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
         )
 
+    def test_block_whose_only_effect_is_an_in_place_write_survives(self):
+        # Nothing uses the call of the torch.autocast or torch.no_grad block, and v, a
+        # view of h taken before the block, is read after the block writes h.
+        class WriteInBlock(torch.nn.Module):
+            def __init__(self, autocast):
+                super().__init__()
+                self.linear = torch.nn.Linear(8, 8)
+                self.autocast = autocast
+
+            def forward(self, x):
+                h = self.linear(x)
+                v = h[:, :4]
+                if self.autocast:
+                    with torch.autocast("cuda", dtype=torch.float16):
+                        h.add_(1.0)
+                else:
+                    with torch.no_grad():
+                        h.add_(1.0)
+                return v.float()
+
+        x = torch.randn(1, 8).cuda()
+        for autocast in (True, False):
+            with self.subTest(autocast=autocast):
+                model = WriteInBlock(autocast).eval().cuda()
+                trt_module = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, (x,)),
+                    arg_inputs=[x],
+                    min_block_size=1,
+                )
+                torch.testing.assert_close(
+                    trt_module(x), model(x), rtol=1e-3, atol=1e-3
+                )
+
 
 class TestNormalizeNegativeSliceStop(TestCase):
     def test_normalizes_negative_symbolic_start_bound(self):

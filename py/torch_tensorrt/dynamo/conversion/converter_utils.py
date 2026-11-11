@@ -1066,6 +1066,9 @@ def flatten_dims(
     """
     shape = input.shape
     dim_size = len(shape)
+    # As in torch.flatten, a 0-d input becomes one element.
+    if dim_size == 0:
+        return (1,)
     start_dim = get_positive_dim(start_dim, dim_size)
     end_dim = get_positive_dim(end_dim, dim_size)
 

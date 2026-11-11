@@ -149,6 +149,24 @@ class TestResizeConverter(DispatchTestCase):
             comparators=comparators,
         )
 
+    @parameterized.expand([((3,),), ((2, 2),), ((1,),)])
+    def test_resize_computed_0d_input(self, target_shape):
+        # x[0] * 2.0 is a 0-d value of one element.
+        class Resize(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.select.int(x, 0, 0) * 2.0
+                return torch.ops.aten.resize_.default(y, target_shape)
+
+        inputs = [torch.randn(4)]
+        comparators = [(self.compare_resized_tensors, [(), target_shape])]
+
+        self.run_test_compare_tensor_attributes_only(
+            Resize(),
+            inputs,
+            expected_ops=[],
+            comparators=comparators,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

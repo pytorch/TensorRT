@@ -75,6 +75,9 @@ CUresult failing_write_value(CUstream stream, CUdeviceptr address, cuuint64_t va
       return CUDA_ERROR_INVALID_VALUE;
     }
   }
+  if (active_calls && active_calls->before_flag_write) {
+    active_calls->before_flag_write(reinterpret_cast<cudaStream_t>(stream));
+  }
   return real_write_value(stream, address, value, flags);
 }
 } // namespace
@@ -186,6 +189,11 @@ cudaError_t __wrap_cudaDeviceGetAttribute(int* value, cudaDeviceAttr attribute, 
 
 cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
   if (active_calls && ++active_calls->malloc_calls == active_calls->fail_malloc_call) {
+    *pointer = nullptr;
+    return cudaErrorMemoryAllocation;
+  }
+  if (active_calls && active_calls->fail_malloc_bytes != 0 && bytes == active_calls->fail_malloc_bytes) {
+    active_calls->fail_malloc_bytes = 0;
     *pointer = nullptr;
     return cudaErrorMemoryAllocation;
   }

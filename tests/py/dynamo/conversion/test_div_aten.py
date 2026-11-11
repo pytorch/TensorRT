@@ -298,6 +298,80 @@ class TestDivConverter(DispatchTestCase):
         inputs = [torch.randint(0, 256, (2, 8), dtype=torch.int32)]
         self.run_test(HalfScale(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
+    @parameterized.expand(
+        [
+            (
+                "trunc_div",
+                lambda x: torch.ops.aten.div.Tensor_mode(x, 2.0, rounding_mode="trunc"),
+            ),
+            (
+                "scalar_dividend",
+                lambda x: torch.ops.aten.div.Tensor_mode(7.0, x, rounding_mode="trunc"),
+            ),
+        ]
+    )
+    def test_trunc_division_of_0d_tensor_and_scalar_stays_0d(self, _, compute):
+        class Div(nn.Module):
+            def forward(self, x):
+                return compute(torch.ops.aten.select.int(x, 0, 0))
+
+        self.run_test(
+            Div(),
+            [torch.randn(4) * 10],
+        )
+
+    @parameterized.expand(
+        [
+            ("true_div", lambda v, n: v / n, torch.int32),
+            (
+                "trunc_div",
+                lambda v, n: torch.div(v, n, rounding_mode="trunc"),
+                torch.int32,
+            ),
+            (
+                "trunc_div_float",
+                lambda v, n: torch.div(v, n, rounding_mode="trunc"),
+                torch.float32,
+            ),
+            (
+                "trunc_div_of_size",
+                lambda v, n: torch.div(n, v, rounding_mode="trunc"),
+                torch.int32,
+            ),
+            ("remainder", lambda v, n: v % n, torch.int32),
+            ("add_alpha", lambda v, n: torch.add(v, n, alpha=2), torch.int32),
+            ("sub_alpha", lambda v, n: torch.sub(v, n, alpha=2), torch.int32),
+        ]
+    )
+    def test_0d_tensor_with_dynamic_size_stays_0d(self, _, compute, dtype):
+        """These ops build layers from a size read from a dynamic shape before their
+        elementwise layer. The result is still 0-dim, as with a Python number, so the
+        two can be stacked."""
+
+        class Div(nn.Module):
+            def forward(self, a):
+                return torch.stack([compute(a[0, 0], a.shape[0]), compute(a[0, 1], 3)])
+
+        a = torch.randint(1, 50, (4, 3), device="cuda").to(dtype)
+        batch = torch.export.Dim("batch", min=2, max=16)
+        program = torch.export.export(Div(), (a,), dynamic_shapes=({0: batch},))
+        compiled = torch_tensorrt.dynamo.compile(
+            program,
+            arg_inputs=[
+                Input(
+                    min_shape=(2, 3),
+                    opt_shape=(4, 3),
+                    max_shape=(16, 3),
+                    dtype=dtype,
+                )
+            ],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        for n in (2, 4, 7):
+            x = torch.randint(1, 50, (n, 3), device="cuda").to(dtype)
+            torch.testing.assert_close(compiled(x), Div()(x))
+
 
 if __name__ == "__main__":
     run_tests()

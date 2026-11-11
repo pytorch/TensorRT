@@ -698,6 +698,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
             if isinstance(n.meta.get("val"), (float, torch.SymFloat)):
                 self.ctx.python_floats.add(trt_node)
+            elif isinstance(n.meta.get("val"), (int, torch.SymInt)):
+                self.ctx.python_ints.add(trt_node)
 
         return trt_node
 
@@ -924,6 +926,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 )
 
         self.ctx.current_node = self._cur_node
+        self.ctx.node_values = self.env
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
         else:

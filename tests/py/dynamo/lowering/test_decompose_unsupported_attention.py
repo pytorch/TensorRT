@@ -1,6 +1,7 @@
 import importlib.util
 import platform
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 import torch
@@ -9,6 +10,8 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    bitwise_not_type_validator,
+    bitwise_type_validator,
     scaled_dot_product_attention_validator,
 )
 from torch_tensorrt.dynamo.lowering.passes.decompose_unsupported_attention import (
@@ -222,6 +225,158 @@ class TestDecomposeUnsupportedAttention(TestCase):
         torch.testing.assert_close(
             trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
         )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_decomposed_attention_gets_its_bool_mask_in_its_own_engine(self):
+        # When the decomposed nodes carried the trace's tensor_meta, the first engine computed the
+        # float bias from the mask and passed it, with a scalar and copies of K and V, to the
+        # attention's engine.
+        import torch_tensorrt
+
+        class Attention(nn.Module):
+            def forward(self, q, k, v, mask):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    (q + 1) * 2, k, v, attn_mask=mask
+                )
+
+        # K and V head dims differ, so the attention is decomposed.
+        inputs = [
+            torch.randn(1, 2, 1, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 32, device="cuda", dtype=torch.float16),
+            torch.rand(1, 2, 1, 16, device="cuda") > 0.3,
+        ]
+        model = Attention()
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, tuple(inputs)),
+            arg_inputs=inputs,
+            min_block_size=1,
+            # Puts q + 1 in an engine before the attention.
+            torch_executed_ops={torch.ops.aten.mul.Tensor},
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        engines = []
+        for name, engine in trt_model.named_children():
+            if "_run_on_acc" in name:
+                engine.register_forward_hook(
+                    lambda _, args, out: engines.append(
+                        (
+                            [arg.dtype for arg in args],
+                            len(out) if isinstance(out, (list, tuple)) else 1,
+                        )
+                    )
+                )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+        )
+        self.assertEqual(
+            engines,
+            [([torch.float16], 1), ([torch.bool] + [torch.float16] * 3, 1)],
+        )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_readers_of_decomposed_attention_stay_in_tensorrt(self):
+        # The sort and diagonal validators read the shape of their input, which the
+        # decomposed nodes carry in "val" only.
+        import torch_tensorrt
+
+        class Attention(nn.Module):
+            def __init__(self, reader):
+                super().__init__()
+                self.reader = reader
+
+            def forward(self, q, k, v, mask):
+                out = torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=mask
+                )
+                return self.reader(out) + 1
+
+        # K and V head dims differ, so the attention is decomposed.
+        inputs = [
+            torch.randn(1, 2, 4, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 32, device="cuda", dtype=torch.float16),
+            torch.rand(1, 2, 4, 16, device="cuda") > 0.3,
+        ]
+        for name, reader in (
+            ("sort", lambda out: torch.sort(out, dim=-1).values),
+            ("diagonal", lambda out: torch.diagonal(out, 0, -2, -1)),
+        ):
+            with self.subTest(name):
+                model = Attention(reader)
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(
+                    trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+                )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_float64_cat_of_decomposed_attention_runs_in_pytorch(self):
+        # The cat validator reads the dtypes of its operands, which the decomposed nodes
+        # carry in "val" only. An empty float64 operand makes the result float64, which
+        # TensorRT has only with truncate_double, so the cat runs in PyTorch.
+        import torch_tensorrt
+
+        class Attention(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("empty", torch.empty(0, dtype=torch.float64))
+
+            def forward(self, q, k, v):
+                out = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+                return torch.cat([out, self.empty])
+
+        # K and V head dims differ, so the attention is decomposed.
+        inputs = [
+            torch.randn(1, 2, 4, 64, device="cuda"),
+            torch.randn(1, 2, 16, 64, device="cuda"),
+            torch.randn(1, 2, 16, 32, device="cuda"),
+        ]
+        model = Attention().cuda()
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, tuple(inputs)),
+            arg_inputs=inputs,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        result = trt_model(*inputs)
+        self.assertEqual(result.dtype, torch.float64)
+        torch.testing.assert_close(result, model(*inputs), rtol=1e-2, atol=1e-2)
+
+    def test_bitwise_validators_read_val(self):
+        # Like a decomposed node, a node can carry its type in "val" only.
+        aten = torch.ops.aten
+        mask = SimpleNamespace(meta={"val": torch.empty(4, 4, dtype=torch.bool)})
+        for validator, node in (
+            (
+                bitwise_not_type_validator,
+                SimpleNamespace(target=aten.bitwise_not.default, args=(mask,)),
+            ),
+            (
+                bitwise_type_validator,
+                SimpleNamespace(target=aten.bitwise_and.Tensor, args=(mask, mask)),
+            ),
+            (
+                bitwise_type_validator,
+                SimpleNamespace(target=aten.bitwise_xor.Scalar, args=(mask, True)),
+            ),
+            (
+                bitwise_type_validator,
+                SimpleNamespace(
+                    target=aten.bitwise_xor.Scalar_Tensor, args=(True, mask)
+                ),
+            ),
+        ):
+            with self.subTest(str(node.target)):
+                self.assertTrue(validator(node))
 
     def test_attention_on_inputs_cast_to_fp32_is_decomposed_where_tensorrt_fails(self):
         # TensorRT folds the casts into its attention layer and builds only when the whole layer can run in

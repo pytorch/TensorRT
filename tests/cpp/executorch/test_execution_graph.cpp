@@ -3464,9 +3464,12 @@ TEST_F(ExecutionGraphTest, WithoutAFlagAPooledCallHoldsThePoolUntilItHasFinished
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
-// The flag keeps the order when the driver drops the event wait. Here the second call's cudaStreamWaitEvent
-// is dropped and the earlier pooled call is held on its stream, so only the flag can keep the second call,
-// on another stream, from finishing first.
+// The flag keeps the order when the driver drops the event wait. The first pooled call is held on its stream
+// after its enqueue and before its flag write, and the second call's cudaStreamWaitEvent is dropped, so only
+// the flag can keep the second call, on another stream, from running on the shared scratch first. While the
+// first call is held, its output is already written, so its write comes after its enqueue, and the second
+// call's output is not, so its wait comes before its own enqueue. The two calls get different inputs, so a
+// race on the scratch would show in their outputs.
 TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDropped) {
   if (!device_can_wait_on_a_flag()) {
     GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
@@ -3478,21 +3481,59 @@ TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDroppe
   BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
   ASSERT_EQ(set_options({options, 2}), Error::Ok);
   LoadedGraphEngine engines[2];
-  std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements);
+  std::vector<float> expected[2];
   for (int i = 0; i < 2; ++i) {
     ASSERT_EQ(engines[i].load(blob), Error::Ok);
     ASSERT_TRUE(engines[i].handle()->claims_pooled_scratch);
+    std::vector<float> input(kMaxElements);
+    for (size_t j = 0; j < input.size(); ++j) {
+      input[j] = static_cast<float>((j * (i + 1)) % 7) / 4.0f;
+    }
     ASSERT_EQ(cudaMemcpy(inputs_[i], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+    ASSERT_EQ(engines[i].run(inputs_[i], outputs_[i], 8, 32, streams_[i]), Error::Ok);
+    expected[i].resize(8 * 32);
+    ASSERT_EQ(cudaMemcpy(expected[i].data(), outputs_[i], 8 * 32 * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
     ASSERT_EQ(cudaMemset(outputs_[i], 0xff, kMaxBytes), cudaSuccess);
   }
+  ASSERT_NE(expected[0], expected[1]) << "both inputs give the same output, so a race on the scratch would not show";
   SharedScratchDevice& device = scratch_pool().get(engines[0].handle()->device_id);
+  cudaStream_t probe = nullptr;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&probe, cudaStreamNonBlocking), cudaSuccess);
+  // Whether each element of an output still holds the 0xff bytes it was cleared to, read on a stream of its
+  // own so that a held stream does not delay it.
+  const auto unwritten = [&](int slot) {
+    std::vector<uint32_t> bits(8 * 32, 0);
+    if (cudaMemcpyAsync(bits.data(), outputs_[slot], bits.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost, probe) !=
+            cudaSuccess ||
+        cudaStreamSynchronize(probe) != cudaSuccess) {
+      ADD_FAILURE() << "could not read output " << slot;
+      return false;
+    }
+    return std::all_of(bits.begin(), bits.end(), [](uint32_t b) { return b == 0xffffffffu; });
+  };
+  const auto written = [&](int slot) {
+    std::vector<float> values(8 * 32);
+    return cudaMemcpyAsync(
+               values.data(), outputs_[slot], values.size() * sizeof(float), cudaMemcpyDeviceToHost, probe) ==
+        cudaSuccess &&
+        cudaStreamSynchronize(probe) == cudaSuccess && values == expected[slot];
+  };
 
   struct Gate {
     std::atomic<bool> open{false};
   } gate;
-  ASSERT_EQ(
+  std::atomic<bool> first_at_its_write{false};
+  Error first = Error::Internal;
+  Error second = Error::Internal;
+  size_t dropped = 0;
+  std::thread first_caller([&] {
+    CudaCalls calls;
+    calls.before_flag_write = [&](cudaStream_t stream) {
+      if (first_at_its_write.exchange(true)) {
+        return;
+      }
       cudaLaunchHostFunc(
-          streams_[0],
+          stream,
           [](void* data) {
             // Bounded, so a case that fails before opening the gate cannot hang the stream.
             const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(30);
@@ -3500,19 +3541,12 @@ TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDroppe
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           },
-          &gate),
-      cudaSuccess);
-  Error first = Error::Internal;
-  Error second = Error::Internal;
-  size_t dropped = 0;
-  std::thread first_caller([&] { first = engines[0].run(inputs_[0], outputs_[0], 8, 32, streams_[0]); });
-  bool first_recorded = false;
+          &gate);
+    };
+    first = engines[0].run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+  });
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-  while (!first_recorded && std::chrono::steady_clock::now() < deadline) {
-    if (device.mu.try_lock()) {
-      first_recorded = device.marker.pending;
-      device.mu.unlock();
-    }
+  while (!first_at_its_write.load() && std::chrono::steady_clock::now() < deadline) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   std::thread second_caller([&] {
@@ -3527,13 +3561,12 @@ TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDroppe
     second_stream_busy = cudaStreamQuery(streams_[1]) == cudaErrorNotReady;
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  bool second_finished_early = false;
+  bool first_written_while_held = false;
+  bool second_written_early = false;
   const auto watch_until = std::chrono::steady_clock::now() + kWatchTheSecondCallFor;
-  while (second_stream_busy && std::chrono::steady_clock::now() < watch_until) {
-    if (cudaStreamQuery(streams_[1]) == cudaSuccess) {
-      second_finished_early = true;
-      break;
-    }
+  while (second_stream_busy && std::chrono::steady_clock::now() < watch_until && !second_written_early) {
+    first_written_while_held = first_written_while_held || written(0);
+    second_written_early = !unwritten(1);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   gate.open.store(true);
@@ -3544,18 +3577,76 @@ TEST_F(ExecutionGraphTest, TheFlagAloneOrdersPooledCallsWhenTheEventWaitIsDroppe
     ASSERT_FALSE(device.marker.event_wait_only) << "this GPU can wait on a flag, but the pool made none";
   }
 
-  ASSERT_TRUE(first_recorded) << "the first call never recorded its enqueue, so there was nothing to wait for";
+  ASSERT_TRUE(first_at_its_write.load()) << "the first call never reached its flag write";
   ASSERT_TRUE(second_stream_busy) << "the second call never queued its work";
   EXPECT_GT(dropped, 0u) << "the second call made no event wait to drop";
-  EXPECT_FALSE(second_finished_early)
-      << "with its event wait dropped, the second pooled call finished while the call before it was still held";
+  EXPECT_TRUE(first_written_while_held)
+      << "the first call's output was not written while it was held before its flag write, so the write was "
+         "queued before its enqueue";
+  EXPECT_FALSE(second_written_early)
+      << "with its event wait dropped, the second pooled call wrote its output while the call before it was "
+         "still held";
   EXPECT_EQ(first, Error::Ok);
   EXPECT_EQ(second, Error::Ok);
   for (int i = 0; i < 2; ++i) {
-    ASSERT_EQ(cudaMemcpy(output.data(), outputs_[i], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
-    for (float value : output) {
-      ASSERT_FLOAT_EQ(value, 1.0f / 8);
-    }
+    EXPECT_TRUE(written(i)) << "output " << i << " differs from the same call made alone";
+  }
+  ASSERT_EQ(cudaStreamDestroy(probe), cudaSuccess);
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// A first pooled call whose handoff flag cannot be allocated fails, leaves nothing pending and the pool's lock
+// free, and makes no flag. Running without one would leave the handoff to the event wait alone. A later call
+// makes the flag and runs.
+TEST_F(ExecutionGraphTest, AFailedFlagAllocationFailsTheCallAndALaterOneRuns) {
+  if (!device_can_wait_on_a_flag()) {
+    GTEST_SKIP() << "This GPU has no 64-bit stream memory operations, so the pool has no flag";
+  }
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements);
+  ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), kMaxBytes, cudaMemcpyHostToDevice), cudaSuccess);
+  SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+  {
+    // The flag outlives a reset, so it is dropped here (and leaked) to make the next claim create one.
+    std::lock_guard<std::mutex> lock(device.mu);
+    device.marker.flag = nullptr;
+    device.marker.sequence = 0;
+  }
+  Error failed = Error::Ok;
+  cudaError_t pending = cudaSuccess;
+  {
+    CudaCalls calls;
+    calls.fail_malloc_bytes = sizeof(std::uint64_t);
+    ASSERT_EQ(cudaGetLastError(), cudaSuccess) << "something before the call under test left a CUDA error pending";
+    failed = engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]);
+    pending = cudaPeekAtLastError();
+  }
+  EXPECT_EQ(failed, Error::MemoryAllocationFailed) << "the call ran although its handoff flag was not allocated";
+  EXPECT_EQ(pending, cudaSuccess) << "the call left '" << cudaGetErrorString(pending) << "' pending";
+  cudaGetLastError();
+  const bool lock_free = device.mu.try_lock();
+  if (lock_free) {
+    EXPECT_EQ(device.marker.flag, nullptr);
+    device.mu.unlock();
+  }
+  ASSERT_TRUE(lock_free) << "the failed call left the pool's lock held";
+
+  ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
+  EXPECT_EQ(engine.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
+  {
+    std::lock_guard<std::mutex> lock(device.mu);
+    EXPECT_NE(device.marker.flag, nullptr) << "the later call ran without making the flag";
+  }
+  ASSERT_EQ(cudaMemcpy(output.data(), outputs_[0], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+  for (size_t i = 0; i < 8 * 32; ++i) {
+    ASSERT_FLOAT_EQ(output[i], 1.0f / 8);
   }
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }

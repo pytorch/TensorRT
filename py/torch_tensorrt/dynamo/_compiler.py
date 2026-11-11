@@ -169,6 +169,7 @@ def cross_compile_for_windows(
     fallback_pytorch_plugin_ops: bool = _defaults.FALLBACK_PYTORCH_PLUGIN_OPS,
     collapse_high_rank_permutes: bool = _defaults.COLLAPSE_HIGH_RANK_PERMUTES,
     convert_antialiased_resize: bool = _defaults.CONVERT_ANTIALIASED_RESIZE,
+    replace_interleave_stack_with_cat: bool = _defaults.REPLACE_INTERLEAVE_STACK_WITH_CAT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -267,6 +268,7 @@ def cross_compile_for_windows(
         fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -432,6 +434,7 @@ def cross_compile_for_windows(
         "fallback_pytorch_plugin_ops": fallback_pytorch_plugin_ops,
         "collapse_high_rank_permutes": collapse_high_rank_permutes,
         "convert_antialiased_resize": convert_antialiased_resize,
+        "replace_interleave_stack_with_cat": replace_interleave_stack_with_cat,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -558,6 +561,9 @@ def compile(
         Union[torch.dtype, dtype]
     ] = _defaults.AUTOCAST_LOW_PRECISION_TYPE,
     autocast_excluded_nodes: Collection[str] = _defaults.AUTOCAST_EXCLUDED_NODES,
+    autocast_excluded_node_names: Collection[
+        str
+    ] = _defaults.AUTOCAST_EXCLUDED_NODE_NAMES,
     autocast_excluded_ops: Collection[Target] = _defaults.AUTOCAST_EXCLUDED_OPS,
     autocast_max_output_threshold: float = _defaults.AUTOCAST_MAX_OUTPUT_THRESHOLD,
     autocast_max_depth_of_reduction: Optional[
@@ -566,6 +572,7 @@ def compile(
     autocast_calibration_dataloader: Optional[
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
+    autocast_model_regions: str = _defaults.AUTOCAST_MODEL_REGIONS,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
@@ -582,6 +589,7 @@ def compile(
     fallback_pytorch_plugin_ops: bool = _defaults.FALLBACK_PYTORCH_PLUGIN_OPS,
     collapse_high_rank_permutes: bool = _defaults.COLLAPSE_HIGH_RANK_PERMUTES,
     convert_antialiased_resize: bool = _defaults.CONVERT_ANTIALIASED_RESIZE,
+    replace_interleave_stack_with_cat: bool = _defaults.REPLACE_INTERLEAVE_STACK_WITH_CAT,
     build_route: Optional[str] = _defaults.BUILD_ROUTE,
     tune_build_routes: Optional[str] = _defaults.TUNE_BUILD_ROUTES,
     tune_build_route_file: Optional[str] = _defaults.TUNE_BUILD_ROUTE_FILE,
@@ -676,11 +684,13 @@ def compile(
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_autocast (bool): Whether to enable autocast.
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
-        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns for the paths of the modules, such as "block.norm", whose nodes should remain in FP32. Default is [].
+        autocast_excluded_node_names (Collection[str]): The set of regex patterns for the names of the nodes in the exported graph, such as "layer_norm_1", that should remain in FP32. A pattern matches from the start of a name, so "layer_norm_1$" matches layer_norm_1 and not layer_norm_10. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
@@ -710,6 +720,7 @@ def compile(
         fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
         tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
@@ -904,10 +915,12 @@ def compile(
         "enable_autocast": enable_autocast,
         "autocast_low_precision_type": autocast_low_precision_type,
         "autocast_excluded_nodes": autocast_excluded_nodes,
+        "autocast_excluded_node_names": autocast_excluded_node_names,
         "autocast_excluded_ops": autocast_excluded_ops,
         "autocast_max_output_threshold": autocast_max_output_threshold,
         "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
+        "autocast_model_regions": autocast_model_regions,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "max_partition_size": max_partition_size,
@@ -922,6 +935,7 @@ def compile(
         "fallback_pytorch_plugin_ops": fallback_pytorch_plugin_ops,
         "collapse_high_rank_permutes": collapse_high_rank_permutes,
         "convert_antialiased_resize": convert_antialiased_resize,
+        "replace_interleave_stack_with_cat": replace_interleave_stack_with_cat,
         "build_route": build_route,
         "tune_build_routes": tune_build_routes,
         "tune_build_route_file": tune_build_route_file,
@@ -2242,6 +2256,7 @@ def convert_exported_program_to_serialized_trt_engine(
     fallback_pytorch_plugin_ops: bool = _defaults.FALLBACK_PYTORCH_PLUGIN_OPS,
     collapse_high_rank_permutes: bool = _defaults.COLLAPSE_HIGH_RANK_PERMUTES,
     convert_antialiased_resize: bool = _defaults.CONVERT_ANTIALIASED_RESIZE,
+    replace_interleave_stack_with_cat: bool = _defaults.REPLACE_INTERLEAVE_STACK_WITH_CAT,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
     kwarg_input_binding_names: Any = None,
@@ -2360,6 +2375,7 @@ def convert_exported_program_to_serialized_trt_engine(
         fallback_pytorch_plugin_ops (bool): If True, skip converters that insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel), so the engine runs without PyTorch. This function builds one engine for the whole program, so an operator that only such a converter supports fails to convert. An accumulating aten.index_put with one 1-D index then uses TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. This function builds one engine, so without the rewrite such a chain makes the conversion fail. Only static shapes are rewritten. A large engine can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Convert antialiased bilinear and bicubic resize (F.interpolate with antialias=True) to TensorRT. This function builds one engine, so without this setting such a resize makes the conversion fail. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -2539,6 +2555,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "fallback_pytorch_plugin_ops": fallback_pytorch_plugin_ops,
         "collapse_high_rank_permutes": collapse_high_rank_permutes,
         "convert_antialiased_resize": convert_antialiased_resize,
+        "replace_interleave_stack_with_cat": replace_interleave_stack_with_cat,
     }
 
     settings = CompilationSettings(**compilation_options)

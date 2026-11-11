@@ -42,7 +42,7 @@ bool install_pooled_scratch(nvinfer1::IExecutionContext& ctx, void* buffer, std:
 // Returns the activation scratch the shapes bound on `ctx`, a kUSER_MANAGED
 // context, need. Where TensorRT reports that it cannot work that out, returns
 // the upper bound for the context's optimization profile instead, and logs that
-// it did, naming `device_id`.
+// it did, naming `device_id`, the first time in the process.
 //
 // updateDeviceMemorySizeForShapes fails that way, answering zero, for some
 // engines with a data-dependent shape inside them, until the context's first
