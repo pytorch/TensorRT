@@ -1,8 +1,10 @@
-# Optimize Torch-TensorRT models with Cursor
+# Torch-TensorRT MCP examples
 
-`run_with_cursor.py` starts a Cursor Local Agent, gives it access
-to the configured Torch-TensorRT MCP server, streams the Agent's response, and
-reports the token usage for that SDK run.
+The administrator configuration and model factories in this directory are
+platform-neutral and can be used by any client that supports stdio MCP
+servers. `run_with_cursor.py` is an optional Cursor SDK client: it starts a
+Cursor Local Agent, gives it access to the configured Torch-TensorRT MCP
+server, streams the Agent's response, and reports token usage for that SDK run.
 
 The script can ask the MCP server to analyze, compile, validate, or benchmark
 models allowlisted in `admin-config.json`. Each invocation gets an isolated
@@ -16,13 +18,18 @@ the MCP job-manager lock used by the Cursor IDE.
 - Linux with a working Torch, TensorRT, and Torch-TensorRT environment.
 - The Torch-TensorRT MCP adapter installed in that environment.
 - Python 3.10 or newer.
+
+Connect any MCP-capable agent platform to `torch-tensorrt-mcp` with
+`--config /absolute/path/to/tools/mcp/examples/admin-config.json`. The
+following requirements apply only when using the optional Cursor SDK client:
+
 - A Cursor API key from [Cursor Dashboard → API Keys](https://cursor.com/dashboard/api-keys).
 - A valid stdio MCP entry in `.cursor/mcp.json`.
 
 Install the Cursor SDK from the repository root:
 
 ```bash
-python -m pip install -r tools/mcp/examples/cursor/requirements.txt
+python -m pip install -r tools/mcp/examples/requirements.txt
 ```
 
 The script is tested with `cursor-sdk 1.3.1`. Check the installed version with:
@@ -44,7 +51,7 @@ The default MCP configuration is `.cursor/mcp.json`. Its server name must be
       "command": "/absolute/path/to/bin/torch-tensorrt-mcp",
       "args": [
         "--config",
-        "/absolute/path/to/TensorRT/tools/mcp/examples/cursor/admin-config.json"
+        "/absolute/path/to/TensorRT/tools/mcp/examples/admin-config.json"
       ],
       "env": {
         "LD_LIBRARY_PATH": "/absolute/path/to/TensorRT/lib"
@@ -60,11 +67,20 @@ starts a new MCP process and passes this configured environment to it; do not
 assume it will use the environment of an already-running Cursor IDE MCP server.
 
 Models and input factories must be allowlisted in
-`tools/mcp/examples/cursor/admin-config.json`. Update its repository paths
+`tools/mcp/examples/admin-config.json`. Update its repository paths
 before launching the server. The configured `workspace_root` must exist; the
 server creates `output_root` if needed. Generated `.mcp-runs/` artifacts are
 ignored by Git.
-The included example defines the model and input name `add`.
+The server creates `<output_root>/.lowering_pass_candidates` for generated lowering passes.
+The Agent selects one through the MCP request's reserved
+`lowering_pass_candidate_id` field. Model factories do not accept or need to
+know about that field.
+Candidate files are trusted, unrestricted Python and execute with the worker's
+OS credentials. They are not sandboxed; only trusted users and Agents should
+receive both write access to the candidate directory and permission to select
+a candidate ID.
+The included examples define the model and input names `add`, `qwen3_5`, and
+`batched_linear`.
 
 ## Set the Cursor API key
 
@@ -100,7 +116,7 @@ Pass one of the returned IDs explicitly with `--model`.
 From the repository root:
 
 ```bash
-python tools/mcp/examples/cursor/run_with_cursor.py \
+python tools/mcp/examples/run_with_cursor.py \
   "Analyze the add model with min_block_size=1. Only run analyze; do not compile, validate, or benchmark." \
   --model composer-2.5
 ```
@@ -113,7 +129,7 @@ The Agent decides which MCP tools to call from the task. State every required
 stage and setting explicitly:
 
 ```bash
-python tools/mcp/examples/cursor/run_with_cursor.py \
+python tools/mcp/examples/run_with_cursor.py \
   "Compile the add model with min_block_size=1, validate the compiled artifact, and benchmark it with 10 warmup iterations and 100 measured iterations." \
   --model composer-2.5
 ```
@@ -121,7 +137,7 @@ python tools/mcp/examples/cursor/run_with_cursor.py \
 For a multiline task, read the prompt from standard input:
 
 ```bash
-cat <<'EOF' | python tools/mcp/examples/cursor/run_with_cursor.py - --model composer-2.5
+cat <<'EOF' | python tools/mcp/examples/run_with_cursor.py - --model composer-2.5
 Analyze the add model with min_block_size=1.
 Only run analyze.
 Report the job ID, node coverage, and partition assignment.
@@ -178,6 +194,104 @@ task                 Optimization request, or "-" to read stdin
 ```
 
 The generated or explicitly supplied output root must not already exist.
+
+## Batched linear optimization demo
+
+The included `batched_linear` example applies the same shared linear projection
+to eight independent inputs. This prompt lets the Agent generate and evaluate
+one lowering-pass optimization:
+
+```bash
+python tools/mcp/examples/run_with_cursor.py \
+  "Use torch-tensorrt MCP to benchmark batched_linear_model. Requirements: min_block_size=1. The agent can optimize graphs to reduce latency." \
+  --model composer-2.5
+```
+
+Output:
+```text
+MCP artifacts: <repo>/.mcp-runs/20261111_202427_12606c2e
+Running the Torch-TensorRT optimization workflow: discovering MCP tools and
+inspecting the batched_linear setup.
+
+Starting baseline analyze and compile jobs.
+Baseline shows eight separate aten.linear nodes in one partition. Searching
+for existing batching/fusion passes to model the candidate.
+Creating the batched-linear fusion candidate and running the candidate job
+pipeline.
+
+## Optimization result
+
+Applied a lowering pass that batches eight shared-weight aten.linear
+projections into one cat → linear → slice pipeline, so TensorRT runs one
+large GEMM instead of eight separate ones.
+
+Request settings:
+  model / inputs: batched_linear / batched_linear
+  model_parameters: {} (default hidden_size=4096)
+  input_parameters: {} (default batch_size=16)
+  seed: 0
+  compilation: min_block_size=1 plus MCP defaults
+
+Benchmark protocol:
+  warmup: 10
+  measured iterations: 100
+  sample_index: 0
+  timing scope: forward_only
+  synchronization: per_invocation
+  sample: branches-8-batch-16-hidden-4096
+
+Baseline jobs (no lowering_pass_candidate_id):
+  analyze:   a2c1f5a1d81e4fa2a5c06e1d809aec92
+  compile:   2472d0e96203402991088fc8b715eede
+  validate:  5a0536b7772f4cbe85eebdd2a7813426
+  benchmark: 1be6d7315b694fccaa820e953b8587af
+
+Baseline:
+  lowered graph: eight independent aten.linear.default nodes, one shared
+    weight, all in partition _run_on_acc_0
+  computational nodes: 8
+  compiled wall median: 2.148871 ms
+  validation: passed for all 8 outputs (atol=0.01, rtol=0.01)
+
+Candidate:
+  ID: c2d23467256047116744296088cc1c6a
+  source: <run-dir>/.lowering_pass_candidates/
+    lowering_pass_candidate_c2d23467256047116744296088cc1c6a.py
+  analyze:   d0fd5eedac9e409996a42c644a7057bf
+  compile:   28ccbff78cf14066965a3f676105a536
+  validate:  a509d28c7fba4a2eb2551ca8c71924bc
+  benchmark: 37a5988a0e014b389917eec60986e2df
+  lowered graph: aten.cat → aten.linear → 8 × aten.slice.Tensor
+  graph I/O: same 8 inputs, 8 outputs, and shared weight
+  compiled wall median: 1.512608 ms
+  validation: passed
+
+Baseline-relative speedup: 2.148871 / 1.512608 = 1.42×
+Latency reduction: approximately 31%
+Benchmark report speedup["wall"]:
+  baseline: 0.0786
+  candidate: 0.1134
+  note: these compare eager PyTorch with each compiled artifact, not the
+    candidate with the baseline.
+
+The candidate source was retained because the lowered graph changed as
+intended, validation passed, and compiled median latency clearly improved.
+
+Token usage
+Run ID: run-593079bf-0bb9-4ab9-9b7f-6d15e82431dd
+Status: finished
+Input: 1,086,806
+Output: 7,381
+Cache read: 1,025,792
+Cache write: 0
+Total: 1,094,187
+Run summary: <run-dir>/run.json
+```
+
+Job IDs, token usage, and latency depend on the run, model, and hardware. The `speedup["wall"]` value in a benchmark report compares eager PyTorch with
+that compiled artifact. The Agent instead calculates the optimization speedup
+by dividing the baseline compiled wall median by the candidate compiled wall
+median.
 
 ## Troubleshooting
 

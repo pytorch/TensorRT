@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MCP_CONFIG = REPO_ROOT / ".cursor" / "mcp.json"
 
 
@@ -287,18 +287,49 @@ def main() -> int:
         print(
             "cursor-sdk is not installed; run "
             "'python -m pip install -r "
-            "tools/mcp/examples/cursor/requirements.txt'.",
+            "tools/mcp/examples/requirements.txt'.",
             file=sys.stderr,
         )
         return 1
 
     prompt = f"""\
 Complete the Torch-TensorRT optimization request below.
-Use the configured torch-tensorrt MCP execution tools for analysis, compilation,
-validation, and benchmarking as appropriate. Poll every submitted job to a
-terminal state and retrieve its report before claiming success. Report concrete
-job IDs, settings, latency, throughput, correctness, and failures. Do not invent
-results.
+
+For lowering-pass graph optimization, follow this bounded workflow:
+1. Run baseline analyze, compile, validate, and benchmark jobs without a
+   lowering_pass_candidate_id request field. Poll every job to a terminal state and
+   retrieve every report. Save the baseline job IDs and benchmark protocol.
+2. Inspect the baseline lowered and partitioned evidence. Create one unique
+   32-character lowercase hexadecimal candidate ID, then generate the complete
+   candidate source as
+   {output_root / ".lowering_pass_candidates"}/lowering_pass_candidate_<lowering_pass_candidate_id>.py.
+   Never overwrite an existing candidate file.
+3. Generate at most one semantics-preserving transformation. The generated
+   file must register an @_aten_lowering_pass decorator without an index, use
+   the (gm, settings) signature, preserve graph I/O and node metadata, and call
+   clean_up_graph_after_modifications after graph edits. Do not modify model
+   factories.
+4. Run candidate analyze and compile jobs with that top-level
+   lowering_pass_candidate_id request field, preserving all baseline model
+   parameters. Then run validate and benchmark from the candidate compile job.
+   Keep the generated source unchanged until all candidate jobs finish.
+   Use the same model, inputs, seed, compilation settings, sample, warmup,
+   and iterations, and treat candidate compile evidence as authoritative.
+5. Require candidate validation to pass. Compare
+   baseline["compiled"]["wall_statistics"]["median"] with
+   candidate["compiled"]["wall_statistics"]["median"], and calculate
+   baseline_compiled_median / candidate_compiled_median. The report's
+   speedup["wall"] compares eager PyTorch with one compiled artifact and is not
+   the candidate-versus-baseline speedup.
+6. Keep the generated candidate only when the lowered evidence changed as
+   intended and compiled median latency clearly improved. Otherwise delete its
+   generated source file. Baseline jobs must always omit
+   lowering_pass_candidate_id.
+
+Use the configured torch-tensorrt MCP execution tools. Report concrete job IDs,
+settings, protocols, compiled latency, calculated baseline-relative speedup,
+correctness, and failures. Do not invent results or claim success from coverage
+alone.
 
 User request:
 {task}

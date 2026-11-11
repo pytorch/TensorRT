@@ -133,6 +133,21 @@ class Policy:
             raise PolicyError(
                 f"output_root {output} cannot equal or contain workspace_root {workspace}"
             )
+        try:
+            candidate_root = confined_path(
+                output, ".lowering_pass_candidates", existing=False
+            )
+            candidate_root.mkdir(mode=0o700, exist_ok=True)
+            candidate_root.chmod(0o700)
+            candidate_root = confined_path(output, ".lowering_pass_candidates")
+        except (OSError, PolicyError) as exc:
+            raise PolicyError(
+                f"private candidate directory could not be created under {output}"
+            ) from exc
+        if not candidate_root.is_dir():
+            raise PolicyError(
+                f"private candidate path must be a directory: {candidate_root}"
+            )
 
         def factories(raw: Any) -> dict[str, Factory]:
             if not isinstance(raw, dict):
@@ -194,13 +209,14 @@ class Policy:
                     for value in parameters
                     if not isinstance(value, str)
                     or not value.isidentifier()
-                    or value == "seed"
+                    or value in ("seed", "lowering_pass_candidate_id")
                 ]
                 if invalid_parameters:
                     raise PolicyError(
                         f"factory {name!r} has invalid parameter names: "
                         + ", ".join(repr(value) for value in invalid_parameters)
-                        + "; each must be a Python identifier and cannot be 'seed'"
+                        + "; each must be a Python identifier and cannot be "
+                        "'seed' or 'lowering_pass_candidate_id'"
                     )
                 result[name] = Factory(
                     str(source.relative_to(workspace)),
@@ -231,13 +247,13 @@ class Policy:
                 f"86400, got {max_timeout!r}"
             )
         return cls(
-            workspace,
-            output,
-            factories(data["models"]),
-            factories(data["inputs"]),
-            max_response_bytes,
-            max_pending_jobs,
-            float(max_timeout),
+            workspace_root=workspace,
+            output_root=output,
+            models=factories(data["models"]),
+            inputs=factories(data["inputs"]),
+            max_response_bytes=max_response_bytes,
+            max_pending_jobs=max_pending_jobs,
+            max_timeout_seconds=float(max_timeout),
         )
 
     def validate_request(self, operation: str, request: dict[str, Any]) -> None:
@@ -247,6 +263,9 @@ class Policy:
                 f"administrator limit {self.max_timeout_seconds}"
             )
         if operation in ("analyze", "compile"):
+            lowering_pass_candidate_id = request.get("lowering_pass_candidate_id")
+            if lowering_pass_candidate_id is not None:
+                self.candidate_path(lowering_pass_candidate_id)
             self.validate_model_request(request)
 
     def validate_model_request(self, request: dict[str, Any]) -> None:
@@ -263,6 +282,53 @@ class Policy:
                 )
             factory = registry[name]
             factory.validate_parameters(parameters)
+
+    def candidate_path(self, lowering_pass_candidate_id: str) -> Path:
+        if not isinstance(lowering_pass_candidate_id, str) or not _JOB.fullmatch(
+            lowering_pass_candidate_id
+        ):
+            raise PolicyError(
+                "invalid candidate ID; expected exactly 32 lowercase hexadecimal "
+                "characters"
+            )
+        relative = (
+            ".lowering_pass_candidates/"
+            f"lowering_pass_candidate_{lowering_pass_candidate_id}.py"
+        )
+        try:
+            path = confined_path(self.output_root, relative)
+        except FileNotFoundError as exc:
+            raise PolicyError(
+                "candidate source must be a regular file: "
+                f"{self.output_root / relative}"
+            ) from exc
+        if not path.is_file():
+            raise PolicyError(f"candidate source must be a regular file: {path}")
+        return path
+
+    def load_candidate(self, lowering_pass_candidate_id: str | None) -> Any | None:
+        """Load one policy-confined lowering candidate in the execution worker."""
+        if lowering_pass_candidate_id is None:
+            return None
+        path = self.candidate_path(lowering_pass_candidate_id)
+        module_name = f"_torch_tensorrt_candidate_{lowering_pass_candidate_id}"
+        module = sys.modules.get(module_name)
+        if module is not None:
+            return module
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        if spec is None or spec.loader is None:
+            raise PolicyError(
+                "could not create an import specification for candidate "
+                f"{lowering_pass_candidate_id}"
+            )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            sys.modules.pop(module_name, None)
+            raise
+        return module
 
     def job_path(self, job_id: str) -> Path:
         if not _JOB.fullmatch(job_id):

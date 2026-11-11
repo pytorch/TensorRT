@@ -8,8 +8,8 @@ Install this package into a **previously provisioned Torch/TensorRT/Torch-Tensor
 python -m pip install ./tools/mcp
 ```
 
-For a complete Cursor Agent integration, see
-[`examples/cursor/README.md`](examples/cursor/README.md).
+For platform-neutral example factories and an optional Cursor Agent client, see
+[`examples/README.md`](examples/README.md).
 
 The default package dependencies contain MCP, Pydantic, and Packaging. They do not contain Torch, TensorRT, or Torch-TensorRT, so the package resolver cannot replace those packages. An explicit `[core]` extra exists for new-environment provisioning. Jobs verify the installed core distribution is `>=2.16.0.dev0` and requires the new public reporting/verification APIs; installations in that range without those APIs fail with retained diagnostics. The launch command never installs dependencies or alters the environment.
 
@@ -34,6 +34,18 @@ administrator configuration:
 ```
 
 The model factory takes its allowlisted JSON keyword arguments and returns an `nn.Module` or an already captured `torch.export.ExportedProgram`. Export in evaluation mode when returning an exported program. The input factory additionally receives `seed` and returns an argument tuple, `InputSample`, a nonempty list of `InputSample`, or a dictionary containing `args`, `kwargs`, `profile`, `sample_id`, and `label` fields. Actual input tensors must be prepared on the intended device. Dynamic export constraints come from an administrator-provided exported program; the input factory can supply min/opt/max profile samples for validation. Benchmark selects one sample with `sample_index` (default 0). Requests cannot inject code, imports, callables, export profiles, cache paths, save destinations, or unverified GPU-isolation claims.
+
+The adapter creates the private lowering-pass candidate directory
+`<output_root>/.lowering_pass_candidates` with mode `0700`. A request may select
+`lowering_pass_candidate_<lowering_pass_candidate_id>.py` there with the top-level `lowering_pass_candidate_id` field; analyze and compile workers load it before invoking the model factory. Validation and benchmark workers do not reload candidate source and remain usable if that source is subsequently changed or removed. `lowering_pass_candidate_id` is reserved and is never passed to or allowlisted by model factories.
+
+Lowering-pass candidates are **trusted, unrestricted Python**, not sandboxed
+expressions or declarative graph rewrites. Importing a candidate can execute
+arbitrary code with the worker's OS credentials, including imports, file and
+network access, and subprocess creation. A request cannot carry Python source
+directly, but write access to `.lowering_pass_candidates` together with the
+ability to select its ID is code-execution authority. Grant both capabilities
+only to trusted users and Agents.
 
 Model and input factories must prepare the intended tensor dtypes. The adapter does not cast tensors or enforce a graph-wide precision: the strongly typed graph and its converters determine supported dtype combinations. Compilation uses the metadata exporter (`retrace=False`) to retain dynamic guards. Follow-up jobs verify that the configured factory identities remain authorized, then compare the reconstructed graph, range constraints, model weights, prepared inputs, and sample metadata against compilation provenance before executing the saved artifact.
 

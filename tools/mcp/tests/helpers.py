@@ -50,3 +50,28 @@ def fake_core(policy, operation, request, path, job_id, emit):
     if operation == "compile":
         (path / "artifacts" / "compiled.pt2").write_bytes(b"fake compiled program")
     return name
+
+
+def factory_import_core(policy, operation, request, path, job_id, emit):
+    """Record trusted factory-import state from a real spawned worker."""
+    assert operation == "compile"
+    candidate = policy.load_candidate(request.get("lowering_pass_candidate_id"))
+    factory = policy.load_factory(policy.models[request["model"]])
+    factory(**request.get("model_parameters", {}))
+    emit({"stage": "compilation", "message": "candidate module imported"})
+    report = {
+        "report_type": "base",
+        "schema_version": "0.1",
+        "job_id": job_id,
+        "created_at": utc_now(),
+        "status": "succeeded",
+        "failure": None,
+        "diagnostics": [],
+        "worker_pid": os.getpid(),
+        "candidate_import_count": candidate.IMPORT_COUNT,
+        "candidate_worker_pid": candidate.WORKER_PID,
+        "candidate_import_token": candidate.IMPORT_TOKEN,
+    }
+    write_json(path / "compilation.json", report)
+    (path / "artifacts" / "compiled.pt2").write_bytes(b"fake compiled program")
+    return "compilation"

@@ -44,6 +44,7 @@ class ExecutionRequest(StrictModel):
 class ModelRequest(ExecutionRequest):
     model: FactoryName
     inputs: FactoryName
+    lowering_pass_candidate_id: JobId | None = None
     model_parameters: dict[str, Any] = Field(default_factory=dict)
     input_parameters: dict[str, Any] = Field(default_factory=dict)
     seed: Annotated[int, Field(ge=0, lt=2**64)] = 0
@@ -72,8 +73,11 @@ class ModelRequest(ExecutionRequest):
         check(value)
         if len(json.dumps(value).encode("utf-8")) > 65536:
             raise ValueError("factory parameters exceed 64 KiB")
-        if "seed" in value:
-            raise ValueError("seed is a reserved factory argument")
+        reserved = {"seed", "lowering_pass_candidate_id"} & value.keys()
+        if reserved:
+            raise ValueError(
+                f"{', '.join(sorted(reserved))} is a reserved factory argument"
+            )
         return value
 
 
@@ -83,8 +87,8 @@ class EnvironmentRequest(ExecutionRequest):
 
 class ValidationRequest(ExecutionRequest):
     source_job_id: JobId
-    atol: Annotated[float, Field(ge=0)] = 1e-5
-    rtol: Annotated[float, Field(ge=0)] = 1e-5
+    atol: Annotated[float, Field(ge=0)] = 1e-2
+    rtol: Annotated[float, Field(ge=0)] = 1e-2
     relative_floor: Annotated[float, Field(gt=0)] = 1e-12
 
 

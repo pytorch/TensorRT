@@ -28,6 +28,38 @@ def test_agent_workflow_uses_immutable_reloaded_artifacts(tmp_path, dynamic):
     output = tmp_path / "output"
     workspace.mkdir()
     output.mkdir()
+    generated = output / ".lowering_pass_candidates"
+    generated.mkdir()
+    lowering_pass_candidate_id = "d" * 32
+    candidate = generated / (f"lowering_pass_candidate_{lowering_pass_candidate_id}.py")
+    candidate.write_text(
+        """
+import torch
+from torch_tensorrt.dynamo.lowering.passes import clean_up_graph_after_modifications
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+    _aten_lowering_pass,
+)
+
+@_aten_lowering_pass
+def remove_duplicate_relu(gm, settings):
+    del settings
+    changed = False
+    for node in list(gm.graph.nodes):
+        if node.op != "call_function" or node.target != torch.ops.aten.relu.default:
+            continue
+        inner = node.args[0]
+        if (
+            isinstance(inner, torch.fx.Node)
+            and inner.op == "call_function"
+            and inner.target == torch.ops.aten.relu.default
+        ):
+            node.replace_all_uses_with(inner)
+            gm.graph.erase_node(node)
+            changed = True
+    return clean_up_graph_after_modifications(gm) if changed else gm
+""",
+        encoding="utf-8",
+    )
     factory = workspace / "model.py"
     factory.write_text(
         """
@@ -36,7 +68,7 @@ from torch_tensorrt.verification import InputSample
 
 class AddRelu(torch.nn.Module):
     def forward(self, x):
-        return torch.relu(x + x)
+        return torch.relu(torch.relu(x + x))
 
 def model(dynamic=False):
     module = AddRelu().cuda().eval()
@@ -104,6 +136,7 @@ def inputs(seed, dynamic=False):
     request = {
         "model": "small",
         "inputs": "sample",
+        "lowering_pass_candidate_id": lowering_pass_candidate_id,
         "model_parameters": {"dynamic": dynamic},
         "input_parameters": {"dynamic": dynamic},
         "settings": {"min_block_size": 1},
@@ -111,11 +144,30 @@ def inputs(seed, dynamic=False):
     }
     try:
         run("collect_environment", {"timeout_seconds": 90.0})
+        baseline_request = {
+            **request,
+        }
+        baseline_request.pop("lowering_pass_candidate_id")
+        baseline_analysis_id = run("analyze", baseline_request)
+        baseline_analysis = manager.get_report(baseline_analysis_id, "analysis")
+        assert (
+            sum(
+                node["operator"] == "aten.relu.default"
+                for node in baseline_analysis["nodes"]
+            )
+            == 2
+        )
         analysis_id = run("analyze", request)
-        assert manager.get_report(analysis_id, "analysis")["coverage"]["assigned"] == 2
+        analysis = manager.get_report(analysis_id, "analysis")
+        assert analysis["coverage"]["assigned"] == 2
+        assert (
+            sum(node["operator"] == "aten.relu.default" for node in analysis["nodes"])
+            == 1
+        )
         compilation_id = run("compile", request)
         compilation_root = output / manager.status(compilation_id)["output_dir"]
         before = (compilation_root / "manifest.json").read_bytes()
+        candidate.unlink()
         validation_id = run(
             "validate",
             {
