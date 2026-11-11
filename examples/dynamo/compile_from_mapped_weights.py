@@ -8,23 +8,34 @@
 Compiling from Memory-Mapped Weights
 ====================================
 
-To compile a model, its weights normally have to be loaded into host memory first, all of them, before
-the first TensorRT engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's
-weights at zero-copy views of a safetensors file. ``torch.export`` reads only shapes, so a weight's
-pages become resident only when TensorRT reads them, while it builds the engine that uses the weight.
-The pages are dropped again once the last engine that reads the weight is built. With the resource
-partitioner, the model is built as several engines, each small enough to build within a host memory
-budget, so only about one engine's weights are resident at a time.
+To compile a model, all of its weights normally have to be loaded into host memory first and stay
+there while every TensorRT engine is built. With ``torch_tensorrt.dynamo.low_memory(model_weights_on_meta=True)``,
+you **construct the model from its config** (for example ``AutoModelForCausalLM.from_config(config)`` or
+``MLP()``, **not** ``from_pretrained``): newly registered ``nn.Parameter`` tensors land on ``meta`` so no
+weights are allocated in RAM, while computed buffers stay real. Calling ``low_mem.map_weights(model, ...)``
+then streams the checkpoint in 64 MiB chunks into a cache file and points the model's tensors at zero-copy
+views of it.
+
+``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them
+while building the engine that uses the weight, and are dropped again once the last engine reading that
+weight is built. With the resource partitioner, the model is built as several engines within a host
+memory budget, so only about one engine's weights are resident at a time.
+
+.. warning::
+
+   Initialize the model from its **config** (``AutoModel.from_config(config)`` or ``MyModel(config)``),
+   **not** ``from_pretrained(...)``. Calling ``from_pretrained`` loads the entire checkpoint into memory
+   before ``low_memory`` can stream it, defeating ``model_weights_on_meta=True``.
 
 This example:
 
-1. writes a model's weights once with ``save_weights_for_mapping``, standing in for a checkpoint;
-2. with ``torch_tensorrt.dynamo.low_memory``, builds the model on the ``meta`` device, so constructing it
-   allocates no weights, maps its weights, and exports and compiles it on the CPU as several engines
-   within a CPU memory budget, watching how much of the weights file is resident;
-3. checks the compiled model against the original.
+1. saves a reference checkpoint on disk (standing in for a downloaded safetensors checkpoint);
+2. enters ``low_memory(model_weights_on_meta=True)``, constructs ``MLP()`` from its config with zero weight
+   allocation, maps weights from the checkpoint via ``low_mem.map_weights``, and compiles within a CPU
+   memory budget while watching how much of the weights file is resident;
+3. checks the compiled model against the reference outputs.
 
-How much of the weights file is resident is read from ``/proc/self/smaps``, so it prints on Linux only.
+The memory figures are read from ``/proc/self``, so they print on Linux only.
 """
 
 import os
@@ -36,6 +47,16 @@ import psutil
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.tools import save_weights_for_mapping
+
+
+def anonymous_mib() -> float:
+    """MiB of this process's memory that no file backs (RssAnon in /proc/self/status)."""
+    if not os.path.exists("/proc/self/status"):
+        return float("nan")
+    for line in open("/proc/self/status"):
+        if line.startswith("RssAnon:"):
+            return int(line.split()[1]) / 1024
+    return float("nan")
 
 
 def resident_mib(path: str) -> float:
@@ -86,52 +107,56 @@ class MLP(torch.nn.Module):
 
 
 # %%
-# Write the weights once
-# ----------------------
+# Prepare a reference checkpoint on disk
+# --------------------------------------
 #
-# Any safetensors file maps if its tensors have the names, dtypes and shapes the model uses.
-# ``save_weights_for_mapping`` is for checkpoints whose loader casts, e.g. stored in float32 and run in
-# bfloat16: it writes the weights as they are after loading, a tied weight once.
+# In real usage this is your existing safetensors file, checkpoint folder, or Hugging Face Hub repo id
+# (for Hugging Face models built with ``AutoModel.from_config(config)``, ``map_weights`` finds the
+# checkpoint automatically from ``config._name_or_path``). Here we write one to a temporary folder and
+# delete the reference model so compilation starts with none of its weights in memory.
 
+checkpoint_dir = tempfile.mkdtemp()
+checkpoint_path = os.path.join(checkpoint_dir, "model.safetensors")
 torch.manual_seed(0)
+x = torch.randn(4, 2048)
 reference = MLP().eval()
-path = os.path.join(tempfile.mkdtemp(), "mlp.safetensors")
-save_weights_for_mapping(reference, path)
-print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
+weights_bytes = sum(t.nbytes for t in reference.state_dict().values())
+with torch.no_grad():
+    expected = reference(x)
+save_weights_for_mapping(reference, checkpoint_path)
+del reference
 
 # %%
-# Build, map, export and compile within a memory budget
-# -----------------------------------------------------
+# Construct from config (not ``from_pretrained``), map weights, and compile
+# -------------------------------------------------------------------------
 #
-# ``low_memory`` builds the model on ``meta``, where it allocates nothing, and maps its weights; every
-# tensor must be in the file. Mapping doesn't read the weights, so none of the file is resident yet.
-#
-# The mapped weights are CPU tensors, so the model and its example input stay on the CPU through
-# ``torch.export``. TensorRT takes weights as host pointers and reads each one in place from the mapping:
-# there's no GPU copy and no host copy. A weight's pages are dropped once the last engine that reads it
-# is built; the tensor stays valid and is re-read from the file if used.
-#
-# ``enable_resource_partitioning`` splits the model into engines small enough to build within
-# ``cpu_memory_budget``, the host memory the process may use. Each engine gets up to a quarter of the
-# budget left over after the memory already in use, since building an engine takes a few times its
-# weights' size. So a budget of the memory in use now plus the weights' size makes engines of at most
-# about a quarter of the weights, and building them one after another keeps only about one engine's
-# weights resident.
+# With ``model_weights_on_meta=True``, constructing ``MLP()`` inside ``low_memory`` places every parameter on
+# ``meta`` — allocating 0 MiB of weights — instead of loading a checkpoint via ``from_pretrained``.
+# ``low_mem.map_weights(model, checkpoint=checkpoint_dir)`` then turns ``meta`` creation off, streams the
+# checkpoint in 64 MiB chunks into Torch-TensorRT's cache file, and points ``model``'s tensors at views of
+# that file. None of the file is resident until TensorRT reads each partition's weights.
 
-x = torch.randn(4, 2048)
+anon_before = anonymous_mib()
 with (
     torch_tensorrt.dynamo.low_memory(
-        lambda: MLP().eval(),
-        path,
-        cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),
+        model_weights_on_meta=True,
+        cpu_memory_budget=psutil.Process().memory_info().rss + weights_bytes,
     ) as low_mem,
     torch.no_grad(),
 ):
+    model = (
+        MLP().eval()
+    )  # constructed from config/args: parameters on meta, 0 MiB allocated
     print(
-        f"mapped {low_mem.report.mapped_bytes / 2**20:.0f} MiB; "
+        f"constructed on meta; anonymous memory delta: {anonymous_mib() - anon_before:+.0f} MiB"
+    )
+    low_mem.map_weights(model, checkpoint=checkpoint_dir)
+    path = os.path.realpath(low_mem.weights_file)
+    print(
+        f"mapped {low_mem.report.mapped_bytes / 2**20:.0f} MiB from checkpoint -> {path}; "
         f"resident: {resident_mib(path):.0f} MiB"
     )
-    exported = torch.export.export(low_mem.model, (x,))
+    exported = torch.export.export(model, (x,))
     trt_model, peak = peak_resident_mib(
         path,
         lambda: torch_tensorrt.dynamo.compile(
@@ -139,8 +164,6 @@ with (
         ),
     )
     engines = [name for name, _ in trt_model.named_children() if "_run_on_acc" in name]
-    # As one engine, without the partitioner, the whole file (192 MiB here) is resident while it builds.
-    # With release_weights_after_build=False, all of it would stay resident after compiling.
     print(
         f"compiled into {len(engines)} engines; at most {peak:.0f} MiB of the weights file was "
         f"resident, {resident_mib(path):.0f} MiB is now"
@@ -151,15 +174,10 @@ with (
 # ----------------
 
 with torch.no_grad():
-    expected = reference(x)
     actual = trt_model(x.cuda()).cpu()
 torch.testing.assert_close(actual, expected, rtol=1e-2, atol=1e-2)
 print(
-    f"max abs difference from the original model: {(actual - expected).abs().max().item():.2e}"
+    f"max abs difference from the reference model: {(actual - expected).abs().max().item():.2e}"
 )
-
-# %%
-# The file must stay in place while the model or its weights are in use: released pages are read from it
-# again. On large models this keeps the host's peak near the largest single engine build instead of the
-# whole model, e.g. pi0.5 (6.7 GiB of bfloat16 weights): host RSS before compilation went from 8.7 to
-# 2.9 GiB.
+os.remove(checkpoint_path)
+os.rmdir(checkpoint_dir)
