@@ -435,6 +435,35 @@ class TestNativeBatchNormConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            # In float16 this scale rounds to 6e-8. Times the running mean -1e8, the
+            # rounding error is about 2.
+            ("rounds_to_6e-8", 4e-8, -1e8, 1.0, 1.0),
+            # The scale 1e-7 rounds to 1.2e-7. With inputs as widely spread as the
+            # running variance 1e8 says, the output is off by up to 20%.
+            ("wide_input", 1e-3, 0.0, 1e8, 1e4),
+        ]
+    )
+    def test_native_batchnorm_legit_no_training_fp16_input_folded_scale_underflows(
+        self, _, weight, mean, var, input_std
+    ):
+        class BatchNorm(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._native_batch_norm_legit_no_training.default(
+                    x,
+                    torch.tensor([weight, 1.0, 1.0]),
+                    torch.zeros(FEATURE_NUM),
+                    torch.tensor([mean, 0.2, 0.3]),
+                    torch.tensor([var, 1.0, 1.0]),
+                    0.1,
+                    1e-05,
+                )[0]
+
+        inputs = [(torch.randn(2, FEATURE_NUM, 8, 8) * input_std).half()]
+        # The wide input gives outputs near 1e-3, below the default absolute tolerance.
+        self.run_test(BatchNorm(), inputs, rtol=1e-2, atol=1e-5)
+
     def test_native_batchnorm_legit_no_training_fp16_weight_folded_out_of_range(self):
         # All parameters are float16, and a float16 fold would overflow.
         class BatchNorm(torch.nn.Module):

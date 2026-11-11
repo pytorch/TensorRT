@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
     has_dynamic_shape,
+    prepend_ones,
     set_layer_name,
     to_numpy,
 )
@@ -530,13 +531,27 @@ def index_select(
     dim: int,
     index: ITensor,
 ) -> ITensor:
+    # A gather layer needs an input of rank 1 or more, and PyTorch gives a 0-d input a
+    # 0-d result.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
     # The axis parameter specifies the dimension along which to index.
     dim = get_positive_dim(dim, len(input.shape))
+    # PyTorch reads a 0-d index as one element and keeps the dim, which a 0-d gather
+    # index would drop.
+    if len(index.shape) == 0:
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (1,)
+        )
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
 
     set_layer_name(gather_layer, target, f"{name}_gather_layer_default", source_ir)
 
-    return gather_layer.get_output(0)
+    out = gather_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_0d", out, ())
+    return out
 
 
 def scatter(
@@ -549,6 +564,24 @@ def scatter(
     index: Union[ITensor, np.ndarray, torch.Tensor],
     src: Union[ITensor, int, float],
 ) -> ITensor:
+    # A scatter layer needs inputs of rank 1 or more, and PyTorch reads a 0-d input, index
+    # or source as one element.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+    if len(index.shape) == 0:
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (1,)
+        )
+    if not isinstance(src, (int, float)) and len(src.shape) == 0:
+        src = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_src_1d",
+            get_trt_tensor(ctx, src, f"{name}_src", min_rank=0),
+            (1,),
+        )
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index_shape)
@@ -594,6 +627,8 @@ def scatter(
     scatter_layer.axis = dim
     set_layer_name(scatter_layer, target, name + "_scatter_layer", source_ir)
     out = scatter_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_0d", out, ())
     return out
 
 
@@ -606,15 +641,26 @@ def gather(
     dim: int,
     index: Union[ITensor, np.ndarray, torch.Tensor],
 ) -> ITensor:
-    input_shape = input.shape
-    dim = get_positive_dim(dim, len(input_shape))
     # Note: TensorRT's Gather layer supports both int32 and int64 indices
     # https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/c-api/classnvinfer1_1_1_i_gather_layer.html
     index = get_trt_tensor(ctx, index, name + "_index_tensor")
+    index_shape = tuple(index.shape)
+    # TensorRT gathers elements only from a tensor of rank 1 or more.
+    scalar_input = len(input.shape) == 0
+    if scalar_input:
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+        index = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_index_1d", index, (-1,)
+        )
+    dim = get_positive_dim(dim, len(input.shape))
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
     gather_layer.mode = trt.GatherMode.ELEMENT
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
     out = gather_layer.get_output(0)
+    if scalar_input:
+        out = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_output", out, index_shape
+        )
     return out
 
 
@@ -1098,9 +1144,9 @@ def index_put_converter(
         ctx.current_node.args if ctx.current_node is not None else ()
     )
     _check_index_entries(node_args)
-    # A converter can hold a 0-d tensor, such as i + 1, as shape (1,), and that extra dim
-    # would move the values in input[indices]. Give such an index its rank in the graph.
-    # Masks are left as they are, since expand_boolean_indices has no 0-d case.
+    # A converter that builds a 0-d tensor at rank 1 hands it on as shape (1,), and that
+    # extra dim would move the values in input[indices]. Give such an index its rank in
+    # the graph.
     graph_indices = node_args[1] if len(node_args) > 1 else None
     ranks = (
         [_rank_in_graph(index) for index in graph_indices]
@@ -1113,7 +1159,6 @@ def index_put_converter(
                 ctx, target, source_ir, f"{name}_index_{i}_0d", idx, ()
             )
             if isinstance(idx, ITensor)
-            and idx.dtype != trt.bool
             and tuple(idx.shape) == (1,)
             and i < len(ranks)
             and ranks[i] == 0
@@ -1121,6 +1166,71 @@ def index_put_converter(
         )
         for i, idx in enumerate(input_indices)
     ]
+    defined = [idx for idx in input_indices if idx is not None]
+    lone_index = defined[0] if len(defined) == 1 else None
+    if (
+        lone_index is not None
+        and not isinstance(lone_index, int)
+        and is_boolean_tensor(lone_index)
+        and len(lone_index.shape) == 0
+    ):
+        graph_input, graph_values = (
+            _graph_tensor(node_args[i]) if len(node_args) > 2 else None for i in (0, 2)
+        )
+        values_shape, input_shape = tuple(values.shape), tuple(input_tensor.shape)
+
+        def dim_fits(k: int) -> bool:
+            size, input_size = values_shape[-k], input_shape[-k]
+            if size == 1 or size == input_size >= 0:
+                return True
+            # A dynamic dim fits only when the graph proves it is the input's dim.
+            return (
+                graph_input is not None
+                and graph_values is not None
+                and min(graph_input.dim(), graph_values.dim()) >= k
+                and statically_known_true(
+                    graph_values.shape[-k] == graph_input.shape[-k]
+                )
+            )
+
+        one_element = all(size == 1 for size in values_shape)
+        fits_input = len(values_shape) <= len(input_shape) and all(
+            dim_fits(k) for k in range(1, len(values_shape) + 1)
+        )
+        if not (one_element or fits_input):
+            raise ValueError(
+                f"index_put: with a 0-d mask, values of shape {values_shape} must have "
+                f"one element or broadcast to the input shape {input_shape} without "
+                "more dims, and each dynamic dim "
+                "must be the same dim as the input's"
+            )
+        # A 0-d mask covers no input dims. PyTorch runs it with a one-element CPU value as
+        # masked_fill, which writes the value everywhere or nowhere, and the converter
+        # does so for any one-element value. Values with more elements fill the input as
+        # in input[mask] = values.
+        fill_value = values
+        if one_element:
+            fill_value = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_fill_value", values, ()
+            )
+        fill_value = cast_trt_tensor(
+            ctx, fill_value, input_tensor.dtype, f"{name}_fill_value_cast"
+        )
+        # A select keeps the input dtype, where impl.condition.where makes int64 int32.
+        mask = get_trt_tensor(ctx, lone_index, f"{name}_mask", min_rank=0)
+        rank = len(input_tensor.shape)
+        if rank:
+            mask = prepend_ones(ctx, mask, f"{name}_mask_broadcast", rank)
+        if len(fill_value.shape) < rank:
+            fill_value = prepend_ones(
+                ctx,
+                fill_value,
+                f"{name}_fill_value_broadcast",
+                rank - len(fill_value.shape),
+            )
+        return impl.condition.select(
+            ctx, target, source_ir, f"{name}_fill", fill_value, input_tensor, mask
+        )
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )

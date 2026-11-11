@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=49ad90c8"></script>
+    <script src="../_static/documentation_options.js?v=23415393"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -188,6 +188,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item current active">
-  <a class="nav-link nav-internal" href="../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -620,7 +634,7 @@ document.write(`
 <dd><p>Binds <code class="docutils literal notranslate"><span class="pre">args</span></code> and runs the engine, selecting the optimization profile the calling thread’s <a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard"><span class="std std-ref">OptimizationProfileGuard</span></a> asked for, on the CUDA stream its executorch::extension::cuda::CallerStreamGuard selected. </p>
 <p>Returns once the work is finished, whatever memory it was given, so outputs are readable as soon as this returns. The stream in use must be on the engine’s device, and calls on one handle must not overlap each other or its destruction. Every buffer passed in must stay alive and unchanged until this returns. Freeing one while the call runs is not detectable here or anywhere below, and returns a plausible wrong answer rather than an error.</p>
 <p>With the shared activation scratch pool (kSharedActivationScratchKey) one buffer per device backs every context created while the option was on. What a caller has to know:<ul class="simple">
-<li><p>Calls on two such handles on one device are serialized at submission. The backend does that itself, with a per-device lock held across the enqueue. A handle loaded with the option off keeps its own scratch, and so does one whose engine needs no activation scratch under any shape; neither is affected.</p></li>
+<li><p>Calls on two such handles on one device are serialized at submission. The backend does that itself, with a per-device lock held across the enqueue, and on a GPU without 64-bit stream memory operations until the call has finished. A handle loaded with the option off keeps its own scratch, and so does one whose engine needs no activation scratch under any shape; neither is affected.</p></li>
 <li><p>A call can wait on the host for pooled work submitted earlier on that device, and a call that grows the pool can wait for an unbounded amount of it. If the caller parks work that only the caller will release once <a class="reference internal" href="#classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a29b22ac15cc79551155771a7f06b826f"><span class="std std-ref">execute()</span></a> returns, the call does not return. Do not hold a pooled call behind something it has to come back to release.</p></li>
 <li><p>Capturing a CUDA graph around this delegate is not supported, with the option on or off. A handle that claims pooled scratch refuses a capturing selected stream with Error::NotSupported. Other streams are not checked. Do not overlap execution with a Global capture on any thread or a ThreadLocal capture on the calling thread, even with the option off or with an engine that needs no scratch: the call can invalidate it.</p></li>
 <li><p>cudaDeviceReset() invalidates the pool without emptying it, and the next call on that device uses what it destroyed. There is no guard: do not reset a device this backend has run a pooled engine on.</p></li>

@@ -17,11 +17,13 @@ from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     ATTN_BIAS_IS_CAUSAL,
     AUTOCAST_CALIBRATION_DATALOADER,
+    AUTOCAST_EXCLUDED_NODE_NAMES,
     AUTOCAST_EXCLUDED_NODES,
     AUTOCAST_EXCLUDED_OPS,
     AUTOCAST_LOW_PRECISION_TYPE,
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    AUTOCAST_MODEL_REGIONS,
     BUILD_ROUTE,
     CACHE_BUILT_ENGINES,
     COLLAPSE_HIGH_RANK_PERMUTES,
@@ -57,6 +59,8 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    RELEASE_WEIGHTS_AFTER_BUILD,
+    REPLACE_INTERLEAVE_STACK_WITH_CAT,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
@@ -164,17 +168,30 @@ class CompilationSettings:
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_autocast (bool): Whether to enable autocast.
         autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
-        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns for the paths of the modules, such as "block.norm", whose nodes should remain in FP32. Default is [].
+        autocast_excluded_node_names (Collection[str]): The set of regex patterns for the names of the nodes in the exported graph, such as "layer_norm_1", that should remain in FP32. A pattern matches from the start of a name, so "layer_norm_1$" matches layer_norm_1 and not layer_norm_10. Default is [].
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner
             splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The
             size is then not derived from the budget and the process's resident memory, so the same model and size always
             give the same split. Setting it turns resource partitioning on. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        release_weights_after_build (Optional[bool]): Release the memory of each model weight once
+            the last TensorRT engine that reads it is built, and of weights no partition reads before
+            the first build, so compilation holds only the weights still to be built.
+            ``None`` (default) releases only weights mapped by ``map_weights``: their pages are dropped
+            and re-read from the file if used again, so the source module keeps working, but an in-place
+            write to a mapped weight is lost. ``True`` also frees ordinary weights: the model's tensors
+            share that memory, so the source module (and an ``ExportedProgram`` exported from it) must
+            not be used after compilation, even if compilation fails. ``False`` releases nothing.
+            Weights read by subgraphs that run in PyTorch are kept. Applies to
+            ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile`` (parameters arrive as
+            graph inputs). ``MutableTorchTensorRTModule`` uses ``False``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -193,6 +210,7 @@ class CompilationSettings:
         fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
         tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".
@@ -255,6 +273,9 @@ class CompilationSettings:
     autocast_excluded_nodes: Collection[str] = field(
         default_factory=lambda: AUTOCAST_EXCLUDED_NODES
     )
+    autocast_excluded_node_names: Collection[str] = field(
+        default_factory=lambda: AUTOCAST_EXCLUDED_NODE_NAMES
+    )
     autocast_excluded_ops: Collection[Target] = field(
         default_factory=lambda: AUTOCAST_EXCLUDED_OPS
     )
@@ -263,6 +284,7 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    autocast_model_regions: str = AUTOCAST_MODEL_REGIONS
     # Set by autocast, not by users: the nodes it kept in high precision using the
     # calibration data. Saved in place of the data so refit can reuse the choice.
     _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
@@ -272,6 +294,7 @@ class CompilationSettings:
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     max_partition_size: Optional[int] = MAX_PARTITION_SIZE
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    release_weights_after_build: Optional[bool] = RELEASE_WEIGHTS_AFTER_BUILD
     decompose_attention: bool = DECOMPOSE_ATTENTION
     disabled_constant_fold_exclusions: Collection[str] = (
         DISABLED_CONSTANT_FOLD_EXCLUSIONS
@@ -283,6 +306,7 @@ class CompilationSettings:
     fallback_pytorch_plugin_ops: bool = FALLBACK_PYTORCH_PLUGIN_OPS
     collapse_high_rank_permutes: bool = COLLAPSE_HIGH_RANK_PERMUTES
     convert_antialiased_resize: bool = CONVERT_ANTIALIASED_RESIZE
+    replace_interleave_stack_with_cat: bool = REPLACE_INTERLEAVE_STACK_WITH_CAT
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
     tune_build_route_file: Optional[str] = TUNE_BUILD_ROUTE_FILE
@@ -320,6 +344,16 @@ class CompilationSettings:
                 f"{self.attn_bias_is_causal!r}"
             )
         self.autocast_excluded_ops = _autocast_op_names(self.autocast_excluded_ops)
+        # None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".
+        if self.release_weights_after_build is not None:
+            self.release_weights_after_build = bool(self.release_weights_after_build)
+        if isinstance(self.autocast_excluded_node_names, str):
+            self.autocast_excluded_node_names = {self.autocast_excluded_node_names}
+        if self.autocast_model_regions not in ("keep", "reclassify"):
+            raise ValueError(
+                'autocast_model_regions must be "keep" or "reclassify", got '
+                f"{self.autocast_model_regions!r}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -339,7 +373,7 @@ class CompilationSettings:
         # settings) leave out the calibration data. Refit then reuses the recorded
         # precisions instead of deciding again from new weights.
         state["autocast_calibration_dataloader"] = None
-        state.pop("autocast_intermediate_node_outputs", None)
+        state.pop("autocast_calibration_trace", None)
         state["torch_executed_ops"] = {
             op if isinstance(op, str) else ConverterRegistry.qualified_name_or_str(op)
             for op in state["torch_executed_ops"]
@@ -360,7 +394,11 @@ class CompilationSettings:
         state.setdefault("fallback_pytorch_plugin_ops", FALLBACK_PYTORCH_PLUGIN_OPS)
         state.setdefault("collapse_high_rank_permutes", COLLAPSE_HIGH_RANK_PERMUTES)
         state.setdefault("convert_antialiased_resize", CONVERT_ANTIALIASED_RESIZE)
+        state.setdefault(
+            "replace_interleave_stack_with_cat", REPLACE_INTERLEAVE_STACK_WITH_CAT
+        )
         state.setdefault("fold_shared_kv_attention", FOLD_SHARED_KV_ATTENTION)
+        state.setdefault("release_weights_after_build", RELEASE_WEIGHTS_AFTER_BUILD)
         state.setdefault("deduplicate_weights", DEDUPLICATE_WEIGHTS)
         state.setdefault("build_route", BUILD_ROUTE)
         state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
@@ -375,6 +413,8 @@ class CompilationSettings:
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
         state.setdefault("max_partition_size", MAX_PARTITION_SIZE)
+        state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
+        state.setdefault("autocast_model_regions", AUTOCAST_MODEL_REGIONS)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
@@ -397,9 +437,11 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enable_autocast",
     "autocast_low_precision_type",
     "autocast_excluded_nodes",
+    "autocast_excluded_node_names",
     "autocast_excluded_ops",
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
+    "autocast_model_regions",
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",
@@ -409,6 +451,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "fallback_pytorch_plugin_ops",
     "collapse_high_rank_permutes",
     "convert_antialiased_resize",
+    "replace_interleave_stack_with_cat",
 }
 
 

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=49ad90c8"></script>
+    <script src="../../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -185,6 +185,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -197,19 +204,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
     Debugging
@@ -324,6 +331,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -480,12 +494,13 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">sympy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -507,6 +522,22 @@ document.write(`
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._engine_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEngineCache</span><span class="p">,</span> <span class="n">DiskEngineCache</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace_execute_engine_no_op_node</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._reporting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">build_engine_with_reporting</span><span class="p">,</span>
+    <span class="n">current_collector</span><span class="p">,</span>
+    <span class="n">is_analyzing</span><span class="p">,</span>
+    <span class="n">partition_analysis</span><span class="p">,</span>
+    <span class="n">record_partition_inputs</span><span class="p">,</span>
+    <span class="n">stage_end</span><span class="p">,</span>
+    <span class="n">stage_start</span><span class="p">,</span>
+    <span class="n">tag_source_nodes</span><span class="p">,</span>
+    <span class="n">with_compiler_lock</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._weight_release</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">WeightReleaser</span><span class="p">,</span>
+    <span class="n">report_released_weights_on_failure</span><span class="p">,</span>
+    <span class="n">weight_storages</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CompilationSettings</span><span class="p">,</span>
     <span class="n">UnsupportedOperatorException</span><span class="p">,</span>
@@ -545,6 +576,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._offloaded_engines</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">defer_engine_setup_to_load</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.tools.weight_mapping</span><span class="w"> </span><span class="kn">import</span> <span class="n">has_mapped_weights</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">deallocate_module</span><span class="p">,</span>
     <span class="n">get_cpu_memory_usage</span><span class="p">,</span>
@@ -553,15 +585,18 @@ document.write(`
     <span class="n">parse_graph_io</span><span class="p">,</span>
     <span class="n">pin_torch_executed_state</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
+    <span class="n">release_host_and_device_memory</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
     <span class="n">validate_optimization_profiles</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.reporting</span><span class="w"> </span><span class="kn">import</span> <span class="n">Stage</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <span class="nd">@needs_cross_compile</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="nd">@with_compiler_lock</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -624,6 +659,7 @@ document.write(`
     <span class="n">fallback_pytorch_plugin_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">,</span>
     <span class="n">collapse_high_rank_permutes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">,</span>
     <span class="n">convert_antialiased_resize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CONVERT_ANTIALIASED_RESIZE</span><span class="p">,</span>
+    <span class="n">replace_interleave_stack_with_cat</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows</span>
@@ -722,6 +758,7 @@ document.write(`
 <span class="sd">        fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.</span>
 <span class="sd">        collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.</span>
 <span class="sd">        convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.</span>
+<span class="sd">        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -887,6 +924,7 @@ document.write(`
         <span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">:</span> <span class="n">fallback_pytorch_plugin_ops</span><span class="p">,</span>
         <span class="s2">"collapse_high_rank_permutes"</span><span class="p">:</span> <span class="n">collapse_high_rank_permutes</span><span class="p">,</span>
         <span class="s2">"convert_antialiased_resize"</span><span class="p">:</span> <span class="n">convert_antialiased_resize</span><span class="p">,</span>
+        <span class="s2">"replace_interleave_stack_with_cat"</span><span class="p">:</span> <span class="n">replace_interleave_stack_with_cat</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="c1"># disable the following settings is not supported for cross compilation for windows feature</span>
@@ -905,6 +943,7 @@ document.write(`
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">stage_start</span><span class="p">(</span><span class="n">Stage</span><span class="o">.</span><span class="n">LOWERING</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">filter_decomposition_table</span><span class="p">(</span>
@@ -926,6 +965,7 @@ document.write(`
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
     <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">stage_end</span><span class="p">(</span><span class="n">Stage</span><span class="o">.</span><span class="n">LOWERING</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
@@ -939,7 +979,7 @@ document.write(`
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
         <span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after CPU offload: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">is_analyzing</span><span class="p">():</span>
         <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -957,6 +997,7 @@ document.write(`
 
 <div class="viewcode-block" id="compile">
 <a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.compile">[docs]</a>
+<span class="nd">@with_compiler_lock</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1012,6 +1053,9 @@ document.write(`
         <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_LOW_PRECISION_TYPE</span><span class="p">,</span>
     <span class="n">autocast_excluded_nodes</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_EXCLUDED_NODES</span><span class="p">,</span>
+    <span class="n">autocast_excluded_node_names</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
+        <span class="nb">str</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_EXCLUDED_NODE_NAMES</span><span class="p">,</span>
     <span class="n">autocast_excluded_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_EXCLUDED_OPS</span><span class="p">,</span>
     <span class="n">autocast_max_output_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
     <span class="n">autocast_max_depth_of_reduction</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
@@ -1020,10 +1064,12 @@ document.write(`
     <span class="n">autocast_calibration_dataloader</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
+    <span class="n">autocast_model_regions</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_MODEL_REGIONS</span><span class="p">,</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
+    <span class="n">release_weights_after_build</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">RELEASE_WEIGHTS_AFTER_BUILD</span><span class="p">,</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span>
         <span class="nb">str</span>
@@ -1035,6 +1081,7 @@ document.write(`
     <span class="n">fallback_pytorch_plugin_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">,</span>
     <span class="n">collapse_high_rank_permutes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">,</span>
     <span class="n">convert_antialiased_resize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CONVERT_ANTIALIASED_RESIZE</span><span class="p">,</span>
+    <span class="n">replace_interleave_stack_with_cat</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span><span class="p">,</span>
     <span class="n">build_route</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">BUILD_ROUTE</span><span class="p">,</span>
     <span class="n">tune_build_routes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TUNE_BUILD_ROUTES</span><span class="p">,</span>
     <span class="n">tune_build_route_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">,</span>
@@ -1129,15 +1176,24 @@ document.write(`
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
 <span class="sd">        enable_autocast (bool): Whether to enable autocast.</span>
 <span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
-<span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns for the paths of the modules, such as "block.norm", whose nodes should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_excluded_node_names (Collection[str]): The set of regex patterns for the names of the nodes in the exported graph, such as "layer_norm_1", that should remain in FP32. A pattern matches from the start of a name, so "layer_norm_1$" matches layer_norm_1 and not layer_norm_10. Default is [].</span>
 <span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
 <span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.</span>
 <span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
+<span class="sd">        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.</span>
 <span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
+<span class="sd">        release_weights_after_build (Optional[bool]): Release the memory of each model weight once the last TensorRT engine that reads it is built,</span>
+<span class="sd">            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. ``None`` (default)</span>
+<span class="sd">            releases only weights mapped by ``map_weights``: their pages are dropped and read back if used again, so the source module keeps</span>
+<span class="sd">            working. ``True`` also frees ordinary weights; the source module, and any tensor sharing storage with its weights, must not be used</span>
+<span class="sd">            afterwards, even if compilation fails. ``False`` releases nothing. Weights read by subgraphs that run in PyTorch are kept. Applies to</span>
+<span class="sd">            ``torch_tensorrt.dynamo.compile``; ``True`` is turned off, with a warning, under ``torch.compile``. ``MutableTorchTensorRTModule``</span>
+<span class="sd">            uses ``False``.</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
@@ -1156,6 +1212,7 @@ document.write(`
 <span class="sd">        fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.</span>
 <span class="sd">        collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.</span>
 <span class="sd">        convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.</span>
+<span class="sd">        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.</span>
 <span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
 <span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
 <span class="sd">        tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".</span>
@@ -1350,14 +1407,17 @@ document.write(`
         <span class="s2">"enable_autocast"</span><span class="p">:</span> <span class="n">enable_autocast</span><span class="p">,</span>
         <span class="s2">"autocast_low_precision_type"</span><span class="p">:</span> <span class="n">autocast_low_precision_type</span><span class="p">,</span>
         <span class="s2">"autocast_excluded_nodes"</span><span class="p">:</span> <span class="n">autocast_excluded_nodes</span><span class="p">,</span>
+        <span class="s2">"autocast_excluded_node_names"</span><span class="p">:</span> <span class="n">autocast_excluded_node_names</span><span class="p">,</span>
         <span class="s2">"autocast_excluded_ops"</span><span class="p">:</span> <span class="n">autocast_excluded_ops</span><span class="p">,</span>
         <span class="s2">"autocast_max_output_threshold"</span><span class="p">:</span> <span class="n">autocast_max_output_threshold</span><span class="p">,</span>
         <span class="s2">"autocast_max_depth_of_reduction"</span><span class="p">:</span> <span class="n">autocast_max_depth_of_reduction</span><span class="p">,</span>
         <span class="s2">"autocast_calibration_dataloader"</span><span class="p">:</span> <span class="n">autocast_calibration_dataloader</span><span class="p">,</span>
+        <span class="s2">"autocast_model_regions"</span><span class="p">:</span> <span class="n">autocast_model_regions</span><span class="p">,</span>
         <span class="s2">"enable_resource_partitioning"</span><span class="p">:</span> <span class="n">enable_resource_partitioning</span><span class="p">,</span>
         <span class="s2">"cpu_memory_budget"</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
         <span class="s2">"max_partition_size"</span><span class="p">:</span> <span class="n">max_partition_size</span><span class="p">,</span>
         <span class="s2">"dynamically_allocate_resources"</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
+        <span class="s2">"release_weights_after_build"</span><span class="p">:</span> <span class="n">release_weights_after_build</span><span class="p">,</span>
         <span class="s2">"decompose_attention"</span><span class="p">:</span> <span class="n">decompose_attention</span><span class="p">,</span>
         <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">:</span> <span class="n">disabled_constant_fold_exclusions</span><span class="p">,</span>
         <span class="s2">"attn_bias_is_causal"</span><span class="p">:</span> <span class="n">attn_bias_is_causal</span><span class="p">,</span>
@@ -1367,6 +1427,7 @@ document.write(`
         <span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">:</span> <span class="n">fallback_pytorch_plugin_ops</span><span class="p">,</span>
         <span class="s2">"collapse_high_rank_permutes"</span><span class="p">:</span> <span class="n">collapse_high_rank_permutes</span><span class="p">,</span>
         <span class="s2">"convert_antialiased_resize"</span><span class="p">:</span> <span class="n">convert_antialiased_resize</span><span class="p">,</span>
+        <span class="s2">"replace_interleave_stack_with_cat"</span><span class="p">:</span> <span class="n">replace_interleave_stack_with_cat</span><span class="p">,</span>
         <span class="s2">"build_route"</span><span class="p">:</span> <span class="n">build_route</span><span class="p">,</span>
         <span class="s2">"tune_build_routes"</span><span class="p">:</span> <span class="n">tune_build_routes</span><span class="p">,</span>
         <span class="s2">"tune_build_route_file"</span><span class="p">:</span> <span class="n">tune_build_route_file</span><span class="p">,</span>
@@ -1384,6 +1445,7 @@ document.write(`
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
 
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">stage_start</span><span class="p">(</span><span class="n">Stage</span><span class="o">.</span><span class="n">LOWERING</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">filter_decomposition_table</span><span class="p">(</span>
@@ -1429,6 +1491,7 @@ document.write(`
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
     <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">stage_end</span><span class="p">(</span><span class="n">Stage</span><span class="o">.</span><span class="n">LOWERING</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
@@ -1448,7 +1511,7 @@ document.write(`
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
         <span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after CPU offload: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="n">is_analyzing</span><span class="p">():</span>
         <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -1827,7 +1890,30 @@ document.write(`
     <span class="k">return</span> <span class="n">user_symbol_bounds</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_warn_if_refit_source_released</span><span class="p">(</span><span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span>
+        <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">strip_engine_weights</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">immutable_weights</span>
+    <span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"release_weights_after_build releases the source weights; engines built with "</span>
+            <span class="s2">"strip_engine_weights must be refit from a freshly loaded checkpoint."</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_placeholders_are_engine_bindings</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">],</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymFloat</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
 <span class="nd">@fn_supports_debugger</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="nd">@with_compiler_lock</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compile_module</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">sample_arg_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
@@ -1856,6 +1942,9 @@ document.write(`
             <span class="s2">"The model may be in training mode, which may affect the performance of the compiled model!"</span>
         <span class="p">)</span>
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
+    <span class="n">stage_start</span><span class="p">(</span><span class="n">Stage</span><span class="o">.</span><span class="n">PARTITIONING</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">current_collector</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
+        <span class="n">tag_source_nodes</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">sample_kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">sample_kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -1891,6 +1980,8 @@ document.write(`
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">total_ops_in_graph</span> <span class="o">=</span> <span class="n">total_ops</span>
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">supported_ops_in_graph</span> <span class="o">=</span> <span class="n">num_supported_ops</span>
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">compilation_settings</span> <span class="o">=</span> <span class="n">settings</span>
+    <span class="c1"># Capability-based fusion rewrites gm.graph in place. Reports count the</span>
+    <span class="c1"># lowered source graph, never newly-created call_module wrapper nodes.</span>
 
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span> <span class="ow">and</span> <span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
@@ -1900,7 +1991,9 @@ document.write(`
 
     <span class="c1"># If the number of supported operations is 0 or less than the block size, skip the subgraph</span>
     <span class="k">if</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="p">(</span>
-        <span class="n">num_supported_ops</span> <span class="o">&lt;</span> <span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span>
+        <span class="n">num_supported_ops</span> <span class="o">&lt;</span> <span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span>
+        <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span> <span class="ow">or</span> <span class="n">is_analyzing</span><span class="p">())</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span> <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span><span class="p">)</span>
     <span class="p">):</span>
         <span class="c1"># Only refuse when an operator genuinely has no converter. A graph whose every</span>
         <span class="c1"># operator converts is fully supported however few of them there are, and all</span>
@@ -1928,9 +2021,14 @@ document.write(`
         <span class="c1"># fallback_operators counts every refused operator, including ones with side</span>
         <span class="c1"># effects that unsupported_operators leaves out, and never a buffer or a parameter.</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">op_support</span><span class="o">.</span><span class="n">fallback_operators</span>
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">analysis_report</span> <span class="o">=</span> <span class="n">partition_analysis</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">op_support</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">skipped</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">gm</span><span class="p">))</span>
         <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">dryrun_tracker</span><span class="p">)</span>
-        <span class="n">dryrun_stats_display</span><span class="p">(</span><span class="n">dryrun_tracker</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">)</span>
+        <span class="n">dryrun_stats_display</span><span class="p">(</span>
+            <span class="n">dryrun_tracker</span><span class="p">,</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">is_analyzing</span><span class="p">()</span> <span class="k">else</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span>
+        <span class="p">)</span>
         <span class="c1"># compile() offloaded gm before this call. No operation converted, so all of gm</span>
         <span class="c1"># runs in PyTorch, and its state must go back to the device.</span>
         <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">offload_module_to_cpu</span><span class="p">:</span>
@@ -1958,6 +2056,17 @@ document.write(`
             <span class="s2">"Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."</span>
         <span class="p">)</span>
 
+    <span class="n">weight_releaser</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># None releases only mapped weights: with none mapped, compile runs as without the setting.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span>
+        <span class="ow">or</span> <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">has_mapped_weights</span><span class="p">())</span>
+    <span class="p">):</span>
+        <span class="n">_warn_if_refit_source_released</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+        <span class="n">weight_releaser</span> <span class="o">=</span> <span class="n">WeightReleaser</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">mapped_only</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">)</span>
+
     <span class="c1"># Engines whose setup lazy_engine_init deferred are set up once every engine is built, unless</span>
     <span class="c1"># compile_and_save keeps them in their files for the save.</span>
     <span class="n">set_up_deferred_engines</span> <span class="o">=</span> <span class="p">(</span>
@@ -1969,36 +2078,71 @@ document.write(`
     <span class="c1"># Every computational op is TRT-legal: skip AccNodesFinder / tag / split and</span>
     <span class="c1"># convert the lowered graph as a single engine. Mixed graphs still partition, and so does</span>
     <span class="c1"># compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.</span>
+    <span class="c1"># Graphs with non-tensor inputs (Flux `return_dict`) also partition, since those inputs</span>
+    <span class="c1"># cannot be engine bindings.</span>
     <span class="k">if</span> <span class="p">(</span>
         <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span>
         <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span>
         <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">enable_resource_partitioning</span>
         <span class="ow">and</span> <span class="ow">not</span> <span class="n">defer_engine_setup_to_load</span><span class="p">()</span>
+        <span class="ow">and</span> <span class="n">_placeholders_are_engine_bindings</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
     <span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">"require_full_compilation + full operator support: "</span>
             <span class="s2">"skipping partitioner, converting whole graph"</span>
         <span class="p">)</span>
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">analysis_report</span> <span class="o">=</span> <span class="n">partition_analysis</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">op_support</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">whole_graph</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
+            <span class="n">convert_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
+                <span class="n">gm</span><span class="p">,</span>
+                <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">record_partition_inputs</span><span class="p">(</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span> <span class="n">convert_inputs</span><span class="p">)</span>
+            <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">tensorrt_graph_count</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">subgraph_data</span> <span class="o">=</span> <span class="n">PerSubgraphData</span><span class="p">(</span>
+                <span class="n">subgraph_name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span> <span class="n">subgraph_op_count</span><span class="o">=</span><span class="n">total_ops</span>
+            <span class="p">)</span>
+            <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">subgraph_data</span><span class="p">)</span>
+            <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">per_subgraph_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subgraph_data</span><span class="p">)</span>
+            <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">dryrun_tracker</span><span class="p">)</span>
+            <span class="n">dryrun_stats_display</span><span class="p">(</span>
+                <span class="n">dryrun_tracker</span><span class="p">,</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">is_analyzing</span><span class="p">()</span> <span class="k">else</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="n">gm</span>
         <span class="n">gm</span> <span class="o">=</span> <span class="n">erase_export_guards</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="c1"># Do not delete `_frozen_param*` here. Stock compile_module only drops</span>
         <span class="c1"># them on the parent after split; convert still needs them on the</span>
         <span class="c1"># graph being interpreted. Use placeholder meta for engine I/O — a</span>
-        <span class="c1"># flattened copy of compile() sample args can wrap kwargs dicts and</span>
-        <span class="c1"># non-tensor flags (Flux `return_dict`) that are not TRT bindings.</span>
+        <span class="c1"># flattened copy of compile() sample args can wrap kwargs dicts that</span>
+        <span class="c1"># are not TRT bindings.</span>
         <span class="n">convert_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
             <span class="n">gm</span><span class="p">,</span>
             <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
             <span class="n">example_tensors</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">trt_module</span> <span class="o">=</span> <span class="n">convert_module</span><span class="p">(</span>
-            <span class="n">gm</span><span class="p">,</span>
-            <span class="n">convert_inputs</span><span class="p">,</span>
-            <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
-            <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
-            <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
-        <span class="p">)</span>
+        <span class="n">read</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">weight_releaser</span><span class="o">.</span><span class="n">count_readers</span><span class="p">([</span><span class="n">gm</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_unread_storages</span><span class="p">():</span>
+                <span class="n">release_host_and_device_memory</span><span class="p">()</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">weight_storages</span><span class="p">(</span><span class="n">gm</span><span class="p">))</span>
+        <span class="n">record_partition_inputs</span><span class="p">(</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span> <span class="n">convert_inputs</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">report_released_weights_on_failure</span><span class="p">(</span><span class="n">weight_releaser</span><span class="p">,</span> <span class="s2">"_run_on_acc_0"</span><span class="p">):</span>
+            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
+                <span class="n">convert_module</span><span class="p">,</span>
+                <span class="n">gm</span><span class="p">,</span>
+                <span class="n">convert_inputs</span><span class="p">,</span>
+                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
+                <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_storages_after_build</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="s2">"_run_on_acc_0"</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">release_host_and_device_memory</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">set_up_deferred_engines</span><span class="p">:</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">trt_module</span>
@@ -2025,6 +2169,13 @@ document.write(`
         <span class="k">if</span> <span class="n">out_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">target_module</span><span class="o">.</span><span class="n">_out_spec</span> <span class="o">=</span> <span class="n">out_spec</span>
 
+    <span class="c1"># Snapshot only for requested reports. Legacy compilation must not retain</span>
+    <span class="c1"># a second module's references to weights across engine builds.</span>
+    <span class="n">analysis_source</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">current_collector</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span>
+        <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">)</span>
     <span class="c1"># Partition module into components that can be TRT-accelerated</span>
     <span class="n">fast_partitioner_failed</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="c1"># A dry run needs the PyTorch partitions to report unsupported operators.</span>
@@ -2071,6 +2222,12 @@ document.write(`
             <span class="n">cpu_memory_budget</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">cpu_memory_budget</span><span class="p">,</span>
             <span class="n">max_partition_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">max_partition_size</span><span class="p">,</span>
         <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">analysis_source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">analysis_report</span> <span class="o">=</span> <span class="n">partition_analysis</span><span class="p">(</span>
+            <span class="n">analysis_source</span><span class="p">,</span> <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">op_support</span><span class="p">,</span> <span class="n">settings</span>
+        <span class="p">)</span>
+    <span class="k">del</span> <span class="n">analysis_source</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">supported_ops</span><span class="o">.</span><span class="n">fallback_operators</span>
 
@@ -2121,15 +2278,30 @@ document.write(`
     <span class="c1"># Iterate over all components that can be accelerated</span>
     <span class="c1"># Generate the corresponding TRT Module for those</span>
 
+    <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.</span>
+        <span class="n">weight_releaser</span><span class="o">.</span><span class="n">count_readers</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">partitioned_module</span><span class="p">]</span>
+            <span class="o">+</span> <span class="p">[</span>
+                <span class="n">sub</span>
+                <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+        <span class="c1"># The lowered module still holds weights no partition reads (for example a model head the</span>
+        <span class="c1"># traced function never calls); nothing needs them once partitioning is done.</span>
+        <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_unread_storages</span><span class="p">()</span>
+
     <span class="c1"># Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.</span>
-    <span class="c1"># This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep</span>
-    <span class="c1"># the ones they still read.</span>
-    <span class="n">still_read</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="n">n</span><span class="o">.</span><span class="n">target</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span>
-    <span class="p">}</span>
-    <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">gm</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"_frozen_param"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">attr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">still_read</span><span class="p">:</span>
-            <span class="nb">delattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+    <span class="c1"># This is done to release CPU memory. The global partitioner leaves PyTorch</span>
+    <span class="c1"># nodes in this graph, so keep the frozen parameters they still read.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_analyzing</span><span class="p">():</span>
+        <span class="n">still_read</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">n</span><span class="o">.</span><span class="n">target</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span>
+        <span class="p">}</span>
+        <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">gm</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"_frozen_param"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">attr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">still_read</span><span class="p">:</span>
+                <span class="nb">delattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
         <span class="n">submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
@@ -2196,6 +2368,7 @@ document.write(`
             <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
             <span class="n">example_tensors</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="n">record_partition_inputs</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">submodule_inputs</span><span class="p">)</span>
 
         <span class="k">assert</span> <span class="n">submodule_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
@@ -2220,16 +2393,26 @@ document.write(`
         <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">submodule</span><span class="p">,</span> <span class="n">subgraph_data</span><span class="p">)</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">tensorrt_graph_count</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">per_subgraph_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subgraph_data</span><span class="p">)</span>
-        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_analyzing</span><span class="p">():</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
         <span class="c1"># Create TRT engines from submodule</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
-            <span class="n">trt_module</span> <span class="o">=</span> <span class="n">convert_module</span><span class="p">(</span>
-                <span class="n">submodule</span><span class="p">,</span>
-                <span class="n">submodule_inputs</span><span class="p">,</span>
-                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
-                <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+            <span class="c1"># Collected before conversion, which deletes the submodule's frozen parameters. Only the keys:</span>
+            <span class="c1"># holding the storages would keep those frozen parameters alive after conversion frees them.</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">set</span><span class="p">(</span><span class="n">weight_storages</span><span class="p">(</span><span class="n">submodule</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
             <span class="p">)</span>
+            <span class="k">with</span> <span class="n">report_released_weights_on_failure</span><span class="p">(</span><span class="n">weight_releaser</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+                <span class="n">trt_module</span> <span class="o">=</span> <span class="n">build_engine_with_reporting</span><span class="p">(</span>
+                    <span class="n">convert_module</span><span class="p">,</span>
+                    <span class="n">submodule</span><span class="p">,</span>
+                    <span class="n">submodule_inputs</span><span class="p">,</span>
+                    <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+                <span class="p">)</span>
 
             <span class="k">if</span> <span class="p">(</span>
                 <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span> <span class="ow">or</span> <span class="n">defer_engine_setup_to_load</span><span class="p">())</span>
@@ -2242,6 +2425,11 @@ document.write(`
                 <span class="c1"># Profiling and layer info need the engine.</span>
                 <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
             <span class="n">trt_modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">weight_releaser</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">weight_releaser</span><span class="o">.</span><span class="n">release_storages_after_build</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="n">release_host_and_device_memory</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="n">_debugger_config</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_engine_profile</span><span class="p">:</span>
@@ -2319,7 +2507,7 @@ document.write(`
     <span class="k">if</span> <span class="n">fast_partitioner_failed</span><span class="p">:</span>
         <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span> <span class="o">=</span> <span class="kc">True</span>
 
-    <span class="n">dryrun_stats_display</span><span class="p">(</span><span class="n">dryrun_tracker</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">)</span>
+    <span class="n">dryrun_stats_display</span><span class="p">(</span><span class="n">dryrun_tracker</span><span class="p">,</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">is_analyzing</span><span class="p">()</span> <span class="k">else</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">)</span>
 
     <span class="n">restore_reshape</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">partitioned_module</span>
@@ -2502,6 +2690,7 @@ document.write(`
 
 <div class="viewcode-block" id="convert_exported_program_to_serialized_trt_engine">
 <a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine">[docs]</a>
+<span class="nd">@with_compiler_lock</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2562,6 +2751,7 @@ document.write(`
     <span class="n">fallback_pytorch_plugin_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">,</span>
     <span class="n">collapse_high_rank_permutes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">,</span>
     <span class="n">convert_antialiased_resize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CONVERT_ANTIALIASED_RESIZE</span><span class="p">,</span>
+    <span class="n">replace_interleave_stack_with_cat</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span><span class="p">,</span>
     <span class="n">lift_mutable_buffers</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">arg_input_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_input_binding_names</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2680,6 +2870,7 @@ document.write(`
 <span class="sd">        fallback_pytorch_plugin_ops (bool): If True, skip converters that insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel), so the engine runs without PyTorch. This function builds one engine for the whole program, so an operator that only such a converter supports fails to convert. An accumulating aten.index_put with one 1-D index then uses TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Default is False.</span>
 <span class="sd">        collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. This function builds one engine, so without the rewrite such a chain makes the conversion fail. Only static shapes are rewritten. A large engine can need much more time and memory to build and to run, so measure it. Default is False.</span>
 <span class="sd">        convert_antialiased_resize (bool): Convert antialiased bilinear and bicubic resize (F.interpolate with antialias=True) to TensorRT. This function builds one engine, so without this setting such a resize makes the conversion fail. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.</span>
+<span class="sd">        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
@@ -2859,6 +3050,7 @@ document.write(`
         <span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">:</span> <span class="n">fallback_pytorch_plugin_ops</span><span class="p">,</span>
         <span class="s2">"collapse_high_rank_permutes"</span><span class="p">:</span> <span class="n">collapse_high_rank_permutes</span><span class="p">,</span>
         <span class="s2">"convert_antialiased_resize"</span><span class="p">:</span> <span class="n">convert_antialiased_resize</span><span class="p">,</span>
+        <span class="s2">"replace_interleave_stack_with_cat"</span><span class="p">:</span> <span class="n">replace_interleave_stack_with_cat</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>

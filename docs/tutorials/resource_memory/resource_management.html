@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=49ad90c8"></script>
+    <script src="../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -187,6 +187,13 @@ document.write(`
 </li>
 
 
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../advanced_usage.html">
     Advanced Usage
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -485,6 +499,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/weight_streaming_example.html">Example: Weight Streaming</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/compile_from_mapped_weights.html">Example: Compiling from Memory-Mapped Weights</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -766,6 +781,118 @@ change drops it.</p>
 <p>Use <code class="docutils literal notranslate"><span class="pre">dynamically_allocate_resources=False</span></code> to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).</p>
 </section>
+<hr class="docutils" />
+<section id="compiling-from-memory-mapped-weights">
+<h2>Compiling from Memory-Mapped Weights<a class="headerlink" href="#compiling-from-memory-mapped-weights" title="Link to this heading">#</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">map_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">save_weights_for_mapping</span></code>, <code class="docutils literal notranslate"><span class="pre">checkpoint_source</span></code> and <code class="docutils literal notranslate"><span class="pre">low_memory</span></code> are
+<strong>experimental</strong> in 2.15: their API will change in 2.16.</p>
+</div>
+<p>To compile, a model’s weights normally have to be loaded into host memory first, all of them, before
+the first engine is built. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.tools.map_weights</span></code> instead points the model’s weights at
+zero-copy views of a safetensors file:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.export</span></code> reads only shapes, so a weight’s pages become resident only when TensorRT reads them,
+while it builds the engine that uses the weight.</p></li>
+<li><p>The pages are dropped again once the last engine that reads the weight is built. A mapped weight stays
+valid; its pages are read back if it is used again.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.low_memory</span></code> does all of it in one block: it builds the model on <code class="docutils literal notranslate"><span class="pre">meta</span></code>, so
+building it allocates no weights, maps them, and drops their pages when the block ends, unless
+<code class="docutils literal notranslate"><span class="pre">release_weights_after_build=False</span></code>. Its <code class="docutils literal notranslate"><span class="pre">compile_settings</span></code> turn the resource partitioner on, so the
+model is built as several engines, each small enough to build within <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code> (or the
+available memory without one), so only about one engine’s weights are resident at a time. They also give a
+part of the model that runs in PyTorch its weights on the GPU after compilation
+(<code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code>). Pass them to <code class="docutils literal notranslate"><span class="pre">compile</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="c1"># Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">low_memory</span><span class="p">(</span>
+    <span class="k">lambda</span><span class="p">:</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">(),</span> <span class="s2">"model.safetensors"</span><span class="p">,</span> <span class="n">cpu_memory_budget</span><span class="o">=</span><span class="mi">8</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
+<span class="p">)</span> <span class="k">as</span> <span class="n">low_mem</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">low_mem</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">mapped_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="o">**</span><span class="mi">30</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> GiB mapped"</span><span class="p">)</span>
+    <span class="n">example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span>  <span class="c1"># CPU: the mapped weights are CPU tensors</span>
+    <span class="n">exported</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">low_mem</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example</span><span class="p">,))</span>
+    <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="n">exported</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example</span><span class="o">.</span><span class="n">cuda</span><span class="p">()],</span> <span class="o">**</span><span class="n">low_mem</span><span class="o">.</span><span class="n">compile_settings</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code> is the host memory the compiling process may use, counting what it already uses,
+and each engine gets up to a quarter of what’s left. In <span class="xref std std-ref">compile_from_mapped_weights</span>, a model with
+192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
+compiling, against all 192 MiB when built as one engine.</p>
+<p><code class="docutils literal notranslate"><span class="pre">low_memory</span></code> takes the compile settings that lower memory during compilation:
+<code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_resource_partitioning</span></code>, <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code> and
+<code class="docutils literal notranslate"><span class="pre">release_weights_after_build</span></code>. <code class="docutils literal notranslate"><span class="pre">compile_settings</span></code> holds the ones given, with the first two on unless
+set. They apply only to the calls they’re passed to: another model compiled inside the block keeps its own
+settings.</p>
+<p><code class="docutils literal notranslate"><span class="pre">low_memory</span></code> uses <code class="docutils literal notranslate"><span class="pre">map_weights</span></code>, which also works alone on a model you build yourself.</p>
+<p><strong>What to know:</strong></p>
+<ul>
+<li><p><strong>Compile on the CPU.</strong> Mapped weights are CPU tensors, so keep the model and its example inputs on
+the CPU for <code class="docutils literal notranslate"><span class="pre">torch.export</span></code>. TensorRT takes weights as host pointers and reads each one in place:
+there’s no GPU copy and no host copy of the weights.</p></li>
+<li><p><strong>Checkpoints.</strong> Any safetensors file maps if its tensors have the names, dtypes and shapes the model
+uses; a mismatch raises. A checkpoint stored in other dtypes than the model runs in, for example
+float32 for a bfloat16 model, is converted once, as below. The file is checked from its header before
+anything is mapped: a truncated file, bytes after the last tensor, or tensors whose bytes overlap, leave
+gaps or don’t hold their dtype and shape raise. Damage inside a tensor’s bytes isn’t detected, since
+that would mean reading the whole file. Tied weights, and distinct tensors that are one view of a
+storage (<code class="docutils literal notranslate"><span class="pre">w</span></code> and <code class="docutils literal notranslate"><span class="pre">Parameter(w.detach())</span></code>), are stored once and mapped to one view, so they stay
+shared; tensors that share a storage otherwise raise.</p></li>
+<li><p><strong>Converting without loading.</strong> <code class="docutils literal notranslate"><span class="pre">save_weights_for_mapping(model,</span> <span class="pre">path,</span> <span class="pre">source=...)</span></code> writes a model
+built on <code class="docutils literal notranslate"><span class="pre">meta</span></code> straight from a checkpoint. It writes one tensor at a time. For each tensor it calls
+<code class="docutils literal notranslate"><span class="pre">source(name,</span> <span class="pre">tensor)</span></code>, which returns the data whole or in chunks along dimension 0, and it casts
+each chunk to the model’s dtype. <code class="docutils literal notranslate"><span class="pre">checkpoint_source(checkpoint,</span> <span class="pre">key=...)</span></code> is a ready source that
+reads a safetensors file, or a sharded checkpoint’s <code class="docutils literal notranslate"><span class="pre">model.safetensors.index.json</span></code>, in 64 MiB chunks,
+so even a float32 checkpoint is never loaded. Change the meta model the way the compiled model will be
+changed first, such as casting it to bfloat16, so the file holds the dtypes and shapes the export maps.
+For pi0.5, converting the 14.5 GB float32 checkpoint held 0.9 GiB of process memory, against 9.3 GiB
+for loading it on the CPU and writing the loaded model. A tensor the source doesn’t store (it raises
+<code class="docutils literal notranslate"><span class="pre">KeyError</span></code>) is written from the model, with a warning if it is persistent, so buffers a checkpoint
+doesn’t store, such as non-persistent rotary frequencies, must be real tensors, not on <code class="docutils literal notranslate"><span class="pre">meta</span></code>.
+accelerate’s <code class="docutils literal notranslate"><span class="pre">init_empty_weights()</span></code> builds a model that way, and its persistent buffers, such as batch
+norm statistics, still come from the checkpoint. <code class="docutils literal notranslate"><span class="pre">save_weights_for_mapping(model,</span> <span class="pre">path)</span></code> without a
+source writes a model that is already loaded.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">checkpoint_source</span><span class="p">,</span> <span class="n">save_weights_for_mapping</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"meta"</span><span class="p">):</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">)</span>
+<span class="n">save_weights_for_mapping</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="s2">"weights.safetensors"</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="n">checkpoint_source</span><span class="p">(</span><span class="s2">"checkpoint.safetensors"</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Missing names</strong> raise for any name in the model’s <code class="docutils literal notranslate"><span class="pre">state_dict</span></code>, in <code class="docutils literal notranslate"><span class="pre">map_weights</span></code> and so in
+<code class="docutils literal notranslate"><span class="pre">low_memory</span></code>; non-persistent buffers, such as rotary frequencies, aren’t required, so recompute those
+or write them with <code class="docutils literal notranslate"><span class="pre">save_weights_for_mapping</span></code>. With <code class="docutils literal notranslate"><span class="pre">strict=False</span></code>, <code class="docutils literal notranslate"><span class="pre">map_weights</span></code> lists missing
+names in its result’s <code class="docutils literal notranslate"><span class="pre">missing</span></code> and leaves them as they were. A missing tensor on <code class="docutils literal notranslate"><span class="pre">meta</span></code> stays
+there, with no values, and a warning names it: a model that reads it can’t be exported or compiled,
+and <code class="docutils literal notranslate"><span class="pre">compile</span></code> names it; one that never reads it is fine. On any error the model is left unchanged.</p></li>
+<li><p><strong>The file must stay in place and unchanged</strong> while the model or its weights are in use: rewriting it
+changes or invalidates the weights. <code class="docutils literal notranslate"><span class="pre">map_weights</span></code> maps it copy-on-write and never writes to it. It
+reserves no memory for the mapping, so a file larger than RAM and swap maps too, except with
+<code class="docutils literal notranslate"><span class="pre">vm.overcommit_memory=2</span></code>. Weights are read when compilation first uses them, so <code class="docutils literal notranslate"><span class="pre">compile</span></code> checks
+that the file of each mapped weight the program reads is still the one mapped (same inode, size and
+modification time) and raises otherwise; reading a weight past the end of a file truncated since would
+kill the process with <code class="docutils literal notranslate"><span class="pre">SIGBUS</span></code>. <code class="docutils literal notranslate"><span class="pre">release_weights_after_build=True</span></code> also frees weights that aren’t
+mapped, which the source model then can’t use.</p></li>
+<li><p><strong>Releasing pages uses</strong> <code class="docutils literal notranslate"><span class="pre">madvise</span></code>. Where the process owns the weights file or may write to it,
+<code class="docutils literal notranslate"><span class="pre">MADV_PAGEOUT</span></code> (Linux 5.4 and later) drops a weight’s pages and keeps writes made to it; it leaves
+pages another process maps too. Elsewhere, such as a root-owned file in a container image read by a
+normal user, <code class="docutils literal notranslate"><span class="pre">MADV_DONTNEED</span></code> drops them and discards such writes, so the weight reverts to the file’s
+data. The bytes reported released are the pages that left the process’s memory. On Windows the mapping
+works, but pages stay resident until the file is unmapped, and a warning says so.</p></li>
+</ul>
+<p>With mapped weights, CPU compilation and the resource partitioner, the host’s peak stays near the
+largest single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host
+RSS before compilation went from 8.7 to 2.9 GiB. See <span class="xref std std-ref">compile_from_mapped_weights</span> for a runnable
+example.</p>
+</section>
 </section>
 
 
@@ -823,6 +950,7 @@ context (the opposite direction — useful for profiling or benchmarking).</p>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-weight-streaming">Runtime Weight Streaming</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-resource-allocation">Dynamic Resource Allocation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compiling-from-memory-mapped-weights">Compiling from Memory-Mapped Weights</a></li>
 </ul>
   </nav></div>
 

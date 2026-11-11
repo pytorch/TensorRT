@@ -16,7 +16,37 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${TORCH_TENSORRT_SOURCE_DIR}/cmake/Modules")
 find_package(TensorRT REQUIRED)
-if(NOT TARGET TensorRT::nvinfer_plugin)
+# libnvinfer also holds the engine builder, which a process that only runs engines never uses, yet
+# its code is mapped and its static initializers run in every such process. The lean library supports
+# only engines compiled with version_compatible=True that use no TensorRT plugin, and some layers
+# cannot be compiled that way, so it is a separate build rather than the default. CMake only: the
+# wheel build does not pass it.
+option(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
+  "Link TensorRT's lean runtime library instead of libnvinfer and libnvinfer_plugin" OFF)
+if(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME is supported on Linux only.")
+  endif()
+  if(NOT TARGET TensorRT::nvinfer_lean)
+    message(FATAL_ERROR
+      "TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME needs TensorRT's lean library (nvinfer_lean), which "
+      "was not found. Set TensorRT_ROOT to a TensorRT installation that includes it, or "
+      "TensorRT_nvinfer_lean_LIBRARY to the library.")
+  endif()
+  # The delegate compiles against the headers of the TensorRT found above, so the lean library has to be
+  # that TensorRT's. This compares the versions at the end of the file names of libnvinfer and the lean
+  # library, which a TensorRT installation carries in full and the pip wheels do not.
+  get_filename_component(_tensorrt_real "${TensorRT_LIBRARY}" REALPATH)
+  get_filename_component(_tensorrt_lean_real "${TensorRT_nvinfer_lean_LIBRARY}" REALPATH)
+  string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+$" _tensorrt_version "${_tensorrt_real}")
+  string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+$" _tensorrt_lean_version "${_tensorrt_lean_real}")
+  if(NOT _tensorrt_lean_version OR NOT _tensorrt_lean_version STREQUAL _tensorrt_version)
+    message(FATAL_ERROR
+      "TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME needs the lean library of the same TensorRT as "
+      "${_tensorrt_real}, and the file name of ${_tensorrt_lean_real} does not show the same full "
+      "version. Set TensorRT_ROOT to one TensorRT installation that includes both.")
+  endif()
+elseif(NOT TARGET TensorRT::nvinfer_plugin)
   message(FATAL_ERROR
     "The TensorRT delegate requires TensorRT's plugin library (nvinfer_plugin), which was "
     "not found. Set TensorRT_ROOT to a TensorRT installation that includes it, or "
@@ -79,9 +109,13 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
   executorch::runtime
   executorch::extension_cuda
   CUDA::cudart
-  TensorRT::nvinfer
-  TensorRT::nvinfer_plugin
   Threads::Threads)
+if(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME)
+  target_compile_definitions(executorch_backend_tensorrt PRIVATE TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME)
+  target_link_libraries(executorch_backend_tensorrt PRIVATE TensorRT::nvinfer_lean)
+else()
+  target_link_libraries(executorch_backend_tensorrt PRIVATE TensorRT::nvinfer TensorRT::nvinfer_plugin)
+endif()
 
 # Build to the standard ExecuTorch's own exported configuration asks for. The delegate is compiled
 # through CMake from Bazel, which forwards the main build's -std=c++20, and under C++20 an ordinary
@@ -167,6 +201,10 @@ set(TORCH_TENSORRT_DELEGATE_RUNPATH
   "$ORIGIN/../../executorch/lib"
   "$ORIGIN/../../tensorrt_libs"
   "$ORIGIN/../../nvidia/cu13/lib")
+# TensorRT's lean wheel installs the library in a sibling directory of its own.
+if(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME)
+  list(INSERT TORCH_TENSORRT_DELEGATE_RUNPATH 2 "$ORIGIN/../../tensorrt_lean_libs")
+endif()
 string(JOIN ":" TORCH_TENSORRT_DELEGATE_RUNPATH_COLONS ${TORCH_TENSORRT_DELEGATE_RUNPATH})
 
 # Match the architecture-specific tags applied by the shared wheel build.

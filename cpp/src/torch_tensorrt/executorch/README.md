@@ -141,7 +141,8 @@ ones a caller has to keep.
 ### Threads
 
 - **Use one `Module` per thread.** Many threads, each with its own `Module`, work, including
-  threads that share one input buffer or one caller stream. ExecuTorch's `Module` is not thread
+  threads that share one input buffer, and threads that share one caller stream when the engine is built
+  with `max_aux_streams=0` (see [CUDA streams](#cuda-streams)). ExecuTorch's `Module` is not thread
   safe, so never call one `Module` from two threads at once, not even two different methods of it.
   Mostly ExecuTorch then fails with `Error::InvalidState`, but sometimes a thread gets the other
   thread's answer.
@@ -151,6 +152,11 @@ ones a caller has to keep.
 Every buffer you pass in must stay alive and unchanged until `execute()` returns. If another
 thread frees an input during the call, the call can return a wrong answer with `Error::Ok`. Nothing
 below your code can detect that. Python callers cannot hit this, because a tensor owns its memory.
+
+An output that shares memory with an input, other than an output the program declares an alias of
+that input, is written to a buffer of the delegate and copied over once the engine finishes, with or
+without CUDA graphs. The answer is right; the cost is an extra copy of that output per call.
+ExecuTorch's memory planning never makes them overlap.
 
 TensorRT needs every input and output address to be a multiple of 256 bytes, and it does not check.
 A view that starts partway into its storage, such as `x[1:]` of a 1-D tensor, misses that. So the
@@ -168,7 +174,18 @@ need only a few copy calls: about 0.25 ms for a 640x480 float32 image on an A100
 matrix needs one call per row: about 6 ms for 1024x1024. From host memory the copy is much slower,
 tens of milliseconds or more for an image, so export such an input in row-major order where you can.
 An input that the engine updates in place must be row-major, or the call fails with
-`Error::InvalidArgument`.
+`Error::InvalidArgument`. The delegate reads an input's layout from its strides, not from its dim
+order, so a tensor built by hand that is not row-major must carry strides that describe its layout.
+A tensor with no strides is read as row-major.
+
+Every input and output must have the type its engine binding has, or the call fails with
+`Error::InvalidProgram` and the log names both types. TensorRT has no float64, so a float64 model
+compiled without `truncate_double=True` gets an engine that binds float32, while the program keeps
+float64 tensors. Without the check it would return wrong numbers. Export such a model again with
+`truncate_double=True`. A binding whose TensorRT type has no ExecuTorch type, such as INT4, FP4 or
+E8M0, accepts no tensor, and the log says that the binding has no ExecuTorch type. An output the
+program declares an alias of an input must have that input's type, or the program fails to load with
+`Error::InvalidProgram`.
 
 ### CUDA streams
 
@@ -185,6 +202,15 @@ An input that the engine updates in place must be row-major, or the call fails w
 - `execute()` always waits for the engine to finish before it returns, on any stream.
 - Calls on one delegate handle are serialized by the delegate. Destroying a handle while a call on
   it runs is not allowed.
+- If another thread uses the same stream at the same time, for example to launch a CUDA graph and
+  synchronize the stream, build the engine with `max_aux_streams=0`. NVIDIA drivers 580 and 595 were
+  seen to drop a stream's wait on an event in that case, and TensorRT joins the auxiliary streams it
+  runs kernels on back to your stream with such a wait at the end of each call. When that wait is
+  dropped, the call returns outputs computed from unfinished results, with no error. With the shared
+  activation scratch on, the next pooled call, on any stream, can also start while those kernels
+  still use the scratch: the pool's flag does not cover TensorRT's own wait. A call that replays a
+  CUDA graph is not affected, since the recording turns that wait into a dependency inside the graph.
+  An engine built with `max_aux_streams=0` has no auxiliary streams.
 
 `torch_tensorrt::executorch_backend::CudaStreamGuard` was removed in Torch-TensorRT 2.14. Use
 `CallerStreamGuard` instead; it is the same idea, shared by every CUDA delegate:
@@ -276,23 +302,99 @@ loaded. The first match wins:
 4. The process option, which is off if it was never set.
 
 How it runs: the first call with a set of input shapes runs normally, the second records the graph
-and launches it, and later calls replay it. With the shared activation scratch on, a call does not
-wait while another engine loads, is destroyed or records. It runs normally, and a later call
-records. Each engine keeps one GPU buffer per input and output, and every call through the graph
-copies the inputs in and the outputs out. For an engine with few kernels, or with large inputs and
-outputs, these copies can cost more than they save.
+and launches it, and later calls replay it. When the second call brings the buffers of the first,
+the graph is on those buffers, unless earlier buffers moved twice (see below), and later calls with
+the same buffers replay it with no copies of its own. A buffer the delegate copies without replay,
+such as host memory on a GPU that does not read host memory directly, pinned or not, memory not
+aligned to 256 bytes, or an input not in row-major order, is still copied. A call of an engine that
+uses the shared activation scratch does not wait while another engine loads, is destroyed or
+records. It runs normally, and a later call records. A stream of another regular CUDA context is the
+exception (see below).
+
+Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
+does, and as a caller that reuses its device tensors does. A graph goes on the caller's buffers once
+a call brings the same buffers as the call before it. Until then it goes on one GPU buffer of its
+own per input and output, for each graph, and every call after the first copies its inputs in and
+its outputs out. When the buffers of a graph on the caller's buffers change, that call records again
+on the new ones. When they change a second time, for any shapes, that graph stops following them,
+also after the shapes or the profile change: it records on buffers of its own, and every call
+copies. The plain graph and the graph of each green context count their own changes. For an engine
+with few kernels, or with large inputs and outputs, these copies can cost more than they save. So a
+caller that moves its buffers on every call, or alternates two sets, records once for each set of
+shapes in each graph, as one that keeps them does, and both first replay on the 3rd call. Each
+growth of the shared scratch in between adds a call without a graph and then a recording.
+
+CUDA allows a green context handle on one CPU thread at a time. The delegate takes a lock around
+its own calls on the handle, but your threads do not take that lock, so do not use the same green
+context handle from another thread while a call runs on one of its streams.
+
+A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
+graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
+Kernels that TensorRT runs on auxiliary streams it creates itself stay in the green context with
+TensorRT 11.4 and newer, which creates those streams in the green context of the stream it is given.
+TensorRT 11.1 and older create them outside it, so their kernels can run on any SM. With those
+versions, build the engine with `max_aux_streams=0` to keep all of its kernels on the green
+context's SMs. TensorRT 11.2 and 11.3 were not checked. With them, build with `max_aux_streams=0`
+and destroy the engine before its green contexts.
+An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
+caller that uses both, or up to 4 green contexts in turn, replays on each. These graphs share one
+record of the engine's input shapes, so they replay only while every caller passes the same shapes:
+a call with other shapes starts every graph over, not only its own. A fifth green context takes the
+place of the one called longest ago, and a green context whose graph was replaced starts over: a
+warm-up call, then a recording on its next call. So a caller that makes one call on each of more
+than 4 green contexts in turn never replays. A caller may free its own buffers after any call,
+since a later call on other addresses records again or copies.
+
+Destroy the engine before the regular CUDA context it was loaded in, and before the green contexts
+it ran on. A call after the load context is destroyed can crash, also when a new context was given
+the destroyed one's handle. TensorRT requires a green context to outlive every CUDA graph recorded
+in it, and the engine keeps a green context's graph until the engine is destroyed or a newer green
+context takes its place. With TensorRT 11.4 and newer, an engine with auxiliary streams needs this
+order even with replay off: TensorRT makes those streams in the green context it runs in, and
+destroying the engine after that context logs a "context is destroyed" error.
+
+An engine loaded while a green context is current is created in the device's primary context, which it
+keeps until it is destroyed, so that green context may be destroyed first if the engine never runs
+on its streams. Only the owner changes: calls still run on the stream they are given, in its
+context. This needs a CUDA 12.5 or newer driver, since only its cuStreamGetCtx_v2 reports that a
+green context is current: with an older one the engine is created in that green context.
 
 Some calls do not replay:
 
-- A change of input shapes, or of the optimization profile, records again. So does a growth of the
-  shared activation scratch below. A loop that changes shape or profile on every call never
-  replays, and still pays the copies.
+- A change of input shapes, or of the optimization profile, records again.
+  A growth of the shared activation scratch below runs one call without a graph, then records again
+  on the same buffers as before. A loop that changes shape or profile on every call never replays.
 - An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
   12.5 never replays. The delegate logs the reason.
-- A call on a green context stream, or on a stream from another CUDA context, takes the ordinary
-  path. The recorded graph is kept for the next call that can replay it.
+- A green context stream while a regular context other than its device's primary one is current,
+  and a plain stream while a green context is current, take the ordinary path, and the recorded
+  graphs are kept.
+- A stream on another device fails, with or without replay. So does a stream from a regular CUDA
+  context other than the one the engine was loaded in, except that, while the stream's own context is
+  current, the engine's own graph replays on it. When that caller's buffers are not the
+  ones the graph was recorded on, and the graph is not already on buffers of its own, the engine
+  records again in its own context, on buffers of its own, and from then on every call of the engine
+  that replays on a plain stream, its own included, copies the inputs in and the outputs out until
+  its shapes or its profile change. When that recording cannot go ahead (the engine's own context
+  has not run the shapes yet, or the recording fails), the call fails with an error that says why.
+  The engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
+  buffers the delegate keeps for such a call are allocated in the engine's context, so that other
+  context may be destroyed first.
+- An engine on the shared activation scratch fails on a stream of another device or of another
+  regular CUDA context than the one it was loaded in, with or without replay. Such a call fails
+  before it sets its shapes or claims the shared scratch, and the engine keeps its graphs. Green
+  context streams of its device run when it was loaded in the device's primary context. The scratch
+  and its completion event are one per device, made in the context of the device's first pooled
+  call, so load every pooled engine on a device in the same regular context. A pooled engine loaded
+  in another one fails before it runs. Keep that context alive while the process uses the scratch:
+  the scratch, and every larger buffer it grows into, is made in it. With a driver older than CUDA
+  12.5, that context is a green context when the first pooled engine was loaded while one was
+  current, so keep that green context alive too. The check on the stream uses cuStreamGetCtx_v2,
+  which CUDA 12.5 added, so with an older driver a call on a stream of another device or context
+  still fails, but only later, after it claims the scratch.
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
-  ordinary path until its shapes or its profile change.
+  ordinary path until its shapes or its profile change. Each graph counts its own, and a green graph
+  that gives up its place to a newer green context starts over.
 
 Engines on the shared activation scratch replay too.
 
@@ -327,11 +429,24 @@ options.set_option("use_shared_activation_scratch", true);
 const Error error = set_option("TensorRTBackend", options.view());
 ```
 
-Set it before you load the methods that should use the pool. What it costs:
+Set it before you load the methods that should use the pool. Load every pooled engine on a device in
+the same regular CUDA context, and keep that context alive while the process uses the pool, with
+replay on or off; [CUDA graph replay](#cuda-graph-replay) has the detail. What it costs:
 
 - **No parallelism between pooled calls on one device.** The delegate holds a per-device lock from
   claiming the buffer until the work is queued and marked. Two pooled calls can be submitted from
-  two threads, on one stream or two, but they never run at the same time on the device.
+  two threads, on one stream or two, but they never run at the same time on the device. Each call's
+  stream waits for the call before it on the pool's CUDA event and also on a small flag in GPU
+  memory that the pool owns: NVIDIA drivers 580 and 595 were seen to drop a stream's wait on an
+  event while another thread used the same stream, and the wait on the flag is not dropped. A GPU
+  without 64-bit stream memory operations has no flag, so there the delegate holds the lock until
+  the call has finished, and the next pooled call queues its work only after that.
+- **Each pooled call takes a few microseconds longer.** Where the GPU has the flag, the wait on it
+  protects the handoff between pooled calls from the dropped event wait above, whether or not another
+  thread shares a stream. It does not cover the wait TensorRT joins its auxiliary streams with; see
+  the note on threads that share a stream. On an
+  H100 it adds about 4 microseconds per call against the event wait alone, and keeping the event
+  wait beside it adds about 0.3 microseconds more.
 - **A pooled call waits for the pooled call before it.** Do not hold back the work of one pooled
   call, for example with a host function on its stream, until a later pooled call returns. The
   later call then never returns.
@@ -339,20 +454,22 @@ Set it before you load the methods that should use the pool. What it costs:
   exits. Whether an engine asks for the size its current shapes need, or for the most its profile
   allows, is decided when TensorRT builds it.
 - **No CUDA graph capture.** See the capture section below.
-- **No `cudaDeviceReset()`.** The pool keeps its buffer, an event and a stream for the life of the
-  process. Do not reset a device that ran a pooled engine.
+- **No `cudaDeviceReset()`.** The pool keeps its buffer, an event, a stream and the handoff flag for
+  the life of the process. Do not reset a device that ran a pooled engine.
 
-With `use_cuda_graphs` on as well, each replaying engine still keeps its own buffers for its inputs
-and outputs.
+With `use_cuda_graphs` on as well, an engine that copies through buffers of its own, as described
+above, keeps them apart from the pool.
 
 #### Capturing a call into a CUDA graph is not supported
 
 A pooled call whose stream is being captured fails with `Error::NotSupported`. The handoff from one
 pooled call to the next waits on an event recorded outside the capture, and that wait fails with
-`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. A growth of
-the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or thread-local capture.
-Without the refusal, you would learn of it only when `cudaStreamEndCapture` returns
-`cudaErrorStreamCaptureInvalidated`.
+`cudaErrorStreamCaptureIsolation` and invalidates the capture in every capture mode. The handoff
+also waits on the pool's flag and then writes it. A capture records those into the graph, so a
+replay would write an old value to the flag, and every later pooled call on that GPU would wait
+forever. A growth of the buffer adds a `cudaMalloc` and a host wait, which invalidate a global or
+thread-local capture. Without the refusal, you would learn of these only when
+`cudaStreamEndCapture` returns `cudaErrorStreamCaptureInvalidated`, or from a hang.
 
 - The check runs before anything in the call that could break the capture.
 - If the query fails for another reason, such as an earlier fault on the device, the call fails
@@ -395,10 +512,16 @@ A call whose shapes need no scratch still needs a buffer installed, because `enq
 context with none when its engine needs scratch for any shape. Against an empty pool such a call
 allocates the one-byte minimum, not the engine's figure for its whole profile, because the pool
 never shrinks: on one dynamic test engine that figure is 4 MiB, against 128 KiB for the next real
-call. Each call also installs its own size rather than the pool's capacity. A size query that
-failed then shows up, because TensorRT refuses a buffer smaller than the bound shapes need, and
-the delegate fails the call with `Error::InvalidState` instead of running on a buffer it may have
-freed.
+call. Each call also installs its own size rather than the pool's capacity. TensorRT refuses a
+buffer smaller than the bound shapes need, and the delegate then fails the call with
+`Error::InvalidState` instead of running on a buffer it may have freed.
+
+Some engines cannot tell their size for the bound shapes before their first run. One example is an
+engine with a boolean mask assignment such as `y[mask] = x[mask]`, where the number of selected
+elements depends on the data. TensorRT reports an error for that query, and the delegate then uses
+the upper bound for the engine's optimization profile, which is no more than the engine
+allocates for itself with the option off. The first time this happens in a process, it logs two lines
+at the Info level, the second with TensorRT's reason.
 
 ### Shared engines
 

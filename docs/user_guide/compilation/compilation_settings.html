@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=49ad90c8"></script>
+    <script src="../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -188,6 +188,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -766,34 +780,60 @@ depths to assign each node to FP32 or low precision.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">set()</span></code></p></td>
-<td><p>Set of <strong>regex patterns</strong> matched against node names. Nodes whose names match
-any pattern are kept in FP32. Example: <code class="docutils literal notranslate"><span class="pre">{&quot;.*layer_norm.*&quot;}</span></code> keeps all
-LayerNorm ops in FP32.</p></td>
+<td><p>Set of <strong>regex patterns</strong> matched against the path of the module that owns each
+node, such as <code class="docutils literal notranslate"><span class="pre">block.norm</span></code>. The ops of modules whose paths match any pattern
+are kept in FP32. Example: <code class="docutils literal notranslate"><span class="pre">{&quot;.*norm$&quot;}</span></code> keeps the ops of every module whose
+name ends in <code class="docutils literal notranslate"><span class="pre">norm</span></code> in FP32.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_excluded_node_names</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">set()</span></code></p></td>
+<td><p>Set of <strong>regex patterns</strong> matched against the names of the nodes in the exported
+graph, such as <code class="docutils literal notranslate"><span class="pre">layer_norm_1</span></code>. Nodes whose names match any pattern are kept in
+FP32. This can pick out an op that shares its module with others. Example:
+<code class="docutils literal notranslate"><span class="pre">{&quot;.*layer_norm.*&quot;}</span></code> keeps all LayerNorm ops in FP32. A pattern matches from
+the start of a name, so <code class="docutils literal notranslate"><span class="pre">{&quot;layer_norm_1$&quot;}</span></code> keeps <code class="docutils literal notranslate"><span class="pre">layer_norm_1</span></code> and not
+<code class="docutils literal notranslate"><span class="pre">layer_norm_10</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">set()</span></code></p></td>
 <td><p>Set of <code class="docutils literal notranslate"><span class="pre">torch.ops</span></code> targets always kept in FP32 regardless of other autocast
 decisions. Example: <code class="docutils literal notranslate"><span class="pre">{torch.ops.aten.softmax.int}</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">512.0</span></code></p></td>
 <td><p>Nodes whose outputs exceed this absolute value are kept in FP32. Guards against
 overflow in activations with large dynamic range (e.g., unnormalized logits).
 Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (∞)</p></td>
 <td><p>Maximum reduction depth allowed in low precision. Reduction depth measures how
 many reduction operations (sum, mean, etc.) feed into a node. Nodes with higher
 depth are kept in FP32 to prevent error accumulation. <code class="docutils literal notranslate"><span class="pre">None</span></code> means no limit.
 Needs <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>; without it this rule is skipped.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
 <td><p>A <code class="docutils literal notranslate"><span class="pre">torch.utils.data.DataLoader</span></code> used to calibrate output statistics (e.g.,
 absolute max values) for each node. The autocast pass runs the model on this
 data to check <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code> and
 <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>. Without it, both rules are skipped.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">autocast_model_regions</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;keep&quot;</span></code></p></td>
+<td><p>What autocast does with the regions the model itself runs under
+<code class="docutils literal notranslate"><span class="pre">torch.autocast</span></code>. <code class="docutils literal notranslate"><span class="pre">&quot;keep&quot;</span></code> builds them with the precisions that PyTorch
+autocast gives them. <code class="docutils literal notranslate"><span class="pre">&quot;reclassify&quot;</span></code> removes their autocast, so that the rules,
+exclusions and calibration above choose the precision of every op in them too.
+This can be faster, for example when PyTorch autocast keeps a LayerNorm or a
+softmax in FP32, but it overrides a choice of the model author, so check the
+accuracy. Regions with <code class="docutils literal notranslate"><span class="pre">enabled=False</span></code>, which a model uses to keep ops in FP32,
+keep their autocast. So do regions whose values inlining would change, such as
+one that writes into a buffer in place, and regions inside a <code class="docutils literal notranslate"><span class="pre">torch.no_grad()</span></code>
+block when the model is exported with grad mode on. Exported under
+<code class="docutils literal notranslate"><span class="pre">torch.no_grad()</span></code>, the block leaves nothing in the graph.
+<code class="docutils literal notranslate"><span class="pre">autocast_excluded_node_names</span></code> also matches the names that ops have in the
+regions.</p></td>
 </tr>
 </tbody>
 </table>
@@ -1040,6 +1080,16 @@ need much more time and memory to build and to run, so measure it.</p></td>
 graph. Only static input and output heights and widths and floating-point
 inputs are converted. Some sizes run slower than in PyTorch, so measure it.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">replace_interleave_stack_with_cat</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Write a stack whose only user is a reshape that merges the new axis into a
+neighbor axis, as in <code class="docutils literal notranslate"><span class="pre">torch.stack([even,</span> <span class="pre">odd],</span> <span class="pre">dim=3).flatten(2,</span> <span class="pre">3)</span></code> for a
+2x upsample, as a concatenation of unsqueezed inputs. This can make large,
+image-sized interleaves faster on GPUs where TensorRT fuses the region around
+them, but slower where TensorRT runs them as separate layers and adds copies,
+so measure it. Only programs from <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> are rewritten, not
+<code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> graphs.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1169,13 +1219,14 @@ rebuilt from scratch:</p>
 <code class="docutils literal notranslate"><span class="pre">refit_identical_engine_weights</span></code>,
 <code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_weight_streaming</span></code>, <code class="docutils literal notranslate"><span class="pre">tiling_optimization_level</span></code>,
 <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_autocast</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
+<code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_node_names</span></code>,
+<code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>,
+<code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_model_regions</span></code>,
 <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>,
 <code class="docutils literal notranslate"><span class="pre">disabled_constant_fold_exclusions</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
 <code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">deduplicate_weights</span></code>, <code class="docutils literal notranslate"><span class="pre">build_route</span></code>,
 <code class="docutils literal notranslate"><span class="pre">fallback_pytorch_plugin_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">collapse_high_rank_permutes</span></code>,
-<code class="docutils literal notranslate"><span class="pre">convert_antialiased_resize</span></code>.
+<code class="docutils literal notranslate"><span class="pre">convert_antialiased_resize</span></code>, <code class="docutils literal notranslate"><span class="pre">replace_interleave_stack_with_cat</span></code>.
 On TensorRT older than 10.14, <code class="docutils literal notranslate"><span class="pre">strip_engine_weights</span></code> also invalidates cached engines.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>

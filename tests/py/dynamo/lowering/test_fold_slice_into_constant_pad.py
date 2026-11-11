@@ -18,6 +18,17 @@ PAD = torch.ops.aten.constant_pad_nd.default
 SLICE = torch.ops.aten.slice.Tensor
 
 
+@torch.library.custom_op("fold_slice_test::read_first_rows", mutates_args=())
+def read_first_rows(t: torch.Tensor) -> torch.Tensor:
+    # Reads from the start of the storage, which can lie before the view.
+    return t.as_strided(t.shape, t.stride(), 0).clone()
+
+
+@read_first_rows.register_fake
+def _(t: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like(t)
+
+
 class PadThenSlice(torch.nn.Module):
     def __init__(
         self, pad, dim, start, end, step=1, mode="constant", keep_pad=False, value=None
@@ -122,6 +133,18 @@ class TestFoldSliceIntoConstantPad(unittest.TestCase):
         self.assertIn(torch.ops.aten.as_strided.default, _targets(gm))
         gm = fold_slice_into_constant_pad(gm, CompilationSettings())
         self.assertIn(SLICE, _targets(gm))
+        torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
+
+    def test_leaves_a_slice_read_by_a_custom_op_alone(self):
+        # The op reads 2 padding rows from the start of the storage, where the slice
+        # holds 1 padding row and the first row of x.
+        class PadSliceCustomOp(torch.nn.Module):
+            def forward(self, x):
+                return read_first_rows(F.pad(x, (0, 0, 2, 0))[1:3])
+
+        module, x = PadSliceCustomOp(), torch.randn(2, 8)
+        gm, _, targets = _lower(module, x)
+        self.assertIn(SLICE, targets)
         torch.testing.assert_close(gm(x)[0], module(x), rtol=0, atol=0)
 
     def test_leaves_a_slice_passed_to_torch_cond_alone(self):

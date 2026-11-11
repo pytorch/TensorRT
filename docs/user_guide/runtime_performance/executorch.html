@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=49ad90c8"></script>
+    <script src="../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -188,6 +188,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -631,6 +645,11 @@ need a CUDA toolkit, because ExecuTorch’s CUDA backend compiles the leftover o
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">save()</span></code> writes the compiled graph as it is, so it needs no example inputs.</p>
+<p>TensorRT has no float64. Compile a float64 model with <code class="docutils literal notranslate"><span class="pre">truncate_double=True</span></code>. Without it, the
+engine expects float32 while the program keeps float64 tensors, and every call fails with
+<code class="docutils literal notranslate"><span class="pre">Error::InvalidProgram</span></code>. An output that the program declares an alias of an input, such as an
+updated KV cache, must have that input’s type, or loading the program fails with
+<code class="docutils literal notranslate"><span class="pre">Error::InvalidProgram</span></code>.</p>
 <p><a class="reference internal" href="saving_models.html#executorch-save"><span class="std std-ref">c) ExecuTorch (.pte)</span></a> lists every option that <code class="docutils literal notranslate"><span class="pre">save()</span></code> takes for this format. It also shows
 how to put several methods in one file, and how to let the engine of a large language model (LLM)
 update its key-value (KV) cache in place.</p>
@@ -983,6 +1002,12 @@ calls, such as creating the stream, also need the CUDA runtime library:</p>
 <li><p>The CUDA backend refuses a caller stream for a method that uses its own CUDA graph option.</p></li>
 <li><p><strong>Synchronize the stream before you read GPU outputs.</strong> The TensorRT delegate always waits for
 its work to finish, but the CUDA backend can return while its work is still queued.</p></li>
+<li><p>If another thread uses the same stream at the same time, for example to launch a CUDA graph and
+synchronize the stream, compile with <code class="docutils literal notranslate"><span class="pre">max_aux_streams=0</span></code>. NVIDIA drivers 580 and 595 were seen
+to drop a stream’s wait on an event in that case, and TensorRT joins its auxiliary streams back to
+your stream with such a wait at the end of each call. When that wait is dropped, the call returns
+wrong outputs with no error, and with the shared activation scratch on, the next call that shares
+it can start while those kernels still use it. Replayed CUDA graphs are not affected.</p></li>
 </ul>
 <p>That stream can belong to a CUDA green context. A green context owns a fixed number of the GPU’s SMs
 (streaming multiprocessors), so the model stays inside that part of the GPU and the rest is free for
@@ -1030,16 +1055,77 @@ run time, the first of these that is set decides:</p>
 <li><p>a process option set to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 </ol>
 <p>With none of them set, replay is off.</p>
-<p>Replay is not free. Each engine keeps its own GPU buffer for every input and output, and every
-replayed call copies the inputs in and the outputs out. With few kernels, or with large inputs
-and outputs, those copies can cost more than the launches they save.</p>
+<p>A replay reads and writes the buffers it was recorded on. Keep each input and output in the same
+device buffer from call to call, as the memory planning of <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code> does, and
+replays copy nothing. With the recipe in <a class="reference internal" href="#keep-inputs-and-outputs-on-the-gpu">Keep inputs and outputs on the GPU</a>, memory planning
+does not own them: from Python pass <code class="docutils literal notranslate"><span class="pre">clone_outputs=False</span></code>, or from C++ give each output once with
+<code class="docutils literal notranslate"><span class="pre">Module::set_output</span></code>, and reuse the same input tensors. These are still copied on every call:
+host buffers (unless the GPU reads host memory directly), buffers off a 256-byte boundary,
+non-row-major inputs, and an output that shares memory with an input. A graph goes on the caller’s
+buffers once a call brings the same buffers as the call before it. Until then the engine records on
+GPU buffers of its own and copies the inputs in and the outputs out on every call after the first.
+When the buffers of a graph on the caller’s buffers change, that call records again on the new ones.
+When they change a second time, for any input shapes, that graph records on its own buffers and
+copies on every call, also after the shapes or the profile change. The plain graph and the graph of
+each green context count their own changes. With few kernels, or with large inputs and outputs,
+those copies can cost more than the launches they save. So buffers that move on every call, or
+alternate between two sets, cost one recording for each set of shapes in each graph, as buffers that
+stay put do, and both first replay on the 3rd call. Each growth of the shared activation scratch in
+between adds a call without a graph and a recording, and moves the first replay later.</p>
+<p>CUDA allows a green context handle on one CPU thread at a time. The delegate takes a lock around
+its own calls on the handle, but your threads do not take that lock, so do not use the same handle
+from another thread while a call runs on one of its streams.</p>
+<p>A graph runs its kernels in the CUDA context it was recorded in, so a green context’s calls keep a
+graph of their own, recorded there, and its replays stay on the green context’s SMs. Kernels that
+TensorRT runs on auxiliary streams it creates itself stay there too with TensorRT 11.4 and newer.
+TensorRT 11.1 and older create those streams outside the green context, so their kernels can run on
+any SM; with those versions, compile with <code class="docutils literal notranslate"><span class="pre">max_aux_streams=0</span></code> to keep all of them on the green
+context’s SMs. TensorRT 11.2 and 11.3 were not checked; with them, compile with <code class="docutils literal notranslate"><span class="pre">max_aux_streams=0</span></code>
+and destroy the engine before its green contexts. An engine keeps such a graph for up to 4 green
+contexts, and one for plain streams, so a caller that uses both replays on each, as long as every caller passes the same input shapes: a
+call with other shapes starts every graph over. A fifth green context takes the place of the one
+called longest ago, and a replaced one starts over with a warm-up call, so one call on each of more
+than 4 green contexts in turn never replays.</p>
+<p>Destroy the engine before the regular CUDA context it was loaded in, and before the green contexts
+it ran on. A call after the load context is destroyed can crash, also when a new context was given
+the destroyed one’s handle. TensorRT requires a green context to outlive every CUDA graph recorded
+in it, and the engine keeps such a graph until the engine is destroyed or a newer green context
+takes its place. With TensorRT 11.4 and newer, an engine with auxiliary streams needs this order
+even with replay off, since TensorRT makes those streams in the green context.</p>
+<p>An engine loaded while a green context is current is created in the device’s primary context, which
+it keeps until it is destroyed, so that green context may be destroyed first if the engine never
+runs on its streams. This needs a CUDA 12.5 or newer driver. With an older one, the engine is
+created in that green context.</p>
 <p>Some calls never replay:</p>
 <ul class="simple">
-<li><p>An engine whose input shapes change on every call never replays, and it still pays the copies.</p></li>
+<li><p>An engine whose input shapes change on every call never replays.</p></li>
 <li><p>An engine with aliased outputs, a GPU without stream-ordered memory, and a driver older than
-CUDA 12.5 never replay. They take the ordinary path, without the extra copies.</p></li>
-<li><p>A call on a green context stream, or on a stream of another CUDA context, takes the ordinary
-path for that call.</p></li>
+CUDA 12.5 never replay. They take the ordinary path.</p></li>
+<li><p>A green context stream while a regular context other than its device’s primary one is current,
+and a plain stream while a green context is current, take the ordinary path.</p></li>
+<li><p>A stream of another device fails, with or without replay. So does a stream of a regular CUDA
+context other than the one the engine was loaded in, except that, while the stream’s own context is
+current, the engine’s own graph replays on it. When that caller’s buffers are not the
+ones the graph was recorded on, and the graph is not already on buffers of its own, the engine
+records again in its own context, on buffers of its own, and from then on every call of the engine
+that replays on a plain stream, its own included, copies the inputs in and the outputs out until
+its shapes or its profile change. When that recording cannot go ahead (the engine’s own context
+has not run the shapes yet, or the recording fails), the call fails with an error that says why.
+The engine’s own calls keep their graph, unless that call brought new shapes, which drop it. The
+buffers the delegate keeps for such a call are allocated in the engine’s context, so that other
+context may be destroyed first.</p></li>
+<li><p>An engine on the shared activation scratch fails on a stream of another device or of another
+regular CUDA context than the one it was loaded in, with or without replay. Such a call fails
+before it sets its shapes or claims the shared scratch, and the engine keeps its graphs. Green
+context streams of its device run when it was loaded in the device’s primary context. The scratch
+and its completion event are one per device, made in the context of the device’s first pooled
+call, so load every pooled engine on a device in the same regular context. A pooled engine loaded
+in another one fails before it runs. Keep that context alive while the process uses the scratch:
+the scratch, and every larger buffer it grows into, is made in it. With a driver older than CUDA
+12.5, that context is a green context when the first pooled engine was loaded while one was
+current, so keep that green context alive too. The check on the stream uses cuStreamGetCtx_v2,
+which CUDA 12.5 added, so with an older driver a call on a stream of another device or context
+still fails, but only later, after it claims the scratch.</p></li>
 </ul>
 <p>An engine on the shared activation scratch below also replays. It records again whenever the
 shared buffer grows.</p>
@@ -1047,10 +1133,16 @@ shared buffer grows.</p>
 <p class="admonition-title">Warning</p>
 <p>While a graph is being recorded, no other thread may create or destroy a TensorRT engine or
 execution context outside this delegate, or call a whole device sync such as
-<code class="docutils literal notranslate"><span class="pre">cudaDeviceSynchronize()</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.cuda.synchronize()</span></code>. Loading a program with
-ExecuTorch’s CUDA backend can make such a sync too. Recording happens again after every shape
-change, so loading everything first does not remove the risk. Leave replay off when other
-threads may do any of these things.</p>
+<code class="docutils literal notranslate"><span class="pre">cudaDeviceSynchronize()</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.cuda.synchronize()</span></code>. Loading a program with ExecuTorch’s
+CUDA backend can make such a sync too. Recording can happen again:</p>
+<ul class="simple">
+<li><p>after a change of shapes, buffers or profile,</p></li>
+<li><p>after the shared activation scratch grows, which another engine can cause,</p></li>
+<li><p>in each new or replaced green context,</p></li>
+<li><p>on the first call from another regular CUDA context with other buffers.</p></li>
+</ul>
+<p>So loading everything first does not remove the risk. Leave replay off when other threads may
+do any of these things.</p>
 </div>
 </section>
 <section id="shared-activation-scratch">
@@ -1061,12 +1153,16 @@ of GPU memory on the number of engines alone. With the <code class="docutils lit
 option, all contexts on a device share one buffer instead. The buffer grows to the largest size
 any call has needed, so you save the sum of the separate sizes minus the largest one.</p>
 <p>Set the option before you load the methods that should use the shared buffer. Methods loaded
-before it keep their own scratch.</p>
-<p>The cost is parallelism. Two calls that share the buffer never run at the same time on one
-device: the delegate takes a per-device lock from claiming the buffer to queuing the work. The
-buffer never shrinks. Do not call <code class="docutils literal notranslate"><span class="pre">cudaDeviceReset()</span></code> on a device that ran an engine with the
-shared buffer. Recording a call into your own CUDA graph is not supported, with or without the
-shared buffer.</p>
+before it keep their own scratch. Load every method that uses it on a device in the same regular
+CUDA context, and keep that context alive while the process uses the buffer, with replay on or off.
+<a class="reference internal" href="#cuda-graph-replay">CUDA graph replay</a> has the detail.</p>
+<p>The cost is parallelism. Two calls that share the buffer never run at the same time on one device:
+the delegate takes a per-device lock from claiming the buffer to queuing the work, and each call’s
+stream waits for the call before it on a CUDA event and on a small flag in GPU memory. A GPU without
+64-bit stream memory operations has no such flag, so there the delegate holds the lock until the
+call has finished. The buffer never shrinks. Do not call <code class="docutils literal notranslate"><span class="pre">cudaDeviceReset()</span></code> on a device that ran
+an engine with the shared buffer. Recording a call into your own CUDA graph is not supported, with
+or without the shared buffer.</p>
 </section>
 <section id="shared-engines">
 <h3>Shared engines<a class="headerlink" href="#shared-engines" title="Link to this heading">#</a></h3>

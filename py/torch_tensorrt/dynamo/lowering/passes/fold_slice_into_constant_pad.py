@@ -37,15 +37,19 @@ def _reaches_storage_reader(node: torch.fx.Node) -> bool:
     users = list(node.users)
     while users:
         user = users.pop()
-        # A branch of torch.cond (a higher-order op) can address the operand's storage too.
-        if user.target in _STORAGE_READERS or isinstance(
-            user.target, torch._ops.HigherOrderOperator
-        ):
+        if user.target in _STORAGE_READERS:
             return True
         if user.target is operator.getitem or (
             isinstance(user.target, torch._ops.OpOverload) and user.target.is_view
         ):
             users.extend(user.users)
+        elif user.op != "output" and not (
+            isinstance(user.target, torch._ops.OpOverload)
+            and user.target.namespace == "aten"
+        ):
+            # An op from outside aten, such as a custom op or a branch of torch.cond
+            # (a higher-order op), can address the storage too.
+            return True
     return False
 
 
@@ -57,7 +61,7 @@ def fold_slice_into_constant_pad(
     Only when every amount is a plain int, the slice has step 1 and static
     bounds on a dim that the pad pads, keeps at least one element of the pad's
     input, does not remove all of the padding, the pad has no other user, and no
-    as_strided or torch.cond reads the slice. Pads and slices that torch_executed_ops or torch_executed_modules keep
+    as_strided, torch.cond or other op from outside aten reads the slice. Pads and slices that torch_executed_ops or torch_executed_modules keep
     in PyTorch are left as they are.
     """
     excluded = settings.torch_executed_ops

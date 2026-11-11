@@ -5,6 +5,7 @@ from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
+import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -106,6 +107,19 @@ def get_padded_shape_tensors(
     return start_indices_tensor, padded_shape_tensor
 
 
+def _only_in_cats_of_pads(node: torch.fx.Node) -> bool:
+    """Whether only cats read ``node`` and every input of those cats is a constant pad."""
+    return bool(node.users) and all(
+        user.target == torch.ops.aten.cat.default
+        and all(
+            isinstance(arg, torch.fx.Node)
+            and arg.target == torch.ops.aten.constant_pad_nd.default
+            for arg in user.args[0]
+        )
+        for user in node.users
+    )
+
+
 def constant_padNd(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -115,6 +129,25 @@ def constant_padNd(
     pad: Sequence[Union[int, TRTTensor]],
     value: Union[int, float] = 0,
 ) -> TRTTensor:
+    # A pad by zero on every side changes nothing, so its readers read the input. Its
+    # fill-mode slice costs layers, and TensorRT 11.1, 11.3 and 11.4 can fail to build
+    # it when a pointwise op reads it. The slice stays when only cats of pads read the
+    # pad, such as the shifted copies of a cost volume, and its input has other
+    # readers: TensorRT can then write the slice of each pad directly into the output
+    # of the cat, and without this slice it adds a layer that copies the input.
+    node = ctx.current_node
+    keeps_slice = (
+        node is not None
+        and isinstance(node.args[0], torch.fx.Node)
+        and len(node.args[0].users) > 1
+        and _only_in_cats_of_pads(node)
+    )
+    if (
+        all(isinstance(amount, int) and amount == 0 for amount in pad)
+        and not keeps_slice
+    ):
+        return input
+
     rank = len(input.shape)
 
     start_indices_tensor, padded_shape_tensor = get_padded_shape_tensors(

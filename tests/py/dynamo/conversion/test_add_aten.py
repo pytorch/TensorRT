@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import os
+import tempfile
+
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -79,6 +82,25 @@ class TestAddConverter(DispatchTestCase):
             add(),
             inputs,
         )
+
+    def test_add_alpha_names_its_layers_apart(self):
+        class add(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.add(lhs_val, rhs_val, alpha=3)
+
+        inputs = (torch.randn(2, 3).cuda(), torch.randn(2, 3).cuda())
+        # A timing cache of its own: TensorRT logs an error when it reads the shared
+        # default one while another test process writes it.
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as cache_dir:
+            with self.assertNoLogs(
+                "torch_tensorrt [TensorRT Conversion Context]", level="ERROR"
+            ):
+                torch_tensorrt.dynamo.compile(
+                    torch.export.export(add().cuda().eval(), inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    timing_cache_path=os.path.join(cache_dir, "timing_cache.bin"),
+                )
 
     def test_add_int8_buffer(self):
         # TensorRT reads an INT8 constant as quantized data, so a plain int8 weight

@@ -262,6 +262,44 @@ Run this again after changing native code or CMake files. Restart any process th
 delegate, because rebuilding does not update a loaded library. Python changes are visible at once.
 For strict editable mode, add `--config-settings editable_mode=strict`.
 
+### Lean TensorRT runtime
+
+The delegate links `libnvinfer`, the full TensorRT library. That library also holds the engine
+builder, which a program that only runs engines never uses, yet its code is mapped and its static
+initializers run in every process that loads the delegate. TensorRT ships a runtime-only library,
+`libnvinfer_lean`, without that cost. On a Jetson board with TensorRT 11.4, a process using it had
+about 130 MiB less resident memory: about 90 MiB of read-only library code, which processes on the
+same machine can share, and about 40 MiB of private memory.
+
+A delegate linked to the lean library supports only engines compiled with `version_compatible=True`,
+and none that use a TensorRT plugin, such as ScatterElements for an accumulating `index_put`. Some
+engines compiled without `version_compatible=True` load anyway, but others do not, for example any
+engine with a reduction, so do not rely on it. Some layers, such as TopK, cannot be compiled
+with `version_compatible=True` at all. For those programs, use the default build.
+
+The lean build is a CMake option, `TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME`. Building the wheel with
+`pip` does not use it. Build the delegate with CMake instead, against a TensorRT installation that
+includes the lean library:
+
+```bash
+ET_CMAKE=$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')
+cmake -S py/torch-tensorrt-executorch-runtime/native -B build-lean -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DTORCH_TENSORRT_SOURCE_DIR="$PWD" \
+  -DCMAKE_PREFIX_PATH="${ET_CMAKE}" \
+  -DTensorRT_ROOT=/path/to/TensorRT \
+  -DTORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME=ON
+cmake --build build-lean
+```
+
+`TensorRT_ROOT` must hold the lean library of the same TensorRT as its headers and `libnvinfer`.
+Configure stops when the versions in the file names of `libnvinfer` and the lean library differ, or
+when a file name has no full version, as in the pip wheels. It does not check the headers. Use `build-lean/libexecutorch_backend_tensorrt.so` in place of the one in
+this package's `lib` directory. pip does not know about that copy, so reinstalling the package puts
+the full library back. At run time the lean delegate needs `libnvinfer_lean.so.11` from the same
+TensorRT version that compiled the engines, for example from the `tensorrt-lean-cu13-libs` wheel,
+whose directory is on the delegate's search path.
+
 ### Environment variables
 
 - `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION`: import the package without loading the delegate.

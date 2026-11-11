@@ -46,8 +46,10 @@ namespace {
 
 using namespace ::executorch::runtime;
 // executorch::aten also has an ArrayRef, so a second using directive would make it ambiguous.
+using ::executorch::aten::DimOrderType;
 using ::executorch::aten::ScalarType;
 using ::executorch::aten::SizesType;
+using ::executorch::aten::StridesType;
 
 // Spelled out rather than taken from TensorRTBackend.h, so the test pins the key's value.
 constexpr char kSharingKey[] = "use_shared_engines";
@@ -430,8 +432,11 @@ class Handle {
     }
     SizesType in_sizes[2] = {static_cast<SizesType>(batch), kDim};
     SizesType out_sizes[2] = {static_cast<SizesType>(batch), kDim};
-    ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 2, in_sizes, device_in_);
-    ::executorch::aten::TensorImpl out_impl(ScalarType::Float, 2, out_sizes, device_out_);
+    DimOrderType dim_order[2] = {0, 1};
+    StridesType in_strides[2] = {kDim, 1};
+    StridesType out_strides[2] = {kDim, 1};
+    ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 2, in_sizes, device_in_, dim_order, in_strides);
+    ::executorch::aten::TensorImpl out_impl(ScalarType::Float, 2, out_sizes, device_out_, dim_order, out_strides);
     ::executorch::aten::Tensor in_tensor(&in_impl);
     ::executorch::aten::Tensor out_tensor(&out_impl);
     EValue in_value(in_tensor);

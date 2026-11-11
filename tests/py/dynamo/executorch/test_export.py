@@ -1146,6 +1146,43 @@ def test_program_without_inputs_exports_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+def test_save_refuses_a_float64_engine_compiled_without_truncate_double(tmp_path):
+    """TensorRT binds a float64 input as float32, which the PyTorch runtime refuses
+    when called, so the save refuses it too and truncate_double=True still saves."""
+
+    class AffineDouble(torch.nn.Module):
+        def forward(self, value):
+            return value * 2 + 1
+
+    example = (torch.ones(3, dtype=torch.float64, device="cuda"),)
+    exported = torch.export.export(AffineDouble().eval(), example)
+    compiled = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=example, min_block_size=1
+    )
+    with pytest.raises(ValueError, match="engine input 'value' is torch.float64"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "double.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+    truncated = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=example, min_block_size=1, truncate_double=True
+    )
+    output = tmp_path / "truncated.pte"
+    torch_tensorrt.save(
+        truncated,
+        str(output),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+    assert b"TensorRTBackend" in output.read_bytes()
+
+
+@pytest.mark.unit
 def test_lowering_stores_the_staged_engine_bytes_as_named_data(monkeypatch, caplog):
     """The rewrite stages each engine as ``bytes``, and lowering must hand that same
     object to named data. A ``detach()`` or ``state_dict()`` on the way drops it,

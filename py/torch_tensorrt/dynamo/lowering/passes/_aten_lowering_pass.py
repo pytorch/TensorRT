@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
 import logging
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import torch
 import torch.utils._pytree as pytree
@@ -19,6 +20,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     set_defer_graph_cleanup,
     trace_intermediate_node_outputs,
 )
+from torch_tensorrt.dynamo.tools.weight_mapping import raise_if_mapped_files_changed
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
 from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
@@ -36,6 +38,7 @@ from .fold_slice_into_constant_pad import fold_slice_into_constant_pad
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .inline_autocast_regions import inline_autocast_regions
 from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
@@ -47,15 +50,18 @@ from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes  # noqa: F401
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
+from .replace_interleave_stack_with_cat import replace_interleave_stack_with_cat
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .reset_folded_constructors import reset_folded_constructors
 from .rule_based_autocast import rule_based_autocast
+from .split_sequence_first_attention_heads import split_sequence_first_attention_heads
 
 pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
     preserve_attention_output_layout,
+    replace_interleave_stack_with_cat,
 ]
 
 
@@ -91,6 +97,7 @@ post_lowering_pass_list = [
     fold_shared_kv_attention,
     force_causal_efficient_attention,
     decompose_unsupported_attention,
+    split_sequence_first_attention_heads,
     annotate_fp8_sdpa,
     decompose_dynamic_slice_scatter,
     collapse_high_rank_permutes,
@@ -255,28 +262,93 @@ def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
     return len(a_values) == len(b_values) and all(map(same, a_values, b_values))
 
 
+def _get_weights_the_graph_reads(
+    ep: torch.export.ExportedProgram,
+) -> Dict[str, torch.Tensor]:
+    """The program's weights that its graph reads, by name: lifted parameters, buffers and constants whose
+    placeholders have users. ``torch.export`` lifts a parameter the module never uses too.
+    """
+    signature = ep.graph_signature
+    names = {
+        **signature.inputs_to_parameters,
+        **signature.inputs_to_buffers,
+        **signature.inputs_to_lifted_tensor_constants,
+    }
+    weights = {}
+    for node in ep.graph.nodes:
+        if node.op == "placeholder" and node.users and node.name in names:
+            tensor = ep.state_dict.get(
+                names[node.name], ep.constants.get(names[node.name])
+            )
+            if isinstance(tensor, torch.Tensor):
+                weights[names[node.name]] = tensor
+    return weights
+
+
+def _raise_if_weights_on_meta(weights: Dict[str, torch.Tensor]) -> None:
+    """A model built on ``meta`` whose weights were never loaded or mapped exports fine, then has nothing to
+    build an engine from. A weight the graph never reads may stay on ``meta``."""
+    on_meta = [name for name, tensor in weights.items() if tensor.is_meta]
+    if on_meta:
+        raise ValueError(
+            f"{len(on_meta)} weights of the program are on the meta device, so they have no values: "
+            f"{on_meta[:8]}. Load the model's weights, or map them with "
+            "torch_tensorrt.dynamo.tools.map_weights, before exporting it."
+        )
+
+
+def _copy_program(ep: torch.export.ExportedProgram) -> torch.export.ExportedProgram:
+    """Copy the graph of an ExportedProgram, sharing its weights."""
+    gm = copy.deepcopy(ep.graph_module)
+    # The copy renames a node named like a Python builtin, such as input to input_1,
+    # which can move other nodes to new names too, such as max_1 to max_2. Give back
+    # the names, which the graph signature and autocast_excluded_node_names refer to.
+    for old, new in zip(ep.graph.nodes, gm.graph.nodes):
+        new.name = old.name
+    return ep._update(gm, copy.deepcopy(ep.graph_signature))
+
+
 def pre_export_lowering(
     ep: torch.export.ExportedProgram,
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.export.ExportedProgram:
     """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
+    weights = _get_weights_the_graph_reads(ep)
+    if not settings.dryrun:  # a dry run builds no engine: shapes are enough
+        _raise_if_weights_on_meta(weights)
+    raise_if_mapped_files_changed(weights.values())
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
 
     # Only for rule-based autocast to collect the intermediate node outputs
     if settings.enable_autocast:
+        # Autocast inserts casts and changes the dtypes of nodes, so it works on a
+        # copy, and the caller's program stays as it was.
+        ep = _copy_program(ep)
+        # Without a low precision type autocast changes nothing, so the regions keep
+        # theirs. Inlining comes before calibration, so that it records the values of
+        # the inlined ops.
+        if (
+            settings.autocast_model_regions == "reclassify"
+            and settings.autocast_low_precision_type is not None
+        ):
+            inline_autocast_regions(ep.graph_module)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "
                 "operand of torch.cond, integers included, to the low precision type, and "
                 "calibration records values only in the main graph."
             )
-        settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
+        settings.autocast_calibration_trace = trace_intermediate_node_outputs(
             ep.module(),
             settings.autocast_calibration_dataloader,
             [torch.ops.higher_order.wrap_with_autocast],
         )
+    elif settings.replace_interleave_stack_with_cat:
+        # The stack rewrite also works on a copy, so that the caller's program
+        # stays as it was.
+        ep = _copy_program(ep)
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     for sub in iter_cond_subgraphs(gm):

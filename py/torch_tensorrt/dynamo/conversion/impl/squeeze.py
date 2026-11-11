@@ -31,6 +31,9 @@ def squeeze(
     else:
         for d in dim:
             dims.append(d)
+    # PyTorch takes dim 0 or -1 of a 0-d tensor and leaves the tensor as it is.
+    if len(input.shape) == 0:
+        dims = []
 
     new_dims = []
     for dim in dims:
