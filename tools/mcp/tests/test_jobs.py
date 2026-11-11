@@ -4,7 +4,7 @@ import re
 import time
 
 import pytest
-from helpers import fake_core
+from helpers import factory_import_core, fake_core
 from torch_tensorrt_mcp.jobs import JobManager, _output_dir_name
 from torch_tensorrt_mcp.policy import PolicyError
 from torch_tensorrt_mcp.storage import write_json
@@ -72,6 +72,40 @@ def test_success_manifest_report_integrity_and_root_lock(policy):
         (policy.job_path(job_id) / "compilation.json").write_text("{}")
         with pytest.raises(PolicyError, match="manifest"):
             manager.get_report(job_id, "compilation")
+    finally:
+        manager.close()
+
+
+def test_each_worker_imports_generated_candidate_in_a_fresh_process(policy):
+    lowering_pass_candidate_id = "c" * 32
+    generated = policy.output_root / ".lowering_pass_candidates"
+    (generated / f"lowering_pass_candidate_{lowering_pass_candidate_id}.py").write_text(
+        "import os\n"
+        "import uuid\n"
+        "IMPORT_COUNT = globals().get('IMPORT_COUNT', 0) + 1\n"
+        "WORKER_PID = os.getpid()\n"
+        "IMPORT_TOKEN = uuid.uuid4().hex\n"
+    )
+    (policy.workspace_root / "factories.py").write_text(
+        "def model(**kwargs): return None\ndef inputs(**kwargs): return ()\n"
+    )
+    manager = JobManager(policy, executor=factory_import_core)
+    try:
+        reports = []
+        for _ in range(2):
+            candidate_request = request()
+            candidate_request["lowering_pass_candidate_id"] = lowering_pass_candidate_id
+            job_id = manager.submit("compile", candidate_request)["job_id"]
+            assert wait_terminal(manager, job_id)["status"] == "succeeded"
+            reports.append(manager.get_report(job_id, "compilation"))
+
+        assert [report["candidate_import_count"] for report in reports] == [1, 1]
+        assert all(
+            report["candidate_worker_pid"] == report["worker_pid"] for report in reports
+        )
+        assert (
+            reports[0]["candidate_import_token"] != reports[1]["candidate_import_token"]
+        )
     finally:
         manager.close()
 

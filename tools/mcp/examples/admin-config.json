@@ -1,5 +1,5 @@
 {
-    "workspace_root": "YOUR_PATH/TensorRT/tools/mcp/examples/cursor",
+    "workspace_root": "YOUR_PATH/TensorRT/tools/mcp/examples",
     "output_root": "YOUR_PATH/TensorRT/.mcp-runs",
     "models": {
         "add": {
@@ -11,6 +11,11 @@
             "path": "factories_qwen3.5-0.8b.py",
             "function": "qwen35_model",
             "parameters": []
+        },
+        "batched_linear": {
+            "path": "factories_batched_linear.py",
+            "function": "batched_linear_model",
+            "parameters": ["hidden_size"]
         }
     },
     "inputs": {
@@ -23,6 +28,11 @@
             "path": "factories_qwen3.5-0.8b.py",
             "function": "qwen35_inputs",
             "parameters": ["batch_size", "sequence_length"]
+        },
+        "batched_linear": {
+            "path": "factories_batched_linear.py",
+            "function": "batched_linear_inputs",
+            "parameters": ["batch_size", "hidden_size"]
         }
     },
     "max_pending_jobs": 32,
