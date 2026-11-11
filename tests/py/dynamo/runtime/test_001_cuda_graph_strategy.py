@@ -3,12 +3,15 @@
 
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
+
+pytestmark = [pytest.mark.trt_rtx_only]
 
 
 class CudaGraphConvModel(torch.nn.Module):
@@ -21,7 +24,7 @@ class CudaGraphConvModel(torch.nn.Module):
 
 
 def _compile_conv(strategy):
-    """Compile CudaGraphConvModel + apply cuda_graph_strategy post-compile."""
+    """Compile a convolution model and apply the CUDA graph strategy."""
     model = CudaGraphConvModel().eval().cuda()
     inputs = [torch.randn(2, 3, 16, 16).cuda()]
     compiled = torchtrt.compile(
@@ -32,8 +35,11 @@ def _compile_conv(strategy):
         min_block_size=1,
     )
     torch._dynamo.reset()
-    apply_runtime_settings(compiled, RuntimeSettings(cuda_graph_strategy=strategy))
-    return compiled, inputs
+    apply_runtime_settings(
+        compiled,
+        RuntimeSettings(cuda_graph_strategy=strategy, runtime_cache=None),
+    )
+    return compiled, model, inputs
 
 
 class SimpleModel(torch.nn.Module):
@@ -225,12 +231,63 @@ class TestMonolithicCapturability(TestCase):
 class TestCudaGraphStrategyInference(TestCase):
     """End-to-end: compile + infer with each strategy on the build-selected runtime."""
 
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
+        torch.manual_seed(0)
+
     @parameterized.expand([("disabled",), ("whole_graph_capture",)])
-    def test_strategy_inference(self, strategy):
-        compiled, inputs = _compile_conv(strategy)
-        y = compiled(*inputs)
-        self.assertEqual(tuple(y.shape), (2, 8, 16, 16))
-        self.assertTrue(torch.isfinite(y).all().item())
+    def test_strategy_matches_eager(self, strategy):
+        compiled, model, inputs = _compile_conv(strategy)
+        with torch.no_grad():
+            for _ in range(3):
+                x = torch.randn_like(inputs[0])
+                output = compiled(x).clone()
+                self.assertEqual(tuple(output.shape), (2, 8, 16, 16))
+                torch.testing.assert_close(output, model(x), rtol=1e-3, atol=1e-3)
+
+    def test_whole_graph_capture_with_graph_break(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        model = CudaGraphConvModel().eval().cuda()
+        x = torch.randn(2, 3, 16, 16, device="cuda")
+        compiled = torchtrt.compile(
+            model,
+            ir="dynamo",
+            inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.relu.default"},
+        )
+        self.assertTrue(
+            any(
+                isinstance(module, torch.fx.GraphModule)
+                and any(
+                    node.op == "call_function"
+                    and node.target == torch.ops.aten.relu.default
+                    for node in module.graph.nodes
+                )
+                for module in compiled.modules()
+            )
+        )
+        self.assertTrue(
+            any(isinstance(m, TorchTensorRTModule) for m in compiled.modules())
+        )
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(
+                cuda_graph_strategy="whole_graph_capture", runtime_cache=None
+            ),
+        )
+        with torch.no_grad():
+            for _ in range(3):
+                x = torch.randn_like(x)
+                torch.testing.assert_close(
+                    compiled(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                )
 
 
 class TestCudaGraphStrategyInvalidValue(TestCase):
