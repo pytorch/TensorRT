@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=e1e4275e"></script>
+    <script src="../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -624,7 +624,8 @@ keep in FP32 precision to maintain model accuracy while benefiting from reduced 
 Torch-TensorRT Autocast also supports users to specify which nodes to exclude from Autocast, considering some nodes
 might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autocast can cooperate with PyTorch Autocast,
 allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast
-respects the precision of the nodes within PyTorch Autocast context.</p>
+respects the precision of the nodes within PyTorch Autocast context. To let Torch-TensorRT Autocast choose the
+precision inside those contexts too, set <code class="docutils literal notranslate"><span class="pre">autocast_model_regions=&quot;reclassify&quot;</span></code>.</p>
 <p>To enable Torch-TensorRT Autocast, we need to set <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code>.
 On top of that, we can also specify the precision of the nodes to reduce to by <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
 and exclude certain nodes/ops from Torch-TensorRT Autocast by <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code> or <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>.
