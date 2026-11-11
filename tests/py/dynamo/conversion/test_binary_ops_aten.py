@@ -243,6 +243,24 @@ class TestBinaryOpConverters(DispatchTestCase):
         inputs = [torch.randint(1, 10, (5,), dtype=torch.int32)]
         self.run_test(m, inputs)
 
+    @parameterized.expand(
+        [
+            ("int64", torch.int64, 5950571286963681280, 196613),
+            ("int32", torch.int32, 2**30, 7),
+        ]
+    )
+    def test_fmod_large_int(self, _, dtype, big, d):
+        # input * divisor overflows the dtype, the sign of the quotient must still be right
+        class Fmod(nn.Module):
+            def forward(self, x, y):
+                return torch.ops.aten.fmod.Tensor(x, y)
+
+        inputs = [
+            torch.tensor([big, -big, big, -big, 7], dtype=dtype),
+            torch.tensor([d, d, -d, -d, -3], dtype=dtype),
+        ]
+        self.run_test(Fmod(), inputs)
+
     # Dynamic shape test
     @parameterized.expand(
         [
