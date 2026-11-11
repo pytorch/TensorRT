@@ -206,10 +206,12 @@ def _inline_traced_decomp(
                 )
 
             if n.op in ("get_attr", "call_function"):
-                # Keep each replacement's own shape/dtype metadata, while
-                # attributing it to the original module for fallback selection
-                # and diagnostics. The standalone trace has no module context.
-                env[n].meta.update(n.meta)
+                # Copy only val and the module keys. The partitioner keeps connected nodes
+                # without tensor_meta in one engine, which keeps the bool mask with the
+                # attention. Module fallback needs the module keys, which the standalone
+                # trace lacks.
+                if "val" in n.meta:
+                    env[n].meta["val"] = n.meta["val"]
                 for key in ("nn_module_stack", "stack_trace", "source_fn_stack"):
                     if key in node.meta:
                         env[n].meta[key] = node.meta[key]

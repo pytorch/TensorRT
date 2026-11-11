@@ -101,10 +101,7 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
-using ::executorch::aten::DimOrderType;
-using ::executorch::aten::ScalarType;
-using ::executorch::aten::SizesType;
-using ::executorch::aten::StridesType;
+using namespace ::executorch::aten;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
@@ -1807,8 +1804,8 @@ TEST_F(SharedScratchBackendTest, AOneByteScratchInstallForAnEmptyBatchIsAccepted
 // reported by either TensorRT or the delegate.
 //
 // Driven over install_pooled_scratch rather than through execute() because what
-// has to hold is a property of the swap rather than of the call around it, and
-// every pooled call makes exactly this one swap.
+// has to hold is a property of the swap rather than of the call around it. A
+// pooled call makes this swap for the install, and one more around its size query.
 TEST_F(SharedScratchBackendTest, AnInstallKeepsAReferenceOnTheRecorderItSwapsOut) {
   // Declared before the context so it outlives it: the context drops its
   // reference on this recorder as it is destroyed.

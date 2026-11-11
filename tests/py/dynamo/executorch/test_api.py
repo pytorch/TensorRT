@@ -684,9 +684,21 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
     } == _executorch_cuda_rows()
 
 
-@pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_35")])
+@pytest.mark.parametrize(
+    "arch,is_jetpack,python_only,floor,retag",
+    [
+        ("x86_64", False, False, "2_28", None),
+        ("aarch64", False, False, "2_35", "manylinux_2_39_aarch64"),
+        # JetPack and Python-only wheels keep the manylinux_2_28 repair.
+        ("aarch64", True, False, "2_35", None),
+        ("aarch64", False, True, "2_35", None),
+    ],
+    ids=["x86_64", "aarch64", "aarch64_jetpack", "aarch64_python_only"],
+)
 @pytest.mark.unit
-def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
+def test_shared_repair_preserves_the_companion_payload(
+    tmp_path, arch, is_jetpack, python_only, floor, retag
+):
     """Run the shared repair loop with real wheels and check tags, hashes, and routing."""
     from email.parser import BytesParser
 
@@ -725,7 +737,10 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     repair.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    # The step installs a newer wheel package, which must not change the test environment.
+    (bin_dir / "python").write_text(
+        f'#!/bin/sh\n[ "$1 $2" = "-m pip" ] && exit 0\nexec "{sys.executable}" "$@"\n'
+    )
     (bin_dir / "python").chmod(0o755)
     build_env = tmp_path / "build-env"
     build_env.write_text("export CONDA_RUN=''\n")
@@ -738,8 +753,8 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     script = (
         step["run"]
         .replace("${{ inputs.repository }}", str(tmp_path))
-        .replace("${{ inputs.is-jetpack }}", "false")
-        .replace("${{ inputs.python-only }}", "false")
+        .replace("${{ inputs.is-jetpack }}", str(is_jetpack).lower())
+        .replace("${{ inputs.python-only }}", str(python_only).lower())
     )
     result = subprocess.run(
         ["bash", "-c", script],
@@ -758,12 +773,10 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     (tmp_path / "stdout.log").write_text(result.stdout)
     (tmp_path / "stderr.log").write_text(result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
-    if arch == "aarch64":
+    if retag:
         # Built in manylinux_2_39, the SBSA wheel needs that floor rather than 2_28.
         assert not calls.exists()
-        assert (
-            dist / f"{standard_name}-cp312-cp312-manylinux_2_39_aarch64.whl"
-        ).exists()
+        assert (dist / f"{standard_name}-cp312-cp312-{retag}.whl").exists()
     else:
         assert calls.read_text().splitlines() == [str(standard)]
     assert not wheel.exists()

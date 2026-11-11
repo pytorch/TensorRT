@@ -186,6 +186,19 @@ class TestAtan2Converter(DispatchTestCase):
             atan2(), input_specs, output_dtypes=[output_type]
         )
 
+    def test_atan2_of_0d_tensors(self):
+        class atan2(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.atan2.default(
+                    torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 0), 2.0),
+                    torch.ops.aten.add.Tensor(torch.ops.aten.select.int(x, 0, 1), 1.0),
+                )
+
+        self.run_test(
+            atan2(),
+            [torch.randn(4)],
+        )
+
 
 # torch.ops.aten.atan2.out will be decomposed/partitioned into core aten ops which torch_tensorrt supported in run_on_acc and
 # non supported ops in run_on_gpu in dynamo tracer, it works via torch_tensorrt.dynamo.compile workflow

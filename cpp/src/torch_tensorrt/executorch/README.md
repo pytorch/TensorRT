@@ -141,7 +141,8 @@ ones a caller has to keep.
 ### Threads
 
 - **Use one `Module` per thread.** Many threads, each with its own `Module`, work, including
-  threads that share one input buffer or one caller stream. ExecuTorch's `Module` is not thread
+  threads that share one input buffer, and threads that share one caller stream when the engine is built
+  with `max_aux_streams=0` (see [CUDA streams](#cuda-streams)). ExecuTorch's `Module` is not thread
   safe, so never call one `Module` from two threads at once, not even two different methods of it.
   Mostly ExecuTorch then fails with `Error::InvalidState`, but sometimes a thread gets the other
   thread's answer.
@@ -323,13 +324,18 @@ caller that moves its buffers on every call, or alternates two sets, records onc
 shapes in each graph, as one that keeps them does, and both first replay on the 3rd call. Each
 growth of the shared scratch in between adds a call without a graph and then a recording.
 
+CUDA allows a green context handle on one CPU thread at a time. The delegate takes a lock around
+its own calls on the handle, but your threads do not take that lock, so do not use the same green
+context handle from another thread while a call runs on one of its streams.
+
 A graph runs its kernels in the CUDA context it was recorded in, so a green context's calls keep a
 graph of their own, recorded in that green context, and its replays stay on the green context's SMs.
 Kernels that TensorRT runs on auxiliary streams it creates itself stay in the green context with
 TensorRT 11.4 and newer, which creates those streams in the green context of the stream it is given.
 TensorRT 11.1 and older create them outside it, so their kernels can run on any SM. With those
 versions, build the engine with `max_aux_streams=0` to keep all of its kernels on the green
-context's SMs.
+context's SMs. TensorRT 11.2 and 11.3 were not checked. With them, build with `max_aux_streams=0`
+and destroy the engine before its green contexts.
 An engine keeps such a graph for each of up to 4 green contexts, and one for plain streams, so a
 caller that uses both, or up to 4 green contexts in turn, replays on each. These graphs share one
 record of the engine's input shapes, so they replay only while every caller passes the same shapes:

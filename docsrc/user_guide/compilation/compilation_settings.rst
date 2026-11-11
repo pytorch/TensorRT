@@ -192,9 +192,18 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        ``enable_autocast=True``).
    * - ``autocast_excluded_nodes``
      - ``set()``
-     - Set of **regex patterns** matched against node names. Nodes whose names match
-       any pattern are kept in FP32. Example: ``{".*layer_norm.*"}`` keeps all
-       LayerNorm ops in FP32.
+     - Set of **regex patterns** matched against the path of the module that owns each
+       node, such as ``block.norm``. The ops of modules whose paths match any pattern
+       are kept in FP32. Example: ``{".*norm$"}`` keeps the ops of every module whose
+       name ends in ``norm`` in FP32.
+   * - ``autocast_excluded_node_names``
+     - ``set()``
+     - Set of **regex patterns** matched against the names of the nodes in the exported
+       graph, such as ``layer_norm_1``. Nodes whose names match any pattern are kept in
+       FP32. This can pick out an op that shares its module with others. Example:
+       ``{".*layer_norm.*"}`` keeps all LayerNorm ops in FP32. A pattern matches from
+       the start of a name, so ``{"layer_norm_1$"}`` keeps ``layer_norm_1`` and not
+       ``layer_norm_10``.
    * - ``autocast_excluded_ops``
      - ``set()``
      - Set of ``torch.ops`` targets always kept in FP32 regardless of other autocast
@@ -216,6 +225,21 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        absolute max values) for each node. The autocast pass runs the model on this
        data to check ``autocast_max_output_threshold`` and
        ``autocast_max_depth_of_reduction``. Without it, both rules are skipped.
+   * - ``autocast_model_regions``
+     - ``"keep"``
+     - What autocast does with the regions the model itself runs under
+       ``torch.autocast``. ``"keep"`` builds them with the precisions that PyTorch
+       autocast gives them. ``"reclassify"`` removes their autocast, so that the rules,
+       exclusions and calibration above choose the precision of every op in them too.
+       This can be faster, for example when PyTorch autocast keeps a LayerNorm or a
+       softmax in FP32, but it overrides a choice of the model author, so check the
+       accuracy. Regions with ``enabled=False``, which a model uses to keep ops in FP32,
+       keep their autocast. So do regions whose values inlining would change, such as
+       one that writes into a buffer in place, and regions inside a ``torch.no_grad()``
+       block when the model is exported with grad mode on. Exported under
+       ``torch.no_grad()``, the block leaves nothing in the graph.
+       ``autocast_excluded_node_names`` also matches the names that ops have in the
+       regions.
 
 ----
 
@@ -411,6 +435,15 @@ Graph Partitioning
        ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
        graph. Only static input and output heights and widths and floating-point
        inputs are converted. Some sizes run slower than in PyTorch, so measure it.
+   * - ``replace_interleave_stack_with_cat``
+     - ``False``
+     - Write a stack whose only user is a reshape that merges the new axis into a
+       neighbor axis, as in ``torch.stack([even, odd], dim=3).flatten(2, 3)`` for a
+       2x upsample, as a concatenation of unsqueezed inputs. This can make large,
+       image-sized interleaves faster on GPUs where TensorRT fuses the region around
+       them, but slower where TensorRT runs them as separate layers and adds copies,
+       so measure it. Only programs from ``torch.export`` are rewritten, not
+       ``torch.compile`` graphs.
 
 ----
 
@@ -510,13 +543,14 @@ rebuilt from scratch:
 ``refit_identical_engine_weights``,
 ``immutable_weights``, ``enable_weight_streaming``, ``tiling_optimization_level``,
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
-``autocast_excluded_nodes``, ``autocast_excluded_ops``,
-``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
+``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
+``autocast_excluded_ops``, ``autocast_max_output_threshold``,
+``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``.
+``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)

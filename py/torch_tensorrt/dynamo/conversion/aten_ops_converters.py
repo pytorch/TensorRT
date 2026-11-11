@@ -329,13 +329,14 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
             input_dtypes.append(inp.dtype)
         else:
             # For nodes, get metadata
-            meta = getattr(inp, "meta", {}).get("tensor_meta")
-            if meta is None:
+            meta = getattr(inp, "meta", {})
+            meta_data = meta.get("val", meta.get("tensor_meta"))
+            if meta_data is None:
                 # Can't validate without metadata, allow it
                 return True
-            shape = tuple(meta.shape)
+            shape = tuple(meta_data.shape)
             input_metas.append(shape)
-            input_dtypes.append(meta.dtype)
+            input_dtypes.append(meta_data.dtype)
 
     # Dropping an empty operand also drops it from dtype promotion, so aten_ops_cat works
     # the promoted dtype out over every operand and passes it through. TensorRT has no
@@ -1484,13 +1485,14 @@ def gather_validator(
     """Keep cases the TensorRT gather cannot serve on the PyTorch path.
 
     Element gather needs the index and the data to have the same rank, so a scalar index
-    fails the engine build. An empty index gives the engine a zero size output binding,
-    which TensorRT refuses to enqueue, and every other output of that engine comes back
-    unwritten. A length that comes from the data, such as the output of nonzero, can be
-    zero at run time, so only an index known to be non-empty converts. An engine built for
-    a float64 input expects float32 and rejects the caller's tensor at run time unless
-    truncate_double is set, and a uint8 output fails the engine build outright. All of
-    these run correctly in PyTorch.
+    for data with dims fails the engine build. A 0-d input is reshaped to 1-D for the
+    gather, so it also takes a scalar or 1-D index. An empty index gives the engine a
+    zero size output binding, which TensorRT refuses to enqueue, and every other output
+    of that engine comes back unwritten. A length that comes from the data, such as the
+    output of nonzero, can be zero at run time, so only an index known to be non-empty
+    converts. An engine built for a float64 input expects float32 and rejects the
+    caller's tensor at run time unless truncate_double is set, and a uint8 output fails
+    the engine build outright. All of these run correctly in PyTorch.
     """
 
     def meta_of(arg: Argument) -> Any:
@@ -1509,7 +1511,12 @@ def gather_validator(
         return False
     if data_meta is None:
         return True
-    if index_meta is not None and len(index_meta.shape) != len(data_meta.shape):
+    # A 0-d input also takes a 1-D index, which repeats its one element.
+    if (
+        index_meta is not None
+        and len(index_meta.shape) != len(data_meta.shape)
+        and not (len(data_meta.shape) == 0 and len(index_meta.shape) == 1)
+    ):
         _LOGGER.debug(
             "gather needs the index and the data to have the same rank, falling back"
         )
@@ -1942,11 +1949,27 @@ def aten_ops_index_put_accumulate(
     )
 
 
+def index_put_0d_mask_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """PyTorch ignores a 0-d mask next to other indices. The converter does not, so
+    leave that case to PyTorch."""
+    indices = [index for index in node.args[1] if index is not None]
+    if len(indices) < 2:
+        return True
+    for index in indices:
+        val = getattr(index, "meta", {}).get("val")
+        if val is not None and val.dtype == torch.bool and val.dim() == 0:
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=lambda node, settings: (
         index_dtype_validator(node, settings)
         and index_nonbool_validator(node, settings)
+        and index_put_0d_mask_validator(node, settings)
         and not args_bounds_check(node.args, 3, False)
     ),
     supports_dynamic_shapes=True,
@@ -3260,15 +3283,18 @@ def aten_ops_add(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
             SourceIR.ATEN,
-            name,
+            name + "_alpha",
             other,
             alpha,
         )
@@ -3278,7 +3304,7 @@ def aten_ops_add(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -3350,10 +3376,13 @@ def aten_ops_sub(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
@@ -3368,7 +3397,7 @@ def aten_ops_sub(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -3607,8 +3636,8 @@ def bitwise_type_validator(
     if node.target in tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if lhs_meta is None or rhs_meta is None:
             return False
 
@@ -3630,7 +3659,7 @@ def bitwise_type_validator(
     elif node.target in scalar_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
         if lhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, rhs_val):
@@ -3640,7 +3669,7 @@ def bitwise_type_validator(
     elif node.target in scalar_tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if rhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, lhs_val):
@@ -3751,7 +3780,7 @@ def bitwise_not_type_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     val = node.args[0]
-    val_meta = val.meta.get("tensor_meta")
+    val_meta = val.meta.get("val", val.meta.get("tensor_meta"))
 
     if val_meta is None:
         return False
@@ -4330,11 +4359,16 @@ def aten_ops_adaptive_max_poolNd(
 
 def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     k = node.args[1]
+    # For a 0-d input and k=0, PyTorch gives 0-d results, which a TopK layer cannot.
+    value = getattr(node.args[0], "meta", {}).get("val")
+    if k == 0 and isinstance(value, torch.Tensor) and value.dim() == 0:
+        return False
     return topk_sort_validator(k)
 
 
 def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    meta_data = node.args[0].meta.get("tensor_meta")
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
     if meta_data is None:
         return False
     shape = meta_data.shape
@@ -5241,25 +5275,19 @@ def aten_ops_flip(
 def zero_diag_size_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    meta = node.args[0].meta.get("tensor_meta")
-    if meta:
-        input_shape = meta.shape
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
+    if meta_data is not None:
+        input_shape = meta_data.shape
     else:
         _LOGGER.warning(
             "Meta information of input is missing. Unable to validate diagonal size, falling back to PyTorch operation."
         )
         return False
 
-    if len(node.args) == 1:
-        offset, dim1, dim2 = 0, 0, 1
-    elif len(node.args) == 2:
-        offset, dim1, dim2 = node.args[1], 0, 1
-    else:
-        offset, dim1, dim2 = (
-            node.args[1],
-            node.args[2],
-            node.args[3],
-        )
+    offset = args_bounds_check(node.args, 1, replacement=0)
+    dim1 = args_bounds_check(node.args, 2, replacement=0)
+    dim2 = args_bounds_check(node.args, 3, replacement=1)
     num_dims = len(input_shape)
 
     # Adjust dimensions to be positive and canonicalize

@@ -587,7 +587,8 @@ def trunc(
             force_layer=True,
         )
 
-    dividend = get_trt_tensor(ctx, 1, f"{name}_dividend")
+    # Dividing by a 0-d 1 keeps a 0-d input 0-d.
+    dividend = get_trt_tensor(ctx, 1, f"{name}_dividend", min_rank=0)
     return impl.elementwise.trunc_div(
         ctx, target, source_ir, f"{name}_trunc", input_val, dividend
     )

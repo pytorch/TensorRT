@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <mutex>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
@@ -30,7 +29,7 @@ constexpr int kMaxCaptureAttempts = 3;
 constexpr size_t kMaxGreenGraphs = 4;
 
 // CUDA allows a green context handle on one CPU thread at a time, and engines that share a green context can run
-// on several threads.
+// on several threads. Never freed, as cuda_graph_capture_mutex is, since handles can outlive other static objects.
 std::mutex& green_context_mutex() {
   static auto* mutex = new std::mutex();
   return *mutex;
@@ -116,15 +115,6 @@ void fall_back(const char* reason, cudaError_t error) {
   cudaGetLastError();
 }
 
-// A failed release must not leave its error for the caller's next CUDA call, which may be another context's
-// execute().
-void released(cudaError_t error) {
-  if (error != cudaSuccess) {
-    ET_LOG(Error, "TensorRTBackend: releasing a CUDA graph failed (%s)", cudaGetErrorString(error));
-    cudaGetLastError();
-  }
-}
-
 // A stream-ordered free that fails still leaves a buffer this call is done with.
 void retire(void* buffer, cudaStream_t stream) {
   const auto error = cudaFreeAsync(buffer, stream);
@@ -163,7 +153,13 @@ ExecutionGraph::~ExecutionGraph() {
 
 void ExecutionGraph::drop_graph() {
   if (graph_exec_ != nullptr) {
-    released(cudaGraphExecDestroy(graph_exec_));
+    // A failed release must not leave its error for the caller's next CUDA call, which may be another context's
+    // execute().
+    const cudaError_t error = cudaGraphExecDestroy(graph_exec_);
+    if (error != cudaSuccess) {
+      ET_LOG(Error, "TensorRTBackend: releasing a CUDA graph failed (%s)", cudaGetErrorString(error));
+      cudaGetLastError();
+    }
     graph_exec_ = nullptr;
   }
 }

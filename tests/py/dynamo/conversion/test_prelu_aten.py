@@ -18,6 +18,16 @@ class TestPReLUConverter(DispatchTestCase):
         inputs = [torch.randn(1, 10), torch.randn(1, 1)]
         self.run_test(TestModule(), inputs)
 
+    def test_prelu_of_0d_tensor(self):
+        # x[0] * 2.0 is 0-d, and the result takes the shape of the slope, as in PyTorch.
+        class TestModule(nn.Module):
+            def forward(self, x, weight):
+                y = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 0), 2.0)
+                return torch.ops.aten._prelu_kernel.default(y, weight)
+
+        inputs = [torch.randn(4), torch.tensor([0.25])]
+        self.run_test(TestModule(), inputs)
+
     def test_prelu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x, weight):

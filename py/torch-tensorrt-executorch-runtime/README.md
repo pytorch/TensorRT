@@ -271,10 +271,10 @@ initializers run in every process that loads the delegate. TensorRT ships a runt
 about 130 MiB less resident memory: about 90 MiB of read-only library code, which processes on the
 same machine can share, and about 40 MiB of private memory.
 
-A delegate linked to the lean library loads only engines compiled with `version_compatible=True`,
+A delegate linked to the lean library supports only engines compiled with `version_compatible=True`,
 and none that use a TensorRT plugin, such as ScatterElements for an accumulating `index_put`. Some
-engines compiled without `version_compatible=True` happen to load, but others do not, for example
-any engine with a reduction, so do not rely on it. Some layers, such as TopK, cannot be compiled
+engines compiled without `version_compatible=True` load anyway, but others do not, for example any
+engine with a reduction, so do not rely on it. Some layers, such as TopK, cannot be compiled
 with `version_compatible=True` at all. For those programs, use the default build.
 
 The lean build is a CMake option, `TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME`. Building the wheel with
@@ -292,10 +292,13 @@ cmake -S py/torch-tensorrt-executorch-runtime/native -B build-lean -G Ninja \
 cmake --build build-lean
 ```
 
-Use `build-lean/libexecutorch_backend_tensorrt.so` in place of the one in this package's `lib`
-directory. At run time it needs `libnvinfer_lean.so.11` from the same TensorRT version that compiled
-the engines, for example from the `tensorrt-lean-cu13-libs` wheel, whose directory is on the
-delegate's search path.
+`TensorRT_ROOT` must hold the lean library of the same TensorRT as its headers and `libnvinfer`.
+Configure stops when the versions in the file names of `libnvinfer` and the lean library differ, or
+when a file name has no full version, as in the pip wheels. It does not check the headers. Use `build-lean/libexecutorch_backend_tensorrt.so` in place of the one in
+this package's `lib` directory. pip does not know about that copy, so reinstalling the package puts
+the full library back. At run time the lean delegate needs `libnvinfer_lean.so.11` from the same
+TensorRT version that compiled the engines, for example from the `tensorrt-lean-cu13-libs` wheel,
+whose directory is on the delegate's search path.
 
 ### Environment variables
 
