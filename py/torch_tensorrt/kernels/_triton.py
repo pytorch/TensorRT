@@ -251,7 +251,7 @@ def make_dtype_capability_validator(
     *,
     artifact: Optional[CompiledTritonArtifact] = None,
 ) -> Callable[..., bool]:
-    """Check tensor dtypes before enforcing Triton's compiled device target."""
+    """Check tensor dtypes and shared memory before Triton's compiled device target."""
     return _common.make_dtype_capability_validator(
         op_name,
         "Triton",
@@ -263,6 +263,7 @@ def make_dtype_capability_validator(
             if artifact is None
             else lambda device: validate_target(artifact, device)
         ),
+        shared_mem=0 if artifact is None else artifact.shared_mem,
     )
 
 

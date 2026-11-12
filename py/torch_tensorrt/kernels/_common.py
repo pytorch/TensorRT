@@ -76,6 +76,48 @@ def check_aot_dtypes(
     return checked
 
 
+# TensorRT launches AOT plugin kernels without CUDA's opt-in, so a block gets
+# at most 48 KiB of shared memory, static arrays and dynamic memory together. A
+# larger launch fails when the engine runs, and TensorRT reports no reason.
+# TODO(upstream-trt): https://github.com/pytorch/TensorRT/issues/5010. When a
+# TensorRT release lifts the limit, skip the check on that release and newer
+# instead of deleting it, because older releases keep the limit.
+AOT_MAX_DYNAMIC_SHARED_MEM = 48 * 1024
+AOT_SHARED_MEM_ISSUE = "https://github.com/pytorch/TensorRT/issues/5010"
+
+
+def require_eager_fn_above_shared_mem_limit(
+    op_name: str,
+    frontend: str,
+    shared_mem: int,
+    eager_fn: Optional[Callable[..., Any]],
+) -> None:
+    """Fail registration when neither TensorRT nor PyTorch could run the op."""
+    if shared_mem <= AOT_MAX_DYNAMIC_SHARED_MEM:
+        return
+    if eager_fn is not None:
+        _LOGGER.warning(
+            "%s '%s' needs %d bytes of shared memory, but TensorRT launches "
+            "plugin kernels with at most %d bytes (%s), so the op is never lowered "
+            "to TensorRT and runs through its eager_fn.",
+            frontend,
+            op_name,
+            shared_mem,
+            AOT_MAX_DYNAMIC_SHARED_MEM,
+            AOT_SHARED_MEM_ISSUE,
+        )
+        return
+    raise RuntimeError(
+        f"{frontend} '{op_name}' needs {shared_mem} bytes of shared "
+        "memory, static arrays included, but TensorRT launches plugin kernels "
+        f"with at most {AOT_MAX_DYNAMIC_SHARED_MEM} bytes "
+        f"({AOT_SHARED_MEM_ISSUE}), and "
+        "without an eager_fn the op has no PyTorch fallback. Use a kernel "
+        "configuration that needs less, for example fewer pipeline stages or "
+        "smaller tiles, or pass an eager_fn."
+    )
+
+
 def make_dtype_capability_validator(
     op_name: str,
     frontend: str,
@@ -84,8 +126,12 @@ def make_dtype_capability_validator(
     user_validator: Optional[Callable[..., bool]] = None,
     *,
     target_validator: Optional[Callable[[Any], None]] = None,
+    shared_mem: int = 0,
 ) -> Callable[..., bool]:
-    """Decline conversion unless every tensor matches the compiled kernel ABI."""
+    """Decline conversion unless every tensor matches the compiled kernel ABI.
+
+    Also declines a kernel whose ``shared_mem`` is over TensorRT's limit.
+    """
 
     def _value(node: Any) -> Any:
         meta = getattr(node, "meta", None)
@@ -111,6 +157,17 @@ def make_dtype_capability_validator(
             return _reject(
                 "its PTX targets one GPU architecture and cannot run in a "
                 "hardware-compatible engine."
+            )
+        if shared_mem > AOT_MAX_DYNAMIC_SHARED_MEM:
+            return _reject(
+                "its kernel needs %d bytes of shared memory, static arrays "
+                "included, but TensorRT "
+                "launches plugin kernels with at most %d bytes (%s). Use a kernel "
+                "configuration that needs less, for example fewer pipeline stages "
+                "or smaller tiles.",
+                shared_mem,
+                AOT_MAX_DYNAMIC_SHARED_MEM,
+                AOT_SHARED_MEM_ISSUE,
             )
         if user_validator is not None and not user_validator(node, settings):
             return False
@@ -562,8 +619,12 @@ def parse_reqntid(ptx: str) -> Optional[Tuple[int, int, int]]:
     return _ptx_int(x), _ptx_int(y), _ptx_int(z)
 
 
-def load_ptx(ptx: str, kernel_name: str) -> Any:
-    """Ask the driver to JIT the module and resolve its expected entry."""
+def load_ptx(ptx: str, kernel_name: str) -> Tuple[Any, int]:
+    """JIT the module with the driver and resolve its expected entry.
+
+    Returns the driver's result and the entry's static shared memory in bytes,
+    which is 0 when the result is an error.
+    """
     try:
         from cuda.bindings import driver as cuda
     except ImportError:  # cuda-python < 12.8
@@ -576,9 +637,14 @@ def load_ptx(ptx: str, kernel_name: str) -> Any:
 
     err, module = cuda.cuModuleLoadData(ptx.encode("utf-8"))
     if err != cuda.CUresult.CUDA_SUCCESS:
-        return err
+        return err, 0
     try:
-        err, _function = cuda.cuModuleGetFunction(module, kernel_name.encode())
+        err, function = cuda.cuModuleGetFunction(module, kernel_name.encode())
+        if err != cuda.CUresult.CUDA_SUCCESS:
+            return err, 0
+        err, static_shared_mem = cuda.cuFuncGetAttribute(
+            cuda.CUfunction_attribute.CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, function
+        )
+        return err, static_shared_mem
     finally:
         cuda.cuModuleUnload(module)
-    return err

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import keyword
 import logging
@@ -25,6 +26,7 @@ import torch
 
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins import custom_op
+from torch_tensorrt.kernels import _common
 from torch_tensorrt.kernels._qdp import (
     _patch_trt_shape_expr_reflected_ops,
     _QDPRegistrationState,
@@ -49,6 +51,7 @@ _GENERATED_PARAMETER_NAMES = frozenset(
         "_generic_plugin_desc",
         "_generic_plugin_impl",
         "_user_aot_fn",
+        "_check_shared_mem",
         "_kernel_name",
         "_ptx_str",
         "_trtp",
@@ -386,6 +389,41 @@ def _register_pytorch_op(
     return lib
 
 
+@functools.lru_cache(maxsize=32)
+def _static_shared_mem(ptx: str, kernel_name: str) -> int:
+    """The entry's static shared memory, or 0 when the driver cannot report it."""
+    try:
+        error, static_shared_mem = _common.load_ptx(ptx, kernel_name)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        _LOGGER.debug("Could not read static shared memory of %s: %s", kernel_name, exc)
+        return 0
+    return int(static_shared_mem) if int(error) == 0 else 0
+
+
+def _check_aot_shared_mem(
+    kernel_name: str, ptx: str, launch_params: Any, tactic: int
+) -> None:
+    """Fail the engine build for a launch that would fail on every run."""
+    shared_mem = _common.constant_int(getattr(launch_params, "shared_mem", None))
+    if not shared_mem:
+        return
+    static_shared_mem = _static_shared_mem(ptx, kernel_name)
+    if shared_mem + static_shared_mem <= _common.AOT_MAX_DYNAMIC_SHARED_MEM:
+        return
+    message = (
+        f"kernel '{kernel_name}' asks for {shared_mem} bytes of dynamic shared "
+        f"memory on top of {static_shared_mem} bytes of static shared memory, but "
+        "TensorRT launches plugin kernels with at most "
+        f"{_common.AOT_MAX_DYNAMIC_SHARED_MEM} bytes in total "
+        f"({_common.AOT_SHARED_MEM_ISSUE})."
+    )
+    if tactic:
+        # TensorRT can drop a custom tactic whose launch fails and build with another.
+        _LOGGER.warning("%s TensorRT cannot use tactic %d.", message, tactic)
+        return
+    raise ValueError(message)
+
+
 def _make_aot_impl(
     schema_info: OpSchemaInfo,
     ptx: str,
@@ -407,6 +445,7 @@ def _aot_impl({sig}):
         launch_params, extra_args = result
     else:
         launch_params, extra_args = result, None
+    _check_shared_mem(_kernel_name, _ptx_str, launch_params, tactic)
     if extra_args is None:
         extra_args = _trtp.SymIntExprs(0)
     return (_kernel_name, _ptx_str, launch_params, extra_args)
@@ -414,6 +453,7 @@ def _aot_impl({sig}):
 
     fn_globals = {
         "_user_aot_fn": user_aot_fn,
+        "_check_shared_mem": _check_aot_shared_mem,
         "_kernel_name": kernel_name,
         "_ptx_str": ptx,
         "_trtp": trtp,

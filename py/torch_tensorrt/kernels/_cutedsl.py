@@ -70,6 +70,7 @@ class CompiledCuteDSLArtifact(NamedTuple):
     block: Tuple[int, int, int]
     shared_mem: int
     arch: Tuple[int, int]
+    static_shared_mem: int = 0
 
 
 class _CuteAPI(NamedTuple):
@@ -218,7 +219,7 @@ def make_capability_validator(
     artifact: CompiledCuteDSLArtifact,
     user_validator: Optional[Callable[..., bool]] = None,
 ) -> Callable[..., bool]:
-    """Check dtypes and the compiled target; declines hardware-compatible engines."""
+    """Check dtypes, shared memory and target; declines hardware-compatible engines."""
     return _common.make_dtype_capability_validator(
         op_name,
         "CuTe DSL",
@@ -226,6 +227,7 @@ def make_capability_validator(
         [param.dtype for param in layout.outputs],
         user_validator,
         target_validator=lambda device: validate_target(artifact, device),
+        shared_mem=artifact.shared_mem + artifact.static_shared_mem,
     )
 
 
@@ -512,7 +514,7 @@ def compile_to_ptx(
 
             ptx = _compile_within_driver_isa(compile)
     name = _validate_ptx(ptx, layout, block, shared_mem)
-    error = _common.load_ptx(ptx, name)
+    error, static_shared_mem = _common.load_ptx(ptx, name)
     if int(error) != 0:
         raise RuntimeError(
             f"The CUDA driver could not load CuTe DSL PTX for '{name}': {error}. "
@@ -521,7 +523,9 @@ def compile_to_ptx(
         )
     if fresh:
         _write_cache(cache, ptx)
-    return CompiledCuteDSLArtifact(ptx.encode(), name, block, shared_mem, arch)
+    return CompiledCuteDSLArtifact(
+        ptx.encode(), name, block, shared_mem, arch, static_shared_mem
+    )
 
 
 def validate_target(artifact: CompiledCuteDSLArtifact, device: Any = None) -> None:
