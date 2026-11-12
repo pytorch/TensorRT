@@ -794,8 +794,9 @@ jobs:
   upload:
     needs: [build, prepare-upload, sign-arm64]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
-    if: ${{ always() && !cancelled() && needs.build.result == 'success' && needs.prepare-upload.result == 'success' && (needs.sign-arm64.result == 'success' || needs.sign-arm64.result == 'skipped') && inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    # Release wheels are published to the PyTorch test index.
+    # ZIP artifacts use a different artifact name and are not wheel uploads.
+    if: ${{ always() && !cancelled() && needs.build.result == 'success' && needs.prepare-upload.result == 'success' && (needs.sign-arm64.result == 'success' || needs.sign-arm64.result == 'skipped') && inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
