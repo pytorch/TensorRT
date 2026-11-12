@@ -68,6 +68,11 @@ python run_vla.py --mode reference --clip_id <clip uuid> --save ref.pt    # PyTo
 python run_vla.py --mode run --clip_id <clip uuid> --ref ref.pt           # TensorRT rollout + comparison
 ```
 
+By default `--mode run` loads one engine group at a time, so peak GPU memory stays low; the engines are then
+reloaded on every call. Pass `--resident` to keep them loaded (~14 GB for FP8, ~28 GB for FP16). The script then
+runs a warmup call and a timed call, and only the timed `[trt:run]` line gives steady-state latency. Engine load
+time is reported apart from the stage timings.
+
 `--model` can also be a ModelOpt FP8 checkpoint directory (one with a `modelopt_state.pth`; needs `nvidia-modelopt`).
 The FP8 path needs two workarounds for TensorRT problems before TensorRT 11.6, described in `maybe_separate_sibling_input_scales` and `maybe_disable_attention_output_quantizers`.
 
@@ -79,6 +84,7 @@ Key arguments of `run_vla.py`:
 - `--clip_id`: Dataset clip to run on (or `--parquet` with `--clip_index`).
 - `--engine_dir`: Where the engines are saved and loaded (`vla_engines` by default).
 - `--llm_segments`: Number of engines the text decoder is split into (2 by default) to keep build memory down.
+- `--resident`: Keep all engines loaded and time a second, steady-state call (needs more GPU memory).
 - `--save` / `--ref`: Write the reference results / compare the TensorRT rollout against them.
 
 #### Key Arguments
@@ -160,7 +166,7 @@ This codebase can be extended to
 
 - Torch-TensorRT 2.8.0
 - Transformers v4.52.3
-- For the VLA model (run_vla.py), developed with TensorRT 11.4, Transformers 5.20 and a PyTorch nightly:
+- For the VLA model (run_vla.py), developed with TensorRT 11.4, Transformers 4.57.1 and PyTorch 2.15:
   - The `alpamayo1_5` package (model and dataset loading) and access to its dataset
   - `nvidia-modelopt` for FP8 checkpoints
   - A Transformers version with Qwen3-VL support
@@ -169,3 +175,54 @@ This codebase can be extended to
   - **Flash Attention**: For models using flash attention operations (e.g., Eagle2-2B), install one of the following:
     - **Fast installation (recommended)**: `pip install flash-attn==2.8.1` (pre-built wheel, should work)
     - **Source build (slow)**: `pip install flash-attn --no-build-isolation -v` (fallback if pre-built wheels fail)
+
+## Steps for Alpamayo 1.5 FP8 Reproduction
+
+Alpamayo PTQ and TensorRT compilation need different PyTorch versions, so the steps below install them into
+one venv in a specific order: the PTQ step runs first with the recipe's PyTorch, then PyTorch is upgraded for
+Torch-TensorRT.
+
+Measured with the FP8 checkpoint on an RTX 5090 (one clip, 6 trajectory samples, 17 generated tokens): eager PyTorch
+takes about 5.3 s and TensorRT about 1.2 s (`--resident`, steady state), roughly 4.5x faster.
+
+The Alpamayo 1.5 model and the PhysicalAI-AV dataset are gated on Hugging Face: request access to both and run
+`hf auth login` first (see the [Alpamayo Recipes README](https://github.com/NVlabs/alpamayo-recipes)).
+
+### Run the PTQ Script from Alpamayo Recipes
+
+```bash
+cd ~
+# Setup Alpamayo venv with Python 3.12
+uv venv --python 3.12 venv_am15
+source venv_am15/bin/activate
+
+# Clone Alpamayo Recipes and perform PTQ
+git clone https://github.com/NVlabs/alpamayo-recipes.git
+cd ~/alpamayo-recipes/recipes/alpamayo1_5_quant
+uv sync --active --no-install-package flash-attn  # all dependencies except flash-attn
+uv sync --active  # builds flash-attn against the installed torch; set MAX_JOBS=N if the build runs out of memory
+# writes ./alpamayo1.5_fp8_calib100
+python3 quantize.py --quant_format=fp8 --num_of_calib_clips=100 --save_model_dir=.
+```
+
+### Export and Run the TensorRT Engines
+
+```bash
+# From the root of this Torch-TensorRT checkout, with venv_am15 still active
+# Torch-TensorRT needs a newer torch than the recipe: install 2.15 first so the editable install builds against it...
+uv pip install torch==2.15 torchvision --upgrade
+PYTHON_ONLY=1 uv pip install -e . --no-build-isolation
+# ...and again in case the install pulled in a later torch (2.16 drops TorchScript, which breaks the import)
+uv pip install torch==2.15 torchvision --upgrade
+cd tools/llm
+
+FP8=~/alpamayo-recipes/recipes/alpamayo1_5_quant/alpamayo1.5_fp8_calib100
+PARQUET=~/alpamayo-recipes/data/1005_7cam_gold_eval_metadb_public.parquet
+
+# Build the engines (one process per engine)
+python3 run_vla.py --mode build --component all --model $FP8 --parquet $PARQUET
+# Eager PyTorch reference: latency, trajectories and first-token logits
+python3 run_vla.py --mode reference --model $FP8 --parquet $PARQUET --save ref.pt
+# TensorRT rollout compared against the reference (--resident: keep the engines loaded, report steady-state latency)
+python3 run_vla.py --mode run --resident --model $FP8 --parquet $PARQUET --ref ref.pt
+```

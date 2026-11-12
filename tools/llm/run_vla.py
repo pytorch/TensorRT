@@ -768,6 +768,7 @@ class TrtAlpamayo:
             args.resident,
             {},
         )
+        self.load_ms = 0.0  # engine deserialization time, reported apart from compute
         self.llm_names = [
             p.stem
             for p in sorted(
@@ -808,7 +809,9 @@ class TrtAlpamayo:
             self._engines[name] = torch.export.load(
                 str(self.engine_dir / f"{name}.ep")
             ).module()
-            print(f"[run] loaded {name} in {time.perf_counter() - t:.1f}s")
+            dt = time.perf_counter() - t
+            self.load_ms += dt * 1e3
+            print(f"[run] loaded {name} in {dt:.1f}s")
         return self._engines[name]
 
     def release(self, *names):
@@ -965,11 +968,16 @@ class TrtAlpamayo:
     def __call__(self, data, tokenized):
         from alpamayo1_5.models.token_utils import replace_padding_after_eos
 
+        # Stage timings exclude engine loads (lazy unless --resident); those are summed under "load".
         timings = {}
+        self.load_ms = 0.0
+        loaded = 0.0
 
         def tick(name, t0):
+            nonlocal loaded
             torch.cuda.synchronize()
-            timings[name] = (time.perf_counter() - t0) * 1e3
+            timings[name] = (time.perf_counter() - t0) * 1e3 - (self.load_ms - loaded)
+            loaded = self.load_ms
             return time.perf_counter()
 
         t = time.perf_counter()
@@ -987,6 +995,8 @@ class TrtAlpamayo:
         seqs = replace_padding_after_eos(seqs, self.eos_id, self.pad_id)
         pred_xyz = self.expert_rollout(seqs, caches, rope_deltas, data)
         tick("expert", t)
+        if self.load_ms:
+            timings["engine load"] = self.load_ms
         return pred_xyz, seqs, timings, seqs.shape[1] - input_ids.shape[1]
 
 
@@ -999,7 +1009,8 @@ def run_trt(args):
     data, tokenized = load_inputs(model, args)
     pipe = TrtAlpamayo(model, args)
 
-    # 1st call includes lazy engine/context setup
+    # The 1st call includes lazy engine loads and context setup. Without --resident the engines are
+    # reloaded every call, so only --resident gives a steady-state ("run") timing.
     for i in range(2 if args.resident else 1):
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
