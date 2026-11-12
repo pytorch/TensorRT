@@ -263,6 +263,7 @@ def make_dtype_capability_validator(
             if artifact is None
             else lambda device: validate_target(artifact, device)
         ),
+        shared_mem=0 if artifact is None else artifact.shared_mem,
     )
 
 

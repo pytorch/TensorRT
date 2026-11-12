@@ -218,7 +218,7 @@ def make_capability_validator(
     artifact: CompiledCuteDSLArtifact,
     user_validator: Optional[Callable[..., bool]] = None,
 ) -> Callable[..., bool]:
-    """Check dtypes and the compiled target; declines hardware-compatible engines."""
+    """Check dtypes, shared memory and target; declines hardware-compatible engines."""
     return _common.make_dtype_capability_validator(
         op_name,
         "CuTe DSL",
@@ -226,6 +226,7 @@ def make_capability_validator(
         [param.dtype for param in layout.outputs],
         user_validator,
         target_validator=lambda device: validate_target(artifact, device),
+        shared_mem=artifact.shared_mem,
     )
 
 

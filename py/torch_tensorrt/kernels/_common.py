@@ -76,6 +76,35 @@ def check_aot_dtypes(
     return checked
 
 
+# TensorRT launches AOT plugin kernels without opting them in to more than
+# CUDA's default 48 KiB of dynamic shared memory, so a larger launch fails when
+# the engine runs, and TensorRT reports no reason.
+# TODO(upstream-trt): https://github.com/pytorch/TensorRT/issues/5010. When a
+# TensorRT release lifts the limit, skip the check on that release and newer
+# instead of deleting it, because older releases keep the limit.
+AOT_MAX_DYNAMIC_SHARED_MEM = 48 * 1024
+_AOT_SHARED_MEM_ISSUE = "https://github.com/pytorch/TensorRT/issues/5010"
+
+
+def require_eager_fn_above_shared_mem_limit(
+    op_name: str,
+    frontend: str,
+    shared_mem: int,
+    eager_fn: Optional[Callable[..., Any]],
+    error: type = ValueError,
+) -> None:
+    """Fail registration when neither TensorRT nor PyTorch could run the op."""
+    if shared_mem > AOT_MAX_DYNAMIC_SHARED_MEM and eager_fn is None:
+        raise error(
+            f"{frontend} '{op_name}' needs {shared_mem} bytes of dynamic shared "
+            f"memory, but TensorRT launches plugin kernels with at most "
+            f"{AOT_MAX_DYNAMIC_SHARED_MEM} bytes ({_AOT_SHARED_MEM_ISSUE}), and "
+            "without an eager_fn the op has no PyTorch fallback. Use a kernel "
+            "configuration that needs less, for example fewer pipeline stages or "
+            "smaller tiles, or pass an eager_fn."
+        )
+
+
 def make_dtype_capability_validator(
     op_name: str,
     frontend: str,
@@ -84,6 +113,7 @@ def make_dtype_capability_validator(
     user_validator: Optional[Callable[..., bool]] = None,
     *,
     target_validator: Optional[Callable[[Any], None]] = None,
+    shared_mem: int = 0,
 ) -> Callable[..., bool]:
     """Decline conversion unless every tensor matches the compiled kernel ABI."""
 
@@ -111,6 +141,16 @@ def make_dtype_capability_validator(
             return _reject(
                 "its PTX targets one GPU architecture and cannot run in a "
                 "hardware-compatible engine."
+            )
+        if shared_mem > AOT_MAX_DYNAMIC_SHARED_MEM:
+            return _reject(
+                "its kernel needs %d bytes of dynamic shared memory, but TensorRT "
+                "launches plugin kernels with at most %d bytes (%s). Use a kernel "
+                "configuration that needs less, for example fewer pipeline stages "
+                "or smaller tiles.",
+                shared_mem,
+                AOT_MAX_DYNAMIC_SHARED_MEM,
+                _AOT_SHARED_MEM_ISSUE,
             )
         if user_validator is not None and not user_validator(node, settings):
             return False

@@ -260,7 +260,9 @@ def triton_op(
             unsupported type, disagrees with ``meta_fn``'s tensor arity, or has
             no source for its scalar arguments.
         RuntimeError: if Triton's compiled launch metadata is incomplete or
-            requires a feature the TensorRT AOT path cannot reproduce.
+            requires a feature the TensorRT AOT path cannot reproduce, or if
+            the kernel needs more than 48 KiB of shared memory and there is no
+            ``eager_fn``.
 
     .. note::
         Compilation targets the current CUDA device. Register inside
@@ -272,7 +274,10 @@ def triton_op(
         ``signature`` (fixed input dtypes) and ``constexprs`` (single config).
         Inputs whose dtypes don't match the compiled ones are declined at
         conversion time, as are ``hardware_compatible=True`` engines, which
-        could run on architectures the PTX does not target. Such inputs can
+        could run on architectures the PTX does not target, and kernels that
+        need more than the 48 KiB of shared memory TensorRT gives plugin
+        kernels (pytorch/TensorRT#5010); without an ``eager_fn`` such a kernel
+        fails registration instead. Such inputs can
         fall back to PyTorch only when the surrounding partition and
         ``eager_fn`` permit it. Multi-config
         autotuning and dtype specialization are follow-up work.
@@ -316,6 +321,9 @@ def triton_op(
 
     artifact = _triton.compile_triton_to_ptx(
         kernel, signature, constexprs, num_warps=num_warps, num_stages=num_stages
+    )
+    _common.require_eager_fn_above_shared_mem_limit(
+        op_name, "triton_op", artifact.shared_mem, eager_fn, RuntimeError
     )
 
     final_validator = _triton.make_dtype_capability_validator(
@@ -576,8 +584,10 @@ def cutedsl_op(
     ``extra_args_fn(inputs, outputs)`` returns one int or ``trtp.SymInt32`` per
     scalar parameter. Use symbolic shapes in both callbacks for dynamic inputs.
     ``block_size`` is a static CUDA thread count or tuple. ``shared_mem`` is the
-    required dynamic shared-memory size in bytes. ``eager_fn`` optionally defines
-    the op's CUDA implementation outside TensorRT.
+    required dynamic shared-memory size in bytes; TensorRT launches plugin
+    kernels with at most 48 KiB, so a larger op is not lowered, and without an
+    ``eager_fn`` it is rejected (pytorch/TensorRT#5010). ``eager_fn`` optionally defines the op's CUDA
+    implementation outside TensorRT.
 
     ``pointer_alignment`` is the byte alignment CuTe may assume for every tensor
     pointer, or a mapping from pointer names to alignments (unlisted pointers
@@ -616,6 +626,9 @@ def cutedsl_op(
         or not 0 <= shared_mem < 2**31
     ):
         raise ValueError("cutedsl_op shared_mem must be a non-negative i32 byte count.")
+    _common.require_eager_fn_above_shared_mem_limit(
+        op_name, "cutedsl_op", shared_mem, eager_fn
+    )
     schema_info = analyze_op_schema(
         meta_fn,
         schema,
