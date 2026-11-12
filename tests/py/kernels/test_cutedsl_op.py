@@ -130,6 +130,86 @@ def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     assert not validate(node, SimpleNamespace(hardware_compatible=True))
 
 
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_stays_registered_but_is_not_lowered(
+    monkeypatch, caplog
+):
+    from torch_tensorrt.kernels import _register
+
+    captured = {}
+    monkeypatch.setattr(
+        _register,
+        "register_precompiled_qdp_plugin",
+        lambda **kwargs: captured.update(kwargs),
+    )
+    monkeypatch.setattr(
+        _cutedsl,
+        "validate_config",
+        lambda op, kernel, signature, constants, arity, extra: _common.analyze_signature(
+            signature, arity, frontend="cutedsl_op"
+        ),
+    )
+    monkeypatch.setattr(
+        _cutedsl,
+        "compile_to_ptx",
+        lambda kernel, constants, layout, block, shared_mem, alignments: _cutedsl.CompiledCuteDSLArtifact(
+            b"ptx", "kernel", block, shared_mem, (9, 0)
+        ),
+    )
+    monkeypatch.setattr(_cutedsl, "validate_target", lambda *args: None)
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    def eager(x):
+        return x.clone()
+
+    ttk.cutedsl_op(
+        "ttk_test::cutedsl_shared_mem_limit",
+        object(),
+        {"x": "*fp32", "out": "*fp32"},
+        meta,
+        grid=lambda i, o: 1,
+        block_size=128,
+        shared_mem=64 * 1024,
+        eager_fn=eager,
+    )
+
+    assert captured["eager_fn"] is eager
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        value = torch.empty(4, device="meta")
+        node = SimpleNamespace(
+            args=(SimpleNamespace(meta={"val": value}),), meta={"val": value}
+        )
+        assert captured["capability_validator"](node) is False
+    assert "65536 bytes of dynamic shared memory" in caplog.text
+
+
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_without_eager_fn_is_rejected(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        _cutedsl,
+        "compile_to_ptx",
+        lambda *args: pytest.fail("compiled an op that could never run"),
+    )
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    with pytest.raises(ValueError, match="65536 bytes.*no PyTorch fallback"):
+        ttk.cutedsl_op(
+            "ttk_test::cutedsl_shared_mem_no_eager",
+            object(),
+            {"x": "*fp32", "out": "*fp32"},
+            meta,
+            grid=lambda i, o: 1,
+            block_size=128,
+            shared_mem=64 * 1024,
+        )
+
+
 def _cached_kernel(x, n, out, block):
     pass
 
