@@ -95,6 +95,10 @@ might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autoc
 allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast
 respects the precision of the nodes within PyTorch Autocast context. To let Torch-TensorRT Autocast choose the
 precision inside those contexts too, set ``autocast_model_regions="reclassify"``.
+``"reclassify_all"`` also lets it choose inside the contexts with ``enabled=False``. Some models use those
+contexts to keep ops in FP32 for correctness, so check the accuracy, and keep such a context in FP32 by adding
+the path of its module to ``autocast_excluded_nodes`` as a full match, such as ``^rotary$``.
+That keeps the ops the module runs directly in FP32, but not those of its submodules.
 
 To enable Torch-TensorRT Autocast, we need to set ``enable_autocast=True``.
 On top of that, we can also specify the precision of the nodes to reduce to by ``autocast_low_precision_type``,
