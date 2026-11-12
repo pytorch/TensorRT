@@ -14,10 +14,12 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Mapping,
     NamedTuple,
     Optional,
     Sequence,
     Tuple,
+    Union,
 )
 
 import torch
@@ -113,8 +115,8 @@ def require_eager_fn_above_shared_mem_limit(
         f"with at most {AOT_MAX_DYNAMIC_SHARED_MEM} bytes "
         f"({AOT_SHARED_MEM_ISSUE}), and "
         "without an eager_fn the op has no PyTorch fallback. Use a kernel "
-        "configuration that needs less, for example fewer pipeline stages or "
-        "smaller tiles, or pass an eager_fn."
+        "configuration that needs less, for example fewer pipeline stages, "
+        "smaller tiles or a smaller pointer_alignment, or pass an eager_fn."
     )
 
 
@@ -163,8 +165,8 @@ def make_dtype_capability_validator(
                 "its kernel needs %d bytes of shared memory, static arrays "
                 "included, but TensorRT "
                 "launches plugin kernels with at most %d bytes (%s). Use a kernel "
-                "configuration that needs less, for example fewer pipeline stages "
-                "or smaller tiles.",
+                "configuration that needs less, for example fewer pipeline stages, "
+                "smaller tiles or a smaller pointer_alignment.",
                 shared_mem,
                 AOT_MAX_DYNAMIC_SHARED_MEM,
                 AOT_SHARED_MEM_ISSUE,
@@ -490,6 +492,42 @@ def validate_launch_grid(
                 f"1 and {limit}; got {constant}."
             )
     return dims
+
+
+PointerAlignment = Union[int, Mapping[str, int]]
+
+
+def normalize_pointer_alignment(
+    op_name: str,
+    layout: SignatureLayout,
+    alignment: PointerAlignment,
+    *,
+    frontend: str,
+) -> Dict[str, int]:
+    """Resolve the byte alignment a kernel may assume for each tensor pointer."""
+    pointers = [param.name for param in layout.inputs + layout.outputs]
+    if isinstance(alignment, Mapping):
+        unknown = sorted(set(alignment) - set(pointers), key=str)
+        if unknown:
+            raise ValueError(
+                f"{frontend} '{op_name}' pointer_alignment names unknown pointer "
+                f"parameter(s) {unknown}; expected a subset of {pointers}."
+            )
+        resolved = {name: alignment.get(name, 1) for name in pointers}
+    else:
+        resolved = dict.fromkeys(pointers, alignment)
+    for name, value in resolved.items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 1 <= value <= 256
+            or value & (value - 1)
+        ):
+            raise ValueError(
+                f"{frontend} '{op_name}' pointer_alignment for '{name}' must be a "
+                f"power of two between 1 and 256 bytes; got {value!r}."
+            )
+    return resolved
 
 
 def make_pointer_aot_fn(

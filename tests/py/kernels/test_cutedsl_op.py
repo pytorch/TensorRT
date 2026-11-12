@@ -97,24 +97,29 @@ def test_ptx_may_declare_wider_pointer_alignment():
     assert _cutedsl._validate_ptx(ptx, layout, (128, 1, 1), 0) == "kernel"
 
 
-@pytest.mark.parametrize(
-    "alignment,expected",
-    [
-        (1, {"x": 1, "out": 1}),
-        (16, {"x": 16, "out": 16}),
-        ({"x": 16}, {"x": 16, "out": 1}),
-    ],
-)
-def test_pointer_alignment_resolves_per_pointer(alignment, expected):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    assert _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment) == expected
+@skip_no_qdp
+def test_invalid_pointer_alignment_is_rejected_before_compiling(
+    cute_kernel, monkeypatch
+):
+    monkeypatch.setattr(
+        _cutedsl, "compile_to_ptx", lambda *args: pytest.fail("compiled the kernel")
+    )
 
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
 
-@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
-def test_invalid_pointer_alignment_is_rejected(alignment):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    with pytest.raises(ValueError, match="pointer_alignment"):
-        _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment)
+    with pytest.raises(ValueError, match="cutedsl_op 'ns::op' pointer_alignment"):
+        ttk.cutedsl_op(
+            "ns::op",
+            cute_kernel,
+            SIGNATURE,
+            meta,
+            grid=lambda i, o: 1,
+            block_size=128,
+            constants={"block": 128},
+            extra_args_fn=lambda i, o: [1],
+            pointer_alignment={"n": 16},
+        )
 
 
 def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
