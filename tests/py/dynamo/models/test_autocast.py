@@ -6,6 +6,7 @@ import copy
 import logging
 import operator
 import pickle
+import sys
 import warnings
 
 import pytest
@@ -1844,6 +1845,34 @@ def test_autocast_model_regions_casts_an_output_for_readers_after_a_write():
     a, b = ep.module()(x)
     torch.testing.assert_close(a, x @ x @ x)
     torch.testing.assert_close(b, torch.zeros_like(x))
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
+    class Model(nn.Module):
+        def forward(self, x):
+            # Chains of in-place ops as long as the recursion limit: one that the
+            # first region returns, and one outside the regions. mul_ keeps the
+            # values in the float16 range at any length.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+                for _ in range(sys.getrecursionlimit()):
+                    y.mul_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).float()
+            acc = x.clone()
+            for _ in range(sys.getrecursionlimit()):
+                acc.add_(1.0)
+            return a + acc
+
+    x = torch.full((2, 2), 0.25, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    torch.testing.assert_close(ep.module()(x).float(), Model()(x), rtol=1e-2, atol=1e-2)
 
 
 @torch.library.custom_op("autocast_regions_test::read_first_rows", mutates_args=())
