@@ -6,6 +6,7 @@ import copy
 import logging
 import operator
 import pickle
+import sys
 import warnings
 
 import pytest
@@ -1844,6 +1845,108 @@ def test_autocast_model_regions_casts_an_output_for_readers_after_a_write():
     a, b = ep.module()(x)
     torch.testing.assert_close(a, x @ x @ x)
     torch.testing.assert_close(b, torch.zeros_like(x))
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
+    class Model(nn.Module):
+        def forward(self, x):
+            # Chains of in-place ops as long as the recursion limit: one that the
+            # first region returns, and one outside the regions. mul_ keeps the
+            # values in the float16 range at any length.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+                for _ in range(sys.getrecursionlimit()):
+                    y.mul_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).float()
+            acc = x.clone()
+            for _ in range(sys.getrecursionlimit()):
+                acc.add_(1.0)
+            return a + acc
+
+    x = torch.full((2, 2), 0.25, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    torch.testing.assert_close(ep.module()(x).float(), Model()(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_analyzes_each_region_once(monkeypatch):
+    class Model(nn.Module):
+        def forward(self, x):
+            h = x * 1.0
+            # Each region writes into the output of the region before it, so it asks
+            # whether that region gets inlined.
+            for _ in range(20):
+                with torch.autocast(x.device.type, dtype=torch.float16):
+                    h.mul_(0.5)
+                    h = h * 1.5
+            return h.float()
+
+    module = sys.modules[
+        "torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions"
+    ]
+    can_inline, analyzed = module._can_inline, []
+    monkeypatch.setattr(
+        module,
+        "_can_inline",
+        lambda gm, region, *args: analyzed.append(region)
+        or can_inline(gm, region, *args),
+    )
+    x = torch.randn(4, 8, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
+    assert len(analyzed) == len(set(analyzed)) == 20
+    torch.testing.assert_close(ep.module()(x).float(), Model()(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_follows_a_chain_of_in_place_ops_once(monkeypatch):
+    class Model(nn.Module):
+        def __init__(self, length):
+            super().__init__()
+            self.length = length
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = x @ x
+            # A chain of in-place ops in a region, on the output of the region before
+            # it, which a later region reads.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                for _ in range(self.length):
+                    h = h.mul_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (h @ x).float()
+
+    module = sys.modules[
+        "torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions"
+    ]
+    source, followed = module._source, []
+    monkeypatch.setattr(
+        module, "_source", lambda value: followed.append(value) or source(value)
+    )
+    x = torch.full((2, 2), 0.25, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    steps = []
+    for length in (100, 200):
+        followed.clear()
+        pre_export_lowering(torch.export.export(Model(length), (x,)), settings)
+        steps.append(len(followed))
+    # A chain twice as long takes about twice the steps, not four times.
+    assert steps[1] < 3 * steps[0]
 
 
 @torch.library.custom_op("autocast_regions_test::read_first_rows", mutates_args=())

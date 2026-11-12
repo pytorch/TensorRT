@@ -74,23 +74,55 @@ def _region_output(value: torch.fx.Node) -> Optional[torch.fx.Node]:
     return _body(block).graph.output_node().args[0][value.args[1]]
 
 
-def _base(value: torch.fx.Node) -> torch.fx.Node:
-    """The value whose memory a value shares, through views, in-place ops, nested
-    regions and torch.no_grad blocks."""
+def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The tensor whose memory a value shares directly: the input of a view or an
+    in-place op, or for an output of a region or a torch.no_grad block, the value of
+    its body or the operand that output shares memory with. None for new memory."""
     output = _region_output(value)
     if output is not None:
         base = _base(output)
         placeholders = list(base.graph.find_nodes(op="placeholder"))
         if base not in placeholders:
             return base
-        return _base(_operands(value.args[0])[placeholders.index(base)])
+        return _operands(value.args[0])[placeholders.index(base)]
     op = value.args[0] if value.target == operator.getitem else value
     if op.target == torch.ops.aten.set_.source_Tensor:
         # set_ gives its input the memory of the other tensor.
-        return _base(op.args[1])
+        return op.args[1]
     if _aliases_an_input(op) and not _copies(op):
-        return _base((tensors_written_by(op) or [op.args[0]])[0])
+        return (tensors_written_by(op) or [op.args[0]])[0]
+    return None
+
+
+def _base(value: torch.fx.Node) -> torch.fx.Node:
+    """The value whose memory a value shares, through views, in-place ops, nested
+    regions and torch.no_grad blocks."""
+    # A loop, since a chain of in-place ops can be longer than the recursion limit.
+    while (source := _source(value)) is not None:
+        value = source
     return value
+
+
+def _sharing(gm: torch.fx.GraphModule, value: torch.fx.Node) -> Set[torch.fx.Node]:
+    """The values of gm that share the memory of value. They follow, through views,
+    in-place ops and regions, from the value of gm that value follows from, or from
+    the outputs of the region or block whose body gives them that memory."""
+    root = value
+    while (source := _source(root)) is not None and source.graph is gm.graph:
+        root = source
+    base = _base(root)
+    shared = (
+        {root} if base is root else {g for g in root.args[0].users if _base(g) is base}
+    )
+    todo = list(shared)
+    while todo:
+        n = todo.pop()
+        for u in n.users:
+            for c in (u, *(g for g in u.users if g.target == operator.getitem)):
+                if c not in shared and _source(c) is n:
+                    shared.add(c)
+                    todo.append(c)
+    return shared
 
 
 def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
@@ -100,7 +132,10 @@ def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     if node.target not in _BODY:
         return tensors_maybe_written_by(node)
     body = _body(node)
-    written = {_base(w) for n in body.graph.nodes for w in _written_by(n)}
+    values = {w for n in body.graph.nodes for w in _written_by(n)}
+    # Each op of a chain of in-place ops writes into the one before, which has the
+    # same memory, so only the start of a chain is followed back.
+    written = {_base(w) for w in values if _source(w) not in values}
     return [
         a
         for p, a in zip(body.graph.find_nodes(op="placeholder"), _operands(node))
@@ -108,16 +143,11 @@ def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     ]
 
 
-def _first_write(
-    gm: torch.fx.GraphModule, value: torch.fx.Node
-) -> Optional[torch.fx.Node]:
-    """The first op of gm that may write in place into the memory of value, through
-    value or any tensor that shares that memory."""
-    base = _base(value)
-    shared = {n for n in gm.graph.nodes if _base(n) is base}
-    return next(
-        (n for n in gm.graph.nodes if not shared.isdisjoint(_written_by(n))), None
-    )
+def _writers(gm: torch.fx.GraphModule, value: torch.fx.Node) -> Set[torch.fx.Node]:
+    """The ops of gm that may write in place into the memory of value, through value
+    or any tensor that shares that memory. Such an op takes one of those tensors."""
+    shared = _sharing(gm, value)
+    return {u for n in shared for u in n.users if not shared.isdisjoint(_written_by(u))}
 
 
 def _may_read_storage(node: torch.fx.Node) -> bool:
@@ -147,18 +177,14 @@ def _may_read_storage(node: torch.fx.Node) -> bool:
 def _reads_storage(gm: torch.fx.GraphModule, value: torch.fx.Node) -> bool:
     """Whether an op of gm can read the memory around the elements of value, through
     value or any tensor that shares that memory."""
-    base = _base(value)
-    shared = {n for n in gm.graph.nodes if _base(n) is base}
-    return any(
-        not shared.isdisjoint(n.all_input_nodes) and _may_read_storage(n)
-        for n in gm.graph.nodes
-    )
+    return any(_may_read_storage(u) for n in _sharing(gm, value) for u in n.users)
 
 
 def _writes_only_a_new_value(
     value: Any,
     writer: torch.fx.Node,
     operands: Dict[torch.fx.Node, Tuple[Any, torch.fx.Node]],
+    inlined: Dict[torch.fx.Node, bool],
 ) -> bool:
     """Whether writer can write in place into value: a new tensor, or the result of
     in-place ops on one, that no other op keeps a view of. operands maps an input of a
@@ -185,7 +211,7 @@ def _writes_only_a_new_value(
         output = _region_output(value)
         if output is not None:
             # The output of a region that gets inlined too is a value of its body.
-            if not _is_inlined(value.graph.owning_module, value.args[0]):
+            if not _is_inlined(value.graph.owning_module, value.args[0], inlined):
                 return False
             value, writer = output, output.graph.output_node()
             continue
@@ -202,6 +228,7 @@ def _writes_only_a_new_value(
 def _can_inline(
     gm: torch.fx.GraphModule,
     region: torch.fx.Node,
+    inlined: Dict[torch.fx.Node, bool],
     operands: Optional[Dict[torch.fx.Node, Tuple[Any, torch.fx.Node]]] = None,
 ) -> bool:
     """Whether a region computes the same values without its autocast.
@@ -236,7 +263,7 @@ def _can_inline(
         output, base = outputs[user.args[1]], bases[user.args[1]]
         if (
             bases.count(base) > 1 or base in placeholders or base is not output
-        ) and _first_write(gm, user) is not None:
+        ) and _writers(gm, user):
             return False
         if base is not output and _reads_storage(gm, user):
             return False
@@ -244,25 +271,31 @@ def _can_inline(
         if node.target == torch.ops.aten.view.dtype:
             return False
         if node.target == torch.ops.higher_order.wrap_with_autocast and not (
-            _can_inline(body, node, operands)
+            _can_inline(body, node, inlined, operands)
         ):
             return False
         if not all(
-            _writes_only_a_new_value(w, node, operands)
+            _writes_only_a_new_value(w, node, operands, inlined)
             for w in tensors_written_by(node)
         ):
             return False
     return True
 
 
-def _is_inlined(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
+def _is_inlined(
+    gm: torch.fx.GraphModule, node: torch.fx.Node, inlined: Dict[torch.fx.Node, bool]
+) -> bool:
     """Whether node is a region that gets inlined. A region with enabled=False is
-    how a model keeps ops in FP32, so it keeps its autocast."""
-    return (
-        node.target == torch.ops.higher_order.wrap_with_autocast
-        and bool(node.args[2])
-        and _can_inline(gm, node)
-    )
+    how a model keeps ops in FP32, so it keeps its autocast. inlined keeps the
+    answers for the graph as it is, since each write into the output of a region
+    asks about that region again."""
+    if node not in inlined:
+        inlined[node] = (
+            node.target == torch.ops.higher_order.wrap_with_autocast
+            and bool(node.args[2])
+            and _can_inline(gm, node, inlined)
+        )
+    return inlined[node]
 
 
 def _cast(
@@ -340,7 +373,7 @@ def _inline_region(
                 cast = _cast(gm, output, val.dtype, user)
                 cast.meta["val"] = val
                 readers = {u for u in user.users if u in regions}
-                first = _first_write(gm, user) if readers else None
+                first = min(_writers(gm, user), default=None) if readers else None
                 readers = {u for u in readers if first is None or u <= first}
                 user.replace_all_uses_with(
                     cast, delete_user_cb=lambda u: u not in readers
@@ -420,12 +453,16 @@ def inline_autocast_regions(gm: torch.fx.GraphModule) -> None:
     its autocast gets its inputs in the dtypes it was traced with.
     """
     copied: Dict[torch.fx.Node, bool] = {}
+    inlined: Dict[torch.fx.Node, bool] = {}
     count = 0
-    while regions := [node for node in gm.graph.nodes if _is_inlined(gm, node)]:
+    while regions := [
+        node for node in gm.graph.nodes if _is_inlined(gm, node, inlined)
+    ]:
         inlining = set(regions)
         for region in regions:
             _inline_region(gm, region, inlining, copied)
         count += len(regions)
+        inlined.clear()
     if not count:
         return
     # The asserts of the inlined bodies check the dtypes that autocast gave their
