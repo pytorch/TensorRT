@@ -189,6 +189,17 @@ _L0: list[Suite] = [
         jobs=_HEAVY,
     ),
     Suite(
+        # Auto-Tuner sessions: session logic on a CPU fake workload, plus
+        # worker processes and small TensorRT candidates on the GPU. Linux
+        # only: the session stops workers by killing their process groups.
+        "dynamo-autotune",
+        tier="l0",
+        lanes=("fast", "full", "nightly", "python-only"),
+        paths=("autotune/",),
+        jobs="4",
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
         "py-core",
         tier="l0",
         lanes=("fast", "full", "nightly"),

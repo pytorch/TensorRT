@@ -14,6 +14,7 @@ Core
    logging
    runtime
    region
+   autotune
    kernels
    executorch
    ../cli/torchtrtc

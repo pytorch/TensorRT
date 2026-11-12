@@ -641,6 +641,7 @@ fx_packages = [
 
 dynamo_packages = [
     "torch_tensorrt",
+    "torch_tensorrt.autotune",
     "torch_tensorrt.distributed",
     "torch_tensorrt.distributed.run",
     "torch_tensorrt.kernels",
@@ -685,6 +686,7 @@ fx_package_dir = {
 
 dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
+    "torch_tensorrt.autotune": "py/torch_tensorrt/autotune",
     "torch_tensorrt.distributed": "py/torch_tensorrt/distributed",
     "torch_tensorrt.distributed.run": "py/torch_tensorrt/distributed/run",
     "torch_tensorrt.kernels": "py/torch_tensorrt/kernels",
