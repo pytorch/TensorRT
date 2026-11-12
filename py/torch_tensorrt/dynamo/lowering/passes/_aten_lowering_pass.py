@@ -330,10 +330,13 @@ def pre_export_lowering(
         # theirs. Inlining comes before calibration, so that it records the values of
         # the inlined ops.
         if (
-            settings.autocast_model_regions == "reclassify"
+            settings.autocast_model_regions in ("reclassify", "reclassify_all")
             and settings.autocast_low_precision_type is not None
         ):
-            inline_autocast_regions(ep.graph_module)
+            inline_autocast_regions(
+                ep.graph_module,
+                include_disabled=settings.autocast_model_regions == "reclassify_all",
+            )
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "
