@@ -252,6 +252,12 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        Exported under ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
        regions.
+       Autocast logs, at INFO level, the regions that another value of
+       ``autocast_model_regions`` could let it choose in: under ``"keep"``, regions
+       with ``enabled=False`` or in a dtype other than ``autocast_low_precision_type``,
+       and under ``"reclassify"``, regions with ``enabled=False`` and those nested in
+       them, where one in another dtype logs as a warning. ``"reclassify_all"`` logs
+       nothing. Regions inside a ``torch.no_grad()`` block do not count.
 
 ----
 

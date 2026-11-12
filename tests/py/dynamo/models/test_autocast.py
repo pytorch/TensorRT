@@ -3112,6 +3112,241 @@ def test_autocast_model_regions_excludes_a_disabled_region_by_module(excluded, d
     assert vals[torch.ops.aten.linear.default].dtype == torch.float16
 
 
+def _kept_region_messages(model, x, caplog, **kwargs):
+    settings = CompilationSettings(
+        **{
+            "enable_autocast": True,
+            "autocast_low_precision_type": torch.float16,
+            **kwargs,
+        }
+    )
+    with caplog.at_level(
+        logging.INFO,
+        logger="torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions",
+    ):
+        pre_export_lowering(torch.export.export(model, (x,)), settings)
+    return [
+        (r.levelname, r.message)
+        for r in caplog.records
+        if "torch.autocast regions" in r.message
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "mode, level, text",
+    [
+        # The model's own regions are what "keep" asks for.
+        (
+            "keep",
+            "INFO",
+            "1 region with enabled=False and 1 region in a dtype other than "
+            'torch.float16. Set autocast_model_regions="reclassify_all"',
+        ),
+        # A model keeps ops in FP32 on purpose with enabled=False.
+        (
+            "reclassify",
+            "INFO",
+            '1 region with enabled=False. Set autocast_model_regions="reclassify_all"',
+        ),
+        ("reclassify_all", None, None),
+    ],
+)
+def test_autocast_logs_regions_it_does_not_choose_in(mode, level, text, caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = nn.Linear(16, 16)
+            self.fc2 = nn.Linear(16, 16)
+            self.fc3 = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.fc1(x)
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                h = self.fc2(h.float())
+            with torch.autocast(x.device.type, enabled=False):
+                return self.fc3(h.float())
+
+    messages = _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_model_regions=mode,
+    )
+    assert len(messages) == (0 if level is None else 1)
+    assert level is None or (messages[0][0] == level and text in messages[0][1])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "low_precision_type", [torch.float16, torch_tensorrt.dtype.f16]
+)
+def test_autocast_logs_regions_in_another_dtype(low_precision_type, caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = nn.Linear(16, 16)
+            self.fc2 = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                h = self.fc1(x)
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                return self.fc2(h).float()
+
+    ((level, message),) = _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_low_precision_type=low_precision_type,
+    )
+    assert level == "INFO"
+    assert (
+        ": 2 regions in a dtype other than torch.float16. "
+        'Set autocast_model_regions="reclassify" ' in message
+    )
+
+
+@pytest.mark.unit
+def test_autocast_warns_about_a_region_in_another_dtype_under_reclassify(caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, enabled=False):
+                with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                    return self.fc(x).float()
+
+    # "reclassify" asks autocast to choose in the nested region, which keeps its
+    # dtype in the region with enabled=False.
+    ((level, message),) = _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_model_regions="reclassify",
+    )
+    assert level == "WARNING"
+    assert (
+        ": 1 region with enabled=False and 1 region in a dtype other than "
+        'torch.float16. Set autocast_model_regions="reclassify_all"' in message
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("mode", ["keep", "reclassify"])
+def test_autocast_logs_a_nested_disabled_region(mode, caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.fc(x)
+                with torch.autocast(x.device.type, enabled=False):
+                    return torch.softmax(h.float(), dim=-1)
+
+    # Under reclassify, inlining the outer region brings the nested one to the top.
+    ((level, message),) = _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_model_regions=mode,
+    )
+    assert level == "INFO"
+    assert ": 1 region with enabled=False." in message
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "case",
+    [
+        "region_in_low_precision_type",
+        "in_a_region_that_writes_a_buffer",
+        "in_no_grad",
+    ],
+)
+def test_autocast_does_not_warn_about_regions_it_would_not_change(case, caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(16, 16)
+            self.register_buffer("total", torch.zeros(2, 16))
+
+        def forward(self, x):
+            if case == "region_in_low_precision_type":
+                with torch.autocast(x.device.type, dtype=torch.float16):
+                    return self.fc(x).float()
+            if case == "in_no_grad":
+                # Exported with grad mode on, the region keeps its autocast.
+                with torch.no_grad():
+                    with torch.autocast(x.device.type, enabled=False):
+                        return self.fc(x)
+            # No value inlines a region that writes into a buffer, so the region
+            # nested in it stays there.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                self.total.add_(self.fc(x))
+                with torch.autocast(x.device.type, enabled=False):
+                    return self.fc(self.total).float()
+
+    assert not _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_model_regions="reclassify",
+    )
+
+
+@pytest.mark.unit
+def test_autocast_does_not_warn_without_a_low_precision_type(caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, enabled=False):
+                return self.fc(x)
+
+    assert not _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_low_precision_type=None,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("mode", ["keep", "reclassify"])
+def test_autocast_does_not_analyze_the_regions_to_log_them(mode, monkeypatch, caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(16, 16)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, enabled=False):
+                return self.fc(x)
+
+    def fail(*args, **kwargs):
+        raise AssertionError("the regions were analyzed")
+
+    name = "torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions"
+    monkeypatch.setattr(sys.modules[name], "_can_inline", fail)
+    # Not even at INFO, where it logs the region. Inlining does not analyze a region
+    # with enabled=False either.
+    ((level, message),) = _kept_region_messages(
+        Model().cuda().eval(),
+        torch.randn(2, 16, device="cuda"),
+        caplog,
+        autocast_model_regions=mode,
+    )
+    assert level == "INFO" and ": 1 region with enabled=False." in message
+
+
 @pytest.mark.unit
 def test_autocast_model_regions_rejects_unknown_values():
     assert CompilationSettings().autocast_model_regions == "keep"

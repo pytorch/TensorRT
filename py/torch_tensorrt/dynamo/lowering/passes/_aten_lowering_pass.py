@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import torch
 import torch.utils._pytree as pytree
 from torch.fx.experimental.symbolic_shapes import statically_known_true
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -38,7 +39,7 @@ from .fold_slice_into_constant_pad import fold_slice_into_constant_pad
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
-from .inline_autocast_regions import inline_autocast_regions
+from .inline_autocast_regions import inline_autocast_regions, log_kept_regions
 from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
@@ -328,14 +329,19 @@ def pre_export_lowering(
         ep = _copy_program(ep)
         # Without a low precision type autocast changes nothing, so the regions keep
         # theirs. Inlining comes before calibration, so that it records the values of
-        # the inlined ops.
-        if (
-            settings.autocast_model_regions in ("reclassify", "reclassify_all")
-            and settings.autocast_low_precision_type is not None
-        ):
+        # the inlined ops. Like inlining, the message about kept regions reads the graph
+        # before the later passes change it.
+        low_precision_type = settings.autocast_low_precision_type
+        if isinstance(low_precision_type, dtype):
+            low_precision_type = low_precision_type.to(torch.dtype)
+        mode = settings.autocast_model_regions
+        if low_precision_type is not None and mode == "keep":
+            log_kept_regions(ep.graph_module, low_precision_type)
+        elif low_precision_type is not None:
             inline_autocast_regions(
                 ep.graph_module,
-                include_disabled=settings.autocast_model_regions == "reclassify_all",
+                include_disabled=mode == "reclassify_all",
+                low_precision_type=low_precision_type,
             )
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
