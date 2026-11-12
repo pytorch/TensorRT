@@ -198,3 +198,21 @@ def test_generated_descriptor_preserves_meta_dtype(preserve_input_dtype):
     (output_desc,) = QDP_REGISTRY[op_name].register_func(input_desc)
     assert output_desc.dtype == trt.float16
     assert output_desc.ndim == input_desc.ndim
+
+
+@pytest.mark.parametrize("extra_bytes, accepted", [(0, True), (16, False)])
+def test_kernels_above_48_kib_of_shared_memory_are_declined(
+    extra_bytes, accepted, caplog
+):
+    validate = _common.make_dtype_capability_validator(
+        "test_common::op",
+        "kernel",
+        [torch.float32],
+        [torch.float32],
+        shared_mem=48 * 1024 + extra_bytes,
+    )
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        assert validate(_FakeNode([torch.float32], torch.float32)) is accepted
+    assert bool(caplog.records) is not accepted
+    if not accepted:
+        assert "49168 bytes" in caplog.text
