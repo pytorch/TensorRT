@@ -428,26 +428,33 @@ class TestUpsampleConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("bilinear", torch.ops.aten._upsample_bilinear2d_aa.default),
-            ("bicubic", torch.ops.aten._upsample_bicubic2d_aa.default),
+            # name, op, input size, output size, setting (None: the default converts it)
+            ("bilinear", "bilinear", (288, 512), [234, 416], None),
+            # 6 nonzero taps per axis; an exact 3x downscale has only 5.
+            ("bilinear_6_taps", "bilinear", (26, 40), [9, 14], None),
+            ("bicubic", "bicubic", (288, 512), [234, 416], True),
         ]
     )
-    def test_antialias2d_matches_pytorch(self, _, op):
-        # Images are often rounded to uint8 after the resize, and at this 16/13 downscale
+    def test_antialias2d_matches_pytorch(
+        self, _, mode, input_size, output_size, convert
+    ):
+        # Images are often rounded to uint8 after the resize, and at these downscales
         # many exact results end in .5, so this must stay far below one level. 1e-4,
         # far below main's 4e-3, covers both modes when TensorRT sums in another order
         # or without fused multiply-adds: the measured worst case was 6.1e-5 (bicubic).
+        op = getattr(torch.ops.aten, f"_upsample_{mode}2d_aa").default
+
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return op(x, [234, 416], False, None, None)
+                return op(x, output_size, False, None, None)
 
         self.run_test(
             TestModule(),
-            [torch.randint(0, 256, (2, 3, 288, 512)).float()],
+            [torch.randint(0, 256, (2, 3, *input_size)).float()],
             rtol=0,
             atol=1e-4,
             use_dynamo_tracer=True,
-            convert_antialiased_resize=True,
+            convert_antialiased_resize=convert,
         )
 
     def test_antialias2d_float64_compile(self):
@@ -605,6 +612,100 @@ class TestUpsampleConverter(DispatchTestCase):
         )
         self.assertEqual(antialiased_upsample_validator(node, settings), expected)
 
+    @parameterized.expand(
+        [
+            # name, input size, align_corners, scale, dtype, setting, expected (output 8x8)
+            ("default_6_taps", (24, 24), False, None, torch.float32, None, True),
+            ("default_7_taps", (26, 26), False, None, torch.float32, None, False),
+            ("default_7_taps_width", (24, 26), False, None, torch.float32, None, False),
+            (
+                "default_7_taps_height",
+                (26, 24),
+                False,
+                None,
+                torch.float32,
+                None,
+                False,
+            ),
+            ("default_upscale", (6, 6), False, None, torch.float32, None, False),
+            ("default_align_corners", (24, 24), True, None, torch.float32, None, False),
+            (
+                "default_align_corners_6_taps",
+                (21, 21),
+                True,
+                None,
+                torch.float32,
+                None,
+                True,
+            ),
+            ("default_scale", (24, 24), False, 0.25, torch.float32, None, False),
+            ("default_scale_half", (16, 16), False, 0.5, torch.float32, None, True),
+            ("default_float16", (24, 24), False, None, torch.float16, None, False),
+            ("default_float64", (24, 24), False, None, torch.float64, None, False),
+            ("on_7_taps", (26, 26), False, None, torch.float32, True, True),
+            ("off_zero", (24, 24), False, None, torch.float32, 0, False),
+        ]
+    )
+    def test_antialias2d_validator_default(
+        self, _, input_size, align_corners, scale, dtype, convert, expected
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._upsample_bilinear2d_aa.default(
+                    x, [8, 8], align_corners, scale, scale
+                )
+
+        exported = torch.export.export(
+            TestModule(), (torch.zeros(1, 3, *input_size, dtype=dtype),)
+        )
+        (node,) = (
+            n
+            for n in exported.graph.nodes
+            if n.target == torch.ops.aten._upsample_bilinear2d_aa.default
+        )
+        # truncate_double lets float64 reach the default's own dtype check. The setting is
+        # assigned after construction, as an old pickle restores it, so the validator
+        # itself must read a falsy 0 as False.
+        settings = CompilationSettings(truncate_double=True)
+        settings.convert_antialiased_resize = convert
+        self.assertEqual(antialiased_upsample_validator(node, settings), expected)
+        if convert is None:
+            self.assertEqual(antialiased_upsample_validator(node, None), expected)
+
+    def test_antialias2d_default_float64_log(self):
+        # By default a float64 resize stays in PyTorch even with truncate_double, so the
+        # log must not point to truncate_double.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._upsample_bilinear2d_aa.default(
+                    x, [8, 8], False, None, None
+                )
+
+        x = torch.zeros(1, 3, 24, 24, dtype=torch.float64)
+        (node,) = (
+            n
+            for n in torch.export.export(TestModule(), (x,)).graph.nodes
+            if n.target == torch.ops.aten._upsample_bilinear2d_aa.default
+        )
+        logger = "torch_tensorrt.dynamo.conversion.aten_ops_converters"
+        with self.assertLogs(logger, "DEBUG") as logs:
+            self.assertFalse(antialiased_upsample_validator(node, None))
+        self.assertNotIn("truncate_double", "".join(logs.output))
+
+    def test_antialias2d_setting_is_bool(self):
+        # 0 and False must give equal settings, and so the same engine-cache key.
+        settings = CompilationSettings(convert_antialiased_resize=0)
+        self.assertIs(settings.convert_antialiased_resize, False)
+
+    def test_antialias2d_old_pickle_keeps_resize_in_pytorch(self):
+        # Settings pickled before convert_antialiased_resize existed kept antialiased
+        # resize in PyTorch, and refit must partition them the same way.
+        state = CompilationSettings().__dict__.copy()
+        state.pop("convert_antialiased_resize")
+        restored = CompilationSettings.__new__(CompilationSettings)
+        restored.__setstate__(state)
+        self.assertIs(restored.convert_antialiased_resize, False)
+
     def test_antialias2d_dynamic_batch_and_channels(self):
         class TestModule(torch.nn.Module):
             def forward(self, x):
@@ -629,32 +730,41 @@ class TestUpsampleConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("static", None, True, 1, 0),
-            ("off_by_default", None, False, 2, 1),
+            ("static", "bicubic", None, {"convert_antialiased_resize": True}, 1, 0),
+            ("off_by_default", "bicubic", None, {}, 2, 1),
             (
                 "dynamic_height",
+                "bicubic",
                 ({2: torch.export.Dim("h", min=32, max=96)}, None),
-                True,
+                {"convert_antialiased_resize": True},
                 2,
                 1,
             ),
             (
                 "dynamic_size",
+                "bicubic",
                 (None, {0: torch.export.Dim("size", min=8, max=32)}),
-                True,
+                {"convert_antialiased_resize": True},
+                2,
+                1,
+            ),
+            ("bilinear_default", "bilinear", None, {}, 1, 0),
+            (
+                "bilinear_off",
+                "bilinear",
+                None,
+                {"convert_antialiased_resize": False},
                 2,
                 1,
             ),
         ]
     )
     def test_antialias2d_engines(
-        self, _, dynamic_shapes, convert, acc_count, gpu_count
+        self, _, mode, dynamic_shapes, options, acc_count, gpu_count
     ):
         class TestModule(torch.nn.Module):
             def forward(self, x, size):
-                x = F.interpolate(
-                    x.relu(), size=size.shape, mode="bicubic", antialias=True
-                )
+                x = F.interpolate(x.relu(), size=size.shape, mode=mode, antialias=True)
                 return x + 1
 
         module = TestModule().eval().cuda()
@@ -663,7 +773,6 @@ class TestUpsampleConverter(DispatchTestCase):
             torch.empty(24, 40, device="cuda"),
         )
         exported = torch.export.export(module, inputs, dynamic_shapes=dynamic_shapes)
-        options = {"convert_antialiased_resize": True} if convert else {}
         compiled = torch_tensorrt.dynamo.compile(
             exported, inputs=inputs, min_block_size=1, **options
         )

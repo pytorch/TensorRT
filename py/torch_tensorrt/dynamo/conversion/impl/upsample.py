@@ -80,6 +80,21 @@ def upsample(
     return layer.get_output(0)
 
 
+def _antialias_ratio(
+    input_size: int,
+    output_size: int,
+    align_corners: bool,
+    scale: Optional[float],
+    ft: Any,
+) -> Any:
+    """Returns ATen's input-to-output size ratio on one axis, computed in ``ft``."""
+    if align_corners:
+        return ft(input_size - 1) / ft(output_size - 1) if output_size > 1 else ft(0)
+    if scale is not None and scale > 0:
+        return ft(1.0 / scale)
+    return ft(input_size) / ft(output_size)
+
+
 def _antialias_taps(
     input_size: int,
     output_size: int,
@@ -94,9 +109,10 @@ def _antialias_taps(
     """
     # For float32 every step rounds like upsample_antialias::_compute_weights_span and
     # _compute_weights in ATen's cuda/UpSample.cuh, including the multiply-adds nvcc fuses
-    # there (checked against PyTorch 2.16.0.dev20261111 with CUDA 13.2 and 13.4). For
-    # bilinear downscales of up to 6 taps per axis the TensorRT output then matched PyTorch
-    # bit for bit on the GPUs tested, but TensorRT may sum in another order elsewhere.
+    # there (checked against PyTorch 2.16.0.dev20261111 with CUDA 13.2 and 13.4). For the
+    # bilinear downscales that convert by default (see DEFAULT_MAX_ANTIALIAS_TAPS) the
+    # TensorRT output then matched PyTorch bit for bit on the GPUs tested, but TensorRT may
+    # sum in another order elsewhere.
     ft: Any = np.float64 if float64 else np.float32
 
     def fma(a: Any, b: Any, c: Any) -> Any:
@@ -104,12 +120,7 @@ def _antialias_taps(
         # rounds once like an FMA, unless the exact sum needs more than float64 holds.
         return (np.multiply(a, b, dtype=np.float64) + c).astype(ft)
 
-    if align_corners:
-        ratio = ft(input_size - 1) / ft(output_size - 1) if output_size > 1 else ft(0)
-    elif scale is not None and scale > 0:
-        ratio = ft(1.0 / scale)
-    else:
-        ratio = ft(input_size) / ft(output_size)
+    ratio = _antialias_ratio(input_size, output_size, align_corners, scale, ft)
     # A downscale stretches the filter over every input pixel it covers.
     stretch = ratio >= 1.0
     support = ft(1.0 if mode == "bilinear" else 2.0) * (ratio if stretch else ft(1))
@@ -144,6 +155,29 @@ def _antialias_taps(
         np.divide(weights, total[:, None], out=np.zeros_like(weights), where=nonempty),
         in_window,
     )
+
+
+# convert_antialiased_resize=None converts float32 bilinear downscales with at most this
+# many taps per output pixel along each axis. It is the measured limit: up to here TensorRT
+# summed the taps in order like PyTorch's CUDA kernel on the GPUs tested. With more taps it
+# may reorder the sum, and upscales rounded differently, by a float32 step that can flip a
+# later rounding to integers.
+DEFAULT_MAX_ANTIALIAS_TAPS = 6
+
+
+def antialias_converts_by_default(
+    input_size: int, output_size: int, align_corners: bool, scale: Optional[float]
+) -> bool:
+    """Returns whether one axis of a float32 bilinear antialiased resize is in the range
+    that convert_antialiased_resize=None converts: a downscale with at most
+    DEFAULT_MAX_ANTIALIAS_TAPS taps per output pixel.
+    """
+    if _antialias_ratio(input_size, output_size, align_corners, scale, np.float32) < 1:
+        return False
+    _, _, in_window = _antialias_taps(
+        input_size, output_size, align_corners, scale, "bilinear"
+    )
+    return bool(in_window.shape[1] <= DEFAULT_MAX_ANTIALIAS_TAPS)
 
 
 def upsample_antialias(
