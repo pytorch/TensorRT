@@ -443,9 +443,9 @@ jobs:
           source "${BUILD_ENV_FILE}"
           version="$(${CONDA_RUN} python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }})"
           echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"
-          # A release wheel has the form PyPI needs, and PyPI's Windows ExecuTorch is the CPU build the
-          # delegate cannot load, so it records no channel and its extra leaves the delegate out. Any
-          # other build goes to this run's PyTorch channel.
+          # Release companions are built against ExecuTorch's PyTorch CUDA channel below.
+          # PyPI's Windows ExecuTorch is the CPU build, so the main release wheel records no
+          # channel and its extra leaves the companion out. Other builds use this run's channel.
           if [[ ${{ inputs.is-release-wheel }} != true ]]; then
             echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL=${CHANNEL}" >> "${GITHUB_ENV}"
           fi
@@ -500,11 +500,8 @@ jobs:
           else
             ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
           fi
-      # A release wheel has the form PyPI needs, and the delegate cannot load PyPI's Windows
-      # ExecuTorch, so its job builds no delegate. The version is still recorded above for the install
-      # advice.
       - name: Build the ExecuTorch runtime wheel
-        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' && !inputs.is-release-wheel }}
+        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
           set -euxo pipefail

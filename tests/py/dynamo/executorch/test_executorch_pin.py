@@ -735,10 +735,8 @@ _NAMING_GATES = {
 
 _BUILD_GATES = {
     "build_linux.yml": "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}",
-    # A Windows release wheel goes to PyPI, where the delegate cannot load.
-    "build_windows.yml": (
-        "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' && !inputs.is-release-wheel }}"
-    ),
+    # Windows release companions also build against ExecuTorch's PyTorch CUDA channel.
+    "build_windows.yml": "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}",
 }
 
 
