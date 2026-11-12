@@ -120,7 +120,14 @@ bypass the corresponding auto-derivation:
 * ``aot_fn`` — TensorRT AOT impl with signature
   ``(inputs, outputs, tactic) -> (KernelLaunchParams, SymExprs | None)``.
   When both ``eager_fn`` and ``aot_fn`` are supplied, ``spec.geometry``
-  may be omitted.
+  may be omitted. TensorRT launches the kernel without CUDA's opt-in, so a
+  block gets at most 48 KiB of shared memory in total, and ``shared_mem`` at
+  most 48 KiB minus the kernel's static shared size
+  (`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+  A constant ``shared_mem`` above 48 KiB fails the engine build, and the
+  build log names the reason. The static size is not known there, so a launch
+  that is over the limit only because of static arrays builds and then fails
+  on every run.
 * ``schema`` — explicit Torch schema (for example
   ``"(Tensor x, float alpha) -> Tensor"``). Falls back to deriving from
   ``spec.inputs`` / ``spec.outputs`` if both are present, else to
@@ -145,7 +152,15 @@ Pre-compiled PTX entry point
 requested ``.entry`` symbol before it mutates the PyTorch or TensorRT global
 registries. Its AOT path requires a Tensor-only Torch schema. Treat PTX and its
 entry name as trusted build artifacts: this API validates the registration ABI,
-not the behavior or memory safety of arbitrary device code.
+not the behavior or memory safety of arbitrary device code. TensorRT launches
+the kernel without CUDA's opt-in, so a block gets at most 48 KiB of shared
+memory in total, and ``aot_fn`` must keep ``shared_mem`` at or below 48 KiB
+minus the kernel's static shared size
+(`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+A constant ``shared_mem`` above 48 KiB fails the engine build, and the build
+log names the reason. The static size is not known there, so a launch that is
+over the limit only because of static arrays builds and then fails on every
+run.
 
 Triton entry point
 ------------------
@@ -255,6 +270,12 @@ a positive launch grid and a kernel that masks every load and store.
    unchecked pointer binding. Register a second op for a second dtype —
    multi-config autotuning and dtype specialization are not yet supported.
 
+   A kernel that needs more than 48 KiB of dynamic shared memory is declined
+   the same way, because TensorRT launches plugin kernels with at most 48 KiB
+   (`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+   Without an ``eager_fn`` such a kernel could not run at all, so registration
+   fails instead. Fewer ``num_stages`` or smaller tiles reduce the requirement.
+
    Triton emits PTX at the ISA version of its own bundled ``ptxas``, which
    can be newer than the installed CUDA driver accepts.  ``triton_op``
    attempts to detect the driver's maximum ISA and recompiles at that version
@@ -318,7 +339,10 @@ driver; serialized engines retain these compatibility requirements.
 Kernels index contiguous TensorRT buffers and must guard their loads and
 stores. ``meta_fn`` must describe contiguous outputs with the compiled dtypes.
 The caller must provide enough ``shared_mem`` for the kernel; launch limits
-and scalar ranges must hold throughout the input profile. Empty tensors
+and scalar ranges must hold throughout the input profile. TensorRT launches
+plugin kernels with at most 48 KiB of shared memory, so an op whose
+``shared_mem`` plus static ``.shared`` arrays need more is left to PyTorch with
+a warning, and registration fails if it has no ``eager_fn``. Empty tensors
 require a positive grid. Native tensor arguments, TMA descriptors, clusters,
 and compiler-added workspaces are unsupported; kernels may construct CuTe
 tensors internally from pointers.

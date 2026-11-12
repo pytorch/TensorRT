@@ -3,6 +3,7 @@
 
 """Behavior shared by the compiled-kernel frontend capability guards."""
 
+import contextlib
 from types import SimpleNamespace
 
 import pytest
@@ -198,3 +199,56 @@ def test_generated_descriptor_preserves_meta_dtype(preserve_input_dtype):
     (output_desc,) = QDP_REGISTRY[op_name].register_func(input_desc)
     assert output_desc.dtype == trt.float16
     assert output_desc.ndim == input_desc.ndim
+
+
+@pytest.mark.parametrize("extra_bytes, accepted", [(0, True), (16, False)])
+def test_kernels_above_48_kib_of_shared_memory_are_declined(
+    extra_bytes, accepted, caplog
+):
+    shared_mem = 48 * 1024 + extra_bytes
+    validate = _common.make_dtype_capability_validator(
+        "test_common::op",
+        "kernel",
+        [torch.float32],
+        [torch.float32],
+        shared_mem=shared_mem,
+    )
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        assert validate(_FakeNode([torch.float32], torch.float32)) is accepted
+    assert bool(caplog.records) is not accepted
+    if not accepted:
+        assert "49168 bytes" in caplog.text
+
+    # Without an eager_fn, registration must fail exactly where conversion declines.
+    expectation = (
+        contextlib.nullcontext()
+        if accepted
+        else pytest.raises(RuntimeError, match="49168 bytes")
+    )
+    with expectation:
+        _common.require_eager_fn_above_shared_mem_limit(
+            "test_common::op", "kernel", shared_mem, None
+        )
+
+
+@skip_no_qdp
+@pytest.mark.parametrize("extra_bytes, accepted", [(0, True), (16, False)])
+def test_aot_launch_above_48_kib_of_shared_memory_is_rejected(
+    extra_bytes, accepted
+):
+    from torch_tensorrt.kernels import _register
+
+    # TensorRT's own launch params hold a value only during an engine build.
+    params = SimpleNamespace(shared_mem=48 * 1024 + extra_bytes)
+    info = _register.analyze_op_schema(lambda x: x, "(Tensor x) -> Tensor")
+    # Every frontend's AOT launch, ptx_op and cuda_kernel_op included, goes through here.
+    launch = _register._make_aot_impl(
+        info, "ptx", "kernel", lambda inputs, outputs, tactic: (params, object())
+    )
+    expectation = (
+        contextlib.nullcontext()
+        if accepted
+        else pytest.raises(ValueError, match="49168 bytes")
+    )
+    with expectation:
+        launch(object(), (object(),), 0)
