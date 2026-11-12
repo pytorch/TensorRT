@@ -127,7 +127,6 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       is-release-wheel: true
-      trigger-event: ${{ github.event_name }}
       build-executorch-runtime: true
 
 concurrency:
