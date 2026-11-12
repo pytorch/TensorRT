@@ -124,7 +124,9 @@ jobs:
         if: always()
         run: |
           cd $GITHUB_WORKSPACE
-          uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
+          # Keep this release branch on PyTorch 2.15 and ignore the project's nightly indexes.
+          uv --no-config pip install --system "torch>=2.15.0,<2.16.0" \
+            --index-url https://download.pytorch.org/whl/cpu
           python3 -m pytest \
             tests/py/dynamo/executorch/test_api.py \
             tests/py/dynamo/executorch/test_load_compatibility.py \
