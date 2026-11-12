@@ -40,6 +40,7 @@ from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .inline_autocast_regions import inline_autocast_regions
 from .lower_associative_scan import lower_associative_scan
+from .mark_merged_bf16_attention_queries import mark_merged_bf16_attention_queries
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
 from .preserve_attention_output_layout import preserve_attention_output_layout
@@ -96,6 +97,7 @@ post_lowering_pass_list = [
     complex_lowering_pass,
     fold_shared_kv_attention,
     force_causal_efficient_attention,
+    mark_merged_bf16_attention_queries,
     decompose_unsupported_attention,
     split_sequence_first_attention_heads,
     annotate_fp8_sdpa,
