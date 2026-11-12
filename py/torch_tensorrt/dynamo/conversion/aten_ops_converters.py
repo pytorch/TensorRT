@@ -4926,6 +4926,7 @@ def aten_ops_upsample_antialias(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    meta = ctx.current_node.args[0].meta if ctx.current_node is not None else {}
     return impl.upsample.upsample_antialias(
         ctx,
         target,
@@ -4940,6 +4941,9 @@ def aten_ops_upsample_antialias(
             if target == torch.ops.aten._upsample_bilinear2d_aa.default
             else "bicubic"
         ),
+        # A float64 input arrives here truncated to float32, but ATen weighs it in float64.
+        float64_weights=getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None)
+        == torch.float64,
     )
 
 
