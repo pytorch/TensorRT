@@ -190,8 +190,8 @@ class Test64BitSupport(TestCase):
 
 
 def _build_engine(input_dtype, add_layer):
-    # Built by hand: the _to_copy converter does not accept a cast to uint8 or FP8, and
-    # TensorRT does not let a cast layer read an FP8 input.
+    # Built by hand: the _to_copy converter does not make a uint8 tensor or accept FP8,
+    # and TensorRT does not let a cast layer read an FP8 input.
     builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
     network = builder.create_network(
         1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)

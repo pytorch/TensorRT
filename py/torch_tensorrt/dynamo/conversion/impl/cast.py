@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistr
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
+    wrap_to_uint8,
 )
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -34,6 +35,32 @@ FLOAT64_TRUNCATABLE_SOURCES = frozenset(
         torch.float64,
     }
 )
+
+
+def to_uint8(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: Union[TRTTensor, torch.Tensor, np.ndarray],
+) -> TRTTensor:
+    """Return PyTorch's cast to uint8 as the widened int32 value an engine holds.
+
+    TensorRT allows uint8 only at engine inputs and outputs. PyTorch converts through
+    int64, truncating toward zero, then wraps modulo 256, and the TensorRT cast to int64
+    truncates the same way. Values outside the int64 range, infinity and NaN are
+    undefined in PyTorch, so they are unspecified. A bool is 0 or 1, which needs no
+    wrap.
+    """
+    if not isinstance(input, TRTTensor):
+        input = get_trt_tensor(ctx, input, f"{name}_copy_tensor")
+    if input.dtype == trt.bool:
+        return cast_trt_tensor(
+            ctx, input, trt.int32, f"{name}_int32", target, source_ir
+        )
+    value = cast_trt_tensor(ctx, input, trt.int64, f"{name}_int64", target, source_ir)
+    value = wrap_to_uint8(ctx, target, value, name)
+    return cast_trt_tensor(ctx, value, trt.int32, f"{name}_int32", target, source_ir)
 
 
 def to_copy(
