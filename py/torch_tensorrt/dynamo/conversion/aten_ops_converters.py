@@ -1762,25 +1762,8 @@ def aten_ops_scatter(
     )
 
 
-def select_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    """Keep a select of a uint8 tensor on the PyTorch path.
-
-    TensorRT allows uint8 only at engine inputs and at outputs made by a cast or
-    identity layer, so the gather's uint8 result fails the engine build, as it does
-    for aten.gather.
-    """
-    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
-    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
-        _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
-        return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.select.int,
-    capability_validator=select_validator,
     supports_dynamic_shapes=True,
 )
 def aten_ops_select(

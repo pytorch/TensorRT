@@ -601,6 +601,10 @@ class TestUInt8Support(TestCase):
             def forward(self, mask, a, b):
                 return torch.where(mask, a, b).permute(2, 0, 1).float()
 
+        class SelectThenUnsqueeze(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b)[..., 0].unsqueeze(0).float()
+
         class SelectBackground(nn.Module):
             def __init__(self, background):
                 super().__init__()
@@ -619,6 +623,7 @@ class TestUInt8Support(TestCase):
         cases = {
             "uint8": (Select(), (mask, a, b)),
             "uint8, then permuted": (SelectThenPermute(), (mask, a, b)),
+            "uint8, then selected": (SelectThenUnsqueeze(), (mask, a, b)),
             "bool": (Select(), (mask, a, flags)),
             "bool of lower rank": (Select(), (mask, a, flags[0, 0])),
             "bool constant": (SelectBackground(flags), (mask, a)),
@@ -650,14 +655,9 @@ class TestUInt8Support(TestCase):
                 )
                 torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
 
-        # A select runs in PyTorch, and so does a where in torch_executed_ops, so uint8
-        # data reaches the next engine as an input, which the interpreter widens.
-        class SelectThenUnsqueeze(nn.Module):
-            def forward(self, mask, a, b):
-                return torch.where(mask, a, b)[..., 0].unsqueeze(0).float()
-
+        # A where in torch_executed_ops runs in PyTorch, so uint8 data reaches the next
+        # engine as an input, which the interpreter widens.
         partial = {
-            "select, then unsqueezed": (SelectThenUnsqueeze(), {}),
             "where in PyTorch, then permuted": (
                 SelectThenPermute(),
                 {"torch_executed_ops": {torch.ops.aten.where.self}},
