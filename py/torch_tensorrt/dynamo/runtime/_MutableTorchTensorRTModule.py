@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    is_quantized_by_modelopt,
     pin_torch_executed_state,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -107,12 +108,7 @@ def _digest_state_dict(state_dict: Dict[str, torch.Tensor]) -> Dict[str, bytes]:
 
 def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
     """Return True if the model has been quantized with the modelopt library."""
-    try:
-        from modelopt.torch.quantization.nn import TensorQuantizer
-
-        return any(isinstance(m, TensorQuantizer) for m in model.modules())
-    except ImportError:
-        return False
+    return is_quantized_by_modelopt(model)
 
 
 def _offload_original_model(module: "MutableTorchTensorRTModule") -> None:

@@ -6,7 +6,6 @@ from __future__ import annotations
 import ctypes
 import functools
 import gc
-import importlib.util
 import logging
 import os
 import platform
@@ -28,6 +27,7 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
+import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -42,7 +42,6 @@ from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -1113,19 +1112,13 @@ def trim_host_heap() -> None:
 
 def is_quantized_by_modelopt(model: torch.nn.Module) -> bool:
     """
-    Check if the model has been quantized by NVIDIA ModelOpt library.
-    If ModelOpt is installed, use its function to check if the model is quantized.
-    Otherwise, do name/module-string checks. A caveat is that it can break if ModelOpt renames things.
+    Check for ModelOpt quantizers without importing the optional ModelOpt library.
     """
-    if importlib.util.find_spec("modelopt") is not None:
-        from modelopt.torch.quantization.utils import is_quantized
-
-        return bool(is_quantized(model))
-
     for m in model.modules():
-        cls = type(m)
-        if cls.__name__ == "TensorQuantizer" and cls.__module__.startswith(
-            "modelopt.torch.quantization"
+        if any(
+            cls.__name__ == "TensorQuantizer"
+            and cls.__module__.startswith("modelopt.torch.quantization")
+            for cls in type(m).__mro__
         ):
             return True
     return False

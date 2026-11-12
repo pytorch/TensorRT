@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_ATEN_CONVERTERS,
     ConverterPriority,
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
@@ -1087,73 +1088,66 @@ def aten_ops_neg(
     )
 
 
-try:
-    import modelopt.torch.quantization as mtq  # noqa: F401
-
-    assert torch.ops.tensorrt.quantize_op.default
-except Exception as e:
-    _LOGGER.warning(
-        "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
+def aten_ops_quantize_op(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.quantize.quantize(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
     )
-else:
 
-    @dynamo_tensorrt_converter(
-        torch.ops.tensorrt.quantize_op.default, supports_dynamic_shapes=True
+
+def aten_ops_dynamic_block_quantize_op(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.dynamic_block_quantize.quantize(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+        args[5],
+        args[6],
     )
-    def aten_ops_quantize_op(
-        ctx: ConversionContext,
-        target: Target,
-        args: Tuple[Argument, ...],
-        kwargs: Dict[str, Argument],
-        name: str,
-    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.quantize.quantize(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name,
-            args[0],
-            args[1],
-            args[2],
-            args[3],
+
+
+def register_modelopt_converters() -> None:
+    """Register available quantization ops without importing ModelOpt.
+
+    Called again before compilation to handle ModelOpt imported after Torch-TensorRT.
+    """
+    converters = [("quantize_op", aten_ops_quantize_op)]
+    if is_tensorrt_version_supported("10.8.0"):
+        converters.append(
+            ("dynamic_block_quantize_op", aten_ops_dynamic_block_quantize_op)
         )
+    for op_name, converter in converters:
+        packet = getattr(torch.ops.tensorrt, op_name, None)
+        if packet is not None:
+            op = packet.default
+            if op not in DYNAMO_ATEN_CONVERTERS:
+                dynamo_tensorrt_converter(op, supports_dynamic_shapes=True)(converter)
 
 
-if is_tensorrt_version_supported("10.8.0"):
-    try:
-        import modelopt.torch.quantization as mtq  # noqa: F401
-
-        assert torch.ops.tensorrt.dynamic_block_quantize_op.default
-    except Exception as e:
-        _LOGGER.warning(
-            "Unable to import quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
-        )
-    else:
-
-        @dynamo_tensorrt_converter(
-            torch.ops.tensorrt.dynamic_block_quantize_op.default,
-            supports_dynamic_shapes=True,
-        )
-        def aten_ops_dynamic_block_quantize_op(
-            ctx: ConversionContext,
-            target: Target,
-            args: Tuple[Argument, ...],
-            kwargs: Dict[str, Argument],
-            name: str,
-        ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-            return impl.dynamic_block_quantize.quantize(
-                ctx,
-                target,
-                SourceIR.ATEN,
-                name,
-                args[0],
-                args[1],
-                args[2],
-                args[3],
-                args[4],
-                args[5],
-                args[6],
-            )
+register_modelopt_converters()
 
 
 try:

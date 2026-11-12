@@ -50,12 +50,20 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 
 #### Key Arguments
 
+For `run_llm.py`, quantization utilities and their dependencies are only imported
+when `--quant_format` or `--pre_quantized` is specified. Use `--pre_quantized` to
+load a ModelOpt checkpoint containing `hf_quant_config.json`. FP16, BF16, and FP32
+inference with an unquantized checkpoint skips these imports and the quantization
+configuration download. Transformers still uses Hugging Face Hub for model and
+tokenizer loading.
+
 - `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
 - `--prompt`: Input prompt for generation.
 - `--image_path`: (Optional) Path to input image file for VLM models. If not provided, will use a sample image.
 - `--model_precision`: Precision of model weight/buffer (`FP16`, `BF16`, `FP32`).
 - `--quant_format`: (Optional) Quantization format (`int8`,  `fp8`, `nvfp4`) to apply.
+- `--pre_quantized`: Load a pre-quantized ModelOpt checkpoint instead of applying quantization.
 - `--quant_algo`: (Optional) Quantization algorithm (`max`, `smoothquant`), by default it is `max`.
 - `--weight_only`: (Optional) weight only quantization flag, by default it False.
 - `--num_tokens`: Number of output tokens to generate.

@@ -22,12 +22,6 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from modelopt.torch.quantization.utils import export_torch_mode
-from quantize_utils import (
-    convert_linear_to_tensorrt_quantized,
-    load_quantization_config,
-    quantize_model,
-)
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
@@ -41,7 +35,7 @@ from utils import (
 DEVICE = torch.device("cuda:0")
 
 
-def get_model(args):
+def get_model(args, hf_quant_config=None):
     """
     Load and configure the language model for inference.
 
@@ -53,6 +47,8 @@ def get_model(args):
         args: Parsed command line arguments containing:
             - model (str): Name or path of the model to load
             - precision (str): Precision to use ("FP16", "BF16", or "FP32")
+        hf_quant_config (dict or None): Pre-quantized checkpoint configuration
+            returned by load_quantization_config, if present.
 
     Returns:
         torch.nn.Module: The loaded and configured model ready for inference,
@@ -72,8 +68,9 @@ def get_model(args):
         # register SDPA variant for the model
         register_sdpa.enable_sdpa_converter(args.model, model.config)
 
-    hf_quant_config = load_quantization_config(args.model)
     if hf_quant_config:
+        from quantize_utils import convert_linear_to_tensorrt_quantized
+
         model = convert_linear_to_tensorrt_quantized(
             model, args.model_precision, hf_quant_config
         ).cuda()
@@ -95,7 +92,7 @@ def get_model(args):
     return model
 
 
-def compile_torchtrt(model, input_ids, args):
+def compile_torchtrt(model, input_ids, args, is_quantized=False):
     """
     Compile a PyTorch model to TensorRT using torch_tensorrt.dynamo.compile.
 
@@ -111,13 +108,20 @@ def compile_torchtrt(model, input_ids, args):
             - precision (str): Precision to use ("FP16", "BF16", or "FP32")
             - debug (bool): Whether to enable debug logging
             - min_block_size (int): Minimum block size for TensorRT compilation
+        is_quantized (bool): Whether the model uses quantized layers, including
+            layers loaded from a pre-quantized checkpoint.
 
     Returns:
         torch_tensorrt.dynamo.TorchTensorRTModule: The compiled TensorRT model ready
             for optimized inference
     """
     max_seq_len = input_ids.shape[1] + args.num_tokens
-    with export_torch_mode():
+    export_context = nullcontext()
+    if is_quantized:
+        from modelopt.torch.quantization.utils import export_torch_mode
+
+        export_context = export_torch_mode()
+    with export_context:
         ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
@@ -252,6 +256,11 @@ if __name__ == "__main__":
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
     arg_parser.add_argument(
+        "--pre_quantized",
+        action="store_true",
+        help="Load a pre-quantized ModelOpt checkpoint with hf_quant_config.json",
+    )
+    arg_parser.add_argument(
         "--quant_format",
         help=("Apply quantization format. Options: int8, fp8, nvfp4 (default: None)"),
         default=None,
@@ -269,7 +278,16 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     with torch.inference_mode():
-        model = get_model(args)
+        hf_quant_config = None
+        if args.pre_quantized or args.quant_format is not None:
+            from quantize_utils import load_quantization_config
+
+            hf_quant_config = load_quantization_config(args.model)
+            if args.pre_quantized and not hf_quant_config:
+                raise RuntimeError(
+                    "--pre_quantized requires a checkpoint with hf_quant_config.json"
+                )
+        model = get_model(args, hf_quant_config)
 
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
         # Set pad token
@@ -292,7 +310,9 @@ if __name__ == "__main__":
         pyt_timings = None
         pyt_stats = None
 
-        if args.quant_format != None:
+        if args.quant_format is not None:
+            from quantize_utils import quantize_model
+
             model = quantize_model(model, args, tokenizer)
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
@@ -323,7 +343,12 @@ if __name__ == "__main__":
             import static_cache_v2
 
         # Compile the model with Torch-TensorRT
-        trt_model = compile_torchtrt(model, input_ids, args)
+        trt_model = compile_torchtrt(
+            model,
+            input_ids,
+            args,
+            is_quantized=args.quant_format is not None or bool(hf_quant_config),
+        )
 
         if args.cache == "static_v1" or args.cache == "static_v2":
             if args.cudagraph:

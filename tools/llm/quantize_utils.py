@@ -5,27 +5,9 @@ import json
 import logging
 import os
 
-import huggingface_hub
 import torch
-from huggingface_hub import snapshot_download
 
 logger = logging.getLogger(__name__)
-
-try:
-    import modelopt.torch.quantization as mtq  # noqa: F401f
-
-    assert torch.ops.tensorrt.quantize_op.default
-except Exception:
-    logger.warning("Unable to import quantization op. Please install modelopt library")
-
-from modelopt.torch.quantization.config import QuantizerAttributeConfig
-from modelopt.torch.quantization.nn.modules.tensor_quantizer import TensorQuantizer
-from modelopt.torch.quantization.qtensor.nvfp4_tensor import NVFP4QTensor
-from modelopt.torch.utils.dataset_utils import (
-    create_forward_loop,
-    get_dataset_dataloader,
-)
-from safetensors import safe_open
 
 # FP8 E4M3 format has a maximum representable value of 448.0
 MAX_BOUND_FP8 = 448.0
@@ -52,6 +34,12 @@ def quantize_model(model, args, tokenizer):
     Returns:
         Quantized model
     """
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.utils.dataset_utils import (
+        create_forward_loop,
+        get_dataset_dataloader,
+    )
+
     # Create calibration dataloader for quantization
     calib_dataloader = get_dataset_dataloader(
         tokenizer=tokenizer,
@@ -104,6 +92,10 @@ class TensorRTQuantizedLinear(torch.nn.Module):
             weight_amax: Maximum absolute value for weight quantization scaling
             quant_cfg: Quantization configuration for TensorQuantizer
         """
+        from modelopt.torch.quantization.nn.modules.tensor_quantizer import (
+            TensorQuantizer,
+        )
+
         super().__init__()
 
         # Store reference to original linear layer for weight access
@@ -135,6 +127,9 @@ def load_quantization_config(model_name):
     if os.path.isdir(model_name):
         model_path = model_name
     else:
+        import huggingface_hub
+        from huggingface_hub import snapshot_download
+
         # Download model from Hugging Face Hub
         model_path = snapshot_download(
             model_name,
@@ -181,6 +176,9 @@ def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config
     Raises:
         RuntimeError: If quantization config is not found or unsupported format
     """
+    from modelopt.torch.quantization.config import QuantizerAttributeConfig
+    from safetensors import safe_open
+
     model_path = hf_quant_config["model_path"]
     # Load all tensors from SafeTensors files
     tensors = {}
@@ -236,6 +234,10 @@ def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config
                 )
 
             elif hf_quant_algo == "NVFP4":
+                from modelopt.torch.quantization.qtensor.nvfp4_tensor import (
+                    NVFP4QTensor,
+                )
+
                 # NVFP4 format requires additional scale tensor and different configuration
                 weight_name = name + ".weight"
                 weight_scale2_name = name + ".weight_scale_2"
