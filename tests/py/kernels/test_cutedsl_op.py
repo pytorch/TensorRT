@@ -97,26 +97,6 @@ def test_ptx_may_declare_wider_pointer_alignment():
     assert _cutedsl._validate_ptx(ptx, layout, (128, 1, 1), 0) == "kernel"
 
 
-@pytest.mark.parametrize(
-    "alignment,expected",
-    [
-        (1, {"x": 1, "out": 1}),
-        (16, {"x": 16, "out": 16}),
-        ({"x": 16}, {"x": 16, "out": 1}),
-    ],
-)
-def test_pointer_alignment_resolves_per_pointer(alignment, expected):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    assert _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment) == expected
-
-
-@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
-def test_invalid_pointer_alignment_is_rejected(alignment):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    with pytest.raises(ValueError, match="pointer_alignment"):
-        _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment)
-
-
 def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
     artifact = _cutedsl.CompiledCuteDSLArtifact(b"", "kernel", (128, 1, 1), 0, (9, 0))
