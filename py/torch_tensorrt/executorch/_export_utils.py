@@ -17,6 +17,10 @@ from torch.fx.experimental.symbolic_shapes import (
     has_guarding_hint,
 )
 from torch_tensorrt.dynamo._exporter import deepcopy_memo_sharing_tensors
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    engines_go_to_files,
+    offload_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +261,11 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         if raw is not None:
             # raw() views TensorRT's own buffer, and the returned tensor stays registered on
             # the program until the save ends. ExecuTorch writes named data only from
-            # bytes, so copy now, while TensorRT's buffer is the only other copy.
+            # bytes or a file, so in a save given an engine_offload_dir write the buffer
+            # to a file, which the save streams into the program; elsewhere copy it,
+            # while TensorRT's buffer is the only other copy.
+            if engines_go_to_files():
+                return offload_engine(raw().numpy(), node.name)
             return engine_bytes_tensor(raw().numpy().tobytes())
         _warn_missing_accessor("serialized_engine_tensor")
 

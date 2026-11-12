@@ -1,16 +1,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import errno
 import glob
+import os
 import platform
+import stat
 import tempfile
 
 import pytest
 import torch
 import torch_tensorrt
-from torch_tensorrt._utils import _cache_root
+from torch_tensorrt import _compile
 from torch_tensorrt.dynamo import _compiler
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    offload_engine,
+    offload_engines_to_disk,
+)
 
 pytestmark = pytest.mark.skipif(
     platform.system() == "Windows",
@@ -36,7 +43,7 @@ def _engine_files(root):
 @pytest.mark.unit
 def test_exported_program_loads_the_engines_once_all_are_built(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
-    offloaded = _cache_root() / "offloaded_engines"
+    offloaded = tmp_path / "torch_tensorrt_engines_*"
     built, setups = [], []
     real_convert = _compiler.convert_module
     real_setup = TorchTensorRTModule.setup_engine
@@ -64,10 +71,11 @@ def test_exported_program_loads_the_engines_once_all_are_built(tmp_path, monkeyp
         torch_executed_ops={torch.ops.aten.sin.default},
     )
 
-    # Both engines were built, into the cache directory, before either was loaded, and the files are gone.
+    # Both engines were built, each into its file in the private directory, before either was loaded, and the
+    # directory is gone.
     assert len(built) == 2
     assert setups and all(entry == (2, 2) for entry in setups)
-    assert not _engine_files(tmp_path)
+    assert not glob.glob(str(offloaded))
     loaded = torch_tensorrt.load(str(path)).module()
     torch.testing.assert_close(loaded(x), model(x), atol=1e-2, rtol=1e-2)
 
@@ -121,6 +129,13 @@ def test_arguments_are_packed_for_compile_and_save(monkeypatch):
         torch_tensorrt.compile_and_save(
             "program", "model.ts", output_format="torchscript", arg_inputs=["x"]
         )
+    with pytest.raises(ValueError, match="not both"):
+        torch_tensorrt.compile_and_save(
+            "program",
+            "model.pte",
+            engine_offload_dir="a",
+            save_options={"engine_offload_dir": "b"},
+        )
 
 
 def test_a_fully_supported_graph_with_require_full_compilation(tmp_path, monkeypatch):
@@ -164,3 +179,80 @@ def test_engine_files_are_deleted_when_compilation_fails(tmp_path, monkeypatch):
         )
     assert len(calls) == 2
     assert not _engine_files(tmp_path)
+
+
+def _small_export():
+    return torch.export.export(torch.nn.Linear(4, 4).eval(), (torch.randn(2, 4),))
+
+
+class _BuildReached(Exception):
+    pass
+
+
+@pytest.mark.unit
+def test_engine_offload_dir_holds_the_private_directory_from_the_start(
+    tmp_path, monkeypatch
+):
+    engine_dir = tmp_path / "engines"
+    private = []
+
+    def stop_at_build(*args, **kwargs):
+        private.extend(glob.glob(str(engine_dir / "torch_tensorrt_engines_*")))
+        raise _BuildReached
+
+    monkeypatch.setattr(_compile, "dynamo_compile", stop_at_build)
+    with pytest.raises(_BuildReached):
+        torch_tensorrt.compile_and_save(
+            _small_export(), tmp_path / "model.ep", engine_offload_dir=engine_dir
+        )
+    # The folder was created, writable only by its owner, with the private directory in it before the
+    # build; only the directory is gone.
+    assert len(private) == 1
+    assert engine_dir.is_dir() and not os.listdir(engine_dir)
+    assert stat.S_IMODE(engine_dir.stat().st_mode) == 0o700
+
+
+@pytest.mark.unit
+def test_a_missing_parent_of_engine_offload_dir_fails_before_any_build(
+    tmp_path, monkeypatch
+):
+    def no_build(*args, **kwargs):
+        pytest.fail(
+            "compile_and_save built an engine before checking engine_offload_dir"
+        )
+
+    monkeypatch.setattr(_compile, "dynamo_compile", no_build)
+    with pytest.raises(OSError, match="engine_offload_dir"):
+        torch_tensorrt.compile_and_save(
+            _small_export(),
+            tmp_path / "model.ep",
+            engine_offload_dir=tmp_path / "typo" / "engines",
+        )
+
+
+@pytest.mark.unit
+def test_a_full_disk_names_the_setting_that_moves_the_files(tmp_path, monkeypatch):
+    real_fdopen = os.fdopen
+
+    def full_disk(fd, *args, **kwargs):
+        if os.readlink(f"/proc/self/fd/{fd}").endswith(".engine"):
+            os.close(fd)
+            raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+        return real_fdopen(fd, *args, **kwargs)
+
+    def no_space(*args, **kwargs):
+        raise OSError(errno.ENOSPC, os.strerror(errno.ENOSPC))
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    # The disk can fill up when the file is created or while it is written.
+    for failing_call in ((tempfile, "mkstemp", no_space), (os, "fdopen", full_disk)):
+        with monkeypatch.context() as patch:
+            patch.setattr(*failing_call)
+            for folder, advice in (
+                (tmp_path / "engines", "set engine_offload_dir to"),
+                (None, "set engine_offload_dir (or TMPDIR) to"),
+            ):
+                with offload_engines_to_disk(folder):
+                    with pytest.raises(OSError) as error:
+                        offload_engine(b"engine", "trt_engine")
+                assert "trt_engine" in str(error.value) and advice in str(error.value)
