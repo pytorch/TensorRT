@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -20,6 +21,10 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    defer_engine_setup_to_load,
+    offload_engine,
+)
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
     get_output_dtypes,
@@ -48,6 +53,7 @@ class SerializedInterpreterResult(NamedTuple):
     # and bind the same device pointer).
     aliased_io: Dict[str, Tuple[str, str]] = {}
     num_user_outputs: Optional[int] = None
+    pytorch_plugin_ops: List[str] = []
 
 
 def infer_module_output_dtypes(
@@ -106,6 +112,7 @@ def insert_engine_to_cache(
             interpreter_result.requires_output_allocator,
             interpreter_result.requires_native_multidevice,
             interpreter_result.aliased_io,
+            interpreter_result.pytorch_plugin_ops,
         ),
     )
     logger.info(f"Engine with hash: {hash_val} was successfully inserted into cache")
@@ -144,6 +151,7 @@ def pull_cached_engine(
             requires_output_allocator,
             requires_native_multidevice,
             aliased_io,
+            pytorch_plugin_ops,
         ) = cached_data
 
         setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -192,7 +200,7 @@ def pull_cached_engine(
             # The serialization config keeps its engine alive, so free both.
             del engine, serialization_config
 
-        return SerializedInterpreterResult(
+        serialized_interpreter_result = SerializedInterpreterResult(
             serialized_engine=serialized_engine,
             input_names=input_names,
             output_names=output_names,
@@ -200,19 +208,24 @@ def pull_cached_engine(
             requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
             aliased_io=aliased_io,
+            pytorch_plugin_ops=pytorch_plugin_ops,
             # The cached graph is identical; recover its user-output boundary
-            # without changing the cache's on-disk tuple format.
+            # without changing the cache's on-disk tuple format. The interpreter
+            # marks one engine output per output position.
             num_user_outputs=len(
-                {
-                    id(value)
-                    for value in torch.utils._pytree.tree_leaves(
-                        next(
-                            node for node in module.graph.nodes if node.op == "output"
-                        ).args[0]
-                    )
-                }
+                torch.utils._pytree.tree_leaves(
+                    next(
+                        node for node in module.graph.nodes if node.op == "output"
+                    ).args[0]
+                )
             ),
         )
+        # Record a cache hit only after compatibility checks, refitting, and
+        # result reconstruction have all completed successfully.
+        from torch_tensorrt.dynamo._reporting import record_cache_hit
+
+        record_cache_hit()
+        return serialized_interpreter_result
     return None
 
 
@@ -391,6 +404,7 @@ def _interpret_module_to_result_impl(
         symbolic_shape_expressions=symbolic_shape_expressions,
         aliased_io=interpreter_result.aliased_io,
         num_user_outputs=interpreter_result.num_user_outputs,
+        pytorch_plugin_ops=interpreter_result.pytorch_plugin_ops,
     )
 
     return serialized_interpreter_result
@@ -416,6 +430,9 @@ def convert_module(
     serialized_interpreter_result = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
+    from torch_tensorrt.dynamo._reporting import record_engine_metadata
+
+    record_engine_metadata(name, serialized_interpreter_result)
 
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
         logger.info(
@@ -438,8 +455,12 @@ def convert_module(
                 "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
             )
 
-    return TorchTensorRTModule(
-        serialized_engine=serialized_interpreter_result.serialized_engine,
+    module = TorchTensorRTModule(
+        serialized_engine=(
+            None
+            if defer_engine_setup_to_load()
+            else serialized_interpreter_result.serialized_engine
+        ),
         input_binding_names=list(serialized_interpreter_result.input_names),
         output_binding_names=list(serialized_interpreter_result.output_names),
         name=name,
@@ -449,4 +470,11 @@ def convert_module(
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
         aliased_io=serialized_interpreter_result.aliased_io,
         num_user_outputs=serialized_interpreter_result.num_user_outputs,
+        pytorch_plugin_ops=serialized_interpreter_result.pytorch_plugin_ops,
     )
+    if defer_engine_setup_to_load():
+        # Inside compile_and_save: the engine stays in its file until the save.
+        module.serialized_engine = offload_engine(
+            serialized_interpreter_result.serialized_engine, name
+        )
+    return module

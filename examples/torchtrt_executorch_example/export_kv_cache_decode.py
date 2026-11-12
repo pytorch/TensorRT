@@ -29,10 +29,9 @@ one. Nothing does that for it: on the two-call path the check is the caller's.
 
 Prerequisites
 -------------
-Install Torch-TensorRT with the ExecuTorch extra before running this example::
-
-    pip install -e ".[executorch]" \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
+Install Torch-TensorRT with its ``executorch`` extra, as the Installation section of
+the ExecuTorch deployment guide shows:
+https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#installation
 """
 
 import argparse

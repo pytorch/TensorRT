@@ -123,6 +123,18 @@ class TestAsStridedConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
+    def test_diagonal_without_dim2(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.diagonal.default(x, 0, 2)
+
+        self.run_test(
+            TestModule(),
+            [torch.randn(2, 4, 4)],
+            enable_passes=True,
+            use_dynamo_tracer=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

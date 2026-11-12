@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=29ff6be7"></script>
+    <script src="../_static/documentation_options.js?v=23415393"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -188,6 +188,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -200,19 +207,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
     Debugging
@@ -329,6 +336,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -666,8 +680,15 @@ for a full walkthrough.</p>
 <h3>Resource Partitioning<a class="headerlink" href="#resource-partitioning" title="Link to this heading">#</a></h3>
 <p>Large models can exhaust CPU RAM during TensorRT engine building because TensorRT holds
 multiple copies of the graph in memory during optimization. <strong>Resource partitioning</strong>
-splits oversized TRT subgraphs into smaller pieces to stay within a memory budget,
-running them sequentially through the builder.</p>
+splits oversized TRT subgraphs into smaller pieces and builds them one after another, so
+each build holds only part of the model.</p>
+<p>It has two controls:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>, the host memory the compilation may use. The partitioner derives
+the size of each engine from it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code>, the size of each engine itself. It is a finer control
+over the same split; see <a class="reference internal" href="#fixing-the-engine-size">Fixing the Engine Size</a> below.</p></li>
+</ul>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.partitioning._resource_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">resource_partition</span>
 
 <span class="c1"># After capability partitioning, split subgraphs that exceed memory budget</span>
@@ -683,21 +704,78 @@ running them sequentially through the builder.</p>
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>How the budget is computed:</p>
+<p>How the split is computed:</p>
 <ol class="arabic simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">ResourcePartitioner</span></code> queries available system memory via <code class="docutils literal notranslate"><span class="pre">psutil</span></code>.</p></li>
-<li><p>It estimates the parameter footprint of each TRT subgraph by summing <code class="docutils literal notranslate"><span class="pre">get_attr</span></code>
-tensor byte sizes.</p></li>
-<li><p>The per-engine budget is <code class="docutils literal notranslate"><span class="pre">available_memory</span> <span class="pre">//</span> <span class="pre">ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER</span></code>
-(default multiplier: 4, accounting for TensorRT’s internal copies during build).</p></li>
-<li><p>Any subgraph whose estimated footprint exceeds this budget is split iteratively
-until all pieces fit.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ResourcePartitioner</span></code> reads the process’s resident memory (RSS) via <code class="docutils literal notranslate"><span class="pre">psutil</span></code>, or the
+available system memory when <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code> is not set.</p></li>
+<li><p>It estimates the size of each TRT subgraph as the bytes of the weights (<code class="docutils literal notranslate"><span class="pre">get_attr</span></code>
+tensors) its nodes read. A weight read by two subgraphs counts in both, because each
+engine stores its own copy.</p></li>
+<li><p>The per-engine size is <code class="docutils literal notranslate"><span class="pre">(cpu_memory_budget</span> <span class="pre">-</span> <span class="pre">RSS)</span> <span class="pre">//</span> <span class="pre">ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">available_memory</span> <span class="pre">//</span> <span class="pre">ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER</span></code> without a budget
+(default multiplier: 4, the assumption that building an engine takes about 4 times its
+weights in host memory).</p></li>
+<li><p>If the whole model is within that size, nothing is split. A model more than
+<code class="docutils literal notranslate"><span class="pre">MAX_NUM_OF_ENGINES</span></code> (50) times that size fails with an error instead.</p></li>
+<li><p>Otherwise, each larger subgraph is split from the front, in graph order. Nodes move into
+a new engine in steps; a step that would take the engine over the size is undone and
+retried with fewer nodes. A single node larger than the size gets an engine of its own,
+which is then larger than the size.</p></li>
 </ol>
 <p>The splitter keeps <strong>atomic subgraphs</strong> (operator fusions) intact. It will not split a
-fused <code class="docutils literal notranslate"><span class="pre">conv</span> <span class="pre">→</span> <span class="pre">bn</span> <span class="pre">→</span> <span class="pre">relu</span></code> pattern across a boundary, migrating the whole fusion to
-whichever side contains the most of its nodes.</p>
+fused <code class="docutils literal notranslate"><span class="pre">conv</span> <span class="pre">→</span> <span class="pre">bn</span> <span class="pre">→</span> <span class="pre">relu</span></code> pattern across a boundary: it moves the whole fusion, and the
+producers it needs, into the earlier engine.</p>
 <p>Empirically, resource partitioning has negligible runtime cost — TRT can optimise
 within each piece nearly as well as across the full subgraph.</p>
+</section>
+<section id="fixing-the-engine-size">
+<h3>Fixing the Engine Size<a class="headerlink" href="#fixing-the-engine-size" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code> sets the per-engine size of step 3 directly, in bytes of
+weights, instead of deriving it from <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code> and the resident memory. Every
+other step stays the same:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">max_partition_size</span><span class="o">=</span><span class="mi">512</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>  <span class="c1"># 512 MiB of weights per engine</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Use it when:</p>
+<ul class="simple">
+<li><p><strong>The split must be the same on every run.</strong> The size derived from the budget changes
+with the process’s resident memory when partitioning starts, which depends on things
+unrelated to the model: what the caller still holds, the allocator, and weights that are
+memory-mapped and not yet read. With the same budget, a 3.6-billion-parameter robot
+policy split into 27 engines in one run and 13 in another. With a fixed size, the split
+depends only on the model and the size.</p></li>
+<li><p><strong>Programs need different sizes.</strong> Each <code class="docutils literal notranslate"><span class="pre">compile</span></code> call takes its own size, so an
+application that compiles several programs can split a large one finely and keep a
+small one in a single engine.</p></li>
+<li><p><strong>You want to choose the trade-off yourself.</strong> A smaller size lowers the memory peak of
+each build, at the cost of more engines.</p></li>
+</ul>
+<p>How it combines with the budget:</p>
+<ul class="simple">
+<li><p>Setting it turns resource partitioning on, so <code class="docutils literal notranslate"><span class="pre">enable_resource_partitioning</span></code> need not
+be set.</p></li>
+<li><p>It replaces <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>, so setting both raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>. The resident
+memory is not read.</p></li>
+<li><p>Internally, the partitioner treats the size as a budget of
+<code class="docutils literal notranslate"><span class="pre">4</span> <span class="pre">×</span> <span class="pre">max_partition_size</span></code>, so the checks of step 4 follow from it: a model
+within the size stays one engine, and a size so small that the model is more than 50
+times it fails with an error that names <code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code>.</p></li>
+</ul>
+<p>What it does not bound:</p>
+<ul class="simple">
+<li><p><strong>The memory of a build.</strong> The size counts an engine’s weights. The memory TensorRT
+takes to build that engine is a multiple of it, which the factor of 4 only estimates;
+builds have been measured at 3 to 10 times their weights. Check the peak of a first
+compile, and lower the size if it is too high. Each split logs its engines’ weights at
+<code class="docutils literal notranslate"><span class="pre">INFO</span></code> level.</p></li>
+<li><p><strong>Layers larger than the size.</strong> A single layer larger than the size still gets an
+engine of its own, larger than the size. Lowering the size below the largest layer
+doesn’t make that layer’s engine any smaller.</p></li>
+</ul>
 </section>
 <section id="atomic-subgraphs-and-fusion-preservation">
 <h3>Atomic Subgraphs and Fusion Preservation<a class="headerlink" href="#atomic-subgraphs-and-fusion-preservation" title="Link to this heading">#</a></h3>
@@ -761,7 +839,12 @@ groups, migrating whole fusions to keep them together.</p>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
-<td><p>Byte budget per TRT engine during build. <code class="docutils literal notranslate"><span class="pre">None</span></code> uses available system memory.</p></td>
+<td><p>Host memory budget for the build; each engine gets <code class="docutils literal notranslate"><span class="pre">(budget</span> <span class="pre">-</span> <span class="pre">RSS)</span> <span class="pre">/</span> <span class="pre">4</span></code>. <code class="docutils literal notranslate"><span class="pre">None</span></code> uses available system memory.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_partition_size</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Weight bytes per engine: a finer control than <code class="docutils literal notranslate"><span class="pre">cpu_memory_budget</span></code>, which it replaces
+when set. The split then depends only on the model and this size.</p></td>
 </tr>
 </tbody>
 </table>
@@ -865,6 +948,7 @@ Segments marked <code class="docutils literal notranslate"><span class="pre">do_
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#checking-converter-coverage">Checking Converter Coverage</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#partitioning-strategies">Partitioning Strategies</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#resource-partitioning">Resource Partitioning</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fixing-the-engine-size">Fixing the Engine Size</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#atomic-subgraphs-and-fusion-preservation">Atomic Subgraphs and Fusion Preservation</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#user-facing-controls">User-Facing Controls</a></li>
 </ul>

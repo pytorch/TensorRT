@@ -4,7 +4,7 @@
 import logging
 import operator
 import warnings
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import tensorrt as trt
 import torch
@@ -78,6 +78,48 @@ def _fold_constants(
     return _PYTHON_FOLD_OPS[trt_op](lhs_val, rhs_val)
 
 
+def _python_int_as_0d(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    value: TRTTensor,
+    other: TRTTensor,
+) -> TRTTensor:
+    if (
+        value not in ctx.python_ints
+        or len(other.shape) != 0
+        or tuple(value.shape) != (1,)
+    ):
+        return value
+    layer = ctx.net.add_shuffle(value)
+    layer.reshape_dims = ()
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
+
+
+def python_ints_as_0d(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Any,
+    rhs_val: Any,
+) -> Tuple[Any, Any]:
+    """A Python int that the graph computes, such as a size read from a dynamic shape,
+    comes as a tensor of shape (1,). Next to a 0-d tensor it becomes 0-d, as in PyTorch.
+    A converter that builds layers from its operands before the elementwise layer calls
+    this first, because the tensors those layers make are not known to hold the int."""
+    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
+        lhs_val = _python_int_as_0d(
+            ctx, target, source_ir, f"{name}_lhs_0d", lhs_val, rhs_val
+        )
+        rhs_val = _python_int_as_0d(
+            ctx, target, source_ir, f"{name}_rhs_0d", rhs_val, lhs_val
+        )
+    return lhs_val, rhs_val
+
+
 def convert_binary_elementwise(
     ctx: ConversionContext,
     target: Target,
@@ -132,17 +174,22 @@ def convert_binary_elementwise(
         )
         return _fold_constants(op_type, lhs_val, rhs_val)
 
-    # If the following conditions are true:
-    #  1. the network has implicit batch dimension,
-    #  2. one operand has shape [] (real shape is [batch_size]),
-    #  3. another operand is a scalar,
-    # then the result should also have shape [] (real shape is [batch_size]).
-    #
-    # In such case, we need to convert the scalar operand to tensor, because
-    # this way the shape will become [1], and then will be properly squeezed
-    # into [], meaning that the result will have shape [], which is what we
-    # expect.
-    #
+    # TensorRT takes an INT8 constant only as quantized data, so int8 constants (and
+    # Python ints next to an int8 tensor) become int32 ones, and an int8 result made
+    # from one does not wrap around as in PyTorch until it is cast back to int8 at a
+    # graph output.
+    output = getattr(ctx.current_node, "meta", {}).get("val")
+    if getattr(output, "dtype", None) == torch.int8 and any(
+        (isinstance(v, torch.Tensor) and v.dtype == torch.int8)
+        or (isinstance(v, int) and not isinstance(v, bool))
+        for v in (lhs_val, rhs_val)
+    ):
+        logger.warning(
+            f"{name} computes an int8 result from an int8 constant in int32, so int8 "
+            "overflow does not wrap around as it does in PyTorch when the result feeds "
+            "other ops in the engine. An int8 graph output is cast back to int8 and wraps."
+        )
+
     # Wrap Python scalars using PyTorch's weak scalar-promotion rules. This
     # preserves low-precision floating-point tensors while allowing mixed
     # integer/float and bool/numeric expressions to promote when required.
@@ -153,12 +200,24 @@ def convert_binary_elementwise(
         promoted = torch.result_type(torch.empty([1], dtype=torch_tensor_dtype), scalar)
         return _enums.dtype._from(promoted).to(trt.DataType)
 
-    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = to_torch(rhs_val, dtype=_scalar_wrap_dtype(lhs_dtype, rhs_val))
-    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = to_torch(lhs_val, dtype=_scalar_wrap_dtype(rhs_dtype, lhs_val))
+    # A scalar next to a 0-d tensor stays 0-d, or the result would gain a dim.
+    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, (float, int, bool)):
+        dtype = _scalar_wrap_dtype(lhs_dtype, rhs_val)
+        rhs_val = (
+            get_trt_tensor(ctx, rhs_val, f"{name}_rhs", dtype, min_rank=0)
+            if len(lhs_val.shape) == 0
+            else to_torch(rhs_val, dtype=dtype)
+        )
+    if isinstance(rhs_val, TRTTensor) and isinstance(lhs_val, (float, int, bool)):
+        dtype = _scalar_wrap_dtype(rhs_dtype, lhs_val)
+        lhs_val = (
+            get_trt_tensor(ctx, lhs_val, f"{name}_lhs", dtype, min_rank=0)
+            if len(rhs_val.shape) == 0
+            else to_torch(lhs_val, dtype=dtype)
+        )
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
+    lhs_val, rhs_val = python_ints_as_0d(ctx, target, source_ir, name, lhs_val, rhs_val)
 
     # Match PyTorch's actual elementwise dtype rules, which use the weak
     # ZeroDim promotion rule (0-dim fp32 * Nd fp16 -> fp16, not fp32).
@@ -187,13 +246,30 @@ def convert_binary_elementwise(
     ):
         trt_promoted_type = _enums.dtype._from(torch.int32).to(trt.DataType)
 
-    if trt_promoted_type != lhs_val.dtype:
-        lhs_val = cast_trt_tensor(
-            ctx, lhs_val, trt_promoted_type, f"{name}_cast_lhs_val", target, source_ir
+    # PyTorch computes a 16-bit float tensor with a Python float in float32 and rounds only
+    # the result. Do the same for a value the graph computes as a Python float, such as a
+    # quotient of dynamic sizes, so one above the float16 range still gives finite values.
+    # Comparisons are the exception: PyTorch compares in the tensor's type.
+    compute_type = trt_promoted_type
+    if (
+        trt_promoted_type in (trt.DataType.HALF, trt.DataType.BF16)
+        and op_type
+        not in (
+            trt.ElementWiseOperation.EQUAL,
+            trt.ElementWiseOperation.GREATER,
+            trt.ElementWiseOperation.LESS,
         )
-    if trt_promoted_type != rhs_val.dtype:
+        and (lhs_val in ctx.python_floats or rhs_val in ctx.python_floats)
+    ):
+        compute_type = trt.DataType.FLOAT
+
+    if compute_type != lhs_val.dtype:
+        lhs_val = cast_trt_tensor(
+            ctx, lhs_val, compute_type, f"{name}_cast_lhs_val", target, source_ir
+        )
+    if compute_type != rhs_val.dtype:
         rhs_val = cast_trt_tensor(
-            ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
+            ctx, rhs_val, compute_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
     if len(lhs_val.shape) == len(rhs_val.shape) and all(
@@ -212,6 +288,10 @@ def convert_binary_elementwise(
     layer = ctx.net.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name, source_ir)
     output = layer.get_output(0)
+    if output.dtype == compute_type != trt_promoted_type:
+        output = cast_trt_tensor(
+            ctx, output, trt_promoted_type, f"{name}_cast_output", target, source_ir
+        )
     kind: str = str(target.__name__) if callable(target) else target
     output.name = output.name + "_" + kind
     return output

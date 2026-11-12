@@ -9,6 +9,10 @@ File TensorRTBackend.h
 .. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
 
 
+
+ExecuTorch backend delegate that runs TensorRT engines serialized by torch_tensorrt. 
+ 
+
 .. contents:: Contents
    :local:
    :backlinks: none
@@ -24,6 +28,11 @@ Definition (``cpp/include/torch_tensorrt/executorch/TensorRTBackend.h``)
 
 
 
+Detailed Description
+--------------------
+
+The processed blob uses the standalone TR01 wire format from py/torch_tensorrt/executorch/serialization.py and is parsed directly here. This runtime path intentionally does not depend on the legacy Torch-TensorRT C++ runtime or libtorch. 
+
 
 
 Includes
@@ -32,15 +41,15 @@ Includes
 
 - ``NvInfer.h``
 
+- ``cstdint``
+
 - ``executorch/runtime/backend/interface.h``
 
 - ``memory``
 
-- ``mutex``
+- ``torch_tensorrt/executorch/OptimizationProfileSelection.h`` (:ref:`file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h`)
 
-- ``string``
-
-- ``vector``
+- ``type_traits``
 
 
 
@@ -60,11 +69,11 @@ Classes
 -------
 
 
-- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle`
-
-- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds`
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag`
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard`
 
 - :ref:`exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend`
 

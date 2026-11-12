@@ -136,7 +136,16 @@ def _generate_plugin_converter(
 
         unique_id = uuid.uuid4()
         itensor_args = [
-            get_trt_tensor(ctx, t, f"{t_name}_{unique_id}")
+            get_trt_tensor(
+                ctx,
+                t,
+                f"{t_name}_{unique_id}",
+                target_quantized_type=(
+                    trt.DataType.INT8
+                    if getattr(t, "dtype", None) == torch.int8
+                    else None
+                ),
+            )
             for (t, t_name) in zip(tensor_args, tensor_inputs)
         ]
 
@@ -184,6 +193,8 @@ def _generate_plugin_converter(
         # A mutating schema means the plugin declares aliased I/O
         # (`_generate_plugin` emits `.aliased()` from the same signal).
         requires_aliased_plugin_io=schema_declares_mutation,
+        # A JIT plugin runs the PyTorch op from Python at execution time.
+        requires_pytorch_plugin=not use_aot_plugin,
     )(custom_kernel_converter)
     assert torch_overload in DYNAMO_CONVERTERS, (
         f"Generated dynamo converter for {namespace}::{op_name} did not get properly"

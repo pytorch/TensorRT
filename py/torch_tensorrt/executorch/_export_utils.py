@@ -5,12 +5,18 @@ from __future__ import annotations
 
 import copy
 import logging
+import warnings
 from typing import Any, Sequence
 
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
+from torch.fx.experimental.symbolic_shapes import (
+    guarding_hint_or_throw,
+    has_guarding_hint,
+)
+from torch_tensorrt.dynamo._exporter import deepcopy_memo_sharing_tensors
 
 logger = logging.getLogger(__name__)
 
@@ -91,21 +97,82 @@ def get_engine_info_from_state(
     return list(state[0] if isinstance(state, tuple) else state)
 
 
-def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
-    """Reject engine configurations unsupported by ExecuTorch export."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
+    """Whether the engine knows every output shape for this node's input shapes.
+
+    Torch-TensorRT marks an engine as needing an output allocator when any of its
+    operations has a data-dependent shape, which also keeps CUDA graphs off for it.
+    Only an output with such a shape needs the allocator ExecuTorch lacks. An input
+    without a concrete example shape makes the answer False, since nothing proves
+    the outputs known.
+    """
+    input_shapes = []
+    for arg in node.args[0]:
+        val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        if not all(has_guarding_hint(dim) for dim in val.shape):
+            return False
+        input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
+    output_shapes = engine_obj.infer_outputs(input_shapes)
+    return all(
+        -1 not in tuple(getattr(shape, "shape", shape)) for shape in output_shapes
     )
 
+
+def validate_engine_info(
+    engine_info: Sequence[Any],
+    *,
+    node_name: str = "",
+    cause: BaseException | None = None,
+) -> None:
+    """Reject engine configurations unsupported by ExecuTorch export.
+
+    ``cause`` is chained to the refusal, so the error behind it stays visible.
+    """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+        SERIALIZED_METADATA_IDX,
+        TorchTensorRTModule,
+    )
+
+    node_suffix = f" for node '{node_name}'" if node_name else ""
     if (
         len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
         and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
     ):
-        node_suffix = f" for node '{node_name}'" if node_name else ""
         raise RuntimeError(
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
+        ) from cause
+    serialized_metadata = (
+        engine_info[SERIALIZED_METADATA_IDX]
+        if len(engine_info) > SERIALIZED_METADATA_IDX
+        else ""
+    )
+    metadata = (
+        TorchTensorRTModule.decode_metadata(serialized_metadata)
+        if serialized_metadata
+        else {}
+    )
+    plugin_ops = metadata.get("pytorch_plugin_ops")
+    # Dynamo compilation always writes metadata, so only an engine built another way lacks
+    # it and is passed through as before. One with metadata but no mark may hold plugins.
+    if metadata and plugin_ops is None:
+        raise RuntimeError(
+            f"ExecuTorch export cannot check the TensorRT engine{node_suffix}: it does "
+            "not record whether the engine uses TensorRT plugins that run PyTorch. It "
+            "was saved by an older Torch-TensorRT, or wrapped in TorchTensorRTModule "
+            "without pytorch_plugin_ops. Compile the model again, or pass "
+            "pytorch_plugin_ops ([] for an engine without such plugins)."
+        )
+    if plugin_ops:
+        raise RuntimeError(
+            f"ExecuTorch export does not support the TensorRT engine{node_suffix}: it "
+            f"runs {', '.join(plugin_ops)} with TensorRT plugins that run PyTorch, and "
+            "the ExecuTorch TensorRT runtime does not load PyTorch. Compile with "
+            "fallback_pytorch_plugin_ops=True to keep those operators out of TensorRT."
         )
 
 
@@ -188,7 +255,10 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         engine_obj = _resolve_engine_object(exported_program, node)
         raw = getattr(engine_obj, "serialized_engine_tensor", None)
         if raw is not None:
-            return raw()
+            # raw() views TensorRT's own buffer, and the returned tensor stays registered on
+            # the program until the save ends. ExecuTorch writes named data only from
+            # bytes, so copy now, while TensorRT's buffer is the only other copy.
+            return engine_bytes_tensor(raw().numpy().tobytes())
         _warn_missing_accessor("serialized_engine_tensor")
 
     engine_bytes = _resolve_engine_info(exported_program, node)[ENGINE_IDX]
@@ -196,9 +266,27 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         import base64
 
         engine_bytes = base64.b64decode(engine_bytes)
-    elif not isinstance(engine_bytes, (bytes, bytearray)):
+    elif not isinstance(engine_bytes, bytes):
         engine_bytes = bytes(engine_bytes)
-    return torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
+    return engine_bytes_tensor(engine_bytes)
+
+
+# The attribute engine_bytes_tensor sets and TensorRTBackend.preprocess reads back.
+ENGINE_BYTES_ATTR = "_trt_engine_bytes"
+
+
+def engine_bytes_tensor(engine_bytes: bytes) -> "torch.Tensor":
+    """A uint8 view of ``engine_bytes`` that remembers the ``bytes`` object.
+
+    ExecuTorch stores named data only as ``bytes``, so ``TensorRTBackend.preprocess``
+    reads ``ENGINE_BYTES_ATTR`` back to hand over this same object rather than a copy.
+    Nothing writes an engine buffer, so viewing read-only memory is safe.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="The given buffer is not writable")
+        tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
+    setattr(tensor, ENGINE_BYTES_ATTR, engine_bytes)
+    return tensor
 
 
 def validate_engine_program(
@@ -209,12 +297,19 @@ def validate_engine_program(
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
 
-    Validation reads only metadata, so the records kept in ``resolved`` are
-    metadata-only: their ENGINE_IDX slot is empty. The rewrite reuses them for the
+    Validation reads each engine's metadata. For an engine marked as needing an
+    output allocator it also asks the live engine for its output shapes, which sets
+    the node's input shapes on the engine's execution context and creates the context
+    if no run has yet. The records kept in ``resolved`` are metadata-only: their
+    ENGINE_IDX slot is empty. The rewrite reuses them for the
     plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
     """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    )
+
     count = 0
     # One engine can feed several execute_engine nodes, and resolving it again would
     # serialize it again and keep a second copy of the bytes.
@@ -241,7 +336,28 @@ def validate_engine_program(
             )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
-        validate_engine_info(engine_info, node_name=node.name)
+        inference_error = None
+        if (
+            node.target is torch.ops.tensorrt.execute_engine.default
+            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
+        ):
+            try:
+                shapes_known = _output_shapes_are_known(
+                    _resolve_engine_object(exported_program, node), node
+                )
+            except RuntimeError as error:
+                # The C++ engine raises when it cannot create an output for an
+                # unknown dimension, but also when anything else fails, so the
+                # refusal keeps the error as its cause.
+                shapes_known, inference_error = False, error
+            if shapes_known:
+                # ExecuTorch needs no output allocator then. This record becomes
+                # the ExecuTorch engine's arguments, and the backend refuses a
+                # marked one.
+                engine_info = list(engine_info)
+                engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
+        validate_engine_info(engine_info, node_name=node.name, cause=inference_error)
         if resolved is not None:
             resolved[node.name] = engine_info
         count += 1
@@ -249,22 +365,15 @@ def validate_engine_program(
 
 
 def _payload_sharing_memo(exported_program: Any) -> dict[int, Any]:
-    memo: dict[int, Any] = {}
+    memo = deepcopy_memo_sharing_tensors(
+        exported_program.graph_module, _SHARED_PAYLOAD_TYPES
+    )
     for value in (
         *exported_program.state_dict.values(),
         *exported_program.constants.values(),
     ):
         if isinstance(value, _SHARED_PAYLOAD_TYPES):
             memo[id(value)] = value
-    for module in exported_program.graph_module.modules():
-        for value in (
-            *module.parameters(recurse=False),
-            *module.buffers(recurse=False),
-        ):
-            memo[id(value)] = value
-        for value in module.__dict__.values():
-            if isinstance(value, _SHARED_PAYLOAD_TYPES):
-                memo[id(value)] = value
     for module in exported_program.graph_module.modules():
         if not isinstance(module, torch.fx.GraphModule):
             continue

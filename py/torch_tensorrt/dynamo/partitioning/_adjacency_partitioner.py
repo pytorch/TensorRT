@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+from collections import defaultdict, deque
 from typing import Collection, Dict, List, Optional, Set, Tuple
 
 import torch
@@ -10,6 +11,7 @@ from torch.fx.node import Target
 from torch.fx.passes.splitter_base import (
     FxNetAccFusionsFinder,
     FxNetAccNodesFinder,
+    FxNetSplitterInternalError,
     Subgraph,
     _SplitterBase,
     _SplitterSettingBase,
@@ -25,10 +27,14 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
-from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
+from torch_tensorrt.dynamo.partitioning.common import (
+    get_node_module_types,
+    node_in_torch_executed_module,
+)
 from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -50,6 +56,8 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Keep impure refusals out of the counters used to decide full support.
         self.fallback_operators: Dict[str, int] = {}
         self.fallback_reasons: Dict[str, Set[str]] = {}
+        self.node_support: Dict[str, bool] = {}
+        self.node_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
         self.torch_executed_modules = torch_executed_modules
@@ -57,6 +65,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     def _record_fallback(
         self, node: torch.fx.Node, node_name: str, reason: str
     ) -> None:
+        self.node_reasons.setdefault(node.name, set()).add(reason)
         # Structural nodes must not make a fully supported graph report fallback.
         if node.op in CALLABLE_NODE_OPS:
             self.fallback_operators[node_name] = (
@@ -65,6 +74,13 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             self.fallback_reasons.setdefault(node_name, set()).add(reason)
 
     def is_node_supported(
+        self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
+    ) -> bool:
+        supported = self._is_node_supported(submodules, node)
+        self.node_support[node.name] = supported
+        return supported
+
+    def _is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
@@ -106,6 +122,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
             self._record_fallback(node, node_name, "complex tensor dtype")
+            return False
+
+        if makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
             return False
 
         if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
@@ -303,6 +327,10 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                         "Eliminating acc subgraph because it's smaller than the threshold: "
                         f"{len(subgraph.nodes)} < {self.settings.min_acc_module_size}"
                     )
+                    for node in subgraph.nodes:
+                        node.meta["_torchtrt_partition_fallback_reason"] = (
+                            "below_min_block_size"
+                        )
                     if result:
                         result[-1].nodes.extend(subgraph.nodes)
                     else:
@@ -412,6 +440,67 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         return starter_non_acc_nodes, starter_acc_nodes
 
+    def put_nodes_into_subgraphs(self) -> List[Subgraph]:
+        """Builds the same subgraphs as _SplitterBase.put_nodes_into_subgraphs
+
+        starter_nodes puts every callable node in the frontier, and the base
+        class can rescan that whole frontier for a ready node at every step,
+        which is quadratic on large graphs. Counting the unplaced dependencies
+        of each node finds ready nodes in time proportional to the nodes plus
+        their dependency entries. Each subgraph still takes every node of its
+        kind whose dependencies are placed, so the node sets match. Fusion
+        groups need no extra step: every callable node is counted from the
+        start, and their constraints are already in deps.
+        """
+        pending = {
+            node: len(self.deps[node])
+            for node in self.module.graph.nodes
+            if node.op in CALLABLE_NODE_OPS
+        }
+        dependents: Dict[torch.fx.Node, List[torch.fx.Node]] = defaultdict(list)
+        for node in pending:
+            for dep in self.deps[node]:
+                dependents[dep].append(node)
+
+        ready = {
+            is_acc: deque(
+                node
+                for node, count in pending.items()
+                if count == 0 and (node in self.acc_nodes) == is_acc
+            )
+            for is_acc in (False, True)
+        }
+        acc_subgraph = not ready[False]
+        current_subgraph_nodes: List[torch.fx.Node] = []
+        subgraphs: List[Subgraph] = []
+        remaining = len(pending)
+        while remaining:
+            if not ready[acc_subgraph]:
+                if not current_subgraph_nodes:
+                    raise FxNetSplitterInternalError("Subgraph can't be empty")
+                subgraphs.append(
+                    Subgraph(is_acc=acc_subgraph, nodes=current_subgraph_nodes)
+                )
+                acc_subgraph = not acc_subgraph
+                current_subgraph_nodes = []
+                continue
+
+            node = ready[acc_subgraph].popleft()
+            current_subgraph_nodes.append(node)
+            remaining -= 1
+            for user in dependents[node]:
+                pending[user] -= 1
+                if pending[user] == 0:
+                    ready[user in self.acc_nodes].append(user)
+
+        if current_subgraph_nodes:
+            subgraphs.append(
+                Subgraph(is_acc=acc_subgraph, nodes=current_subgraph_nodes)
+            )
+        if not subgraphs:
+            raise FxNetSplitterInternalError("Couldn't create subgraphs")
+        return subgraphs
+
 
 def partition(
     gm: torch.fx.GraphModule,
@@ -446,7 +535,7 @@ def partition(
         all_module_types = {
             module_type
             for node in gm.graph.nodes
-            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+            for module_type in get_node_module_types(node)
         }
         unmatched = set(torch_executed_modules) - all_module_types
         if unmatched:

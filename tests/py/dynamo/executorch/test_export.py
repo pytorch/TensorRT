@@ -4,6 +4,7 @@
 import base64
 import gc
 import importlib
+import pickle
 import sys
 import types
 import weakref
@@ -117,7 +118,9 @@ class _EngineState:
         self.info[INPUT_BINDING_NAMES_IDX] = "x"
         self.info[OUTPUT_BINDING_NAMES_IDX] = "output0"
         self.info[HW_COMPATIBLE_IDX] = "0"
-        self.info[SERIALIZED_METADATA_IDX] = "engine-metadata"
+        self.info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+            pickle.dumps({"name": "engine-metadata", "pytorch_plugin_ops": []})
+        ).decode("utf-8")
         self.info[TARGET_PLATFORM_IDX] = "linux_x86_64"
         self.info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(int(requires_output_allocator))
         self.info[RESOURCE_ALLOCATION_STRATEGY_IDX] = "1"
@@ -490,6 +493,22 @@ def test_validate_engine_program_rejects_output_allocator_without_mutation():
 
 
 @pytest.mark.unit
+def test_validate_engine_program_keeps_the_output_shape_error_as_the_cause():
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, input_node, engine = _engine_program(
+        lifted=False, requires_output_allocator=True
+    )
+    input_node.meta["val"] = torch.empty(2, 3)
+    error = RuntimeError("Unable to create TensorRT execution context")
+    engine.infer_outputs = MagicMock(side_effect=error)
+
+    with pytest.raises(RuntimeError, match="output allocator") as refusal:
+        export_utils.validate_engine_program(program)
+
+    assert refusal.value.__cause__ is error
+
+
+@pytest.mark.unit
 def test_export_returns_edge_and_forwards_all_options(monkeypatch):
     export_module, lower = _patch_lowering(monkeypatch)
     program = FakeExportedProgram()
@@ -855,6 +874,357 @@ def test_python_only_build_can_export_a_pte(tmp_path):
     )
 
     assert output.stat().st_size > 0
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="specifically validates a Python-only wheel",
+)
+def test_python_only_build_saves_engines_from_their_files(tmp_path):
+    """With compile_and_save the exporter emits the placeholder op itself, which a
+    Python-only build registers only through meta_ops."""
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    output = tmp_path / "python-only-engine-files.pte"
+    torch_tensorrt.compile_and_save(
+        torch.export.export(AddOne().eval().cuda(), example),
+        output,
+        output_format="executorch",
+        arg_inputs=example,
+        min_block_size=1,
+    )
+
+    assert output.stat().st_size > 0
+
+
+@pytest.mark.unit
+def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
+    """The boolean mask selection has a data-dependent shape, the engine output does not."""
+
+    class MaskedSum(torch.nn.Module):
+        def forward(self, value, mask):
+            return value + value[mask].sum()
+
+    class MaskedRows(torch.nn.Module):
+        def forward(self, value, mask):
+            return value[mask] * 2
+
+    value = torch.randn(10, 4, device="cuda")
+    mask = torch.arange(10, device="cuda") % 3 == 0
+
+    def save(model):
+        exported = torch.export.export(model.eval().cuda(), (value, mask))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[value, mask],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        output = tmp_path / f"{type(model).__name__}.pte"
+        torch_tensorrt.save(
+            compiled,
+            str(output),
+            output_format="executorch",
+            arg_inputs=(value, mask),
+            retrace=False,
+        )
+        return output
+
+    assert save(MaskedSum()).stat().st_size > 0
+    # An output shape that depends on the data still needs an output allocator.
+    with pytest.raises(RuntimeError, match="output allocator"):
+        save(MaskedRows())
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dynamic", [False, True])
+def test_save_leaves_no_lowered_program_alive(tmp_path, dynamic):
+    """A saved program's delegates, and so its engines, must not outlive save()."""
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
+
+    # No gc.collect() of its own: save() has to hand the memory back before it returns.
+    def live_lowered_modules():
+        return [o for o in gc.get_objects() if isinstance(o, LoweredBackendModule)]
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    dynamic_shapes = (
+        ({0: torch.export.Dim("batch", min=1, max=8)},) if dynamic else None
+    )
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(
+            AddOne().eval().cuda(), example, dynamic_shapes=dynamic_shapes
+        ),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    # Modules an earlier test left behind may be collected during this save too.
+    before = weakref.WeakSet(live_lowered_modules())
+
+    torch_tensorrt.save(
+        compiled,
+        str(tmp_path / "add_one.pte"),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+
+    assert [m for m in live_lowered_modules() if m not in before] == []
+
+
+def test_a_failed_save_leaves_no_lowered_program_alive(tmp_path, monkeypatch):
+    """The caches are cleared also when writing the program fails."""
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    before = weakref.WeakSet(
+        o for o in gc.get_objects() if isinstance(o, LoweredBackendModule)
+    )
+    cleared = []
+    real = torch_tensorrt._compile._release_lowering_caches
+    monkeypatch.setattr(
+        torch_tensorrt._compile,
+        "_release_lowering_caches",
+        lambda program: (cleared.append(True), real(program)),
+    )
+    with pytest.raises(OSError):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "missing_dir" / "add_one.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+    assert cleared
+    gc.collect()  # the exception's traceback held the failed program's frames
+    assert [
+        o
+        for o in gc.get_objects()
+        if isinstance(o, LoweredBackendModule) and o not in before
+    ] == []
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_an_engine_saved_without_the_plugin_mark_is_refused(tmp_path):
+    """An engine saved before pytorch_plugin_ops existed may still hold ScatterAdd."""
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    (engine_module,) = [
+        module
+        for module in compiled.modules()
+        if isinstance(module, TorchTensorRTModule)
+    ]
+    state = engine_module.get_extra_state()
+    engine_info = list(state[1])
+    metadata = TorchTensorRTModule.decode_metadata(engine_info[SERIALIZED_METADATA_IDX])
+    del metadata["pytorch_plugin_ops"]
+    engine_info[SERIALIZED_METADATA_IDX] = engine_module.encode_metadata(metadata)
+    engine_module.set_extra_state((state[0], engine_info, *state[2:]))
+    assert engine_module.pytorch_plugin_ops is None
+
+    with pytest.raises(RuntimeError, match="older Torch-TensorRT"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "older.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="Torch-TensorRT runtime operators are not available",
+)
+def test_a_hand_wrapped_engine_needs_its_plugin_list(tmp_path):
+    """TorchTensorRTModule without pytorch_plugin_ops cannot tell whether the engine needs PyTorch."""
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    ((name, engine_module),) = [
+        (name, module)
+        for name, module in compiled.named_children()
+        if isinstance(module, TorchTensorRTModule)
+    ]
+
+    def wrap(**plugin_ops):
+        setattr(
+            compiled,
+            name,
+            TorchTensorRTModule(
+                engine_module.serialized_engine,
+                input_binding_names=engine_module.input_binding_names,
+                output_binding_names=engine_module.output_binding_names,
+                settings=engine_module.settings,
+                symbolic_shape_expressions=engine_module.symbolic_shape_expressions,
+                **plugin_ops,
+            ),
+        )
+
+    wrap()
+    with pytest.raises(RuntimeError, match="without pytorch_plugin_ops"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "unknown.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+    wrap(pytorch_plugin_ops=[])
+    torch_tensorrt.save(
+        compiled,
+        str(tmp_path / "plugin_free.pte"),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+    assert b"TensorRTBackend" in (tmp_path / "plugin_free.pte").read_bytes()
+
+
+@pytest.mark.unit
+def test_program_without_inputs_exports_a_pte(tmp_path):
+    """With no user inputs, lift() has only the TensorRT engine to turn into an input."""
+
+    class Noise(torch.nn.Module):
+        def forward(self):
+            # The random draw stays in PyTorch, so the engine gets its result as input.
+            return torch.randn(50, 32, device="cuda") * 2 + 1
+
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(Noise().eval(), ()), arg_inputs=(), min_block_size=1
+    )
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+    output = tmp_path / "noise.pte"
+
+    torch_tensorrt.save(
+        compiled, str(output), output_format="executorch", retrace=False
+    )
+
+    assert b"TensorRTBackend" in output.read_bytes()
+
+
+@pytest.mark.unit
+def test_save_refuses_a_float64_engine_compiled_without_truncate_double(tmp_path):
+    """TensorRT binds a float64 input as float32, which the PyTorch runtime refuses
+    when called, so the save refuses it too and truncate_double=True still saves."""
+
+    class AffineDouble(torch.nn.Module):
+        def forward(self, value):
+            return value * 2 + 1
+
+    example = (torch.ones(3, dtype=torch.float64, device="cuda"),)
+    exported = torch.export.export(AffineDouble().eval(), example)
+    compiled = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=example, min_block_size=1
+    )
+    with pytest.raises(ValueError, match="engine input 'value' is torch.float64"):
+        torch_tensorrt.save(
+            compiled,
+            str(tmp_path / "double.pte"),
+            output_format="executorch",
+            arg_inputs=example,
+            retrace=False,
+        )
+
+    truncated = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=example, min_block_size=1, truncate_double=True
+    )
+    output = tmp_path / "truncated.pte"
+    torch_tensorrt.save(
+        truncated,
+        str(output),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+    assert b"TensorRTBackend" in output.read_bytes()
+
+
+@pytest.mark.unit
+def test_lowering_stores_the_staged_engine_bytes_as_named_data(monkeypatch, caplog):
+    """The rewrite stages each engine as ``bytes``, and lowering must hand that same
+    object to named data. A ``detach()`` or ``state_dict()`` on the way drops it,
+    and preprocess then copies the engine, holding it twice during the save."""
+    import logging
+
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
+    from torch_tensorrt.executorch import _export_utils
+    from torch_tensorrt.executorch import backend as backend_module
+
+    staged = []
+    real_engine_bytes_tensor = _export_utils.engine_bytes_tensor
+
+    def recording(engine_bytes):
+        staged.append(engine_bytes)
+        return real_engine_bytes_tensor(engine_bytes)
+
+    monkeypatch.setattr(_export_utils, "engine_bytes_tensor", recording)
+    monkeypatch.setattr(backend_module, "_warned_engine_copy", False)
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    with caplog.at_level(logging.WARNING, logger=backend_module.__name__):
+        edge = torch_tensorrt.executorch.export(compiled, arg_inputs=example)
+
+    named = [
+        buffer
+        for module in edge.exported_program().graph_module.modules()
+        if isinstance(module, LoweredBackendModule)
+        for buffer in module.named_data_store_output.buffers
+    ]
+    assert staged and named
+    assert all(any(buffer is engine for engine in staged) for buffer in named)
+    assert _export_utils.ENGINE_BYTES_ATTR not in caplog.text
 
 
 @pytest.mark.unit
@@ -1232,6 +1602,7 @@ def test_export_prepares_compiled_graph_module(monkeypatch):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
     assert lower.call_args.args == (("rewritten", prepared),)
 
@@ -1254,6 +1625,7 @@ def test_export_forwards_input_alias(monkeypatch, input_option):
         kwarg_inputs=None,
         dynamic_shapes=None,
         retrace=False,
+        share_tensors=True,
     )
 
 

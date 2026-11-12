@@ -1,14 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import weakref
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NamedTuple, Optional
+from typing import Any, Hashable, NamedTuple, Optional
 
 import torch
 import torch.fx
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.types import TRTNetwork
+from torch_tensorrt.dynamo.types import TRTNetwork, TRTTensor
 
 
 class AliasKind(str, Enum):
@@ -46,6 +47,7 @@ class ConversionContext:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+        pytorch_plugin_ops: Operators converted with TensorRT plugins whose kernels run PyTorch, so the engine only runs in a process with PyTorch
         weight_refit_map: Dictionary mapping weight names to their corresponding np.array
         cpu_weights_reference_holder: Dictionary mapping weight names to their corresponding torch.Tensor
         current_node: The FX node currently being converted, used by converters that need access to graph-level metadata (e.g. annotations set by lowering passes)
@@ -56,11 +58,33 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
+    pytorch_plugin_ops: set[str] = field(default_factory=set)
     requires_native_multidevice: bool = False
     requires_aliased_plugin_io: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
     cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
+    # With the deduplicate_weights setting, the constants made from tensors and
+    # arrays, keyed by the memory they view, so all the layers that read a weight
+    # share one (see converter_utils.get_trt_tensor).
+    # Each entry holds a weak reference to its source: once the source is freed,
+    # another value can take its memory.
+    constant_cache: dict[Hashable, tuple[weakref.ref[Any], TRTTensor]] = field(
+        default_factory=dict
+    )
+    # One transposed view per constant and rank (see
+    # converter_utils.get_transposed_trt_tensor).
+    transposed_constants: dict[tuple[TRTTensor, int], TRTTensor] = field(
+        default_factory=dict
+    )
     current_node: Optional[torch.fx.Node] = field(default=None)
+    # The values of the nodes converted so far (see the in-place plugin converter).
+    node_values: dict[torch.fx.Node, Any] = field(default_factory=dict)
+    # Outputs of nodes whose value is a Python float, such as a quotient of sizes or a
+    # value computed from one (see impl.elementwise.base).
+    python_floats: set[TRTTensor] = field(default_factory=set)
+    # Outputs of nodes whose value is a Python int, such as a size read from a dynamic
+    # shape (see impl.elementwise.base).
+    python_ints: set[TRTTensor] = field(default_factory=set)
     # Aliased outputs registered by converters during conversion.
     # ``TRTInterpreter`` is responsible for ensuring each output_tensor that
     # isn't already a user output is added to the network outputs, and for

@@ -10,9 +10,8 @@ from importlib import metadata
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-
-from packaging.version import Version
 
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
@@ -530,6 +529,84 @@ def test_base_fp8(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "quant, dtype, calib_value, dynamic_amax, run_input",
+    [
+        ("fp8", torch.float32, 0.0, False, "random"),
+        ("int8", torch.float32, 0.0, False, "random"),
+        ("fp8", torch.float32, 0.0, True, "zeros"),
+        ("fp8", torch.float32, 0.0, True, "random"),
+        ("fp8", torch.float16, 1e-5, False, "tiny"),
+        ("fp8", torch.float16, 0.0, True, "tiny"),
+    ],
+    ids=[
+        "fp8",
+        "int8",
+        "fp8_dynamic_amax",
+        "fp8_dynamic_amax_random_input",
+        "fp8_fp16_tiny_amax",
+        "fp8_fp16_dynamic_tiny_amax",
+    ],
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+def test_zero_amax(ir, quant, dtype, calib_value, dynamic_amax, run_input):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    if quant == "fp8" and torch.cuda.get_device_capability() < (8, 9):
+        pytest.skip("FP8 quantization requires compute capability 8.9 or later")
+    # Some results sit close to the tolerance, so fix the random data.
+    torch.manual_seed(0)
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
+            self.linear2 = torch.nn.Linear(in_features=10, out_features=5)
+
+        def forward(self, x, y):
+            return self.linear1(x) + self.linear2(y)
+
+    x = torch.randn(2, 10, dtype=dtype).cuda()
+    # The input quantizer of linear2 sees only this value, so its amax is 0 or tiny.
+    calib = torch.full((2, 10), calib_value, dtype=dtype).cuda()
+    model = SimpleNetwork().eval().cuda().to(dtype)
+    quant_cfg = mtq.INT8_DEFAULT_CFG if quant == "int8" else mtq.FP8_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=lambda model: model(x, calib))
+    if dynamic_amax:
+        # Without a calibrated amax, the engine computes it from the input.
+        model.linear2.input_quantizer.reset_amax()
+    if run_input == "random":
+        y = torch.randn(2, 10, dtype=dtype).cuda()
+    else:
+        y = torch.zeros(2, 10, dtype=dtype).cuda()
+        if run_input == "tiny":
+            # In FP16, a scale that rounds to 0 turns the zeros into NaN.
+            y[:, 0] = 1e-5
+    output_pyt = model(x, y)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (x, calib), strict=False)
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[x, calib],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+            )
+            outputs_trt = trt_model(x, y)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
@@ -819,6 +896,9 @@ def test_fp8_mha_fused_kernel(ir, repeat_kv):
 
     import tensorrt as trt
     import torch_tensorrt
+
+    if not is_tensorrt_rtx_version_supported("1.8"):
+        pytest.skip("FP8 MHA accuracy requires TensorRT-RTX 1.8 or later")
 
     B, H, S, D = 1, 2, 32, 64
     KV_H = 1 if repeat_kv else H

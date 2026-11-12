@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=29ff6be7"></script>
+    <script src="../../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -185,6 +185,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -197,19 +204,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
     Debugging
@@ -324,6 +331,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -483,19 +497,26 @@ document.write(`
 <span class="c1"># ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Container</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">final</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir._serialize._cord</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileBackedData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir._serialize._named_data_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">NamedDataStore</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.backend_details</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">BackendDetails</span><span class="p">,</span>
     <span class="n">CompileSpec</span><span class="p">,</span>
     <span class="n">PreprocessResult</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.exported_program</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_resolve_lifted_custom_obj</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._offloaded_engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_offloaded_engine_path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
     <span class="n">DEVICE_IDX</span><span class="p">,</span>
@@ -503,10 +524,13 @@ document.write(`
     <span class="n">HW_COMPATIBLE_IDX</span><span class="p">,</span>
     <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
     <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
-    <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">,</span>
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TARGET_PLATFORM_IDX</span><span class="p">,</span>
     <span class="n">deserialize_aliased_io</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ENGINE_BYTES_ATTR</span><span class="p">,</span>
+    <span class="n">validate_engine_info</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">TensorRTBlobMetadata</span><span class="p">,</span>
@@ -514,7 +538,30 @@ document.write(`
     <span class="n">serialize_engine</span><span class="p">,</span>
 <span class="p">)</span>
 
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
 <span class="n">_BINDING_DELIM</span> <span class="o">=</span> <span class="s2">"%"</span>
+
+<span class="n">_warned_engine_copy</span> <span class="o">=</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_warn_engine_copy</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Warn once that preprocess copies an engine instead of reusing the export's bytes.</span>
+
+<span class="sd">    The export stages each engine as a tensor that remembers its ``bytes``</span>
+<span class="sd">    (``engine_bytes_tensor``); a ``detach()`` or ``state_dict()`` along the way drops</span>
+<span class="sd">    that, and the copy here is then a second host copy of the engine during the save.</span>
+<span class="sd">    """</span>
+    <span class="k">global</span> <span class="n">_warned_engine_copy</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_warned_engine_copy</span><span class="p">:</span>
+        <span class="n">_warned_engine_copy</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"TensorRTBackend.preprocess: an engine tensor no longer carries the bytes it "</span>
+            <span class="s2">"was staged from (</span><span class="si">%s</span><span class="s2">), so the engine is copied once more and the save holds an "</span>
+            <span class="s2">"extra host copy of it."</span><span class="p">,</span>
+            <span class="n">ENGINE_BYTES_ATTR</span><span class="p">,</span>
+        <span class="p">)</span>
+
 
 <span class="c1"># CompileSpec key naming the aliased outputs a delegate deliberately does not</span>
 <span class="c1"># carry. Its value is the JSON list of those engine output binding names (see</span>
@@ -528,6 +575,11 @@ document.write(`
 <span class="c1"># short of its aliased outputs is a bug, not a zero-copy program, and stays an</span>
 <span class="c1"># error.</span>
 <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"zero_copy_kv"</span>
+
+<span class="c1"># CompileSpec key naming the ExecuTorch data file (.ptd) that receives each engine of the</span>
+<span class="c1"># method, so the .pte keeps only the engine's key. The value is the file name without the</span>
+<span class="c1"># .ptd extension. Absent, every engine is stored in the .pte.</span>
+<span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"external_engine_data"</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_schema_name</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -688,14 +740,7 @@ document.write(`
             <span class="s2">"TensorRT ExecuTorch backend received incomplete engine "</span>
             <span class="s2">"serialization info."</span>
         <span class="p">)</span>
-    <span class="k">if</span> <span class="p">(</span>
-        <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span>
-        <span class="ow">and</span> <span class="nb">str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">])</span> <span class="o">==</span> <span class="s2">"1"</span>
-    <span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"ExecuTorch export does not support TensorRT engines that require "</span>
-            <span class="s2">"an output allocator (data-dependent output shapes)."</span>
-        <span class="p">)</span>
+    <span class="n">validate_engine_info</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_split_binding_names</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
@@ -744,7 +789,7 @@ document.write(`
 <span class="sd">    tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's</span>
 <span class="sd">    outputs are permuted, and they would need the same node-identity reordering as</span>
 <span class="sd">    the inputs below. ``_validate_output_binding_order`` checks that correspondence</span>
-<span class="sd">    on every preprocess, so it would fail loudly rather than mis-bind.</span>
+<span class="sd">    on every preprocess, so it would fail loudly rather than bind wrongly.</span>
 <span class="sd">    """</span>
     <span class="n">input_nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_names</span><span class="p">):</span>
@@ -894,6 +939,44 @@ document.write(`
         <span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_validate_io_dtypes</span><span class="p">(</span>
+    <span class="n">engine_node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">input_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">output_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Refuse an engine input or output whose program dtype TensorRT cannot bind.</span>
+
+<span class="sd">    The engine then binds that tensor as another type, float32 for a float64</span>
+<span class="sd">    input compiled without ``truncate_double``. The PyTorch runtime and the</span>
+<span class="sd">    native delegate refuse such a tensor when the program runs; this refuses the</span>
+<span class="sd">    program before it is saved. ``input_names`` is in engine binding order, the</span>
+<span class="sd">    order of the engine node's input list.</span>
+<span class="sd">    """</span>
+    <span class="n">output_vals</span> <span class="o">=</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"val"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output_vals</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+        <span class="n">output_vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">output_vals</span><span class="p">]</span>
+    <span class="n">io</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s2">"input"</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">input_names</span><span class="p">,</span> <span class="n">engine_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="p">]</span> <span class="o">+</span> <span class="p">[(</span><span class="s2">"output"</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">output_names</span><span class="p">,</span> <span class="n">output_vals</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">io</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"TensorRT ExecuTorch backend: engine </span><span class="si">{</span><span class="n">kind</span><span class="si">}</span><span class="s2"> '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' is "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2"> in the program, but TensorRT has no binding type for "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">, so the engine was built with another type and would "</span>
+                <span class="s2">"misread the data."</span>
+                <span class="o">+</span> <span class="p">(</span>
+                    <span class="s2">" Compile with truncate_double=True to cast float64 to float32 "</span>
+                    <span class="s2">"around the engine."</span>
+                    <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span>
+                    <span class="k">else</span> <span class="s2">""</span>
+                <span class="p">)</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_serialize_elided_output_names</span><span class="p">(</span><span class="n">names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Encode the elided aliased-output binding names for the compile spec.</span>
 
@@ -960,6 +1043,40 @@ document.write(`
     <span class="k">return</span> <span class="kc">None</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_external_engine_tag</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">CompileSpec</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""The .ptd file name, without the extension, that engines go to, or ``None``."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_external_engine_data</span>
+
+    <span class="n">tags</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">compile_specs</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">tags</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' must appear at most once."</span>
+        <span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' must hold the file name as UTF-8 "</span>
+            <span class="sa">f</span><span class="s2">"bytes, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">tag</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">UnicodeDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' is not valid UTF-8: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+    <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tag</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">default</span>
@@ -978,7 +1095,9 @@ document.write(`
 <span class="w">    </span><span class="sd">"""Backend that serializes TensorRT engines for the native ExecuTorch runtime.</span>
 
 <span class="sd">    The partition contains a single execute_engine node; we extract the engine</span>
-<span class="sd">    and metadata and encode them as a standalone blob. The C++ runtime</span>
+<span class="sd">    and metadata, store the engine as named data (in the .pte, or with</span>
+<span class="sd">    external_engine_data in a .ptd file), and encode its key and the metadata as a</span>
+<span class="sd">    standalone blob. The C++ runtime</span>
 <span class="sd">    backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.</span>
 <span class="sd">    """</span>
 
@@ -1006,27 +1125,39 @@ document.write(`
         <span class="n">engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
         <span class="n">_validate_engine_info</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
         <span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
-            <span class="c1"># `bytes(storage)` looks equivalent but has two problems. It iterates</span>
-            <span class="c1"># the storage element by element in Python, costing about two seconds</span>
-            <span class="c1"># per megabyte, and it returns the whole backing allocation rather than</span>
-            <span class="c1"># the tensor's own extent, so a view of a larger buffer serializes too</span>
-            <span class="c1"># many bytes. A view and not a bytes copy, because serialize_engine</span>
-            <span class="c1"># already copies the engine into the blob once, and an engine can be</span>
-            <span class="c1"># several gigabytes. `.view(torch.uint8)` keeps `.numpy()` from</span>
-            <span class="c1"># rejecting a dtype it has no equivalent for.</span>
-            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">serialized_engine</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">memoryview</span><span class="p">(</span><span class="n">engine_bytes</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
-        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
+        <span class="c1"># ExecuTorch writes named data only from `bytes`, and an engine can be several</span>
+        <span class="c1"># gigabytes, so reuse the `bytes` the export staged the engine from</span>
+        <span class="c1"># (engine_bytes_tensor) and copy only a tensor that did not come from one.</span>
+        <span class="c1"># An engine still in its file (compile_and_save) is streamed from the file into</span>
+        <span class="c1"># the .pte, never read into memory.</span>
+        <span class="n">engine_file</span> <span class="o">=</span> <span class="n">get_offloaded_engine_path</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
+        <span class="n">engine_bytes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">ENGINE_BYTES_ATTR</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">engine_file</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">_warn_engine_copy</span><span class="p">()</span>
+                <span class="c1"># `bytes(storage)` looks equivalent but iterates element by element in</span>
+                <span class="c1"># Python, about two seconds per megabyte, and returns the whole backing</span>
+                <span class="c1"># allocation rather than the tensor's own extent. `.view(torch.uint8)`</span>
+                <span class="c1"># keeps `.numpy()` from rejecting a dtype it has no equivalent for.</span>
+                <span class="n">engine_bytes</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">serialized_engine</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">tobytes</span><span class="p">()</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">engine_bytes</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
+        <span class="n">engine_input_names</span> <span class="o">=</span> <span class="n">_split_binding_names</span><span class="p">(</span>
+            <span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="n">input_names</span> <span class="o">=</span> <span class="n">_reorder_input_names_for_executorch</span><span class="p">(</span>
-            <span class="n">edge_program</span><span class="p">,</span>
-            <span class="n">engine_node</span><span class="p">,</span>
-            <span class="n">_split_binding_names</span><span class="p">(</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">)),</span>
+            <span class="n">edge_program</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">,</span> <span class="n">engine_input_names</span>
         <span class="p">)</span>
         <span class="n">output_names</span> <span class="o">=</span> <span class="n">_split_binding_names</span><span class="p">(</span>
             <span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">_validate_io_dtypes</span><span class="p">(</span><span class="n">engine_node</span><span class="p">,</span> <span class="n">engine_input_names</span><span class="p">,</span> <span class="n">output_names</span><span class="p">)</span>
         <span class="n">elidable_output_names</span> <span class="o">=</span> <span class="n">_elided_output_names</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">)</span>
         <span class="n">_validate_output_binding_order</span><span class="p">(</span>
             <span class="n">edge_program</span><span class="p">,</span>
@@ -1061,6 +1192,14 @@ document.write(`
                 <span class="s2">"a mutated buffer."</span>
             <span class="p">)</span>
 
+        <span class="n">engine_data</span><span class="p">:</span> <span class="n">Any</span>
+        <span class="k">if</span> <span class="n">engine_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">engine_data</span> <span class="o">=</span> <span class="n">FileBackedData</span><span class="p">(</span><span class="n">engine_file</span><span class="p">)</span>
+            <span class="n">engine_data_sha256</span> <span class="o">=</span> <span class="n">engine_data</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+            <span class="n">engine_data</span> <span class="o">=</span> <span class="n">engine_bytes</span>
+            <span class="n">engine_data_sha256</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">TensorRTBlobMetadata</span><span class="p">(</span>
             <span class="n">io_bindings</span><span class="o">=</span><span class="n">io_bindings</span><span class="p">,</span>
             <span class="n">aliased_io</span><span class="o">=</span><span class="n">aliased_io</span><span class="p">,</span>
@@ -1068,9 +1207,25 @@ document.write(`
             <span class="n">device_id</span><span class="o">=</span><span class="n">_parse_device_id</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">]),</span>
             <span class="n">serialized_metadata</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">),</span>
             <span class="n">target_platform</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">TARGET_PLATFORM_IDX</span><span class="p">),</span>
+            <span class="n">tensorrt_version</span><span class="o">=</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">__version__</span><span class="p">,</span>
+            <span class="c1"># Content-keyed, so identical engines in different methods share one</span>
+            <span class="c1"># entry and different engines can never collide on a key.</span>
+            <span class="n">engine_key</span><span class="o">=</span><span class="s2">"tensorrt_engine_"</span> <span class="o">+</span> <span class="n">engine_data_sha256</span><span class="o">.</span><span class="n">hex</span><span class="p">(),</span>
         <span class="p">)</span>
-        <span class="n">blob</span> <span class="o">=</span> <span class="n">serialize_engine</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="n">metadata</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">PreprocessResult</span><span class="p">(</span><span class="n">processed_bytes</span><span class="o">=</span><span class="n">blob</span><span class="p">)</span></div>
+        <span class="c1"># The engine goes to named data by reference and is streamed into the .pte, or</span>
+        <span class="c1"># into &lt;external_engine_data&gt;.ptd when set, so the delegate blob holds only the</span>
+        <span class="c1"># header and metadata.</span>
+        <span class="n">named_data</span> <span class="o">=</span> <span class="n">NamedDataStore</span><span class="p">()</span>
+        <span class="n">named_data</span><span class="o">.</span><span class="n">add_named_data</span><span class="p">(</span>
+            <span class="n">metadata</span><span class="o">.</span><span class="n">engine_key</span><span class="p">,</span>
+            <span class="n">engine_data</span><span class="p">,</span>
+            <span class="n">alignment</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+            <span class="n">external_tag</span><span class="o">=</span><span class="n">_external_engine_tag</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">PreprocessResult</span><span class="p">(</span>
+            <span class="n">processed_bytes</span><span class="o">=</span><span class="n">serialize_engine</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="p">,</span> <span class="n">metadata</span><span class="p">),</span>
+            <span class="n">data_store_output</span><span class="o">=</span><span class="n">named_data</span><span class="o">.</span><span class="n">get_named_data_store_output</span><span class="p">(),</span>
+        <span class="p">)</span></div>
 
 </pre></div>
 

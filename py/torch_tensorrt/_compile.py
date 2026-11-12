@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import gc
 import importlib
 import inspect
 import logging
@@ -74,12 +75,17 @@ if ENABLED_FEATURES.dynamo_frontend:
         get_dynamic_shapes_kwargs,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
     from torch_tensorrt.dynamo.utils import get_torch_inputs
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "compile",
+    "compile_and_save",
     "cross_compile_for_windows",
     "load_cross_compiled_exported_program",
     "convert_method_to_trt_engine",
@@ -725,6 +731,7 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "weight_streaming_budget_per_engine": None,
     "use_cuda_graphs": None,
     "zero_copy_kv": False,
+    "external_engine_data": None,
 }
 
 
@@ -739,7 +746,7 @@ def save(
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
-    retrace: bool = True,
+    retrace: Optional[bool] = None,
     use_legacy_exporter: Optional[bool] = None,
     pickle_protocol: int = 4,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
@@ -755,7 +762,10 @@ def save(
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
         output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
-        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+        retrace (Optional[bool]): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+
+                Defaults to True, except for ``output_format="executorch"``, where it defaults to False:
+                the compiled graph is lowered as it is, so no example inputs are needed.
 
                 For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:
 
@@ -825,25 +835,30 @@ def save(
                   parameter takes precedence.
         use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
                 (False) into every TensorRT delegate for ``output_format="executorch"``.
-                None leaves the choice unset so the runtime default applies. A load-time
-                option overrides this value. Non-booleans are rejected for ExecuTorch;
+                None leaves the choice unset so the runtime default applies. A load
+                option, or a process option set to False, overrides this value.
+                Non-booleans are rejected for ExecuTorch;
                 other formats ignore non-None values with a warning. Use this keyword,
                 not a raw ``CompileSpec("use_cuda_graphs", ...)``.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
-                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are
+                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
+                ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
-                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
-                b"cuda:<i>")]`` to override the default target device (``cuda:0``).
+                ignored with a warning. A ``CompileSpec("target_device", ...)`` in
+                ``compile_specs=`` only labels the delegate's inputs and outputs; each
+                engine runs on the GPU it was built on.
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
+                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the
+                boundary TensorRT needs for every input and output.
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
-                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
-                CUDA ``.pte``. See :ref:`the ExecuTorch save guide
-                <executorch_save>` for the ``CudaPartitioner`` recipe, its
+                delegate, for example a ``CudaPartitioner`` for a coalesced TensorRT +
+                CUDA ``.pte``. See :ref:`the ExecuTorch deployment guide
+                <executorch_deployment>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
                 ``.ptd`` weight caveats.
                 ``constant_methods=``, ``transform_passes=`` and
@@ -856,7 +871,8 @@ def save(
                 TRT engines.
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
-                ExecuTorch Inspector.
+                ExecuTorch Inspector. It does not work for a program with
+                TensorRT engines: writing the record raises a ``SerializeError``.
                 ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
                 number of bytes of engine weights that may stay resident in GPU
                 memory, with the rest streamed from host memory. It applies to
@@ -876,9 +892,23 @@ def save(
                 :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the
                 finalized program before writing the file, so a single
                 ``zero_copy_kv=True`` is enough.
+                ``external_engine_data=`` (default ``None``) takes a file name without
+                the ``.ptd`` extension and
+                writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
+                instead of into it. Pass that file as the program's data file when
+                loading. An existing file with that name is replaced, so give each
+                program in a directory its own name, for example
+                ``external_engine_data="model"`` for ``model.pte``. A program that also
+                has a CUDA backend part needs its own directory and
+                ``external_engine_data="aoti_cuda_blob"`` instead. See
+                :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
+    if retrace is None:
+        # Match torch_tensorrt.executorch.export, which lowers a compiled GraphModule as it
+        # is, so writing a .pte needs no example inputs.
+        retrace = output_format != "executorch"
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
@@ -915,6 +945,7 @@ def save(
         "weight_streaming_budget_per_engine"
     ]
     executorch_zero_copy_kv = executorch_options["zero_copy_kv"]
+    executorch_external_engine_data = executorch_options["external_engine_data"]
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -923,7 +954,7 @@ def save(
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
             "Saving with output_format='executorch' requires executorch.exir. "
-            "This CUDA integration supports Linux. Setup: "
+            "This CUDA integration supports Linux and Windows x86-64. Setup: "
             + executorch_install_command()
         )
     if output_format == "executorch":
@@ -938,6 +969,7 @@ def save(
             )
         # Validate options before input and model-shape checks can obscure type errors.
         from torch_tensorrt.executorch.partitioner import (
+            normalize_external_engine_data,
             normalize_use_cuda_graphs,
             normalize_weight_streaming_budget_per_engine,
         )
@@ -946,6 +978,7 @@ def save(
             executorch_weight_streaming_budget_per_engine
         )
         normalize_use_cuda_graphs(use_cuda_graphs)
+        normalize_external_engine_data(executorch_external_engine_data)
         # For the same reason, the one refusal zero-copy makes on the config
         # alone. _save_as_executorch reaches it only through
         # zero_copy_backend_config, which it calls after export() has partitioned
@@ -955,6 +988,15 @@ def save(
             from torch_tensorrt.executorch._zero_copy import _refuse_skip_h2d
 
             _refuse_skip_h2d(executorch_backend_config)
+        # Every backend writes its data as <name>.ptd beside the program, so a
+        # program named *.ptd can be replaced by one. Windows ignores case and
+        # trailing dots and spaces in a file name.
+        if os.fspath(file_path).rstrip(". ").lower().endswith(".ptd"):
+            raise ValueError(
+                f"file_path must not end with .ptd, got {file_path!r}. save() writes the "
+                "program's data files as <name>.ptd beside it, so one of them could replace "
+                "the program. Use the .pte extension."
+            )
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -1109,6 +1151,11 @@ def save(
             "use_cuda_graphs= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_external_engine_data is not None and output_format != "executorch":
+        logger.warning(
+            "external_engine_data= is only used with output_format='executorch' and "
+            f"will be ignored for output_format='{output_format}'."
+        )
     if executorch_zero_copy_kv and output_format != "executorch":
         logger.warning(
             "zero_copy_kv= is only used with output_format='executorch' and will "
@@ -1211,6 +1258,7 @@ def save(
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
+                    external_engine_data=executorch_external_engine_data,
                 )
             else:
                 raise RuntimeError(
@@ -1241,6 +1289,14 @@ def save(
             #
             # Copy-back is gated per-branch below: the legacy exporter declares it
             # itself and consumes the trailing values while doing so.
+            #
+            # The program is discarded once saved, so it can share the module's
+            # tensors instead of copying every weight. Not with a caller's partitioner:
+            # its backend may free what it lowers, as CudaBackend's low_memory_mode
+            # does, and that would free the module's weights.
+            share_tensors = output_format == "exported_program" or (
+                output_format == "executorch" and not executorch_partitioners
+            )
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1260,6 +1316,7 @@ def save(
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
+                    share_tensors=share_tensors,
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1330,6 +1387,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1367,6 +1425,7 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
+                        share_tensors=share_tensors,
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally
@@ -1458,6 +1517,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1465,33 +1525,154 @@ def save(
                     )
 
 
+def compile_and_save(
+    exported_program: ExportedProgram,
+    file_path: Union[str, os.PathLike[str]],
+    *,
+    output_format: Literal[
+        "exported_program", "aot_inductor", "executorch"
+    ] = "exported_program",
+    arg_inputs: Optional[Sequence[Input | torch.Tensor]] = None,
+    kwarg_inputs: Optional[Dict[str, Any]] = None,
+    save_options: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> None:
+    """Compile an ExportedProgram with TensorRT and save it, keeping each engine on disk instead of in
+    memory from its build to the save.
+
+    Equivalent to::
+
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs
+        )
+        torch_tensorrt.save(trt_gm, file_path, output_format=output_format, **save_options)
+
+    but each engine is written to a file as soon as it is built, so no built engine is held on the GPU
+    or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever
+    loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).
+    The other formats save each engine from a loaded one, so their engines are loaded once all of them
+    are built, and their save needs as much memory as after ``compile``.
+
+    The files go to Torch-TensorRT's cache directory, ``torch_tensorrt_<user>/offloaded_engines`` in the
+    system temporary directory (``TMPDIR``), and are deleted when the call returns. It needs room for
+    every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take the memory this
+    saves. Linux only, since Windows can't delete a file while it is memory-mapped.
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): The program to compile
+        file_path (Union[str, os.PathLike]): Where to save the compiled program
+
+    Keyword Arguments:
+        output_format (str): ``exported_program``, ``aot_inductor`` or ``executorch``
+        arg_inputs (Sequence[Union[torch_tensorrt.Input, torch.Tensor]]): The program's inputs, as for
+            :func:`torch_tensorrt.dynamo.compile`. The formats other than ``executorch`` re-export the
+            compiled module to save it, so the save gets them too.
+        kwarg_inputs (dict[str, Any]): The program's keyword inputs, passed on like ``arg_inputs``
+        save_options (dict[str, Any]): Keyword arguments for :func:`torch_tensorrt.save`, such as
+            ``external_engine_data`` or ``retrace``
+        **kwargs: Compilation settings for :func:`torch_tensorrt.dynamo.compile`
+    """
+    if output_format not in ("exported_program", "aot_inductor", "executorch"):
+        raise ValueError(
+            f"compile_and_save saves exported_program, aot_inductor or executorch, not {output_format!r}"
+        )
+    if platform.system() == "Windows":
+        raise NotImplementedError(
+            "compile_and_save keeps each engine in a memory-mapped file, which Windows can't delete; "
+            "use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."
+        )
+    save_kwargs = dict(save_options or {})
+    if output_format != "executorch":
+        # These saves re-export the compiled module, so they need its inputs too.
+        save_kwargs.setdefault("arg_inputs", arg_inputs)
+        save_kwargs.setdefault("kwarg_inputs", kwarg_inputs)
+
+    with offload_engines_to_disk():
+        trt_gm = dynamo_compile(
+            exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs
+        )
+        if output_format != "executorch":
+            # Only an ExecuTorch save streams an engine from its file. The other formats save each
+            # engine from a loaded one.
+            for module in trt_gm.modules():
+                if isinstance(module, TorchTensorRTModule):
+                    module.setup_engine()
+        save(trt_gm, os.fspath(file_path), output_format=output_format, **save_kwargs)
+
+
 def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
     """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
-    (``save_data_externally``), which ExecuTorch serializes only via
+    (``save_data_externally``), and so does the TensorRT backend for its engines
+    when saved with ``external_engine_data=``. ExecuTorch serializes that data only via
     ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
-    persist it. So a partition that carries external weights (e.g. a
-    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
+    persist it. So a partition that carries external data (e.g. a
+    ``CudaPartitioner`` delegate) would lose it and the ``.pte`` could not
     load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
     the program has any; the runtime must then be given those data file(s) (e.g.
-    via the ExecuTorch ``Module`` data-files argument) to load the weights.
+    via the ExecuTorch ``Module`` data-files argument) to load the program.
     """
     # Direct attribute access (no getattr default) so a future rename fails loud.
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
+        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+        paths = [
+            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+            for name in executorch_program._tensor_data
+        ]
         logger.info(
-            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
-            "data-files at this directory to load them.",
-            out_dir,
+            "Wrote external delegate data to %s. Pass %s, not the directory, "
+            "when loading the program.",
+            ", ".join(paths),
+            "this file" if len(paths) == 1 else "these files",
         )
+
+
+# TensorRT needs every input and output address to be a multiple of this, and the delegate copies a
+# buffer that misses it.
+_TENSORRT_ADDRESS_ALIGNMENT = 256
+
+
+def _with_tensorrt_alignment(backend_config: Any) -> Any:
+    """Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.
+
+    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output
+    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common
+    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the
+    caller's planner keeps its own. Any other planner is left as it is.
+    """
+    import copy
+    import dataclasses
+    import math
+
+    from executorch.exir import ExecutorchBackendConfig
+    from executorch.exir.passes import MemoryPlanningPass
+
+    def aligned(planner: Any) -> Any:
+        if (
+            not isinstance(planner, MemoryPlanningPass)
+            or planner.alignment % _TENSORRT_ADDRESS_ALIGNMENT == 0
+        ):
+            return planner
+        planner = copy.copy(planner)
+        planner.alignment = math.lcm(planner.alignment, _TENSORRT_ADDRESS_ALIGNMENT)
+        return planner
+
+    config = backend_config if backend_config is not None else ExecutorchBackendConfig()
+    planner = config.memory_planning_pass
+    if isinstance(planner, dict):
+        planner = {name: aligned(p) for name, p in planner.items()}
+    else:
+        planner = aligned(planner)
+    return dataclasses.replace(config, memory_planning_pass=planner)
 
 
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
     try:
-        from torch_tensorrt.executorch import (
+        from torch_tensorrt.executorch import (  # noqa: F401
             check_zero_copy_kv,
             export,
             zero_copy_backend_config,
@@ -1499,9 +1680,25 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "Could not import the ExecuTorch export integration for "
-            "output_format='executorch'. This CUDA integration supports Linux. "
+            "output_format='executorch'. This CUDA integration supports Linux and "
+            "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
+    try:
+        _lower_and_write_executorch(exp_program, file_path, **kwargs)
+    finally:
+        _release_lowering_caches(exp_program)
+
+
+def _lower_and_write_executorch(
+    exp_program: Any, file_path: str, **kwargs: Any
+) -> None:
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
     for option in ("partitioners", "compile_specs"):
@@ -1531,7 +1728,9 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         ),
         use_cuda_graphs=kwargs.get("use_cuda_graphs"),
         zero_copy_kv=zero_copy_kv,
+        external_engine_data=kwargs.get("external_engine_data"),
     )
+    backend_config = _with_tensorrt_alignment(kwargs.get("backend_config"))
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()
     # owns both, so it installs the finalization pass itself. Wrapping preserves
@@ -1540,7 +1739,6 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     # writes, and the pass refuses it. A backend_config that already carries
     # the pass is wrapped again here; the second run finds the buffers already
     # un-staged and changes nothing.
-    backend_config = kwargs.get("backend_config")
     if zero_copy_kv:
         backend_config = zero_copy_backend_config(backend_config)
     executorch_program = edge_program.to_executorch(config=backend_config)
@@ -1562,6 +1760,51 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
         etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
         executorch_program.get_etrecord().save(etrecord_path)
+
+
+def _release_lowering_caches(exp_program: Any) -> None:
+    """Drop the cache entries that point at the lowered program once it is written, also when the save
+    failed.
+
+    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's
+    dispatch cache keys entries on the ``executorch_call_delegate`` arguments: in the class-wide
+    cache, or with symbolic shapes in the ShapeEnv of ``exp_program``'s fake mode, which the
+    compiled module keeps. They keep the lowered modules, and with them every serialized engine,
+    alive after save() returns, so each saved program stays resident until the process exits.
+    Clearing them frees nothing still in use; they refill on demand. The program is a web of
+    reference cycles (graph and nodes), so it is collected here rather than at some
+    later automatic collection, which can land in the middle of the next save. The freed
+    heap goes back to the system, which is what a Jetson shares with the GPU.
+    """
+    from torch._subclasses.fake_tensor import FakeTensorMode
+    from torch_tensorrt.dynamo.utils import trim_host_heap
+
+    # TODO: remove once ExecuTorch bounds or scopes the is_same_node memo (an unbounded lru_cache on FX
+    # nodes, exir/backend/utils.py), and PyTorch stops keying the negative cache entry it stores for
+    # executorch_call_delegate (registered skip_cache=True) on the lowered module itself.
+    try:
+        from executorch.exir.backend.utils import is_same_node
+
+        is_same_node.cache_clear()
+    except (ImportError, AttributeError):
+        logger.debug("ExecuTorch's is_same_node cache is gone; nothing to clear")
+    FakeTensorMode.cache_clear()
+    # The save may have failed on its arguments, so don't assume a program: an error here would hide that.
+    nodes = getattr(getattr(exp_program, "graph", None), "nodes", ())
+    shape_envs = {
+        id(env): env
+        for node in nodes
+        if (
+            env := getattr(
+                getattr(node.meta.get("val"), "fake_mode", None), "shape_env", None
+            )
+        )
+        is not None
+    }
+    for env in shape_envs.values():
+        getattr(env, "fake_tensor_cache", {}).clear()
+    gc.collect()
+    trim_host_heap()
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:

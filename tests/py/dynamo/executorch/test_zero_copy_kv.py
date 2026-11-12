@@ -3293,8 +3293,10 @@ def _install_save_stubs(monkeypatch, *, wrap_config=True):
 def test_save_zero_copy_kv_true_threads_flag_and_installs_config(monkeypatch, tmp_path):
     """save(zero_copy_kv=True, backend_config=cfg) opts export() in and wraps the
     caller's config exactly once, forwarding the wrapped one to to_executorch()."""
+    from executorch.exir import ExecutorchBackendConfig
+
     calls = _install_save_stubs(monkeypatch)
-    user_cfg = object()
+    user_cfg = ExecutorchBackendConfig(run_reinplace_pass=True)
 
     torch_tensorrt.save(
         _trivial_exported_program(),
@@ -3306,15 +3308,18 @@ def test_save_zero_copy_kv_true_threads_flag_and_installs_config(monkeypatch, tm
 
     assert calls.export_kwargs["zero_copy_kv"] is True
     # The user's config is wrapped once (preserving their fields), not double-wrapped.
-    assert calls.wrap_args == [user_cfg]
+    # save() moves its memory planning to TensorRT's 256-byte boundary first.
+    [wrapped] = calls.wrap_args
+    assert wrapped.run_reinplace_pass is True
+    assert wrapped.memory_planning_pass.alignment == 256
     assert calls.to_executorch_config is calls.wrapped_sentinel
     assert calls.checked == [calls.program]
 
 
 @pytest.mark.unit
 def test_save_zero_copy_kv_true_wraps_defaults_without_a_config(monkeypatch, tmp_path):
-    """With no backend_config, zero_copy_backend_config(None) starts from ET
-    defaults; the finalization config is still installed."""
+    """With no backend_config, zero_copy_backend_config starts from ET defaults,
+    aligned for TensorRT; the finalization config is still installed."""
     calls = _install_save_stubs(monkeypatch)
 
     torch_tensorrt.save(
@@ -3325,7 +3330,8 @@ def test_save_zero_copy_kv_true_wraps_defaults_without_a_config(monkeypatch, tmp
     )
 
     assert calls.export_kwargs["zero_copy_kv"] is True
-    assert calls.wrap_args == [None]
+    [wrapped] = calls.wrap_args
+    assert wrapped.memory_planning_pass.alignment == 256
     assert calls.to_executorch_config is calls.wrapped_sentinel
 
 
@@ -3342,7 +3348,7 @@ def test_save_zero_copy_kv_true_installs_the_real_unstaging_pass(monkeypatch, tm
         zero_copy_kv=True,
     )
 
-    assert calls.wrap_args == [None]
+    assert len(calls.wrap_args) == 1
     assert (
         type(calls.to_executorch_config.to_out_var_pass).__name__
         == "_UnstageThenToOutVar"
@@ -3385,10 +3391,12 @@ def test_save_refuses_skip_h2d_before_it_compiles_anything(monkeypatch, tmp_path
 @pytest.mark.unit
 def test_save_defaults_leave_kv_staged(monkeypatch, tmp_path):
     """Default save() (zero_copy_kv omitted) never wraps the config, so the KV
-    buffer keeps its staging and its copy-back: the caller's config reaches
-    to_executorch() untouched and export() is told zero_copy_kv=False."""
+    buffer keeps its staging and its copy-back: the caller's to_out_var_pass
+    reaches to_executorch() unwrapped and export() is told zero_copy_kv=False."""
+    from executorch.exir import ExecutorchBackendConfig
+
     calls = _install_save_stubs(monkeypatch)
-    user_cfg = object()
+    user_cfg = ExecutorchBackendConfig(run_reinplace_pass=True)
 
     torch_tensorrt.save(
         _trivial_exported_program(),
@@ -3399,7 +3407,8 @@ def test_save_defaults_leave_kv_staged(monkeypatch, tmp_path):
 
     assert calls.export_kwargs["zero_copy_kv"] is False
     assert calls.wrap_args == []
-    assert calls.to_executorch_config is user_cfg
+    assert calls.to_executorch_config.run_reinplace_pass is True
+    assert calls.to_executorch_config.to_out_var_pass is user_cfg.to_out_var_pass
     assert calls.checked == []
 
 

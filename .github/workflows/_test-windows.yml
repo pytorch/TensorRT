@@ -158,9 +158,11 @@ jobs:
       script: |
         set -euo pipefail
         if [[ "${{ matrix.suite }}" == "executorch-windows" ]]; then
+          # A development ExecuTorch pin is on the nightly channel, a release pin on the test channel.
           # Windows uses torchao's Python-only nightly wheel from the CPU index.
           python -m pip install --pre pyyaml \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/cpu" \
             -r packaging/executorch_pin.txt
           runtime_wheels=("${RUNNER_TEMP}"/artifacts/torch_tensorrt_executorch_runtime-*.whl)

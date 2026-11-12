@@ -1,0 +1,298 @@
+{
+  "$defs": {
+    "BenchmarkProtocol": {
+      "additionalProperties": false,
+      "properties": {
+        "cuda_graphs": {
+          "type": "boolean"
+        },
+        "gpu_isolation": {
+          "type": "string"
+        },
+        "inference_mode": {
+          "type": "boolean"
+        },
+        "input_reset": {
+          "type": "string"
+        },
+        "iterations": {
+          "type": "integer"
+        },
+        "model_mode": {
+          "type": "string"
+        },
+        "percentiles": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "seed_reset": {
+          "type": "string"
+        },
+        "speedup_method": {
+          "type": "string"
+        },
+        "synchronization": {
+          "type": "string"
+        },
+        "throughput_method": {
+          "type": "string"
+        },
+        "timing_scope": {
+          "type": "string"
+        },
+        "warmup": {
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "BenchmarkReport": {
+      "additionalProperties": false,
+      "properties": {
+        "compiled": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimingMeasurements"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "preprocessing": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "protocol": {
+          "$ref": "#/$defs/BenchmarkProtocol"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimingMeasurements"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "report_type": {
+          "const": "benchmark"
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speedup": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "skipped"
+          ],
+          "type": "string"
+        },
+        "throughput": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "transfers": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "invalid_input",
+            "unsupported_operator",
+            "unsupported_environment",
+            "builder_error",
+            "out_of_memory",
+            "timeout",
+            "cancelled",
+            "worker_crash",
+            "serialization_error",
+            "artifact_error",
+            "validation_error",
+            "benchmark_error",
+            "internal_error"
+          ],
+          "type": "string"
+        },
+        "exception_type": {
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "retry_after_change": {
+          "type": "boolean"
+        },
+        "retry_unchanged": {
+          "type": "boolean"
+        },
+        "stage": {
+          "enum": [
+            "environment",
+            "capture",
+            "analysis",
+            "compilation",
+            "lowering",
+            "partitioning",
+            "conversion",
+            "build",
+            "serialization",
+            "save",
+            "validation",
+            "benchmark",
+            "finalization"
+          ],
+          "type": "string"
+        },
+        "suggested_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "message",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "TimingMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "device_samples_ms": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "device_statistics": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "wall_samples_ms": {
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "wall_statistics": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/BenchmarkReport",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

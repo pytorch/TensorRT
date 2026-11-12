@@ -32,6 +32,7 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
@@ -111,7 +112,15 @@ def _refit_single_trt_engine_with_gm(
             trt_wt_tensor = trt.Weights(
                 trt_dtype, weight.data_ptr(), torch.numel(weight)
             )
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            if not refitter.set_named_weights(
+                layer_name, trt_wt_tensor, trt_wt_location
+            ):
+                expected = refitter.get_weights_prototype(layer_name)
+                raise AssertionError(
+                    f"TensorRT refused the new weight for {layer_name}: the engine "
+                    f"holds {expected.size} {expected.dtype}, the new weight is "
+                    f"{trt_wt_tensor.size} {trt_dtype}"
+                )
             refitted.add(layer_name)
 
         if len(refitted) != len(weight_list):
@@ -276,6 +285,7 @@ def refit_module_weights(
             new_weight_module.graph_module,
         )
     )
+    new_weight_module = remove_alias_from_exported_program(new_weight_module)
     new_gm = new_weight_module.module()
 
     logger.debug("Input graph: " + str(new_gm.graph))
@@ -352,8 +362,16 @@ def refit_module_weights(
         for name, submodule in list(new_partitioned_module.named_children()):
             if isinstance(submodule, torch.export._unlift.GuardsFn):
                 new_partitioned_module.delete_submodule(name)
+        # The global partitioner leaves the model's own submodules in place after the engines take over their
+        # weights, and release_weights_after_build empties them: compare and refit the ones the graphs use.
+        new_partitioned_module.delete_all_unused_submodules()
+        used = {
+            str(node.target).split(".")[0]
+            for node in compiled_module.graph.nodes
+            if node.op in ("call_module", "get_attr")
+        }
         assert {sm[0] for sm in new_partitioned_module.named_children()} == {
-            sm[0] for sm in compiled_module.named_children()
+            sm[0] for sm in compiled_module.named_children() if sm[0] in used
         }, "New weights module is not compatible with previously compiled Torch-TensorRT module"
     # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
@@ -395,7 +413,9 @@ def refit_module_weights(
             )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            new_submodule, example_tensors=False
+        )
         logger.debug(
             "Refitting Submodule name: %s\n",
             str(name),
@@ -456,11 +476,26 @@ def refit_module_weights(
         gc.collect()
         torch.cuda.empty_cache()
 
+    # The global partitioner leaves the PyTorch nodes in the top graph, and they can read
+    # state set on the top module itself, such as a folded constant. The loop above only
+    # refits the children, so copy that state over too.
+    if not settings.use_fast_partitioner and not inline_module:
+        with torch.no_grad():
+            for node in new_partitioned_module.graph.nodes:
+                if node.op != "get_attr" or "." in node.target:
+                    continue
+                new_value = getattr(new_partitioned_module, node.target)
+                if not isinstance(new_value, torch.Tensor):
+                    continue
+                value = getattr(compiled_module, node.target)
+                assert (
+                    value.shape == new_value.shape
+                ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
+                value.copy_(new_value)
+
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))  # move to device for inference
-        # A complex placeholder stays complex in the lowered reference module; the
-        # unpacking to real happens inside the graph, so both modules take the same
-        # inputs the caller passed.
+        _restore_complex_io(new_gm)
         outputs_match = check_module_output(
             new_module=new_gm,
             refitted_module=compiled_module,
@@ -475,6 +510,42 @@ def refit_module_weights(
         logger.info("Refitting Completed! Output verification skipped.")
 
     return compiled_module
+
+
+def _restore_complex_io(gm: torch.fx.GraphModule) -> None:
+    """Make the lowered reference module take and return complex tensors, as the
+    compiled module does, so the output check can compare the two.
+
+    The legacy complex rewriter replaces a complex input with a real
+    "<name>_unpacked_complex" one, and both complex lowerings return a complex
+    output as a real tensor with a trailing dimension of 2.
+    """
+    graph = gm.graph
+    unpacked = {f"{n}_unpacked_complex" for n in gm.meta.get("complex_input_names", [])}
+    for node in list(graph.nodes):
+        if node.op == "placeholder" and node.name in unpacked:
+            with graph.inserting_after(node):
+                real = graph.call_function(torch.ops.aten.view_as_real.default, (node,))
+            node.replace_all_uses_with(real)
+            real.args = (node,)
+    output_node = list(graph.nodes)[-1]
+    output_arg = output_node.args[0]
+    outputs = (
+        list(output_arg) if isinstance(output_arg, (list, tuple)) else [output_arg]
+    )
+    for idx in gm.meta.get("complex_output_indices", []):
+        with graph.inserting_before(output_node):
+            outputs[idx] = graph.call_function(
+                torch.ops.aten.view_as_complex.default, (outputs[idx],)
+            )
+    output_node.args = (
+        (
+            type(output_arg)(outputs)
+            if isinstance(output_arg, (list, tuple))
+            else outputs[0]
+        ),
+    )
+    gm.recompile()
 
 
 # Util functions -----------

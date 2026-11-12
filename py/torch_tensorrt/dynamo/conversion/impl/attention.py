@@ -8,6 +8,7 @@ from typing import Optional, Tuple, Union
 import tensorrt as trt
 import torch
 from tensorrt import ITensor as TRTTensor
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -123,6 +124,33 @@ def _restore_static_query_heads(
         query,
         query_shape,
     )
+
+
+def _causal_mask_kind(
+    ctx: ConversionContext, target: Target, query: TRTTensor, key: TRTTensor
+) -> trt.CausalMaskKind:
+    """Return the causal mask alignment that matches PyTorch.
+
+    When the query and key lengths differ, PyTorch aligns the mask to the top left, except in its
+    flash kernel, which aligns it to the bottom right. Lengths known to be equal keep LOWER_RIGHT.
+    """
+    if target == torch.ops.aten._scaled_dot_product_flash_attention.default:
+        return trt.CausalMaskKind.LOWER_RIGHT
+    q_len, k_len = query.shape[-2], key.shape[-2]
+    if q_len < 0 or k_len < 0:
+        # Dynamic in TensorRT, so ask the FX shapes whether the lengths are provably equal.
+        node = ctx.current_node
+        query_val, key_val = (
+            [getattr(arg, "meta", {}).get("val") for arg in node.args[:2]]
+            if node
+            else [None, None]
+        )
+        if query_val is None or key_val is None:
+            return trt.CausalMaskKind.UPPER_LEFT
+        q_len, k_len = query_val.shape[-2], key_val.shape[-2]
+    if statically_known_true(q_len == k_len):
+        return trt.CausalMaskKind.LOWER_RIGHT
+    return trt.CausalMaskKind.UPPER_LEFT
 
 
 def tril(
@@ -272,6 +300,10 @@ def scaled_dot_product_attention(
     Returns:
         TRTTensor: Attention output tensor with shape [batch, heads, seq_len, head_dim]
     """
+    query = get_trt_tensor(ctx, query, f"{name}_query")
+    key = get_trt_tensor(ctx, key, f"{name}_key")
+    value = get_trt_tensor(ctx, value, f"{name}_value")
+
     # When FP8 softmax normalization is active (modelopt FP8 MHA pattern) TRT's
     # FP8 MHA fusion requires the Q/DQ output to feed IAttention via a single
     # same-dtype Mul; any HALF<->FLOAT cast inserted by the default dynamic
@@ -281,7 +313,12 @@ def scaled_dot_product_attention(
         ctx.current_node is not None
         and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
     )
-    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+    # Also BF16, where a dynamic scale costs accuracy; a constant was not clearly better in FP16.
+    if (
+        (fp8_norm_active or query.dtype == trt.DataType.BF16)
+        and scale is None
+        and query.shape[-1] > 0
+    ):
         scale = 1.0 / math.sqrt(query.shape[-1])
 
     query = _restore_static_query_heads(ctx, target, source_ir, name, query)
@@ -299,7 +336,14 @@ def scaled_dot_product_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
         )
     else:
-        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        # At the query's rank the multiply broadcasts. Expanded to the query's shape, a constant
+        # scale is not folded into the attention by TensorRT-RTX, which then rounds the query.
+        scale = prepend_ones(
+            ctx,
+            get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype),
+            f"{name}_scale_prepend_ones",
+            len(query.shape) - 1,
+        )
         scaled_query = impl.elementwise.mul(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
@@ -314,7 +358,7 @@ def scaled_dot_product_attention(
     assert attention_layer is not None, "attention layer is None"
 
     if is_causal:
-        attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+        attention_layer.causal_kind = _causal_mask_kind(ctx, target, query, key)
     else:
         if attn_mask is not None:
             attn_mask = get_trt_tensor(ctx, attn_mask, f"{name}_attn_mask")
@@ -392,11 +436,19 @@ def scaled_dot_product_efficient_attention(
     is_causal: bool = False,
     scale: Optional[float] = None,
 ) -> Tuple[TRTTensor, Optional[TRTTensor], Optional[TRTTensor], Optional[TRTTensor]]:
+    query = get_trt_tensor(ctx, query, f"{name}_query")
+    key = get_trt_tensor(ctx, key, f"{name}_key")
+    value = get_trt_tensor(ctx, value, f"{name}_value")
+
     fp8_norm_active = (
         ctx.current_node is not None
         and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
     )
-    if fp8_norm_active and scale is None and isinstance(query.shape[-1], int):
+    if (
+        (fp8_norm_active or query.dtype == trt.DataType.BF16)
+        and scale is None
+        and query.shape[-1] > 0
+    ):
         scale = 1.0 / math.sqrt(query.shape[-1])
 
     query = _restore_static_query_heads(ctx, target, source_ir, name, query)
@@ -414,7 +466,14 @@ def scaled_dot_product_efficient_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, sqrt_q_dim
         )
     else:
-        scale = get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype)
+        # At the query's rank the multiply broadcasts. Expanded to the query's shape, a constant
+        # scale is not folded into the attention by TensorRT-RTX, which then rounds the query.
+        scale = prepend_ones(
+            ctx,
+            get_trt_tensor(ctx, scale, f"{name}_scale", query.dtype),
+            f"{name}_scale_prepend_ones",
+            len(query.shape) - 1,
+        )
         scaled_query = impl.elementwise.mul(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
@@ -468,7 +527,7 @@ def scaled_dot_product_efficient_attention(
             )
             attention_layer.mask = mask
         else:
-            attention_layer.causal_kind = trt.CausalMaskKind.LOWER_RIGHT
+            attention_layer.causal_kind = _causal_mask_kind(ctx, target, query, key)
     else:
         if attn_bias is not None:
             attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")

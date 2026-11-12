@@ -346,6 +346,20 @@ int main(int argc, char** argv) {
   HierarchicalAllocator planned_memory{{planned_spans.data(), planned_spans.size()}};
   MemoryManager memory_manager{&method_allocator, &planned_memory, &temp_allocator};
 
+  // Declared before the method so it is destroyed after it: TensorRT requires a green context to outlive the
+  // CUDA graphs recorded in it and, with TensorRT 11.4 and newer, the auxiliary streams it creates there.
+  CUgreenCtx green_ctx = nullptr;
+  std::unique_ptr<CUgreenCtx, void (*)(CUgreenCtx*)> destroy_green_ctx(&green_ctx, [](CUgreenCtx* green) {
+    if (*green == nullptr || g_cuda_driver == nullptr) {
+      return;
+    }
+    const CUresult res = g_cuda_driver->GreenCtxDestroy(*green);
+    if (res != CUDA_SUCCESS) {
+      const char* msg = nullptr;
+      g_cuda_driver->GetErrorString(res, &msg);
+      ET_LOG(Error, "cuGreenCtxDestroy failed: %s", msg ? msg : "unknown");
+    }
+  });
   Result<Method> method = program->load_method(method_name, &memory_manager, nullptr);
   ET_CHECK_MSG(method.ok(), "load_method('%s') failed: 0x%" PRIx32, method_name, static_cast<uint32_t>(method.error()));
   ET_LOG(Info, "Method loaded. inputs=%zu outputs=%zu", method->inputs_size(), method->outputs_size());
@@ -398,7 +412,6 @@ int main(int argc, char** argv) {
 
   cudaStream_t caller_stream = nullptr;
   cudaError_t cuda_status = cudaSuccess;
-  CUgreenCtx green_ctx = nullptr;
   if (green_context_sms > 0) {
     unsigned int partition_sms = 0;
     const GreenContext green = make_green_context_stream(
@@ -453,14 +466,6 @@ int main(int argc, char** argv) {
   cuda_status = cudaStreamDestroy(caller_stream);
   if (cuda_status != cudaSuccess) {
     ET_LOG(Error, "cudaStreamDestroy failed: %s", cudaGetErrorString(cuda_status));
-  }
-  if (green_ctx != nullptr && g_cuda_driver != nullptr) {
-    const CUresult res = g_cuda_driver->GreenCtxDestroy(green_ctx);
-    if (res != CUDA_SUCCESS) {
-      const char* msg = nullptr;
-      g_cuda_driver->GetErrorString(res, &msg);
-      ET_LOG(Error, "cuGreenCtxDestroy failed: %s", msg ? msg : "unknown");
-    }
   }
   ET_LOG(Info, "Inference completed (%d run(s)).", num_runs);
 

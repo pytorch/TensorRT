@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=29ff6be7"></script>
+    <script src="../../../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -185,6 +185,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -197,19 +204,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../../debugging/index.html">
     Debugging
@@ -324,6 +331,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -610,6 +624,7 @@ document.write(`
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_user_outputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pytorch_plugin_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
@@ -630,6 +645,7 @@ document.write(`
 <span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
 <span class="sd">            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)</span>
 <span class="sd">            symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding</span>
+<span class="sd">            pytorch_plugin_ops (List[str]): Operators the engine runs with TensorRT plugins whose kernels run PyTorch, ``[]`` if none. ExecuTorch export refuses an engine that does not set it, because it cannot tell whether the engine needs PyTorch</span>
 
 <span class="sd">        Example:</span>
 
@@ -689,6 +705,9 @@ document.write(`
         <span class="c1"># Map of output binding name -&gt; (input binding name, kind_str)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">aliased_io</span> <span class="ow">or</span> <span class="p">{})</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span> <span class="o">=</span> <span class="n">num_user_outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pytorch_plugin_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="kc">None</span> <span class="k">if</span> <span class="n">pytorch_plugin_ops</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">pytorch_plugin_ops</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
@@ -709,12 +728,13 @@ document.write(`
         <span class="c1"># The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)</span>
         <span class="c1"># engines — creating a new execution context during copy can crash at</span>
         <span class="c1"># destruction time.  Since the exporter only reads the engine (never</span>
-        <span class="c1"># executes it), sharing the same C++ object is safe.</span>
+        <span class="c1"># executes it), sharing the same C++ object is safe. A plan is never modified either,</span>
+        <span class="c1"># and copying a memory-mapped one (compile_and_save) would read it in.</span>
         <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">"engine"</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"engine"</span><span class="p">,</span> <span class="s2">"_serialized_engine"</span><span class="p">):</span>
                 <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>  <span class="c1"># shallow: reuse the same C++ Engine</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">memo</span><span class="p">))</span>
@@ -761,6 +781,7 @@ document.write(`
             <span class="s2">"settings"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
             <span class="s2">"inout_symexprs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
             <span class="s2">"num_user_outputs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span><span class="p">,</span>
+            <span class="s2">"pytorch_plugin_ops"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pytorch_plugin_ops</span><span class="p">,</span>
             <span class="s2">"output_tensors_are_unowned"</span><span class="p">:</span> <span class="p">(</span>
                 <span class="kc">False</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -1077,6 +1098,7 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"inout_symexprs"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_user_outputs"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pytorch_plugin_ops</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"pytorch_plugin_ops"</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span>
                 <span class="nb">str</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">])</span>
             <span class="p">)</span>
@@ -1214,6 +1236,9 @@ document.write(`
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_serialized_engine"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_implicit_cache_handle"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># A module saved before the mark existed keeps it unknown (None), so the</span>
+        <span class="c1"># ExecuTorch save check asks for a recompile instead of guessing.</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"pytorch_plugin_ops"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">"__setstate__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">set_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">set_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>

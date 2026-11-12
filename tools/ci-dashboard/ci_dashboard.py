@@ -1109,7 +1109,7 @@ DIDNT_RUN = ("skip", "cancel")
 # converter gap, or a real regression (numerical/assertion)? First pattern wins,
 # so order is most-specific → most-generic. `kind` drives the tag colour:
 #   infra = "probably not your bug"  ·  env/gap = setup/feature hole  ·  bug = real.
-# NOTE: an OOM often surfaces AS an AssertionError ("assert cuda_engine"); the OOM
+# NOTE: an OOM often surfaces as a failed engine build ("TensorRT could not build the engine"); the OOM
 # signatures below are listed first on purpose so they win over the generic assert.
 _FAIL_CATS = [
     (
@@ -1119,6 +1119,7 @@ _FAIL_CATS = [
         re.compile(
             r"OutOfMemory|out of memory|createCaskHardwareInfo|\bCask\b|"
             r"build_serialized_network returned None|assert cuda_engine|cuda_engine\b|"
+            r"TensorRT could not build the engine|"
             r"catchCudaError|cudaError|cuInit|defaultAllocator|no CUDA GPUs|"
             r"CUDA error|cudaMalloc|device-side assert",
             re.I,

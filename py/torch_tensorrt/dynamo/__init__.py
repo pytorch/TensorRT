@@ -18,7 +18,9 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
         save_cross_compiled_exported_program,
     )
     from ._exporter import export
+    from ._low_memory import low_memory
     from ._refit import refit_module_weights
+    from ._reporting import analyze, compile_with_report
     from ._settings import CompilationSettings
     from ._SourceIR import SourceIR
     from ._tracer import trace

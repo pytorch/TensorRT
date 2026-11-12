@@ -90,6 +90,10 @@ class _InputBindingInfo(NamedTuple):
     is_aliased_input: bool
 
 
+class _InputShapeRefusedError(RuntimeError):
+    pass
+
+
 def _get_dynamic_shapes_kernel_strategy(strategy_str: str) -> Any:
     """Map strategy string to TRT enum. Only meaningful on TensorRT-RTX builds."""
     return {
@@ -266,6 +270,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self._bound_inputs_by_name: Dict[str, torch.Tensor] = {}
+        self._shape_input_buffers: List[Any] = []
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
@@ -348,11 +353,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._context
 
     def invalidate_context(self) -> None:
-        """Drop the live execution context. Next ``self.context`` read
-        rebuilds it with the then-current ``runtime_settings``. Called from
-        every settings-mutation path so reads of ``self.context`` always
-        observe up-to-date settings."""
+        """Drop the live execution context, the CUDA graph captured on it, and
+        the dynamic workspace.
+        Next ``self.context`` read rebuilds it with the then-current
+        ``runtime_settings``, and with CUDA graphs on the next execution records
+        a new graph. Called from every settings-mutation path so reads of
+        ``self.context`` always observe up-to-date settings."""
+        # The graph replays this context's kernels and memory, so it must go first.
+        self.reset_captured_graph()
+        self.runtime_states.context_changed = True
         self._context = None
+        self._dynamic_workspace = None
 
     def has_context(self) -> bool:
         """True iff the execution context has been materialized. Probes
@@ -401,6 +412,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers = []
         self._output_buffers = []
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         self._caller_stream = None
         self._engine_stream = None
         self._owned_pool_stream = None
@@ -753,7 +765,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
             self.runtime_settings.cuda_graph_strategy != "disabled"
         )
-        self.runtime_states.context_changed = True
 
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
@@ -850,8 +861,29 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         the enqueue stream). Used by auto-selection, which switches on
         ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
         """
-        if self.num_optimization_profiles <= 1:
+        # An index this engine does not have cannot be honored. A single-profile
+        # engine is the one case where that is not a mistake to fail on: it has
+        # profile 0 and nothing to switch to, so a pin aimed at some other engine
+        # is ignored with a warning rather than raising. A multi-profile engine
+        # handed an index it lacks could have done something different, and a
+        # negative index is a computed value gone wrong on any engine, so both
+        # stay errors -- silently running on mistuned kernels is worse than
+        # stopping. Kept identical to the C++ runtime, which this mirrors.
+        #
+        # Reachable only by calling the engine directly; optimization_profile()
+        # validates the index first.
+        if self.num_optimization_profiles <= 1 and profile_index > 0:
+            logger.warning(
+                f"Ignoring optimization profile index {profile_index}: this engine has "
+                f"{self.num_optimization_profiles} optimization profile(s), so it stays on "
+                f"profile {self._active_profile_index}."
+            )
             return
+        if not 0 <= profile_index < self.num_optimization_profiles:
+            raise ValueError(
+                f"Optimization profile index {profile_index} is out of range: this engine "
+                f"has {self.num_optimization_profiles} optimization profile(s)."
+            )
         if profile_index == self._active_profile_index:
             return
         self.context.set_optimization_profile_async(profile_index, stream.cuda_stream)
@@ -1015,10 +1047,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if budget_bytes < 0:
             budget_bytes = self.streamable_device_memory_budget
         # TRT 11+ rejects setWeightStreamingBudgetV2 while a live
-        # IExecutionContext exists (its use_count must be 1). A captured
-        # cudagraph also keeps the context alive, so drop the graph first and
-        # then the context -- matching the C++ TRTEngine::set_device_memory_budget.
-        self.reset_captured_graph()
+        # IExecutionContext exists (its use_count must be 1), so drop it first,
+        # matching the C++ TRTEngine::set_device_memory_budget.
         self.invalidate_context()
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
@@ -1035,7 +1065,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             self.enable_profiling()
         else:
             _ = self.context
-        self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
         if self.cudagraph:
@@ -1048,7 +1077,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             return
         self.resource_allocation_strategy = new_strategy
         self.invalidate_context()
-        self.runtime_states.context_changed = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         self.output_tensors_are_unowned = enabled
@@ -1071,7 +1099,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         torch.cuda.synchronize()
         self.invalidate_context()
         self._profile_execution = False
-        self.runtime_states.context_changed = True
 
     def get_engine_layer_info(self) -> str:
         inspector = self.cuda_engine.create_engine_inspector()
@@ -1087,9 +1114,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def infer_outputs(self, input_shapes: List[Any]) -> List[Any]:
         """Return output shapes inferred for the given input shapes."""
         results = []
-        for i, input_name in enumerate(self.in_binding_names):
-            if i < len(input_shapes):
-                self.context.set_input_shape(input_name, tuple(input_shapes[i]))
+        # TensorRT accepts a shape that fits any optimization profile, not only the
+        # active one, so this needs no profile selection.
+        for i, binding in enumerate(self._input_binding_infos):
+            # Like the run path, skip shape tensors. Their shape is fixed in the
+            # engine and can differ from the input's (a scalar is declared [1]).
+            if i < len(input_shapes) and not binding.is_shape_tensor:
+                self._set_input_shape(binding.name, tuple(input_shapes[i]))
         for output_name in self.out_binding_names:
             results.append(tuple(self.context.get_tensor_shape(output_name)))
         return results
@@ -1161,6 +1192,16 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 f"TensorRT failed to run engine {self.name}, see the TensorRT error above"
             )
 
+    def _set_input_shape(self, name: str, shape: Tuple[int, ...]) -> None:
+        # TensorRT keeps the previous shape when it refuses one, so going on
+        # would run the engine on stale shapes and return wrong outputs.
+        if not self.context.set_input_shape(name, shape):
+            raise _InputShapeRefusedError(
+                f"TensorRT refused shape {list(shape)} for input {name} of engine "
+                f"{self.name}, the engine declares "
+                f"{list(self.cuda_engine.get_tensor_shape(name))}"
+            )
+
     def setup_input_tensors(
         self,
         contiguous_inputs: List[torch.Tensor],
@@ -1171,6 +1212,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # create_output_tensors / the output-binding loop to alias outputs to
         # their source-input storage.
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         for i, binding in enumerate(self._input_binding_infos):
             input_name = binding.name
 
@@ -1187,11 +1229,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             if binding.is_shape_tensor:
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                # TensorRT reads this host memory when the engine runs, so the
+                # array must outlive this loop.
+                self._shape_input_buffers.append(inputs_cpu)
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                self.context.set_input_shape(
-                    input_name, tuple(contiguous_inputs[i].shape)
-                )
+                self._set_input_shape(input_name, tuple(contiguous_inputs[i].shape))
                 tensor_to_bind = contiguous_inputs[i]
                 if cudagraphs_enabled and not binding.is_aliased_input:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
@@ -1384,7 +1427,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                if self.resource_allocation_strategy:
+                # A captured graph replays into the workspace it was recorded with.
+                if self.resource_allocation_strategy and self.cudagraph is None:
                     workspace_bytes = self.cuda_engine.device_memory_size_v2
                     self._dynamic_workspace = torch.empty(
                         workspace_bytes,
@@ -1602,6 +1646,9 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
         input_shapes = [list(t.shape) for t in input_tensors]
         try:
             output_shapes = engine.infer_outputs(input_shapes)
+        except _InputShapeRefusedError:
+            # Running would fail on this shape too, so report it instead of guessing.
+            raise
         except Exception:
             # Fall back to the statically-stored shapes when shape inference is
             # unavailable (e.g. engine context not yet initialised in meta mode).

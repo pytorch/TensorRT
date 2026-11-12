@@ -9,6 +9,7 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -52,6 +53,65 @@ def batch_norm(
     # Save the original output shape for later use
     output_shape = input.shape
     feature_num = output_shape[1]
+    input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
+    # Refit with identical weights cannot bring new values, like immutable weights.
+    fixed_weights = (
+        ctx.compilation_settings.immutable_weights
+        or ctx.compilation_settings.refit_identical_engine_weights
+    )
+    if training:
+        # In training mode, and whenever no running stats are tracked, PyTorch normalizes
+        # with the mean and biased variance of the current batch, per channel
+        stats_shape = (1, feature_num) + (1,) * (len(output_shape) - 2)
+        with unset_fake_temporarily():
+            if weight is None:
+                weight = torch.ones((feature_num,), dtype=input_dtype)
+            if bias is None:
+                bias = torch.zeros((feature_num,), dtype=input_dtype)
+            # Weight and bias of another dtype take the input dtype only when they are
+            # constants that fit it and the engine weights cannot change.
+            normalize_in_float32 = False
+            if any(
+                _enums.dtype._from(p.dtype).to(torch.dtype) != input_dtype
+                for p in (weight, bias)
+            ):
+                normalize_in_float32 = not (
+                    fixed_weights
+                    and all(
+                        not isinstance(p, trt.ITensor)
+                        and torch.as_tensor(p).to(input_dtype).isfinite().all()
+                        for p in (weight, bias)
+                    )
+                )
+            weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+            bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        if normalize_in_float32:
+            input = cast_trt_tensor(
+                ctx, input, trt.float32, f"{name}_input_float32", target, source_ir
+            )
+        weight = cast_trt_tensor(
+            ctx, weight, input.dtype, f"{name}_cast_weight", target, source_ir
+        )
+        bias = cast_trt_tensor(
+            ctx, bias, input.dtype, f"{name}_cast_bias", target, source_ir
+        )
+        weight = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_weight", weight, stats_shape
+        )
+        bias = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_bias", bias, stats_shape
+        )
+        axes = get_axes_for_reduce_op([0] + list(range(2, len(output_shape))))
+        layer = ctx.net.add_normalization(input, weight, bias, axes)
+        layer.epsilon = eps
+        set_layer_name(layer, target, name, source_ir)
+        output = layer.get_output(0)
+        if normalize_in_float32:
+            output = cast_trt_tensor(
+                ctx, output, input_dtype, f"{name}_output_cast", target, source_ir
+            )
+        return (output, None, None) if return_mean_rstd else output
+
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
@@ -164,20 +224,67 @@ def batch_norm(
     else:
         with unset_fake_temporarily():
             if weight is None:
-                weight = torch.ones((feature_num,))
+                weight = torch.ones((feature_num,), dtype=input_dtype)
 
             if bias is None:
-                bias = torch.zeros((feature_num,))
+                bias = torch.zeros((feature_num,), dtype=input_dtype)
 
             if running_mean is None:
-                running_mean = torch.zeros((feature_num,))
+                running_mean = torch.zeros((feature_num,), dtype=input_dtype)
 
             if running_var is None:
-                running_var = torch.ones((feature_num,))
+                running_var = torch.ones((feature_num,), dtype=input_dtype)
 
+            # A float16 fold can overflow even when the folded values fit float16.
             adjusted_scale, adjusted_bias = batch_norm_constant_folding(
-                weight, bias, running_mean, running_var, eps
+                weight.float(),
+                bias.float(),
+                running_mean.float(),
+                running_var.float(),
+                eps,
             )
+            input_scale = adjusted_scale.to(input_dtype)
+            # The shift uses the rounded scale, so at a large running mean its only
+            # error is its own rounding: at most half a step of input_dtype.
+            input_bias = (bias.float() - running_mean.float() * input_scale.float()).to(
+                input_dtype
+            )
+            if fixed_weights:
+                # Rounding the scale adds |x - mean| * |scale error| to the output. An
+                # input at 0 or within 6 standard deviations of the mean is at most
+                # |mean| + 6 * std from it. The fold stays in input_dtype while that
+                # error is below a step of input_dtype at a bound on the output there.
+                # A normal scale always meets this, and a subnormal one may not. This
+                # is a heuristic: the bound can be above the largest output, so the
+                # rounding error can be more than one step of the largest output.
+                finfo = torch.finfo(input_dtype)
+                spread = running_mean.float().abs() + 6 * running_var.float().sqrt()
+                scale_error = spread * (input_scale.float() - adjusted_scale).abs()
+                step = torch.clamp(
+                    finfo.eps * (spread * adjusted_scale.abs() + bias.float().abs()),
+                    min=finfo.tiny * finfo.eps,
+                )
+                normalize_in_float32 = bool((scale_error > step).any()) or not (
+                    input_scale.isfinite().all() and input_bias.isfinite().all()
+                )
+            else:
+                # Refit may bring weights that do not fit the input dtype, and the
+                # layers cannot change then, so only the dtypes decide.
+                normalize_in_float32 = any(
+                    p.dtype != input_dtype
+                    for p in (weight, bias, running_mean, running_var)
+                )
+                if not normalize_in_float32 and not (
+                    input_scale.isfinite().all() and input_bias.isfinite().all()
+                ):
+                    _LOGGER.warning(
+                        f"Batch norm {name}: the folded scale or shift does not fit "
+                        f"{input_dtype}, so this refittable engine computes inf. Compile "
+                        "with immutable_weights=True, or give it float32 parameters."
+                    )
+            if not normalize_in_float32:
+                # The input dtype lets a preceding convolution fuse with the scale layer.
+                adjusted_scale, adjusted_bias = input_scale, input_bias
 
         adjusted_scale = to_trt_weights(
             ctx,
@@ -208,11 +315,20 @@ def batch_norm(
                 ctx, target, source_ir, f"{name}_reshape_2d", input, new_shape
             )
 
+        if normalize_in_float32:
+            input = cast_trt_tensor(
+                ctx, input, trt.float32, f"{name}_input_float32", target, source_ir
+            )
+
         layer = ctx.net.add_scale_nd(
             input, trt.ScaleMode.CHANNEL, adjusted_bias, adjusted_scale, None, 1
         )
         set_layer_name(layer, target, name, source_ir)
         output = layer.get_output(0)
+        if normalize_in_float32:
+            output = cast_trt_tensor(
+                ctx, output, input_dtype, f"{name}_output_cast", target, source_ir
+            )
 
     # For BatchNorm1d, reshape output back to original shape if necessary
     if len(output_shape) < 4:
@@ -369,10 +485,17 @@ def softmax(
     dim: int,
     half_to_float: bool,
 ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
-    dim = get_positive_dim(dim, len(input.shape))
-
     if half_to_float:
         input = cast_trt_tensor(ctx, input, torch.float, name, target, source_ir)
+
+    rank = len(input.shape)
+    dim = get_positive_dim(dim, rank) if rank else 0
+    if rank == 0 or input.shape[dim] == 1:
+        # Over a single element, a 0-d input or a size-1 dim, softmax is exp(x - x): 1,
+        # or NaN for inf and NaN inputs, as in PyTorch. This avoids a TensorRT fusion bug
+        # that gives wrong values when a softmax over a size-1 dim feeds a matmul.
+        diff = impl.elementwise.sub(ctx, target, source_ir, f"{name}_sub", input, input)
+        return impl.unary.exp(ctx, target, source_ir, f"{name}_exp", diff)
 
     layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim

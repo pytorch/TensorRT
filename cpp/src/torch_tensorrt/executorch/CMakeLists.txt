@@ -20,6 +20,12 @@ foreach(_torchtrt_cmake_module_dir IN ITEMS
 endforeach()
 
 find_package(TensorRT REQUIRED)
+if(NOT TARGET TensorRT::nvinfer_plugin)
+    message(FATAL_ERROR
+        "Torch-TensorRT's ExecuTorch backend requires TensorRT's plugin library "
+        "(nvinfer_plugin), which was not found. Set TensorRT_ROOT to a TensorRT "
+        "installation that includes it, or TensorRT_nvinfer_plugin_LIBRARY to the library.")
+endif()
 find_package(CUDAToolkit 12.5 REQUIRED)
 find_package(Threads REQUIRED)
 
@@ -161,7 +167,24 @@ elseif(_executorch_backend_tensorrt_source_root AND
     # than a copy of it, so this stays correct if ExecuTorch changes the target
     # and so a duplicate definition is a hard error instead of two libraries.
     if(NOT _common_include_directories)
-        set(_common_include_directories "${_executorch_include_parent}")
+        set(_common_include_directories
+            "${_executorch_include_parent}"
+            "${_executorch_backend_tensorrt_source_root}/runtime/core/portable_type/c10"
+        )
+    endif()
+    # extension_cuda links executorch_core. Built standalone, no ExecuTorch build in this project
+    # defines it, so stand in the prebuilt core that the delegate links below.
+    if(NOT TARGET executorch_core)
+        if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)
+            set(EXECUTORCH_CORE_LIBRARY
+                "${_executorch_backend_tensorrt_source_root}/cmake-out/libexecutorch_core.a"
+                CACHE FILEPATH "Path to the ExecuTorch core static library")
+        endif()
+        if(NOT EXISTS "${EXECUTORCH_CORE_LIBRARY}")
+            message(FATAL_ERROR "EXECUTORCH_CORE_LIBRARY='${EXECUTORCH_CORE_LIBRARY}' does not exist")
+        endif()
+        add_library(executorch_core STATIC IMPORTED)
+        set_target_properties(executorch_core PROPERTIES IMPORTED_LOCATION "${EXECUTORCH_CORE_LIBRARY}")
     endif()
     add_subdirectory(
         "${_executorch_backend_tensorrt_source_root}/extension/cuda"
@@ -190,6 +213,7 @@ endif()
 set(_executorch_backend_tensorrt_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
+    TensorRT::nvinfer_plugin
     Threads::Threads
     extension_cuda
 )
@@ -243,6 +267,15 @@ add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backe
 add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
+
+# The archive is linked by file below rather than by target, so the include path
+# does not come along with it. Carry it here: a runner that scopes
+# OptimizationProfileGuard needs the public header. (The caller-stream guard now
+# comes from ExecuTorch, not from this header.)
+target_include_directories(executorch_backend_tensorrt_backend
+    INTERFACE
+        "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+)
 
 if(MSVC)
     target_link_options(executorch_backend_tensorrt_backend INTERFACE

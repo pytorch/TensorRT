@@ -438,6 +438,27 @@ def test_the_cuda_extension_alias_yields_to_a_consumers_own_target() -> None:
     ]
 
 
+def test_the_source_built_cuda_extension_gets_executorch_headers_and_core() -> None:
+    """Built standalone from a checkout, extension_cuda failed to compile and then to link.
+
+    Its sources include ExecuTorch's c10 headers, and it links executorch_core, which only an
+    ExecuTorch build in the same project defines. The standalone archive recipe has neither.
+    """
+    source = (
+        Path(__file__).resolve().parents[4]
+        / "cpp/src/torch_tensorrt/executorch/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    branch = source.split("elseif(_executorch_backend_tensorrt_source_root AND")[1]
+    branch = branch.split(
+        '"${_executorch_backend_tensorrt_source_root}/extension/cuda"'
+    )[0]
+    assert "/runtime/core/portable_type/c10" in branch, branch
+    assert "if(NOT TARGET executorch_core)" in branch, branch
+    # A path the parent project set must survive the cache default.
+    assert "if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)" in branch, branch
+    assert "add_library(executorch_core STATIC IMPORTED)" in branch, branch
+
+
 @pytest.mark.parametrize("embed", [True, False])
 def test_the_run_path_opt_out_changes_what_the_consumer_links(
     tmp_path, linker_tools, embed

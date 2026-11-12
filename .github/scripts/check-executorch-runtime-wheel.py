@@ -238,7 +238,8 @@ def main() -> None:
                         f"the repository pins executorch=={pinned}, but this wheel was built "
                         f"against {installed}, whose version differs from that pin"
                     )
-                expected_version = str(installed)
+                # A wheel for PyPI carries no label, so neither does its requirement.
+                expected_version = str(installed) if version.local else installed.public
             else:
                 # Against the repository's own pin, not just against the environment that produced
                 # the requirement. Taking the expected value from the same environment setup.py read

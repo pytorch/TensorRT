@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=29ff6be7"></script>
+    <script src="../../../_static/documentation_options.js?v=23415393"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -185,6 +185,13 @@ document.write(`
 
 
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
     Advanced Usage
   </a>
@@ -197,19 +204,19 @@ document.write(`
   </a>
 </li>
 
-
-<li class="nav-item ">
-  <a class="nav-link nav-internal" href="../../../api_reference.html">
-    API Reference
-  </a>
-</li>
-
             <li class="nav-item dropdown">
                 <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
                     More
                 </button>
                 <ul id="pst-nav-more-links" class="dropdown-menu">
                     
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
 <li class=" ">
   <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
     Debugging
@@ -324,6 +331,13 @@ document.write(`
 <li class="nav-item ">
   <a class="nav-link nav-internal" href="../../../user_guide/index.html">
     User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/agent_workflows/index.html">
+    Agent workflows
   </a>
 </li>
 
@@ -478,7 +492,7 @@ document.write(`
 <span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">FrozenSet</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -493,15 +507,20 @@ document.write(`
     <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
+    <span class="n">AUTOCAST_EXCLUDED_NODE_NAMES</span><span class="p">,</span>
     <span class="n">AUTOCAST_EXCLUDED_NODES</span><span class="p">,</span>
     <span class="n">AUTOCAST_EXCLUDED_OPS</span><span class="p">,</span>
     <span class="n">AUTOCAST_LOW_PRECISION_TYPE</span><span class="p">,</span>
     <span class="n">AUTOCAST_MAX_DEPTH_OF_REDUCTION</span><span class="p">,</span>
     <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
+    <span class="n">AUTOCAST_MODEL_REGIONS</span><span class="p">,</span>
     <span class="n">BUILD_ROUTE</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
+    <span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">,</span>
+    <span class="n">CONVERT_ANTIALIASED_RESIZE</span><span class="p">,</span>
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
+    <span class="n">DEDUPLICATE_WEIGHTS</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
@@ -516,17 +535,22 @@ document.write(`
     <span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
+    <span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">,</span>
+    <span class="n">FOLD_SHARED_KV_ATTENTION</span><span class="p">,</span>
     <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
+    <span class="n">MAX_PARTITION_SIZE</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="n">OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
     <span class="n">REFIT_IDENTICAL_ENGINE_WEIGHTS</span><span class="p">,</span>
+    <span class="n">RELEASE_WEIGHTS_AFTER_BUILD</span><span class="p">,</span>
+    <span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span><span class="p">,</span>
     <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
@@ -566,6 +590,20 @@ document.write(`
     <span class="c1"># Typed local: --strict mypy rejects returning the untyped helper directly.</span>
     <span class="n">normalized</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">(</span><span class="n">rule_ids</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">normalized</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_autocast_op_names</span><span class="p">(</span><span class="n">ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="c1"># Autocast matches ops by name, and op objects cannot be pickled into the</span>
+    <span class="c1"># engine metadata.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">ConverterRegistry</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ops</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">ops</span> <span class="o">=</span> <span class="p">(</span><span class="n">ops</span><span class="p">,)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">}</span>
 
 
 <div class="viewcode-block" id="CompilationSettings">
@@ -622,13 +660,30 @@ document.write(`
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
 <span class="sd">        enable_autocast (bool): Whether to enable autocast.</span>
 <span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
-<span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns for the paths of the modules, such as "block.norm", whose nodes should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_excluded_node_names (Collection[str]): The set of regex patterns for the names of the nodes in the exported graph, such as "layer_norm_1", that should remain in FP32. A pattern matches from the start of a name, so "layer_norm_1$" matches layer_norm_1 and not layer_norm_10. Default is [].</span>
 <span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
-<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.</span>
-<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.</span>
+<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.</span>
+<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.</span>
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
+<span class="sd">        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".</span>
+<span class="sd">        max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner</span>
+<span class="sd">            splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The</span>
+<span class="sd">            size is then not derived from the budget and the process's resident memory, so the same model and size always</span>
+<span class="sd">            give the same split. Setting it turns resource partitioning on. Default is None.</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
+<span class="sd">        release_weights_after_build (Optional[bool]): Release the memory of each model weight once</span>
+<span class="sd">            the last TensorRT engine that reads it is built, and of weights no partition reads before</span>
+<span class="sd">            the first build, so compilation holds only the weights still to be built.</span>
+<span class="sd">            ``None`` (default) releases only weights mapped by ``map_weights``: their pages are dropped</span>
+<span class="sd">            and re-read from the file if used again, so the source module keeps working, but an in-place</span>
+<span class="sd">            write to a mapped weight is lost. ``True`` also frees ordinary weights: the model's tensors</span>
+<span class="sd">            share that memory, so the source module (and an ``ExportedProgram`` exported from it) must</span>
+<span class="sd">            not be used after compilation, even if compilation fails. ``False`` releases nothing.</span>
+<span class="sd">            Weights read by subgraphs that run in PyTorch are kept. Applies to</span>
+<span class="sd">            ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile`` (parameters arrive as</span>
+<span class="sd">            graph inputs). ``MutableTorchTensorRTModule`` uses ``False``.</span>
 <span class="sd">        decompose_attention (bool): Whether to decompose attention layers into smaller operations</span>
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
@@ -636,11 +691,18 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
-<span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        attn_bias_is_causal (Union[bool, str]): Which attn_bias of efficient SDPA to replace with TensorRT's built-in causal mask, which is faster and more accurate. True: a bias proven causal, one that depends on no graph input and holds 0 on and below the diagonal and -inf (or the dtype's lowest value) above, and also a bias that cannot be proven, such as one built from an input, with a dynamic sequence length, or from a module buffer under torch.compile; you assert that it is causal. "proven": only a bias proven causal, for models whose input-built masks may not be causal, such as masks with padding. A bias that is computed and found not causal is always kept. A mask longer than 4096, or one whose check fails, is not proven: True replaces it and "proven" keeps it. False: never replace. A replaced bias is not read again, so refitting the weights it came from does not change the engine. Default is True.</span>
+<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
+<span class="sd">        deduplicate_weights (bool): Add a weight that several layers read to the TensorRT network once instead of once per layer, and give the linear layers that share a weight one transposed copy of it. This cuts engine-build host memory for models that reuse weights, such as a denoising loop unrolled into one graph, most of all in float32 builds with disable_tf32=True and in refittable engines. TensorRT may pick other kernels, so results can round differently, and some models need more memory instead, so measure it. Under torch.compile the weights are engine inputs, not constants, so they are not shared. Default is False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
+<span class="sd">        fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.</span>
+<span class="sd">        collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.</span>
+<span class="sd">        convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.</span>
+<span class="sd">        replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.</span>
 <span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
 <span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
 <span class="sd">        tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".</span>
@@ -703,6 +765,9 @@ document.write(`
     <span class="n">autocast_excluded_nodes</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
         <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AUTOCAST_EXCLUDED_NODES</span>
     <span class="p">)</span>
+    <span class="n">autocast_excluded_node_names</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AUTOCAST_EXCLUDED_NODE_NAMES</span>
+    <span class="p">)</span>
     <span class="n">autocast_excluded_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
         <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AUTOCAST_EXCLUDED_OPS</span>
     <span class="p">)</span>
@@ -711,15 +776,29 @@ document.write(`
     <span class="n">autocast_calibration_dataloader</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span>
     <span class="p">)</span>
+    <span class="n">autocast_model_regions</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">AUTOCAST_MODEL_REGIONS</span>
+    <span class="c1"># Set by autocast, not by users: the nodes it kept in high precision using the</span>
+    <span class="c1"># calibration data. Saved in place of the data so refit can reuse the choice.</span>
+    <span class="n">_autocast_calibrated_high_precision_nodes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">FrozenSet</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span>
+    <span class="p">)</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_RESOURCE_PARTITIONING</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
+    <span class="n">max_partition_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_PARTITION_SIZE</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
+    <span class="n">release_weights_after_build</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="n">RELEASE_WEIGHTS_AFTER_BUILD</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
     <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span>
     <span class="p">)</span>
-    <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
+    <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
+    <span class="n">fold_shared_kv_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span>
+    <span class="n">deduplicate_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEDUPLICATE_WEIGHTS</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
+    <span class="n">fallback_pytorch_plugin_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span>
+    <span class="n">collapse_high_rank_permutes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span>
+    <span class="n">convert_antialiased_resize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">CONVERT_ANTIALIASED_RESIZE</span>
+    <span class="n">replace_interleave_stack_with_cat</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span>
     <span class="n">build_route</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">BUILD_ROUTE</span>
     <span class="n">tune_build_routes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTES</span>
     <span class="n">tune_build_route_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span>
@@ -739,6 +818,34 @@ document.write(`
                 <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"max_partition_size must be a positive number of bytes, "</span>
+                    <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_partition_size</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpu_memory_budget</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"Set max_partition_size or cpu_memory_budget, not both: the size replaces "</span>
+                    <span class="s2">"the budget as the size the resource partitioner splits to."</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">enable_resource_partitioning</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">attn_bias_is_causal</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"proven"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s1">'attn_bias_is_causal must be True, False or "proven", got '</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">attn_bias_is_causal</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_ops</span> <span class="o">=</span> <span class="n">_autocast_op_names</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_ops</span><span class="p">)</span>
+        <span class="c1"># None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">release_weights_after_build</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">release_weights_after_build</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_node_names</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_node_names</span> <span class="o">=</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">autocast_excluded_node_names</span><span class="p">}</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">autocast_model_regions</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"keep"</span><span class="p">,</span> <span class="s2">"reclassify"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s1">'autocast_model_regions must be "keep" or "reclassify", got '</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">autocast_model_regions</span><span class="si">!r}</span><span class="s2">"</span>
+            <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_compute_capabilities</span><span class="p">:</span>
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 
@@ -754,6 +861,11 @@ document.write(`
         <span class="p">)</span>
 
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c1"># Pickles and copies (saved programs, the engine cache, each engine's own</span>
+        <span class="c1"># settings) leave out the calibration data. Refit then reuses the recorded</span>
+        <span class="c1"># precisions instead of deciding again from new weights.</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"autocast_calibration_dataloader"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"autocast_calibration_trace"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">op</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span>
@@ -767,7 +879,19 @@ document.write(`
                 <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span> <span class="p">())</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"autocast_excluded_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_autocast_op_names</span><span class="p">(</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"autocast_excluded_ops"</span><span class="p">,</span> <span class="p">())</span>
+        <span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">,</span> <span class="n">FALLBACK_PYTORCH_PLUGIN_OPS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"collapse_high_rank_permutes"</span><span class="p">,</span> <span class="n">COLLAPSE_HIGH_RANK_PERMUTES</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"convert_antialiased_resize"</span><span class="p">,</span> <span class="n">CONVERT_ANTIALIASED_RESIZE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span>
+            <span class="s2">"replace_interleave_stack_with_cat"</span><span class="p">,</span> <span class="n">REPLACE_INTERLEAVE_STACK_WITH_CAT</span>
+        <span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"release_weights_after_build"</span><span class="p">,</span> <span class="n">RELEASE_WEIGHTS_AFTER_BUILD</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"deduplicate_weights"</span><span class="p">,</span> <span class="n">DEDUPLICATE_WEIGHTS</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"build_route"</span><span class="p">,</span> <span class="n">BUILD_ROUTE</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_routes"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTES</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_route_file"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">)</span>
@@ -780,6 +904,10 @@ document.write(`
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_algorithm"</span><span class="p">,</span> <span class="n">ACCURACY_ALGORITHM</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_atol"</span><span class="p">,</span> <span class="n">ACCURACY_ATOL</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_rtol"</span><span class="p">,</span> <span class="n">ACCURACY_RTOL</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"max_partition_size"</span><span class="p">,</span> <span class="n">MAX_PARTITION_SIZE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"autocast_excluded_node_names"</span><span class="p">,</span> <span class="n">AUTOCAST_EXCLUDED_NODE_NAMES</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"autocast_model_regions"</span><span class="p">,</span> <span class="n">AUTOCAST_MODEL_REGIONS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_autocast_calibrated_high_precision_nodes"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
@@ -802,14 +930,21 @@ document.write(`
     <span class="s2">"enable_autocast"</span><span class="p">,</span>
     <span class="s2">"autocast_low_precision_type"</span><span class="p">,</span>
     <span class="s2">"autocast_excluded_nodes"</span><span class="p">,</span>
+    <span class="s2">"autocast_excluded_node_names"</span><span class="p">,</span>
     <span class="s2">"autocast_excluded_ops"</span><span class="p">,</span>
     <span class="s2">"autocast_max_output_threshold"</span><span class="p">,</span>
     <span class="s2">"autocast_max_depth_of_reduction"</span><span class="p">,</span>
-    <span class="s2">"autocast_calibration_dataloader"</span><span class="p">,</span>
+    <span class="s2">"autocast_model_regions"</span><span class="p">,</span>
     <span class="s2">"decompose_attention"</span><span class="p">,</span>
     <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
     <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>
+    <span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span>
+    <span class="s2">"deduplicate_weights"</span><span class="p">,</span>
     <span class="s2">"build_route"</span><span class="p">,</span>
+    <span class="s2">"fallback_pytorch_plugin_ops"</span><span class="p">,</span>
+    <span class="s2">"collapse_high_rank_permutes"</span><span class="p">,</span>
+    <span class="s2">"convert_antialiased_resize"</span><span class="p">,</span>
+    <span class="s2">"replace_interleave_stack_with_cat"</span><span class="p">,</span>
 <span class="p">}</span>
 
 

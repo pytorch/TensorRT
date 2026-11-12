@@ -488,7 +488,12 @@ class PlatformDistribution(Distribution):
 # environment means that environment has to be present. The CUDA check leads, so an unsupported
 # CUDA says so before anything else is attempted rather than failing later and less clearly.
 require_supported_cuda()
+runtime_version = get_runtime_version()
 executorch_version = installed_version("executorch")
+# A wheel for PyPI has no local label, because PyPI refuses one, and neither does PyPI's ExecuTorch,
+# so its requirement drops the label too. Every other build names the exact CUDA build it linked.
+if "+" not in runtime_version:
+    executorch_version = public_version(executorch_version)
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_requirements = []
 # NVIDIA's CUDA runtime pip wheels are Linux-only. Windows uses the CUDA
@@ -500,7 +505,7 @@ if sys.platform != "win32":
     ]
 setup(
     name="torch-tensorrt-executorch-runtime",
-    version=get_runtime_version(),
+    version=runtime_version,
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
     packages=find_packages(),
     distclass=PlatformDistribution,
@@ -515,10 +520,11 @@ setup(
     # Capped for the same reason the main manifest is: the pinned ExecuTorch ships no wheel
     # above 3.14, so declaring support past it promises something that cannot resolve.
     python_requires=">=3.11,<3.15",
-    # Exactly what the delegate library links, and nothing else. Each of these three is an ABI
-    # question: the shared object names libexecutorch, libnvinfer and libcudart in its own headers,
-    # so a different build of any of them is a different binary contract, and the local label is the
-    # only part of a version that names the CUDA row they have to share.
+    # Exactly what the delegate library links, and nothing else. Each of these is an ABI question:
+    # the shared object names libexecutorch, libnvinfer, libnvinfer_plugin (shipped by the same
+    # TensorRT wheel) and libcudart in its own headers, so a different build of any of them is a
+    # different binary contract, and the local label is the only part of a version that names the
+    # CUDA row they have to share.
     #
     # Neither PyTorch nor Torch-TensorRT is here, and neither is linked. Torch-TensorRT is needed
     # only by the deprecated forwarder in runtime.py, which imports it lazily and already says which

@@ -87,6 +87,47 @@ class TestAsStridedConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_as_strided_of_0d_tensor_is_refused(self):
+        # x[1] is a view of x, and as_strided reads x[0] from the storage of x.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.select.int(x, 0, 1)
+                return torch.ops.aten.as_strided.default(y, (1,), (1,), 0)
+
+        with self.assertRaisesRegex(RuntimeError, "as_strided of a 0-dim tensor"):
+            self.run_test(TestModule(), [torch.randn(4)])
+
+    def test_as_strided_of_computed_0d_tensor(self):
+        # x[1] * 2.0 is 0-d and has a storage of its own, which as_strided reads.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 1), 2.0)
+                return torch.ops.aten.as_strided.default(y, (2,), (0,), 0)
+
+        self.run_test(TestModule(), [torch.randn(4)])
+
+    def test_as_strided_of_a_view_of_a_computed_0d_tensor(self):
+        # The view reads the storage of x[1] * 2.0, which holds the product only.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 1), 2.0)
+                y = torch.ops.aten.squeeze.dim(
+                    torch.ops.aten.unsqueeze.default(y, 0), 0
+                )
+                return torch.ops.aten.as_strided.default(y, (2,), (0,), 0)
+
+        self.run_test(TestModule(), [torch.randn(4)])
+
+    def test_as_strided_of_0d_tensor_from_a_python_operator(self):
+        # torch.fx.symbolic_trace records x[1] * 2.0 as operator.mul, which makes a
+        # new tensor too.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.select.int(x, 0, 1) * 2.0
+                return torch.ops.aten.as_strided.default(y, (2,), (0,), 0)
+
+        self.run_test(TestModule(), [torch.randn(4)], use_dynamo_tracer=False)
+
 
 if __name__ == "__main__":
     run_tests()

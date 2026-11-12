@@ -96,10 +96,21 @@ fi
 # before, so a link nobody intended passed in silence. libpython is the one that matters most: the
 # wheel is tagged for any Python 3 because the payload has no Python ABI, and linking libpython would
 # make that tag a lie while the wheel still installed everywhere.
+# A lean build is the one whose own RUNPATH reaches TensorRT's lean wheel. It links libnvinfer_lean
+# and neither libnvinfer nor libnvinfer_plugin; no other build links libnvinfer_lean.
+runpath=$(printf '%s\n' "${dyn}" | sed -n '/RUNPATH/s/.*\[\(.*\)\].*/\1/p')
+lean_build=no
+case ":${runpath}:" in
+    *':$ORIGIN/../../tensorrt_lean_libs:'*) lean_build=yes ;;
+esac
 for entry in $(needed_entries "${dyn}"); do
     case "${entry}" in
         libexecutorch.so|libexecutorch_extension_cuda.so|libexecutorch_threadpool.so) ;;
-        libnvinfer.so.*|libcudart.so.*) ;;
+        libnvinfer.so.*|libnvinfer_plugin.so.*)
+            [ "${lean_build}" = no ] || fail "${target} is a lean build but links ${entry}" ;;
+        libnvinfer_lean.so.*)
+            [ "${lean_build}" = yes ] || fail "${target} links ${entry}, which only a lean build may link" ;;
+        libcudart.so.*) ;;
         libstdc++.so.*|libc.so.*|libm.so.*|libgcc_s.so.*|libdl.so.*|librt.so.*|libpthread.so.*) ;;
         ld-linux-*.so.*|libatomic.so.*|libz.so.*) ;;
         *) fail "${target} links ${entry}, which is not one of the libraries this wheel may depend on" ;;
@@ -110,7 +121,6 @@ if ! printf '%s\n' "${dyn}" | grep -qE 'NEEDED.*\[libstdc\+\+\.so\.[0-9]+\]'; th
     fail "${target} has no DT_NEEDED on libstdc++, so it is not linked against the shared C++ runtime"
 fi
 
-runpath=$(printf '%s\n' "${dyn}" | sed -n '/RUNPATH/s/.*\[\(.*\)\].*/\1/p')
 # GNU/LLVM print parenthesized tags; elfutils prints bare tags.
 if printf '%s\n' "${dyn}" | grep -qE '[[:space:]]\(?RPATH\)?[[:space:]]'; then
     fail "${target} carries DT_RPATH rather than DT_RUNPATH"

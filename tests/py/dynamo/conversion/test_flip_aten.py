@@ -36,6 +36,17 @@ class TestFlipConverter(DispatchTestCase):
         inputs = [torch.randn(shape)]
         self.run_test(Flip(), inputs)
 
+    def test_flip_of_0d_tensor(self):
+        # x[0] * 2.0 is 0-d, and flipping it changes nothing.
+        class Flip(nn.Module):
+            def forward(self, x):
+                value = torch.ops.aten.mul.Tensor(
+                    torch.ops.aten.select.int(x, 0, 0), 2.0
+                )
+                return torch.ops.aten.flip.default(value, [-1])
+
+        self.run_test(Flip(), [torch.randn(4)])
+
 
 class TestFlipConverterDynamic(DispatchTestCase):
     @parameterized.expand(

@@ -1,16 +1,31 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+from collections import defaultdict
 from copy import deepcopy
 
 import numpy as np
 import torch
 import torch_tensorrt
 from parameterized import parameterized
+from torch.fx.passes.splitter_base import _SplitterBase
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo.partitioning._adjacency_partitioner import (
+    OpSupportTester,
+    TRTPartitioner,
+)
 
 from ..testing_utilities import lower_graph_testing
+
+
+class _CountingDeps(defaultdict):
+    reads = 0
+
+    def __getitem__(self, node):
+        self.reads += 1
+        return super().__getitem__(node)
 
 
 class TestFastPartitioning(TestCase):
@@ -183,6 +198,39 @@ class TestFastPartitioning(TestCase):
             "Certain operators are set to run in Torch, expected 1 segment",
         )
 
+    def test_put_nodes_into_subgraphs_matches_base_without_rescans(self):
+        class Interleaved(torch.nn.Module):
+            def forward(self, x, y):
+                for i in range(60):
+                    a = torch.ops.aten.add.Tensor(x, y)
+                    b = torch.ops.aten.mul.Tensor(a, y)
+                    if i % 6 == 0:
+                        b = torch.ops.aten.abs.default(b)
+                    x = torch.ops.aten.sub.Tensor(b, a)
+                return x
+
+        partitioner = TRTPartitioner(
+            torch.fx.symbolic_trace(Interleaved()),
+            OpSupportTester(torch_executed_ops={"torch.ops.aten.abs.default"}),
+            min_block_size=1,
+        )
+        partitioner.deps = _CountingDeps(set, partitioner.deps)
+        subgraphs = partitioner.put_nodes_into_subgraphs()
+        reads = partitioner.deps.reads
+
+        expected = _SplitterBase.put_nodes_into_subgraphs(partitioner)
+        self.assertEqual(
+            [(s.is_acc, set(s.nodes)) for s in subgraphs],
+            [(s.is_acc, set(s.nodes)) for s in expected],
+        )
+        self.assertEqual(len(subgraphs), 21)
+
+        # The base loop can reread the dependencies of all waiting nodes at every step.
+        num_nodes = len(
+            [n for n in partitioner.module.graph.nodes if n.op in CALLABLE_NODE_OPS]
+        )
+        self.assertLessEqual(reads, 4 * num_nodes)
+
     @parameterized.expand(
         [
             (["torch.nn.modules.conv.Conv2d"], 2),
@@ -219,6 +267,33 @@ class TestFastPartitioning(TestCase):
                 if "_run_on_acc" in name:
                     cnt += 1
             self.assertEqual(cnt, trt_mod_cnt)
+
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_offload_keeps_returned_buffer_on_device(self, _, use_fast_partitioner):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("b", torch.randn(4))
+
+            def forward(self, x):
+                # The output reads b as is, so b stays a get_attr in the root graph.
+                return torch.relu(x) * 2, self.b
+
+        model = Model().eval().cuda()
+        x = torch.randn(2, 4, device="cuda")
+        expected = model(x)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            use_fast_partitioner=use_fast_partitioner,
+            offload_module_to_cpu=True,
+        )
+        self.assertIn(
+            "b", {n.target for n in trt_mod.graph.nodes if n.op == "get_attr"}
+        )
+        # assert_close also checks that each output is on the same device as eager.
+        torch.testing.assert_close(trt_mod(x), expected)
 
 
 if __name__ == "__main__":

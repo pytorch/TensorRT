@@ -42,10 +42,9 @@ cannot drift away from the model.
 
 Prerequisites
 -------------
-Install Torch-TensorRT with the ExecuTorch extra before running this example::
-
-    pip install -e ".[executorch]" \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
+Install Torch-TensorRT with its ``executorch`` extra, as the Installation section of
+the ExecuTorch deployment guide shows:
+https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#installation
 
 ExecuTorch's CUDA backend also needs a CUDA toolkit (``nvcc``) at export time,
 for the AOTInductor compile.

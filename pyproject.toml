@@ -18,11 +18,11 @@ build-backend = "setuptools.build_meta"
 name = "torch_tensorrt"
 authors = [{ name = "NVIDIA Corporation", email = "narens@nvidia.com" }]
 description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
-license = { file = "LICENSE" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: GPU :: NVIDIA CUDA",
-    "License :: OSI Approved :: BSD License",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Operating System :: POSIX :: Linux",
@@ -132,7 +132,7 @@ docs = [
 
 quantization = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
-    "torchao",
+    "torchao>=0.17",
     "mslk>=1.0.0; sys_platform == 'linux'",
 ]
 
@@ -144,6 +144,9 @@ quantization = [
 # CUDA Toolkit used to build/test this project; users without it can install
 # cuda-tile's ``tileiras`` extra as documented for ``cutile_op``.
 kernels = ["cuda-python", "cuda-core", "cuda-tile>=1.3.0,<2"]
+# CuTe DSL is large and only needed to register ``cutedsl_op`` kernels, so it is
+# opt-in; serialized engines embed PTX and never import it.
+kernels-cutedsl = [{ include-group = "kernels" }, "nvidia-cutlass-dsl>=4.8.1,<5"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

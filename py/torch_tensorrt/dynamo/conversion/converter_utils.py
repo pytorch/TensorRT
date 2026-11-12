@@ -4,11 +4,13 @@
 import collections
 import functools
 import logging
+import operator
+import weakref
 from typing import (
     Any,
     Callable,
     Dict,
-    List,
+    Hashable,
     Literal,
     Optional,
     Sequence,
@@ -24,6 +26,8 @@ import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
+from torch.utils._pytree import tree_flatten
 from torch_tensorrt import _enums
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -154,6 +158,90 @@ def is_only_operator_on_placeholder(
     )
 
 
+# Ops that only move data. TensorRT has no uint8 layers for them, so the interpreter widens a
+# uint8 input to int32 first; the values are the same, and nothing computes on them.
+UINT8_DATA_MOVEMENT_OPS = {
+    torch.ops.aten.permute.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten.view.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.slice.Tensor,
+    torch.ops.aten.cat.default,
+    torch.ops.aten.split.Tensor,
+    torch.ops.aten.split_with_sizes.default,
+    torch.ops.aten.flip.default,
+    torch.ops.aten.roll.default,
+    torch.ops.aten.repeat.default,
+    torch.ops.aten.constant_pad_nd.default,
+    torch.ops.aten.index_select.default,
+}
+
+# When the result type of a comparison is uint8, PyTorch converts the other integer operand to
+# uint8 first, so -1 equals 255. The interpreter does the same on the widened int32 tensor.
+UINT8_COMPARISONS = {
+    torch.ops.aten.eq.Scalar,
+    torch.ops.aten.eq.Tensor,
+    torch.ops.aten.ne.Scalar,
+    torch.ops.aten.ne.Tensor,
+    torch.ops.aten.lt.Scalar,
+    torch.ops.aten.lt.Tensor,
+    torch.ops.aten.le.Scalar,
+    torch.ops.aten.le.Tensor,
+    torch.ops.aten.gt.Scalar,
+    torch.ops.aten.gt.Tensor,
+    torch.ops.aten.ge.Scalar,
+    torch.ops.aten.ge.Tensor,
+}
+
+
+def makes_uint8_tensor(node: torch.fx.Node) -> bool:
+    """Return True if the node would make a uint8 tensor inside a TensorRT engine.
+
+    TensorRT allows uint8 only at engine inputs and outputs, so a layer that makes
+    one, such as an add of uint8 values, fails the build. A clone, and a
+    slice_scatter that overwrites the whole tensor with a uint8 source, can hand an
+    engine input through as it is, the where converter widens uint8 values first,
+    and the interpreter widens the uint8 input of an op that only moves data, so
+    they are left to their converters. A get_attr is not refused: uint8 weights are
+    packed FP4 that the quantization converters read themselves.
+    """
+    if node.op not in CALLABLE_NODE_OPS:
+        return False
+    if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+        return False
+    if node.target in UINT8_DATA_MOVEMENT_OPS or (
+        node.target is operator.getitem
+        and getattr(node.args[0], "target", None) in UINT8_DATA_MOVEMENT_OPS
+    ):
+        return False
+    if node.target == torch.ops.aten.slice_scatter.default:
+        destination = getattr(node.args[0], "meta", {}).get("val")
+        source = getattr(node.args[1], "meta", {}).get("val")
+        if (
+            destination is not None
+            and source is not None
+            and source.dtype == destination.dtype
+        ):
+            args = node.args
+            *_, status = impl.slice_scatter.resolve_slice_scatter_write(
+                tuple(destination.shape),
+                args[2] if len(args) > 2 else 0,
+                args[3] if len(args) > 3 else None,
+                args[4] if len(args) > 4 else None,
+                args[5] if len(args) > 5 else None,
+            )
+            if status is impl.slice_scatter.KVWriteStatus.FULL_OVERWRITE:
+                return False
+    leaves, _ = tree_flatten(node.meta.get("val"))
+    return any(
+        isinstance(leaf, torch.Tensor) and leaf.dtype == torch.uint8 for leaf in leaves
+    )
+
+
 def cast_trt_tensor(
     ctx: ConversionContext,
     input_val: TRTTensor,
@@ -192,26 +280,50 @@ def cast_trt_tensor(
         return input_val
 
 
-def cast_int_int_div_trt_tensor(
+def widen_uint8(
     ctx: ConversionContext,
-    lhs_val: TRTTensor,
-    rhs_val: TRTTensor,
+    value: Any,
     name: str,
-) -> List[TRTTensor]:
+) -> Any:
+    """Cast a uint8 tensor or constant to int32, and return any other value as is.
+
+    TensorRT allows uint8 only at engine inputs and outputs, so ops that only move
+    data, and ``where``, run on int32 instead; the values are the same.
     """
-    Given two `int` data type TRT Tensor to div operation, cast the TRT Tensor to float type
-    Args:
-        ctx (ConversionContext): A ConversionContext object
-        lhs_val (TRTTensor): A TRT Tensor numerator
-        rhs_val (TRTTensor): A TRT Tensor numerator
-        name (str): Name of calling layer
-    Returns:
-        A list of lhs_val and rhs_val casted to the appropriate datatype
-    """
-    if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
-        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
-        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, name)
-    return [lhs_val, rhs_val]
+    if isinstance(value, TRTTensor) and value.dtype == trt.uint8:
+        return cast_trt_tensor(ctx, value, trt.int32, name)
+    # get_trt_tensor converts the constant outside the fake mode of torch.compile.
+    if (isinstance(value, torch.Tensor) and value.dtype == torch.uint8) or (
+        isinstance(value, np.ndarray) and value.dtype == np.uint8
+    ):
+        return get_trt_tensor(ctx, value, name, dtype=torch.int32)
+    return value
+
+
+def wrap_to_uint8(
+    ctx: ConversionContext,
+    target: Target,
+    value: Any,
+    name: str,
+) -> Any:
+    """Return an integer value modulo 256, which is how PyTorch converts it to uint8."""
+    if isinstance(value, TRTTensor):
+        # remainder() goes through trunc_div, which multiplies by the divisor and overflows
+        # near the integer limits. value - floor(value / 256) * 256 stays in range.
+        quotient = impl.elementwise.floor_divide(
+            ctx, target, SourceIR.ATEN, f"{name}_floor_div", value, 256
+        )
+        multiple = impl.elementwise.mul(
+            ctx, target, SourceIR.ATEN, f"{name}_mul", quotient, 256
+        )
+        return impl.elementwise.sub(
+            ctx, target, SourceIR.ATEN, f"{name}_sub", value, multiple
+        )
+    with unset_fake_temporarily():
+        # 256 does not fit in an int8 constant.
+        if isinstance(value, torch.Tensor):
+            value = value.to(torch.int64)
+        return value % 256
 
 
 def broadcastable(
@@ -432,8 +544,11 @@ def create_constant(
         name (str): Name of the added TensorRT Constant layer.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
+            int8 is stored as int32, unless target_quantized_type is trt.DataType.INT8.
         min_rank (int): minimum rank of the constant tensor.
         target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
+            int8 values become int32 unless this is trt.DataType.INT8, because TensorRT
+            accepts an INT8 constant only in front of a dequantize layer or a plugin.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -448,6 +563,13 @@ def create_constant(
             raise ValueError(
                 "TensorRT does not support float64 (double) precision. To resolve this, please set truncate_double=True in your compilation settings and re-run the model."
             )
+        # TensorRT reads an INT8 constant as quantized data, which only a dequantize
+        # layer or a plugin may take. int32 holds every int8 value.
+        if (
+            torch_value.dtype == torch.int8
+            and target_quantized_type != trt.DataType.INT8
+        ):
+            torch_value = torch_value.to(torch.int32)
         # Rank 0 constant is required in IFillLayer inputs.
         if min_rank == 0 and isinstance(value, (int, float, bool)):
             shape = trt.Dims()
@@ -546,6 +668,10 @@ def get_trt_tensor(
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
     An runtime error is raised if we're not able to do that.
+    With the deduplicate_weights setting, a tensor or array is added to the network
+    once: converting the same memory, viewed the same way, to the same dtype again,
+    while the first value is still alive, returns the same ITensor, so all the layers
+    that read a weight share one constant.
     Args:
         ctx (ConversionContext): A TensorRT ConversionContext. If we want to
             add a TensorRT Constant layer, we will add it to this network.
@@ -554,11 +680,25 @@ def get_trt_tensor(
             one.
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
+            int8 is stored as int32, unless target_quantized_type is trt.DataType.INT8.
         min_rank (int): minimum rank of the constant tensor.
         target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
+            int8 values become int32 unless this is trt.DataType.INT8, because TensorRT
+            accepts an INT8 constant only in front of a dequantize layer or a plugin.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    key = (
+        _constant_key(input_val, dtype, target_quantized_type)
+        if ctx.compilation_settings.deduplicate_weights
+        else None
+    )
+    cached = ctx.constant_cache.get(key)
+    # Once its source is freed, an entry's memory may hold another value.
+    if cached is not None and cached[0]() is not None:
+        return cached[1]
+    source = input_val
+
     # If the input is 64-bit, cast it to 32-bit for TRT freezing
     if isinstance(input_val, torch.Tensor) and ctx.compilation_settings.truncate_double:
         if input_val.dtype == torch.float64:
@@ -569,13 +709,79 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(
+        constant = create_constant(
             ctx, input_val, name, dtype, min_rank, target_quantized_type
         )
+        if key is not None:
+            ctx.constant_cache[key] = (weakref.ref(source), constant)
+        return constant
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
         raise AssertionError(f"Cannot convert {input_val} to TRT constant")
+
+
+def get_transposed_trt_tensor(
+    ctx: ConversionContext,
+    value: Union[torch.Tensor, np.ndarray],
+    name: str,
+    rank: int = 2,
+) -> TRTTensor:
+    """
+    Convert a matrix, such as the weight of a linear layer, to a TensorRT ITensor
+    holding its transpose, with leading dimensions of size 1 up to ``rank`` so a
+    batched matrix multiply can read it as it is. With the deduplicate_weights
+    setting, the result is added to the network once and shared, like the constant
+    itself (see ``get_trt_tensor``): TensorRT can keep a host copy of a constant for
+    every layer that transposes it, and in a refittable engine for every layer that
+    reshapes it. A 1-D value is returned as it is.
+    Args:
+        ctx (ConversionContext): A TensorRT ConversionContext
+        value (Union[torch.Tensor, np.ndarray]): A 1-D or 2-D tensor or array
+        name (str): The name of the constant layer, if one is added
+        rank (int): The rank of the matrix multiply that reads the result
+    Returns:
+        A TensorRT ITensor holding the transpose of ``value``.
+    """
+    constant = get_trt_tensor(ctx, value, name)
+    if len(constant.shape) < 2:
+        return constant
+    if (constant, rank) not in ctx.transposed_constants:
+        layer = ctx.net.add_shuffle(constant)
+        layer.first_transpose = (1, 0)
+        layer.reshape_dims = (1,) * (rank - 2) + tuple(constant.shape)[::-1]
+        layer.name = f"{name}_transpose"
+        ctx.transposed_constants[constant, rank] = layer.get_output(0)
+    return ctx.transposed_constants[constant, rank]
+
+
+def _constant_key(
+    value: Any,
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
+    target_quantized_type: Optional[TRTDataType],
+) -> Optional[Hashable]:
+    """Identify a tensor or array by the memory it views, how it views it, and the
+    dtype it is converted to. Other values return None and are not cached."""
+    if isinstance(value, np.ndarray):
+        view: Tuple[Any, ...] = (
+            value.ctypes.data,
+            value.shape,
+            value.strides,
+            value.dtype,
+        )
+    # Not isinstance: a tensor subclass need not own the memory it reports, and
+    # wrapper subclasses all report address 0.
+    elif type(value) in (torch.Tensor, torch.nn.Parameter):
+        view = (
+            value.data_ptr(),
+            tuple(value.shape),
+            value.stride(),
+            value.dtype,
+            value.device,
+        )
+    else:
+        return None
+    return view, dtype, target_quantized_type
 
 
 @overload
@@ -860,6 +1066,9 @@ def flatten_dims(
     """
     shape = input.shape
     dim_size = len(shape)
+    # As in torch.flatten, a 0-d input becomes one element.
+    if dim_size == 0:
+        return (1,)
     start_dim = get_positive_dim(start_dim, dim_size)
     end_dim = get_positive_dim(end_dim, dim_size)
 

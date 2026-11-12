@@ -77,6 +77,23 @@ if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     )
 
 
+@torch.library.custom_op("torchtrt_ex::int8_weight_mm", mutates_args=())  # type: ignore[misc]
+def int8_weight_mm(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    # torch._int_mm takes int8 operands only.
+    return torch._int_mm(x.to(torch.int8), w).to(torch.float32)
+
+
+@torch.library.register_fake("torchtrt_ex::int8_weight_mm")
+def int8_weight_mm(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    return x.new_empty((x.shape[0], w.shape[1]))
+
+
+if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "torchtrt_ex::int8_weight_mm", supports_dynamic_shapes=False
+    )
+
+
 @unittest.skipIf(
     platform.system() == "Windows",
     "Triton is not supported on Windows",
@@ -86,6 +103,23 @@ if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     "QDP Plugin is not available",
 )
 class TestAutomaticPlugin(DispatchTestCase):
+
+    def test_int8_weight_plugin(self):
+        # A plugin may take an INT8 constant, and this one needs int8.
+        class Int8WeightMM(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "w",
+                    torch.randint(-128, 128, (64, 32), dtype=torch.int8, device="cuda"),
+                )
+
+            def forward(self, x):
+                return torch.ops.torchtrt_ex.int8_weight_mm.default(x, self.w)
+
+        inputs = [torch.randint(-8, 8, (32, 64), device="cuda", dtype=torch.float)]
+
+        self.run_test(Int8WeightMM(), inputs)
 
     @parameterized.expand(
         [
@@ -104,6 +138,45 @@ class TestAutomaticPlugin(DispatchTestCase):
         ]
 
         self.run_test(elementwise_mul(), inputs)
+
+    def test_jit_plugin_marks_the_engine_as_running_pytorch(self):
+        class elementwise_mul(nn.Module):
+            def forward(self, lhs, rhs):
+                return torch.ops.torchtrt_ex.elementwise_mul.default(lhs, rhs)
+
+        inputs = (
+            torch.randn(64, 64, device="cuda"),
+            torch.randn(64, 64, device="cuda"),
+        )
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(elementwise_mul(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+        )
+        (engine,) = [
+            module
+            for module in compiled.modules()
+            if isinstance(module, torch_tensorrt.dynamo.runtime.TorchTensorRTModule)
+        ]
+        self.assertEqual(
+            engine.pytorch_plugin_ops, ["torch.ops.torchtrt_ex.elementwise_mul.default"]
+        )
+
+        # The mark survives a state_dict round trip into a new module.
+        restored = torch_tensorrt.dynamo.runtime.TorchTensorRTModule()
+        restored.load_state_dict(engine.state_dict())
+        self.assertEqual(
+            restored.pytorch_plugin_ops,
+            ["torch.ops.torchtrt_ex.elementwise_mul.default"],
+        )
+
+        # A module pickled before the mark existed has no such field.
+        state = engine.__getstate__()
+        del state["pytorch_plugin_ops"]
+        legacy = type(engine).__new__(type(engine))
+        legacy.__setstate__(state)
+        self.assertIsNone(legacy.pytorch_plugin_ops)
+        legacy.state_dict()
 
 
 if __name__ == "__main__":
