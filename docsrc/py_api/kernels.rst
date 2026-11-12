@@ -231,6 +231,23 @@ positive integer. Invalid callbacks, names, and options are rejected before
 compilation. Duplicate operator names are also checked before compilation and
 rechecked under the registration lock.
 
+``pointer_alignment`` declares the byte alignment the kernel may assume for
+every tensor pointer, or for named pointers through a mapping (unlisted
+pointers use 1). Values must be powers of two from 1 to 256, and only pointer
+parameters may be named. The default of 1 adds nothing. Any larger value
+becomes Triton's divisibility hint for that pointer, capped at 16 as Triton's
+own launcher does, so 16 allows 16-byte loads and pipelining and 8 allows
+8-byte loads. The declared alignment must hold for every pointer the kernel
+gets. A misaligned pointer raises ``cudaErrorMisalignedAddress``, which is
+sticky and leaves the process's CUDA context unusable. TensorRT does not
+document an alignment for the buffers it allocates inside the engine. An
+engine input is bound as given, so an offset view such as ``x[1:]`` is
+misaligned when its byte offset is not a multiple of the declared alignment.
+It can come from the caller, or from a PyTorch op that runs before the engine.
+Scalar arguments never get a hint, so accesses masked by a runtime size
+(``off < n``) or offset by a runtime stride can stay scalar; the hint helps
+when offsets and strides come from constexprs.
+
 Registration compiles for the current CUDA device. For a different device,
 register inside ``with torch.cuda.device(device):``. The compiled artifact
 records its target, and conversion and AOT construction reject a different GPU
@@ -245,8 +262,10 @@ to place in those argument slots.  :func:`triton_op` raises
 interleaves scalars between pointers, disagrees with ``meta_fn``'s arity,
 differs from the kernel declaration, contains an unknown pointer dtype or a
 non-``i32`` scalar, or declares scalars without an ``extra_args_fn`` to supply
-them. The launch is also rejected if ``extra_args_fn`` returns the wrong number
-or type of values. Constant scalar values must fit in signed 32-bit integers,
+them, or if ``pointer_alignment`` is not a power of two from 1 to 256 or names
+a parameter that is not a pointer. The launch is also rejected if
+``extra_args_fn`` returns the wrong number or type of values. Constant scalar
+values must fit in signed 32-bit integers,
 including constants wrapped in ``SymInt32``. ``grid`` must return one to three
 dimensions: X must be between 1 and 2**31 - 1, and Y and Z between 1 and 65535.
 These limits are checked for ordinary integers and symbolic constants.
