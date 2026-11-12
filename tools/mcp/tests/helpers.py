@@ -55,7 +55,7 @@ def fake_core(policy, operation, request, path, job_id, emit):
 def factory_import_core(policy, operation, request, path, job_id, emit):
     """Record trusted factory-import state from a real spawned worker."""
     assert operation == "compile"
-    candidate = policy.load_candidate(request.get("lowering_pass_candidate_id"))
+    candidate = policy.load_candidate(request.get("graph_transformation_candidate_id"))
     factory = policy.load_factory(policy.models[request["model"]])
     factory(**request.get("model_parameters", {}))
     emit({"stage": "compilation", "message": "candidate module imported"})

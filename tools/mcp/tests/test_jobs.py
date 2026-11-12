@@ -77,9 +77,12 @@ def test_success_manifest_report_integrity_and_root_lock(policy):
 
 
 def test_each_worker_imports_generated_candidate_in_a_fresh_process(policy):
-    lowering_pass_candidate_id = "c" * 32
-    generated = policy.output_root / ".lowering_pass_candidates"
-    (generated / f"lowering_pass_candidate_{lowering_pass_candidate_id}.py").write_text(
+    graph_transformation_candidate_id = "c" * 32
+    generated = policy.output_root / ".graph_transformation_candidates"
+    (
+        generated
+        / f"graph_transformation_candidate_{graph_transformation_candidate_id}.py"
+    ).write_text(
         "import os\n"
         "import uuid\n"
         "IMPORT_COUNT = globals().get('IMPORT_COUNT', 0) + 1\n"
@@ -94,7 +97,9 @@ def test_each_worker_imports_generated_candidate_in_a_fresh_process(policy):
         reports = []
         for _ in range(2):
             candidate_request = request()
-            candidate_request["lowering_pass_candidate_id"] = lowering_pass_candidate_id
+            candidate_request["graph_transformation_candidate_id"] = (
+                graph_transformation_candidate_id
+            )
             job_id = manager.submit("compile", candidate_request)["job_id"]
             assert wait_terminal(manager, job_id)["status"] == "succeeded"
             reports.append(manager.get_report(job_id, "compilation"))

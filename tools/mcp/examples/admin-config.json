@@ -16,6 +16,11 @@
             "path": "factories_batched_linear.py",
             "function": "batched_linear_model",
             "parameters": ["hidden_size"]
+        },
+        "diff": {
+            "path": "factories_diff.py",
+            "function": "diff_model",
+            "parameters": []
         }
     },
     "inputs": {
@@ -33,6 +38,11 @@
             "path": "factories_batched_linear.py",
             "function": "batched_linear_inputs",
             "parameters": ["batch_size", "hidden_size"]
+        },
+        "diff": {
+            "path": "factories_diff.py",
+            "function": "diff_inputs",
+            "parameters": ["batch_size", "width"]
         }
     },
     "max_pending_jobs": 32,

@@ -36,7 +36,7 @@ def test_policy_creates_missing_output_root(tmp_path):
 
     assert policy.output_root == output
     assert output.is_dir()
-    candidate_root = output / ".lowering_pass_candidates"
+    candidate_root = output / ".graph_transformation_candidates"
     assert candidate_root.is_dir()
     assert stat.S_IMODE(candidate_root.stat().st_mode) == 0o700
 
