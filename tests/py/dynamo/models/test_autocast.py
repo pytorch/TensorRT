@@ -1784,6 +1784,68 @@ def test_autocast_model_regions_casts_an_output_only_for_ops_outside():
     torch.testing.assert_close(y, torch.full_like(x, float("inf")))
 
 
+@pytest.mark.unit
+def test_autocast_model_regions_keeps_the_output_for_readers_despite_writes():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+            # The next 3 blocks write only into new values.
+            with torch.autocast(x.device.type, enabled=False):
+                s = y.float().add_(1.0)
+            with torch.no_grad():
+                t = y.float().add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).relu_().float()
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                b = (y @ x).float()
+            y.add_(1.0)
+            return a, b, s, t
+
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "relu.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # y.add_ runs after the last region reads y, so no write sends y through the
+    # cast, where x @ x, which is 131072, would be inf.
+    a, b, _, _ = ep.module()(x)
+    torch.testing.assert_close(a, x @ x @ x)
+    torch.testing.assert_close(b, x @ x @ x)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_casts_an_output_for_readers_after_a_write():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).float()
+            # _foreach_zero_ returns nothing, so the next region reads y itself.
+            torch._foreach_zero_([y])
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                b = (y @ x).float()
+            return a, b
+
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # The first region reads y before the write, so it gets y as it is, where the
+    # cast would be inf. The second reads y after the write into the cast.
+    a, b = ep.module()(x)
+    torch.testing.assert_close(a, x @ x @ x)
+    torch.testing.assert_close(b, torch.zeros_like(x))
+
+
 @torch.library.custom_op("autocast_regions_test::read_first_rows", mutates_args=())
 def read_first_rows(t: torch.Tensor) -> torch.Tensor:
     # Reads from the start of the storage, which can lie before the view.
@@ -1824,6 +1886,21 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "new_input",
         "read_then_write",
         "write_region_output",
+        "write_between_regions",
+        "foreach_between_regions",
+        "write_in_kept_region",
+        "set_between_regions",
+        "foreach_in_kept_region",
+        "write_between_and_in_region",
+        "foreach_then_region_write",
+        "no_grad_between_regions",
+        "chain",
+        "no_grad_view_between",
+        "no_grad_view_of_outputs",
+        "views_then_new_write",
+        "set_in_no_grad",
+        "type_as_in_reader",
+        "type_as_written_later",
         "to_copy",
         "pow",
         "fresh",
@@ -1906,6 +1983,71 @@ def test_autocast_model_regions_keeps_values(case):
                     v = y[:, :1]
             v.add_(10.0)
             return y.float()
+
+    class NoGradViewBetween(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+            with torch.no_grad():
+                v = y[:, :1]
+            v.add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (y @ x.T).float()
+
+    class NoGradViewOfOutputs(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                w = v[:, :1]
+            w.add_(10.0)
+            return y.float()
+
+    class ViewsThenNewWrite(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            # This region writes only into a new value, so it does not write into v.
+            with torch.autocast(x.device.type, enabled=False):
+                s = v.float().add_(1.0)
+            return y.float() + s
+
+    class SetInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                # set_ gives w the memory of v.
+                w = torch.empty_like(v)
+                w.set_(v)
+                w.add_(10.0)
+            return y.float()
+
+    class TypeAsInReader(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            # type_as copies v here, and the inlined type_as copies v too, so add_
+            # does not write into v.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v.type_as(x).add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (y @ x.T).float()
+
+    class TypeAsWrittenLater(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                w = v.type_as(x)
+            w.add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (y @ x.T).float()
 
     class ViewOfInput(nn.Module):
         def forward(self, x, pos):
@@ -2066,6 +2208,86 @@ def test_autocast_model_regions_keeps_values(case):
             with torch.autocast(x.device.type, dtype=torch.float16):
                 return self.linear2(h.relu_()).float()
 
+    class WriteBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class ForeachBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class WriteInKeptRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # This region writes into a view of its input, so it keeps its autocast.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class SetBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2] = 0
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class ForeachInKeptRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class WriteBetweenAndInRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class ForeachThenRegionWrite(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class NoGradBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            with torch.no_grad():
+                h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class Chain(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # Only this region reads h, so it can write into h and is inlined too.
+            # mul runs in float32 too, so the cast of g is a copy.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                g = h.relu_() * 2.0
+            g[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(g).float()
+
     class NestedFloat(Fresh):
         def forward(self, x, pos):
             with torch.autocast(x.device.type, dtype=torch.float16):
@@ -2148,6 +2370,87 @@ def test_autocast_model_regions_keeps_values(case):
         "new_input": (NewInput, {}),
         "read_then_write": (ReadThenWrite, {}),
         "write_region_output": (WriteRegionOutput, {}),
+        # In the next 10 cases linear1 runs in float32, so its cast to float16 is a copy.
+        "write_between_regions": (
+            WriteBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_between_regions": (
+            ForeachBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "write_in_kept_region": (
+            WriteInKeptRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "set_between_regions": (
+            SetBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_in_kept_region": (
+            ForeachInKeptRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "write_between_and_in_region": (
+            WriteBetweenAndInRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_then_region_write": (
+            ForeachThenRegionWrite,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "no_grad_between_regions": (
+            NoGradBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "chain": (
+            Chain,
+            {
+                "autocast_excluded_nodes": {"^linear1$"},
+                "autocast_excluded_ops": {torch.ops.aten.mul.Tensor},
+            },
+        ),
+        # slice stays in float16, so autocast adds no casts around the no_grad block.
+        "no_grad_view_between": (
+            NoGradViewBetween,
+            {"autocast_excluded_node_names": {"matmul.*"}},
+        ),
+        "no_grad_view_of_outputs": (
+            NoGradViewOfOutputs,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "views_then_new_write": (
+            ViewsThenNewWrite,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "set_in_no_grad": (
+            SetInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        # type_as and add_ stay in float32, so no cast that autocast adds hides a
+        # write into v.
+        "type_as_in_reader": (
+            TypeAsInReader,
+            {
+                "autocast_excluded_node_names": {
+                    "matmul.*",
+                    "slice.*",
+                    "type_as.*",
+                    "add.*",
+                }
+            },
+        ),
+        "type_as_written_later": (
+            TypeAsWrittenLater,
+            {
+                "autocast_excluded_node_names": {
+                    "matmul.*",
+                    "slice.*",
+                    "type_as.*",
+                    "add.*",
+                }
+            },
+        ),
         "to_copy": (ToCopy, {}),
         "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
         "fresh": (Fresh, {}),
@@ -2180,12 +2483,42 @@ def test_autocast_model_regions_keeps_values(case):
         "new_input",
         "read_then_write",
         "write_region_output",
+        "write_between_regions",
+        "foreach_between_regions",
+        "set_between_regions",
+        "foreach_then_region_write",
+        "no_grad_between_regions",
+        "chain",
+        "no_grad_view_between",
+        "views_then_new_write",
         "to_copy",
         "read_only_views",
         "nested_float",
         "read_in_disabled",
+        "type_as_in_reader",
+        "type_as_written_later",
     )
     assert kept == (case not in (*inlined, "pow", "fresh"))
+    if case in (
+        "write_in_kept_region",
+        "foreach_in_kept_region",
+        "write_between_and_in_region",
+    ):
+        # Only the region that writes into its input keeps its autocast.
+        (region,) = [
+            n
+            for n in ep.graph.nodes
+            if n.target == torch.ops.higher_order.wrap_with_autocast and n.args[2]
+        ]
+        body = getattr(ep.graph_module, region.args[4].target)
+        assert any(
+            isinstance(n.target, torch._ops.OpOverload)
+            and any(
+                a.alias_info is not None and a.alias_info.is_write
+                for a in n.target._schema.arguments
+            )
+            for n in body.graph.nodes
+        )
     lowered = ep.module()
     # A second call shows whether the first call's write into a buffer was kept.
     for i in range(2):
@@ -2224,6 +2557,29 @@ def test_autocast_model_regions_excludes_nodes_by_name(pattern, dtype):
     # The region's output already has the name matmul, so inlining renames the op.
     assert matmul.name == "matmul_1"
     assert matmul.meta["val"].dtype == dtype
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_excludes_a_type_as_by_op():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.bfloat16):
+                return (x @ x).type_as(x)
+
+    # 131072 is above the float16 range.
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_ops={
+            torch.ops.aten.matmul.default,
+            torch.ops.aten.type_as.default,
+        },
+    )
+    # Inlining makes the type_as a to, which the exclusion keeps in float32 too.
+    ep = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
+    torch.testing.assert_close(ep.module()(x), torch.full_like(x, 131072.0))
 
 
 @pytest.mark.unit
