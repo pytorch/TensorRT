@@ -239,7 +239,11 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        block when the model is exported with grad mode on. Exported under
        ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
-       regions.
+       regions. A write into the output of a region, made after the region, can still
+       be lost when the rules give the op that writes, or a view it writes through, a
+       dtype other than the dtype of that output, as with ``bfloat16`` regions and
+       ``autocast_low_precision_type=torch.float16``. This also happens with
+       ``"keep"``.
 
 ----
 

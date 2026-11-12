@@ -4,7 +4,7 @@
 import functools
 import logging
 import operator
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 # Inlining can rename an op, as matmul to matmul_1, so autocast_excluded_node_names
 # also matches the name it had in its region.
 NAME_IN_REGION = "_torch_tensorrt_name_in_autocast_region"
+# Inlining makes a type_as that copies a to, so autocast_excluded_ops also matches
+# the op it was in its region.
+OP_IN_REGION = "_torch_tensorrt_op_in_autocast_region"
 
 
 def _aliases_an_input(node: torch.fx.Node) -> bool:
@@ -32,46 +35,89 @@ def _aliases_an_input(node: torch.fx.Node) -> bool:
 
 
 def _copies(node: torch.fx.Node) -> bool:
-    """Whether node is a cast, such as x.float(), that changed the dtype in its region
-    and so made a copy. Inlining keeps that copy."""
+    """Whether node is a cast, such as x.float() or x.type_as(y), that changed the
+    dtype in its region and so made a copy. Inlining keeps that copy."""
     return (
         isinstance(node.target, torch._ops.OpOverload)
-        and node.target.overloadpacket is torch.ops.aten.to
+        and (
+            node.target.overloadpacket is torch.ops.aten.to
+            or node.target == torch.ops.aten.type_as.default
+        )
         and node.args[0].meta["val"].dtype != node.meta["val"].dtype
     )
 
 
+# The index of the body among the arguments of a region and of a torch.no_grad block,
+# whose operands follow it: wrap_with_autocast(device_type, dtype, enabled,
+# cache_enabled, body, *operands) and wrap_with_set_grad_enabled(enabled, body,
+# *operands).
+_BODY = {
+    torch.ops.higher_order.wrap_with_autocast: 4,
+    torch.ops.higher_order.wrap_with_set_grad_enabled: 1,
+}
+
+
+def _body(block: torch.fx.Node) -> torch.fx.GraphModule:
+    return getattr(block.graph.owning_module, block.args[_BODY[block.target]].target)
+
+
+def _operands(block: torch.fx.Node) -> Tuple[Any, ...]:
+    return tuple(block.args[_BODY[block.target] + 1 :])
+
+
 def _region_output(value: torch.fx.Node) -> Optional[torch.fx.Node]:
-    """For the getitem of a region's output, the value its body returns."""
-    region = value.args[0] if value.target == operator.getitem else None
-    if region is None or region.target != torch.ops.higher_order.wrap_with_autocast:
+    """For the getitem of an output of a region or a torch.no_grad block, the value
+    its body returns."""
+    block = value.args[0] if value.target == operator.getitem else None
+    if block is None or block.target not in _BODY:
         return None
-    body = getattr(value.graph.owning_module, region.args[4].target)
-    return body.graph.output_node().args[0][value.args[1]]
+    return _body(block).graph.output_node().args[0][value.args[1]]
 
 
 def _base(value: torch.fx.Node) -> torch.fx.Node:
-    """The value whose memory a value shares, through views, in-place ops and nested
-    regions."""
+    """The value whose memory a value shares, through views, in-place ops, nested
+    regions and torch.no_grad blocks."""
     output = _region_output(value)
     if output is not None:
         base = _base(output)
         placeholders = list(base.graph.find_nodes(op="placeholder"))
         if base not in placeholders:
             return base
-        return _base(value.args[0].args[5 + placeholders.index(base)])
+        return _base(_operands(value.args[0])[placeholders.index(base)])
     op = value.args[0] if value.target == operator.getitem else value
+    if op.target == torch.ops.aten.set_.source_Tensor:
+        # set_ gives its input the memory of the other tensor.
+        return _base(op.args[1])
     if _aliases_an_input(op) and not _copies(op):
         return _base((tensors_written_by(op) or [op.args[0]])[0])
     return value
 
 
-def _is_written(gm: torch.fx.GraphModule, value: torch.fx.Node) -> bool:
-    """Whether an op of gm writes in place into the memory of value, through value or
-    any tensor that shares that memory."""
+def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
+    """The tensors node may write into in place. A region or a torch.no_grad block
+    writes into the operands its body writes into. Another higher order op may write
+    into all of its operands, see tensors_maybe_written_by."""
+    if node.target not in _BODY:
+        return tensors_maybe_written_by(node)
+    body = _body(node)
+    written = {_base(w) for n in body.graph.nodes for w in _written_by(n)}
+    return [
+        a
+        for p, a in zip(body.graph.find_nodes(op="placeholder"), _operands(node))
+        if p in written
+    ]
+
+
+def _first_write(
+    gm: torch.fx.GraphModule, value: torch.fx.Node
+) -> Optional[torch.fx.Node]:
+    """The first op of gm that may write in place into the memory of value, through
+    value or any tensor that shares that memory."""
     base = _base(value)
     shared = {n for n in gm.graph.nodes if _base(n) is base}
-    return any(w in shared for n in gm.graph.nodes for w in tensors_maybe_written_by(n))
+    return next(
+        (n for n in gm.graph.nodes if not shared.isdisjoint(_written_by(n))), None
+    )
 
 
 def _may_read_storage(node: torch.fx.Node) -> bool:
@@ -190,7 +236,7 @@ def _can_inline(
         output, base = outputs[user.args[1]], bases[user.args[1]]
         if (
             bases.count(base) > 1 or base in placeholders or base is not output
-        ) and _is_written(gm, user):
+        ) and _first_write(gm, user) is not None:
             return False
         if base is not output and _reads_storage(gm, user):
             return False
@@ -233,7 +279,10 @@ def _cast(
 
 
 def _inline_region(
-    gm: torch.fx.GraphModule, region: torch.fx.Node, copied: Dict[torch.fx.Node, bool]
+    gm: torch.fx.GraphModule,
+    region: torch.fx.Node,
+    regions: Set[torch.fx.Node],
+    copied: Dict[torch.fx.Node, bool],
 ) -> None:
     device_type, body_node = region.args[0], region.args[4]
     autocast_key = getattr(torch._C.DispatchKey, f"Autocast{device_type.upper()}")
@@ -254,9 +303,14 @@ def _inline_region(
                 env[node] = gm.graph.node_copy(node, env.__getitem__)
                 env[node].meta[NAME_IN_REGION] = node.name
                 if _copies(node):
-                    # to() returns its input when that already has the dtype, as it
-                    # now can. Keep the copy, which a view of the result can need.
-                    names = [a.name for a in node.target._schema.arguments]
+                    # to() and type_as() return their input when that already has the
+                    # dtype, as it now can. Keep the copy, which a write into the
+                    # result or a view of it can need. type_as(y) is to(y), which
+                    # takes copy.
+                    if node.target == torch.ops.aten.type_as.default:
+                        env[node].target = torch.ops.aten.to.other
+                        env[node].meta[OP_IN_REGION] = node.target
+                    names = [a.name for a in env[node].target._schema.arguments]
                     if names.index("copy") < len(node.args):
                         env[node].update_arg(names.index("copy"), True)
                     else:
@@ -276,15 +330,20 @@ def _inline_region(
                 )
         # Each user of a region takes one of its outputs with getitem. Ops get the
         # output in the dtype the region gave it, which the rest of the graph expects,
-        # and regions that get inlined too get it as it is.
+        # and regions inlined in this round too get it as it is. When another op may
+        # write into the output before such a region reads it, it writes into the
+        # cast, so that region gets the cast too.
         for user in list(region.users):
             output = env[outputs[user.args[1]]]
             val = user.meta.get("val")
             if isinstance(val, torch.Tensor) and val.is_floating_point():
                 cast = _cast(gm, output, val.dtype, user)
                 cast.meta["val"] = val
+                readers = {u for u in user.users if u in regions}
+                first = _first_write(gm, user) if readers else None
+                readers = {u for u in readers if first is None or u <= first}
                 user.replace_all_uses_with(
-                    cast, delete_user_cb=lambda u: not _is_inlined(gm, u)
+                    cast, delete_user_cb=lambda u: u not in readers
                 )
                 if not cast.users:
                     gm.graph.erase_node(cast)
@@ -363,8 +422,9 @@ def inline_autocast_regions(gm: torch.fx.GraphModule) -> None:
     copied: Dict[torch.fx.Node, bool] = {}
     count = 0
     while regions := [node for node in gm.graph.nodes if _is_inlined(gm, node)]:
+        inlining = set(regions)
         for region in regions:
-            _inline_region(gm, region, copied)
+            _inline_region(gm, region, inlining, copied)
         count += len(regions)
     if not count:
         return
