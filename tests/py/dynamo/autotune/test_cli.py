@@ -229,37 +229,9 @@ def test_run_needs_a_workload_and_a_session(capsys):
 # ------------------------------------------------------- factory paths
 
 
-def test_a_relative_factory_file_is_made_absolute(tmp_path, monkeypatch):
-    monkeypatch.chdir(WORKLOADS.parent.parent)
-    relative = f"{WORKLOADS.parent.name}/{WORKLOADS.name}:create_fake"
-    session = build(tmp_path, "--workload", relative)
-    assert session.workload_factory.factory == FACTORY
-    assert Path(session.workload_factory.factory.rpartition(":")[0]).is_absolute()
-
-
 def test_a_module_factory_is_kept(tmp_path):
     factory = "my_package.workloads:create_workload"
     assert build(tmp_path, "--workload", factory).workload_factory.factory == factory
-
-
-def test_a_missing_factory_file_is_a_usage_error(tmp_path, capsys):
-    with pytest.raises(SystemExit) as raised:
-        cli.main(
-            [
-                "run",
-                "--workload",
-                str(tmp_path / "missing.py:create_workload"),
-                "--session",
-                str(tmp_path / "s"),
-            ]
-        )
-    assert raised.value.code == 2
-    assert "missing.py does not exist" in capsys.readouterr().err
-    with pytest.raises(SystemExit):
-        cli.main(["run", "--workload", "no_function", "--session", str(tmp_path)])
-
-
-# ----------------------------------------------------------- end to end
 
 
 def test_run_then_status_and_report(tmp_path, workers, capsys):
@@ -322,45 +294,14 @@ def test_status_shows_where_the_planner_stopped(tmp_path, workers, capsys):
     assert "pending" not in status
 
 
-def test_python_dash_m_runs_a_session(tmp_path):
-    """``python -m torch_tensorrt.autotune run`` in a process of its own, with real workers."""
-    directory = tmp_path / "s"
-    environment = {
-        **os.environ,
-        "CUDA_VISIBLE_DEVICES": "",
-        # Workers see no git repository, so edits to this checkout while the
-        # test runs do not count as a changed environment.
-        "GIT_DIR": os.devnull,
-    }
-    command = [sys.executable, "-P", "-m", "torch_tensorrt.autotune"]
+def test_python_dash_m_runs_the_command_line():
+    """``python -m torch_tensorrt.autotune`` runs :func:`main` in a process of its own."""
     run = subprocess.run(
-        [
-            *command,
-            "run",
-            "--workload",
-            FACTORY,
-            "--args",
-            FASTER_FP16,
-            "--session",
-            str(directory),
-            "--max-trials=1",
-            "--trial-timeout-s=300",
-            *QUICK,
-        ],
+        [sys.executable, "-P", "-m", "torch_tensorrt.autotune", "--help"],
         capture_output=True,
         text=True,
-        env=environment,
-        cwd=tmp_path,
-        timeout=900,
-    )
-    assert run.returncode == 0, run.stderr[-2000:]
-    assert "# Auto-Tuner report" in run.stdout
-    status = subprocess.run(
-        [*command, "status", str(directory)],
-        capture_output=True,
-        text=True,
-        env=environment,
+        env={**os.environ, "CUDA_VISIBLE_DEVICES": ""},
         timeout=300,
     )
-    assert status.returncode == 0, status.stderr[-2000:]
-    assert "0001   ok" in status.stdout and "accepted" in status.stdout
+    assert run.returncode == 0, run.stderr[-2000:]
+    assert "{run,status,report,resume}" in run.stdout

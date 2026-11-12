@@ -93,19 +93,23 @@ class FakeKernelCache:
             self.path.write_text(json.dumps({**self.load(), task: kernel}))
 
 
+# How much faster than its eager baseline every fake region kernel runs.
+KERNEL_SPEEDUP = 2.0
+
+
 def record_fake_kernels(
     values: Mapping[str, Any],
     kernels: Mapping[str, Mapping[str, Any]],
     cache: FakeKernelCache,
     regenerates: set,
-    default_speedup: float,
 ) -> None:
     """Register the kernel of every region whose knob is ``generated``.
 
     ``kernels`` maps a knob's region name to its settings: ``region`` (the
     name the region has in the model, by default its knob's), ``task`` (the
     name of its computation, by default its knob's; regions with the same
-    computation share their generation tasks) and ``speedup``. A region's
+    computation share their generation tasks). Every kernel runs its region
+    :data:`KERNEL_SPEEDUP` times faster than its eager baseline. A region's
     generation task, and so its kernel, depends on the optimization level, as
     engine build options are part of a real task. With a cache, a build with
     generation off loads cached kernels and records a missing kernel (then
@@ -146,7 +150,6 @@ def record_fake_kernels(
             origin = "new"
             kernel = _sha(f"{computation} kernel at level {level} for {option}")
             cache.store(task, kernel)
-        speedup = settings.get("speedup", default_speedup)
         record_generated_kernel(
             GeneratedKernel(
                 region=region,
@@ -159,8 +162,8 @@ def record_fake_kernels(
                 generation_s=1.5,
                 latency_ms=0.1,
                 baseline="eager",
-                baseline_latency_ms=0.1 * speedup,
-                speedup=speedup,
+                baseline_latency_ms=0.1 * KERNEL_SPEEDUP,
+                speedup=KERNEL_SPEEDUP,
             )
         )
 
@@ -248,9 +251,8 @@ class FakeWorkload(Workload):
       (``_fake_editable.py``), whose ``SPEED`` scales the latency.
     * ``kernels`` maps region names to settings (see
       :func:`record_fake_kernels`): each declares ``kernels.<name>``, whose
-      prepared value ``generated`` registers the region's kernel, which runs
-      the region ``kernel_speedup`` times faster than its eager baseline unless
-      its settings give its ``speedup``. ``kernel_knob`` declares
+      prepared value ``generated`` registers the region's kernel.
+      ``kernel_knob`` declares
       ``kernels.fused`` (``KERNEL_KNOB``) alone. ``kernel_cache`` is the JSON
       file of a fake kernel cache, so that a build with generation off fails
       on a missing kernel; builds of ``regenerates`` options replace cached
@@ -278,13 +280,11 @@ class FakeWorkload(Workload):
         peak_tflops: float | None = None,
         threads: int = 0,
         kernel_knob: bool = False,
-        kernel_speedup: float = 2.0,
         kernels: Mapping[str, Mapping[str, Any]] | None = None,
         kernel_cache: str | None = None,
         regenerates: tuple = (),
     ) -> None:
         self.kernels = dict(kernels or ({"fused": {}} if kernel_knob else {}))
-        self.kernel_speedup = kernel_speedup
         self.kernel_cache = FakeKernelCache(kernel_cache)
         self.regenerates = set(regenerates)
         self.milliseconds = milliseconds
@@ -352,7 +352,6 @@ class FakeWorkload(Workload):
             self.kernels,
             self.kernel_cache,
             self.regenerates,
-            self.kernel_speedup,
         )
         milliseconds = self.milliseconds
         for option, factor in self.speedups.items():

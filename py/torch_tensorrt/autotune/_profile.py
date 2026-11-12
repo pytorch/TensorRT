@@ -12,7 +12,6 @@ planners; whether a candidate is accepted is decided by measurement alone.
 
 from __future__ import annotations
 
-import time
 from collections import defaultdict
 from typing import Any, Callable, Iterable, Mapping
 
@@ -58,18 +57,14 @@ def profile_calls(
 
     synchronize()
     with torch.profiler.profile(activities=activities) as profiler:
-        start = time.perf_counter()
         for _ in range(calls):
             call()
         synchronize()
-        traced_s = time.perf_counter() - start
-    return summarize_events(
-        profiler.events(), max(calls * units, 1), wall_ms, traced_s * 1e3
-    )
+    return summarize_events(profiler.events(), max(calls * units, 1), wall_ms)
 
 
 def summarize_events(
-    events: Iterable[Any], per_unit: int, wall_ms: float, traced_ms: float
+    events: Iterable[Any], per_unit: int, wall_ms: float
 ) -> dict[str, Any]:
     """Per-unit device time, copies, launches and top kernels of profiler ``events``."""
     kernels: dict[str, list[float]] = defaultdict(lambda: [0.0, 0])
@@ -78,14 +73,11 @@ def summarize_events(
     for event in events:
         if event.device_type != torch.autograd.DeviceType.CUDA:
             continue
-        if getattr(event, "is_user_annotation", False):
+        if event.is_user_annotation:
             # A record_function range mirrored on the device: it spans kernels
             # that are counted on their own.
             continue
-        total = getattr(event, "device_time_total", None)
-        if total is None:
-            total = getattr(event, "cuda_time_total", 0.0)
-        duration = float(total or 0.0)
+        duration = float(event.device_time_total)
         device_us += duration
         name = event.name
         if name.startswith("Memcpy") or name.startswith("Memset"):
@@ -99,7 +91,6 @@ def summarize_events(
     top = sorted(kernels.items(), key=lambda item: -item[1][0])[:_TOP_KERNELS]
     return {
         "wall_ms": wall_ms,
-        "traced_wall_ms": traced_ms / per_unit,
         "device_ms": device_ms,
         "host_overhead_fraction": (
             max(0.0, 1.0 - device_ms / wall_ms) if wall_ms > 0 else 0.0

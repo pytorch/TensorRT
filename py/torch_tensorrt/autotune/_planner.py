@@ -28,9 +28,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from torch_tensorrt.autotune._code_edits import is_edit_key
 from torch_tensorrt.autotune._knobs import (
-    LAYERS,
     Knob,
     apply_changes,
     is_member,
@@ -576,8 +574,8 @@ def planner_from_json(data: Mapping[str, Any]) -> Planner:
         return LLMPlanner(
             data["provider"],
             data.get("model"),
-            timeout_s=data.get("timeout_s", 600.0),
-            max_changes=data.get("max_changes", 2),
+            timeout_s=data["timeout_s"],
+            max_changes=data["max_changes"],
             instructions=data.get("instructions") or None,
             fallback=planner_from_json(fallback) if fallback else None,
         )
@@ -596,7 +594,4 @@ def check_proposal(
     """
     if not proposal.changes:
         raise ValueError("The proposal changes nothing")
-    for name in proposal.changes:
-        if not is_edit_key(name) and name.partition(".")[0] not in LAYERS:
-            raise ValueError(f"Unknown knob {name!r}")
     return apply_changes(config, proposal.changes, knobs)

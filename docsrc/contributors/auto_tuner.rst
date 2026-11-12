@@ -340,15 +340,10 @@ Design rules
   boundary and must not enclose code that computes or compares outputs.
 * **Record before acting; resuming never skips a measurement.** Records are
   written atomically (``write_json``), and ``session.json`` is saved after
-  every decision. ``session.json`` names its format and version: a directory
-  of another version is refused with a ``TuningError``. It also records the
-  session's identity (workload factory, goal, limits, baseline changes,
-  timing), the workload (knobs, baseline, accuracy defaults, editable files
-  and the SHA-256 of the workload factory's file and its sibling ``.py``
-  modules) and the environment (versions, GPU, driver, and the
-  Torch-TensorRT checkout's git commit and uncommitted-diff digest). A run
-  with a different identity, workload or environment is refused, and so is
-  reusing the reference outputs. Completed trials are replayed from their
+  every decision. It pins the session's format, identity, workload and
+  environment (see the user guide's "Pinned workload and environment"); a
+  run that differs in any of them is refused, and so is reusing the
+  reference outputs. Completed trials are replayed from their
   ``decision.json``; a trial interrupted before its decision is measured
   again (an invalid proposal's ``trial.json`` already holds its decision, so
   a stop between its two writes loses nothing); a failed baseline is
@@ -369,60 +364,21 @@ Adding knobs and hints
 
 Standard knobs belong in ``_knobs.STANDARD_KNOBS``, with a mapping in
 ``compile_settings`` or in ``ModuleWorkload``. Workload-specific options
-belong in the workload's ``knobs()``, in the ``workload`` layer. List values
-in the order a rule-based search should try them, and name the bottleneck
-hints they address (``_knobs.BOTTLENECK_HINTS``; ``compute_gap`` for
-compute-bound work): both planners rely on these declarations. Declare what a
-value needs with ``requires``, per value when the values differ (one value
-needing CUDA graphs, another not), so that a config bound to fail is refused
-before it costs a build. List in ``prepare`` the values whose build generates
-something slow that later builds reuse, such as region kernels: the session
-then builds each once before the search and pins the runs that use it.
+belong in the workload's ``knobs()``, in the ``workload`` layer; the user
+guide's "Knobs" section says how to order values and declare hints,
+``requires`` and ``prepare``.
 
 A knob's JSON is part of every pinned workload: changing a standard knob's
 values, bottleneck hints, requirements or prepared values makes every
 recorded session that uses it refuse to resume. Add a knob or a value
 deliberately, and keep the JSON of the per-value ``requires`` form
-unchanged; ``prepare`` appears in the JSON only when it lists values, so
-knobs without it keep their JSON.
+unchanged.
 
 A new bottleneck hint needs its name in ``_knobs.BOTTLENECK_HINTS`` and a
 rule in ``_profile.bottleneck_hints`` that gives it a strength in [0, 1] and
 a detail line saying what was measured; knobs that relieve it then name it.
 Hints only order the search, so a hint must never be needed to accept a
 candidate.
-
-A compute-bound candidate should set ``flops_per_unit`` and ``peak_tflops``
-(or report ``compute_floor_ms`` in ``describe()``) and a memory-bound one
-``bytes_per_unit``, so that its roofline hint can order the search. A
-candidate that cannot be saved raises ``NotImplementedError`` from
-``export``, with the reason.
-
-Runtime support
----------------
-
-Two runtime behaviors matter to what the worker measures, and the runtime
-handles both:
-
-* **Outputs that alias inputs.** An engine that updates some of its inputs in
-  place (a cache or other state carried between calls) returns them as
-  outputs. The ``tensorrt::execute_engine`` custom op is declared without
-  mutated arguments, so it must return clones of such outputs: every call
-  copies the aliased buffers, and a loop that feeds the returned clones back
-  changes their addresses on every call, which a captured CUDA graph cannot
-  follow. In plain eager execution the Python runtime therefore runs such an
-  engine directly (``_python_engine_runs_eagerly`` in
-  ``_TorchTensorRTModule.py``) and returns the updated inputs without a copy.
-  Under ``torch.compile``, ``torch.jit.trace``, ``torch.func`` transforms,
-  any dispatch mode (export, ``make_fx``, fake or functional tensors) or
-  inputs that require gradients, the op still runs, and so does a program
-  loaded with ``torch_tensorrt.load``.
-* **QDP AOT plugins outside CUDA graphs.** TensorRT reloads the CUDA module of
-  every QDP AOT plugin layer each time it runs an engine outside a CUDA graph.
-  The runtime warns once per engine that does so repeatedly; see
-  :ref:`torch_tensorrt_kernels_py` for when the warning is given. A knob
-  whose values add such plugins can list ``runtime.cudagraphs`` in its
-  ``requires``, so that those candidates are only measured under CUDA graphs.
 
 Tests
 -----
@@ -465,36 +421,3 @@ records the new one, and only its own compilation's records change; a build
 with generation off records the kernel it misses, and under the environment
 switch revalidates a cached kernel for correctness only; and a record that
 cannot be made or updated never fails a compilation.
-
-What we took from OpenEvolve and autoresearch
----------------------------------------------
-
-`autoresearch <https://github.com/karpathy/autoresearch>`_ lets a coding agent
-edit one training script under a fixed harness and keep a change only if the
-metric improves; a human steers it through a Markdown brief.
-`OpenEvolve <https://github.com/algorithmicsuperintelligence/openevolve>`_
-re-implements AlphaEvolve: an archive of programs, diff-based edits confined by
-``EVOLVE-BLOCK`` markers, cascade evaluation and structured evaluator feedback.
-From them the Auto-Tuner takes:
-
-* **Code edits:** editable files with fenced SEARCH/REPLACE edits, stored and
-  de-duplicated by digest, judged by the same measurements as knob changes.
-* **Human-editable guidance** (``guidance.md``) shown to the LLM planner with
-  every proposal, and a ``trials.tsv`` written after every decision.
-* **A structured planner context:** profiles, bottleneck hints (including
-  memory-bandwidth and compute roofline gaps and copy overhead), paired gains
-  and errors.
-* **Revisiting rejected options** once the best config changes, since options
-  interact.
-
-It deliberately does not take:
-
-* **Single-run fitness.** Both systems accept a candidate on one measurement,
-  so a change within run-to-run noise can be kept as an improvement. The
-  Auto-Tuner's fixed, independent measurement, with a measured noise
-  threshold and paired, interleaved head-to-head runs, is the part to keep.
-* **LLM judges, novelty embeddings, large populations and template
-  randomness:** acceptance depends only on measured latency, accuracy and
-  memory, and each trial here costs a TensorRT build, not milliseconds.
-* **An agent that controls the loop.** The planner proposes; only the
-  session decides.

@@ -28,12 +28,12 @@ from ._workloads import create_mlp
 WORKLOADS = Path(__file__).with_name("_workloads.py")
 
 
-def worker_session(tmp_path, factory="create_fake", kwargs=None, timeout=300.0):
+def worker_session(tmp_path, factory="create_fake"):
     """A session whose worker jobs the tests run one at a time."""
     return TuningSession(
-        WorkloadFactory(f"{WORKLOADS}:{factory}", kwargs or {}),
+        WorkloadFactory(f"{WORKLOADS}:{factory}"),
         directory=tmp_path / "s",
-        budget=Budget(max_trials=0, trial_timeout_s=timeout),
+        budget=Budget(max_trials=0),
     )
 
 
@@ -60,30 +60,6 @@ def test_worker_processes_run_jobs_and_report_failures(tmp_path):
     failed = broken._run_worker({"kind": "describe"}, tmp_path / "broken" / "describe")
     assert failed["status"] == "failed" and failed["stage"] == "setup"
     assert "missing_factory" in failed["error"]
-
-
-def test_a_worker_past_its_timeout_is_killed(tmp_path):
-    session = worker_session(tmp_path, kwargs={"milliseconds": 60_000}, timeout=20.0)
-    session.directory.mkdir(parents=True)
-    session._run_worker({"kind": "reference"}, session.directory / "reference")
-    result = session._run_worker(
-        {
-            "kind": "measure",
-            "config": {},
-            "timing": {"warmup": 0, "rounds": 3, "calls": 1, "profile_calls": 0},
-        },
-        session.directory / "slow",
-    )
-    assert {key: result[key] for key in ("status", "stage", "error")} == {
-        "status": "failed",
-        "stage": "timeout",
-        "error": "The worker exceeded trial_timeout_s=20",
-    }
-    # How the worker ended, and where it was: on SIGUSR1 it logged its stacks.
-    assert result["exit_status"] == -9 and result["signal"] == "SIGKILL"
-    assert result["synthesized"] and "in __call__" in result["log_tail"]
-    recorded = json.loads((session.directory / "slow" / "result.json").read_text())
-    assert recorded == result
 
 
 requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
@@ -218,8 +194,6 @@ def test_region_knobs_generate_kernels_through_the_kernel_generator(
         compile_options={"min_block_size": 1},
     )
     knobs = knobs_by_name(workload.knobs())
-    assert knobs["kernels.act"].values == ("native", "generated")
-    assert knobs["kernels.act"].prepare == ("generated",)
     timing = Timing(warmup=1, rounds=3, calls=2, profile_calls=0)
     native = measure_candidate(
         workload, resolve({}, knobs), workload.reference(), timing

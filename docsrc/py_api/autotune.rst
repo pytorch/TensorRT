@@ -414,18 +414,12 @@ a spread.
 Prepare kernels
 ^^^^^^^^^^^^^^^
 
-Some knob values need a long build that every later build of them reuses,
-such as a ``kernels.<region>`` knob's ``generated`` value, whose build
-generates the region's kernel. A knob lists them in its ``prepare``. Before
-the search, the session builds the baseline config with each such value, and
-the settings it requires, in one worker per value (``kernels/<knob>=<value>``)
-that may run for ``Budget.prepare_timeout_s`` (7200 s by default) and does no
-timing, as long as the search would still run a trial. It records the region
-kernels the build generated or loaded; every later run that uses a prepared
-value must run, for each generation task they prepared, that task's kernel. A
-value whose preparation failed cannot be proposed. `Generated kernels:
-prepare, pin, choose`_ describes the step, the pinning and how the planners
-use the prepared kernels.
+Before the search, the session builds once every knob value listed in a
+knob's ``prepare``, such as a ``kernels.<region>`` knob's ``generated`` value,
+whose build generates the region's kernel; every later run that uses the
+value is held to the kernels that build generated or loaded. `Generated
+kernels: prepare, pin, choose`_ describes the step, the pinning and how the
+planners use the prepared kernels.
 
 Planner context
 ^^^^^^^^^^^^^^^
@@ -559,13 +553,9 @@ Continuing the example: the best config, still the baseline, ran at
 10.0 ms. A candidate that runs at 9.0 ms gains (10.0 - 9.0) / 10.0 = 10%,
 more than the 6% noise threshold, so it goes on to the head-to-head.
 
-One case measures nothing: a config that uses a prepared value but needs a
-region kernel that was never prepared, because one of its settings changes a
-region's generation task (see `Pin`_), fails to build, since such runs only
-load kernels from the cache. The trial is then recorded as ``invalid``, at
-stage ``kernels``, with the region and task it misses: like a refused
-proposal, it spends no trial and no patience, and the planner sees it in the
-history.
+One case measures nothing: a config that needs a region kernel that was
+never prepared is recorded as an ``invalid`` proposal at stage ``kernels``
+(see `Pin`_).
 
 Head-to-head
 ^^^^^^^^^^^^
@@ -1021,20 +1011,9 @@ controls (``min_block_size``, ``optimization_level`` and
 values if needed, so that the planner sees what actually runs.
 
 ``regions={"name": "submodule.path"}`` with ``generator=KernelGenerator(...)``
-adds a ``kernels.name`` knob with the values ``native`` and ``generated``.
-``generated`` compiles that submodule as a ``fused_kernel`` region named
-``name``, whose kernel the :class:`~torch_tensorrt.region.KernelGenerator`
-writes, validates and caches; such candidates compile with ``strict=True``.
-``generated`` is a prepared value: the kernel search runs once, before the
-search for configs, in a worker stopped after ``Budget.prepare_timeout_s``
-(7200 s by default), and every later build loads the kernel from the
-generator's cache, so the generator must keep ``use_cache=True`` (see
-`Generated kernels: prepare, pin, choose`_). A ``generated`` value that your
-``baseline`` sets is not prepared: the baseline's own worker generates its
-kernel, and runs that use it are not pinned, so any of their workers may
-search, within ``Budget.trial_timeout_s``. For such a region, give the
-generator a ``timeout_s`` well below ``trial_timeout_s`` (``KernelGenerator``
-allows 1800 s per region by default, as much as ``trial_timeout_s``).
+adds a ``kernels.name`` knob with the values ``native`` and ``generated``, a
+prepared value (see :class:`ModuleWorkload` and `Generated kernels: prepare,
+pin, choose`_).
 
 Requirements
 ^^^^^^^^^^^^
@@ -1139,8 +1118,10 @@ also lists the ``pins`` (see `Pin`_) and the ``warnings``.
   invalid, with the reason, and spends no trial (see `Check proposal`_), and
   the rule-based planner never proposes it.
 * A value that the baseline config sets is not prepared, since the baseline's
-  own measurement built it; runs that use it are not pinned (see `Standard
-  knobs`_ for the generator's ``timeout_s`` then).
+  own measurement built it; runs that use it are not pinned, so any of their
+  workers may search, within ``Budget.trial_timeout_s``. Give such a value's
+  generator a ``timeout_s`` well below ``trial_timeout_s`` (``KernelGenerator``
+  allows 1800 s per region by default, as much as ``trial_timeout_s``).
 * A resume reuses a preparation that succeeded with the same config. One that
   failed or was interrupted before its result is prepared again, like a
   failed baseline, since its cause (a crash, a busy GPU, a ``timeout_s`` or
@@ -1171,9 +1152,8 @@ measurement, a head-to-head run, a final check run or the export, is pinned:
   builds with ``TORCH_TENSORRT_REGION_GENERATION=0``, so that every
   :class:`~torch_tensorrt.region.KernelGenerator` only loads cached kernels:
   a kernel missing from the cache fails the build at once instead of starting
-  a search. With the switch off, a generator revalidates a cached kernel for
-  correctness only: its speed was measured when it was accepted, so a busy
-  GPU cannot fail the build;
+  a search, and a cached kernel is revalidated for correctness only (see
+  :ref:`torch_tensorrt_region_py`);
 * after the run, the session checks every kernel the run registered for a
   pinned task: it must be that task's pinned kernel. Kernels of tasks no
   preparation registered are not checked, and a pinned task that the run did
@@ -1247,53 +1227,15 @@ way, only whole-model measurements accept a candidate.
 Kernel records
 ^^^^^^^^^^^^^^
 
-``torch_tensorrt.region.generated_kernels()`` returns the region kernels that
-kernel generation registered in the current process, oldest first: one
-``torch_tensorrt.region.GeneratedKernel`` per generated region of every
-compilation. A worker reports those its job registered, as JSON, in its
-result's ``kernels``. Each record has:
-
-.. list-table::
-   :widths: 30 70
-   :header-rows: 1
-
-   * - Field
-     - Meaning
-   * - ``region``, ``region_id``
-     - the region's name, as given to ``fused_kernel(name=...)``, and its id
-       in the compilation, ``<name>#<index>``
-   * - ``task_sha256``
-     - the digest of the generation task: the kernel cache key
-   * - ``kernel_sha256``
-     - the digest of the kernel, its source and launch settings, as its
-       ``accepted.json`` records it
-   * - ``backend``, ``provider``, ``model``
-     - the kernel language, and the provider and model that wrote the kernel
-   * - ``origin``
-     - ``new`` (a search in this process accepted it), ``cached`` (a cached
-       kernel passed its revalidation) or ``shared`` (an identical region of
-       the same compilation registered it)
-   * - ``generation_s``
-     - the seconds the region's kernel took in this process: waiting for
-       another process generating it, revalidation and any search
-   * - ``latency_ms``, ``baseline``, ``baseline_latency_ms``, ``speedup``
-     - the measurement the kernel was accepted with, from its
-       ``accepted.json``: the kernel's median time on the region, the
-       baseline it was compared with (``eager``, the captured PyTorch region,
-       or ``tensorrt``, a TensorRT engine of the region under
-       ``objective="tensorrt"``), the baseline's median time, and the region
-       speedup, baseline time over kernel time
-   * - ``manifest``
-     - the ``accepted.json`` the provider and the measurement come from
-
-A region whose kernel a later identical region of the same compilation
-replaced shows the kernel it finally uses. Likewise,
-``torch_tensorrt.region.missing_kernels()`` returns a ``MissingKernel``
-(``region``, ``region_id``, ``task_sha256`` and ``reason``) for every region
-whose kernel a compilation with generation off could not provide; a worker
-reports those in its result's ``missing_kernels``. A workload that provides region kernels
-in another way can record them with
-``torch_tensorrt.region.record_generated_kernel`` and
+A worker reports, in its result's ``kernels``, the region kernels its job
+registered (:func:`torch_tensorrt.region.generated_kernels`: one
+:class:`~torch_tensorrt.region.GeneratedKernel` per generated region, with its
+region, task and kernel digests, ``origin`` and the measurement it was
+accepted with), and in ``missing_kernels`` the regions whose kernel a build
+with generation off could not provide
+(:class:`~torch_tensorrt.region.MissingKernel`); see
+:ref:`torch_tensorrt_region_py`. A workload that provides region kernels in
+another way can record them with ``record_generated_kernel`` and
 ``record_missing_kernel`` in its ``build``, and list the knob value that adds
 them in ``prepare``, to have them prepared and pinned as well.
 
@@ -1922,29 +1864,15 @@ records are written to a temporary file and renamed into place, so
 Pinned workload and environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A directory holds one session: resuming with a different workload factory,
-goal, limits, baseline changes or timing is refused, and so is resuming, or
-reusing the reference outputs, once anything the measurements depend on
-changed:
-
-* the workload: its name, knobs, baseline, timing, accuracy defaults and
-  editable files (with each file's SHA-256), and the SHA-256 of the workload
-  factory's file and of every ``.py`` file beside it;
-* the environment: the Python, PyTorch, CUDA, TensorRT and Torch-TensorRT
-  versions, the GPU and its driver, and the Torch-TensorRT source: the git
-  commit of its checkout and a SHA-256 of its uncommitted changes (``git
-  diff HEAD`` of the package directory, untracked files included). Any new
-  commit counts. The queries only read, and they read a checkout that
-  another user owns too (git would refuse it as "dubious ownership"; the
-  workers run its code anyway). An installed package that no checkout
-  tracks has no source record (``null``); its version identifies it. When
-  git cannot read the checkout (git is missing, the repository is damaged),
-  the record is ``{"unavailable": <git's error>}`` and the session warns
-  that a resume will not notice edits to the source.
-
-The error names what changed. A directory that is not an Auto-Tuner session
-of this version is refused with a :class:`TuningError`; start a new session
-directory instead.
+A directory holds one session: the workload and environment that
+`Reference outputs`_ lists are pinned, and a change to any of them is refused.
+The Torch-TensorRT source is recorded as the git commit of its checkout and a
+SHA-256 of its uncommitted changes (``git diff HEAD`` of the package
+directory, untracked files included); any new commit counts. An installed
+package that no checkout tracks has no source record (``null``); its version
+identifies it. When git cannot read the checkout (git is missing, the
+repository is damaged), the record is ``{"unavailable": <git's error>}`` and
+the session warns that a resume will not notice edits to the source.
 
 Limitations
 -----------
@@ -1967,29 +1895,19 @@ Limitations
 * The workload factory and an LLM adapter are trusted code. LLM replies are
   checked against the knobs, but knob implementations run as written, and
   edited code runs unsandboxed in the worker; see `Code edits`_.
-* A prepared value is prepared once, in the baseline config. A config that
-  combines it with a setting that changes a region's generation task (see
-  `Pin`_) needs a kernel that was never prepared, so it is refused as an
-  invalid proposal once its build fails; the session does not prepare such
-  combinations.
+* A prepared value is prepared once, in the baseline config; a config that
+  changes one of its regions' generation tasks is refused (see `Pin`_).
 * The artifact is what the workload's ``Candidate.export`` saves from a fresh
   build of the winning config, checked for accuracy but not timed against
   the final check. Runtime knobs (``runtime.*``, such as CUDA graphs) are
   execution modes, not part of a saved program: apply them when deploying,
   as ``config.json`` records.
-* A program loaded with ``torch_tensorrt.load(path).module()`` checks every
-  input on every call, which adds host time per call for engines with many
-  inputs; ``module(check_guards=False)`` with the module's input-check
-  pre-hook removed avoids it. With the Python runtime, a loaded program also
-  runs its engines through the ``tensorrt::execute_engine`` operator, which
-  copies every output that aliases an input; the compiled module run eagerly
-  does not (see :ref:`auto_tuner`).
 
 API reference
 -------------
 
 .. autoclass:: TuningSession
-   :members: run, resume, check_result
+   :members: run, resume
 
 .. autoclass:: TuningResult
    :members:

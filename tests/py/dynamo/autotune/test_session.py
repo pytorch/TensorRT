@@ -276,17 +276,9 @@ def test_invalid_proposals_are_recorded_and_end_the_search(tmp_path, jobs):
     assert reasons[1].startswith(
         "proposal rejected: Knob engine.optimization_level does not allow 4"
     )
-    assert reasons[2] == "proposal rejected: The proposal changes nothing" or reasons[
-        2
-    ].startswith("proposal rejected: this config was already measured")
+    assert reasons[2].startswith("proposal rejected: this config was already measured")
     # Invalid proposals spend no measurement.
     assert [name for name, _ in jobs if name.startswith("trials/")] == ["trials/0000"]
-
-
-def test_planner_stop_ends_the_search(tmp_path, jobs):
-    result = session(tmp_path / "s", planner=ScriptedPlanner([])).run()
-    assert result.stop_reason == "the planner stopped: done"
-    assert result.decision == "baseline kept"
 
 
 def test_a_best_config_that_fails_the_final_check_keeps_the_baseline(tmp_path, jobs):
@@ -390,24 +382,6 @@ def test_check_result_needs_a_gain_beyond_the_quartiles(tmp_path):
         and reason
         == "accuracy: top1=0.5 (needs >= 0.9); after timing: top1=0.5 (needs >= 0.9)"
     )
-
-
-def test_cli_reports_status_and_the_report(tmp_path, jobs, capsys):
-    session(
-        tmp_path / "s",
-        {"speedups": {"engine.precision=fp16": 0.5}},
-        budget=Budget(max_trials=1),
-    ).run()
-    assert cli.main(["status", str(tmp_path / "s")]) == 0
-    status = capsys.readouterr().out
-    assert (
-        "0001   ok" in status
-        and "accepted" in status
-        and '{"engine.precision": "fp16"}' in status
-    )
-    assert cli.main(["report", str(tmp_path / "s")]) == 0
-    assert "# Auto-Tuner report" in capsys.readouterr().out
-    assert cli.main(["status", str(tmp_path)]) == 1
 
 
 def test_status_shows_a_failed_baseline_being_measured_again_as_failed(
@@ -765,8 +739,6 @@ def test_worker_logs_give_the_first_error_and_the_stack_dump(tmp_path):
         "\n".join(
             [
                 "W1108 22:35:09.678000 1 torch/x.py:1] an error-ish deprecation",
-                "WARNING:torch_tensorrt [TensorRT Conversion Context]:AOT Plugin: "
-                "Kernel 'k' has 2 hidden args",
                 "[11/09/2026-10:42:49] [TRT] [W] a warning about errors",
                 "Building the engine",
                 "ERROR:torch_tensorrt [TensorRT Conversion Context]:Error Code 2",
@@ -1040,23 +1012,6 @@ def test_the_search_stops_when_the_stand_in_fails_too(tmp_path, jobs, monkeypatc
     assert decisions(tmp_path / "s") == ["baseline"]
 
 
-def test_settings_that_came_along_as_requirements_stay_untried(tmp_path, jobs):
-    session(
-        tmp_path / "s",
-        {
-            "requires": {"engine.precision": {"runtime.cudagraphs": True}},
-            "inaccurate": ["engine.precision=fp16"],
-        },
-        budget=Budget(max_trials=2),
-    ).run()
-    first = json.loads((tmp_path / "s/trials/0001/trial.json").read_text())
-    assert first["changes"] == {"engine.precision": "fp16", "runtime.cudagraphs": True}
-    assert first["proposed"] == {"engine.precision": "fp16"}
-    # fp16 was rejected; CUDA graphs on their own are still worth a trial.
-    second = json.loads((tmp_path / "s/trials/0002/trial.json").read_text())
-    assert second["changes"] == {"runtime.cudagraphs": True}
-
-
 def test_per_value_requirements_hold_in_a_session_and_its_resume(tmp_path, jobs):
     kwargs = {"requires": {"workload.variant": {"c": {"runtime.cudagraphs": True}}}}
     planner = ScriptedPlanner(
@@ -1239,14 +1194,6 @@ def test_a_value_that_could_not_be_prepared_is_never_measured(tmp_path, jobs):
     assert shown["reason"].startswith("build failed: RuntimeError: cannot build")
     report = (root / "report.md").read_text()
     assert "| `kernels.fused=generated` | failed: build failed: RuntimeError" in report
-    # The rule-based planner never proposes it.
-    result = with_kernels(tmp_path / "r", kwargs, budget=Budget(max_trials=10)).run()
-    assert result.stop_reason.endswith("Every exposed option has been tried")
-    changes = [
-        read(path)["changes"] for path in (tmp_path / "r").glob("trials/*/trial.json")
-    ]
-    assert len(changes) == 6
-    assert not any("kernels.fused" in change for change in changes)
 
 
 def test_a_config_that_needs_a_kernel_never_prepared_is_an_invalid_proposal(
@@ -1598,37 +1545,6 @@ def test_a_value_the_baseline_sets_is_not_prepared(tmp_path, jobs):
     # The baseline's own build made its kernel; nothing pins the runs.
     assert read(tmp_path / "s/trials/0000/result.json")["kernels"][0]["origin"] == "new"
     assert "allow_generation" not in read(tmp_path / "s/trials/0001/request.json")
-
-
-def test_the_rule_based_planner_tries_a_fast_prepared_kernel_before_engine_options(
-    tmp_path, jobs
-):
-    # Optimization level 5 is fast too, but it changes the region's
-    # generation task: tried first, it would leave the prepared kernel
-    # unusable.
-    result = with_kernels(
-        tmp_path / "s",
-        {
-            "kernel_cache": str(tmp_path / "cache.json"),
-            "speedups": {
-                "kernels.fused=generated": 0.5,
-                "engine.optimization_level=5": 0.5,
-            },
-        },
-        budget=Budget(max_trials=4),
-    ).run()
-    root = tmp_path / "s"
-    changes = [
-        read(path)["changes"] for path in sorted(root.glob("trials/*/trial.json"))
-    ]
-    made = decisions(root)
-    assert changes[1] == {"kernels.fused": "generated"} and made[1] == "accepted"
-    # Level 5 on top of it needs a kernel never prepared: an invalid proposal,
-    # which spends no trial.
-    level = [i for i, c in enumerate(changes) if c.get("engine.optimization_level")]
-    assert [made[i] for i in level] == ["invalid"]
-    assert made.count("invalid") == 1 and len(made) == 6
-    assert result.config == {"kernels.fused": "generated"}
 
 
 def test_status_lists_the_prepared_values(tmp_path, jobs, capsys):

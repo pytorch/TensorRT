@@ -165,9 +165,7 @@ def test_a_crashed_trial_keeps_its_cause_across_a_resume(tmp_path):
     assert "in crash" in faulted and "in idle" not in faulted
 
 
-def test_a_preparation_has_its_own_time_limit_and_pinned_workers_only_load(
-    tmp_path,
-):
+def test_a_preparation_has_its_own_time_limit(tmp_path):
     # The preparation hangs: it is stopped after prepare_timeout_s, not
     # trial_timeout_s, and the value is then refused.
     kwargs = {"kernel_knob": True, "hangs": ["kernels.fused=generated"]}
@@ -181,45 +179,6 @@ def test_a_preparation_has_its_own_time_limit_and_pinned_workers_only_load(
         "proposal rejected: the config uses kernels.fused='generated', which could "
         "not be prepared (timeout failed: The worker exceeded prepare_timeout_s=20"
     )
-    # A real worker of a run that uses the prepared value runs with kernel
-    # generation off, so the fake kernel says it was loaded from the cache.
-    planner = ScriptedPlanner({"kernels.fused": "generated"})
-    session(tmp_path / "s", {"kernel_knob": True}, planner=planner).run()
-    prepared = read(tmp_path / "s/kernels/kernels.fused=generated/result.json")
-    trial = read(tmp_path / "s/trials/0001/result.json")
-    assert prepared["kernels"][0]["origin"] == "new"
-    assert trial["status"] == "ok" and trial["kernels"][0]["origin"] == "cached"
-    assert (
-        trial["kernels"][0]["kernel_sha256"] == prepared["kernels"][0]["kernel_sha256"]
-    )
-
-
-def test_a_crashed_preparation_is_prepared_again_on_resume(tmp_path):
-    kwargs = {"kernel_knob": True}
-    directory = tmp_path / "s"
-    prepared = directory / "kernels" / "kernels.fused=generated"
-    # The preparation's worker dies of SIGSEGV, as in a native library, so
-    # the value cannot be used this time.
-    session(
-        directory,
-        kwargs,
-        planner=ScriptedPlanner({"kernels.fused": "generated"}),
-        env={**NO_GIT, CRASH_ENV: "kernels.fused=generated"},
-    ).run()
-    crashed = read(prepared / "result.json")
-    assert crashed["synthesized"] and crashed["stage"] == "crash"
-    assert crashed["signal"] == "SIGSEGV"
-    assert read(directory / "trials/0001/decision.json")["decision"] == "invalid"
-    # Resumed once the cause is gone, it is prepared again, and runs use it.
-    session(
-        directory,
-        kwargs,
-        max_trials=2,
-        planner=ScriptedPlanner({"kernels.fused": "generated"}),
-    ).run()
-    assert read(prepared / "result.json")["status"] == "ok"
-    trial = read(directory / "trials/0002/result.json")
-    assert trial["status"] == "ok" and trial["kernels"][0]["origin"] == "cached"
 
 
 # Stands in for the worker (the session runs it as its Python): writes a

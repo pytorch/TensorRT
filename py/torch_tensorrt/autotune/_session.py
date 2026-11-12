@@ -2441,8 +2441,6 @@ def _stack_start(lines: list[str]) -> int | None:
     start = None
     for index in range(len(lines) - 1, -1, -1):
         line = lines[index]
-        if line.startswith("Fatal Python error"):
-            return index
         if line.endswith("(most recent call first):"):
             start = index
         elif (
@@ -2520,8 +2518,12 @@ def _stack_excerpt(dump: list[str]) -> str:
     return "\n\n".join(parts)
 
 
-def _error_excerpt(result: Mapping[str, Any], size: int = 500) -> str:
-    """At most ``size`` characters of a failure's log or error for the planner.
+# The most characters of a failure's log or error the planner context quotes.
+_ERROR_EXCERPT_CHARS = 500
+
+
+def _error_excerpt(result: Mapping[str, Any]) -> str:
+    """At most :data:`_ERROR_EXCERPT_CHARS` characters of a failure's log or error for the planner.
 
     The start of the worker's Python stack dump when its log ends with one:
     the fatal error and the innermost frames of the thread that faulted, or
@@ -2529,8 +2531,9 @@ def _error_excerpt(result: Mapping[str, Any], size: int = 500) -> str:
     end of its log or error.
     """
     if result.get("log_stack"):
-        return str(result["log_stack"]).strip()[:size]
-    return str(result.get("log_tail") or result.get("error") or "").strip()[-size:]
+        return str(result["log_stack"]).strip()[:_ERROR_EXCERPT_CHARS]
+    text = str(result.get("log_tail") or result.get("error") or "").strip()
+    return text[-_ERROR_EXCERPT_CHARS:]
 
 
 def _malformed(proposal: Proposal) -> str | None:
@@ -2663,10 +2666,16 @@ def _differences(recorded: Mapping[str, Any], current: Mapping[str, Any]) -> lis
     return found
 
 
-def _abbreviated(value: Any, size: int = 200) -> str:
-    """``repr(value)``, cut to ``size`` characters."""
+# The most characters of a value that a pinned-code mismatch message quotes.
+_ABBREVIATED_CHARS = 200
+
+
+def _abbreviated(value: Any) -> str:
+    """``repr(value)``, cut to :data:`_ABBREVIATED_CHARS` characters."""
     text = repr(value)
-    return text if len(text) <= size else text[: size - 3] + "..."
+    if len(text) <= _ABBREVIATED_CHARS:
+        return text
+    return text[: _ABBREVIATED_CHARS - 3] + "..."
 
 
 def _by_name(value: Any) -> dict[str, Any]:

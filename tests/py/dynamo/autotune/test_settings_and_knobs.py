@@ -157,9 +157,9 @@ def test_prepared_values_keep_the_knobs_order_and_survive_json():
     data = json.loads(json.dumps(knob.to_json()))
     assert data["prepare"] == ["on", 3]
     assert Knob.from_json(data) == knob
-    # A knob without prepared values keeps the JSON that sessions pin.
+    # A knob without prepared values writes an empty list.
     plain = Knob("kernels.k", ("none", "on"), "none", "")
-    assert "prepare" not in plain.to_json()
+    assert plain.to_json()["prepare"] == []
     assert Knob.from_json(plain.to_json()).prepare == ()
     # A prepared value keeps its requirements.
     needs = Knob(
@@ -500,8 +500,7 @@ def test_knobs_may_require_settings_per_value():
     assert unmet_requirements(
         {"runtime.cudagraphs": True}, "kernels.mixed", knobs, "tiled"
     ) == {"runtime.graph_pool": True}
-    # Without a value: what the config's value of the knob needs.
-    assert unmet_requirements({"kernels.mixed": 3}, "kernels.mixed", knobs) == {
+    assert unmet_requirements({"kernels.mixed": 3}, "kernels.mixed", knobs, 3) == {
         "runtime.cudagraphs": True
     }
     assert with_requirements({}, {"kernels.mixed": "tiled"}, knobs) == full
@@ -681,7 +680,6 @@ def test_profile_summaries_skip_annotation_spans():
         ],
         per_unit=1,
         wall_ms=1.0,
-        traced_ms=2.0,
     )
     assert summary["kernels"] == 1 and summary["host_syncs"] == 1
     assert summary["device_ms"] == pytest.approx(0.35)

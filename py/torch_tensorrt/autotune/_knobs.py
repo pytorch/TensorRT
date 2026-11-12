@@ -35,8 +35,6 @@ BOTTLENECK_HINTS = (
     "copy_overhead",
     "compute_gap",
 )
-# unmet_requirements' default value: check the knob's value in the config.
-_VALUE_IN_CONFIG: Any = object()
 
 
 @dataclass(frozen=True)
@@ -214,11 +212,8 @@ class Knob:
     def to_json(self) -> dict[str, Any]:
         """The knob as JSON; per-value ``requires`` become ``{"value", "requires"}`` entries,
         so values that are not strings survive the round trip.
-
-        ``prepare`` appears only when it lists values, so that the JSON of a
-        knob without it, which sessions pin, stays as it was.
         """
-        data = {
+        return {
             "name": self.name,
             "layer": self.layer,
             "values": list(self.values),
@@ -233,25 +228,23 @@ class Knob:
                 if self.requires_by_value
                 else dict(self.requires)
             ),
+            "prepare": list(self.prepare),
         }
-        if self.prepare:
-            data["prepare"] = list(self.prepare)
-        return data
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> "Knob":
         """Rebuild a knob from :meth:`to_json` (extra keys, such as ``current``, are ignored)."""
-        requires = data.get("requires") or {}
+        requires = data["requires"]
         if isinstance(requires, (list, tuple)):
             requires = [(entry["value"], entry["requires"]) for entry in requires]
         return cls(
             data["name"],
             tuple(data["values"]),
             data["default"],
-            data.get("description", ""),
-            tuple(data.get("bottleneck_hints", ())),
+            data["description"],
+            tuple(data["bottleneck_hints"]),
             requires,
-            tuple(data.get("prepare", ())),
+            tuple(data["prepare"]),
         )
 
 
@@ -370,21 +363,10 @@ def unmet_requirements(
     config: Mapping[str, Any],
     name: str,
     knobs: Mapping[str, Knob],
-    value: Any = _VALUE_IN_CONFIG,
+    value: Any,
 ) -> dict[str, Any]:
-    """What ``config`` lacks of the settings knob ``name`` needs at ``value``.
-
-    Without ``value``: what the knob's value in ``config`` needs, or, for a
-    knob whose requirements are the same for every non-default value, those
-    requirements whatever ``config`` sets.
-    """
-    knob = knobs[name]
-    if value is not _VALUE_IN_CONFIG:
-        needs = knob.requirements(value)
-    elif knob.requires_by_value:
-        needs = knob.requirements(config.get(name, knob.default))
-    else:
-        needs = dict(knob.requires)
+    """What ``config`` lacks of the settings knob ``name`` needs at ``value``."""
+    needs = knobs[name].requirements(value)
     return {
         other: needed
         for other, needed in needs.items()

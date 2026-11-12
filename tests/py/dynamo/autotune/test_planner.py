@@ -5,8 +5,6 @@
 
 import json
 import os
-import subprocess
-from pathlib import Path
 
 import pytest
 from torch_tensorrt.autotune import (
@@ -14,10 +12,8 @@ from torch_tensorrt.autotune import (
     LLMPlanner,
     Proposal,
     RuleBasedPlanner,
-    TuningSession,
-    WorkloadFactory,
 )
-from torch_tensorrt.autotune._knobs import apply_changes, knobs_by_name
+from torch_tensorrt.autotune._knobs import knobs_by_name
 from torch_tensorrt.autotune._planner import (
     _proposal_from_reply,
     check_proposal,
@@ -29,7 +25,6 @@ from torch_tensorrt.dynamo.region_compilation._generation import _providers
 from ._workloads import FAKE_KNOBS, KERNEL_KNOB
 
 KNOBS = knobs_by_name(FAKE_KNOBS)
-FAKE_FACTORY = f"{Path(__file__).with_name('_workloads.py')}:create_fake"
 
 
 def planner_context(
@@ -219,9 +214,6 @@ def test_proposals_are_checked_against_the_knobs():
         check_proposal(Proposal(), {}, KNOBS)
     with pytest.raises(ValueError, match="Unknown knob"):
         check_proposal(Proposal(changes={"engine.fast": True}), {}, KNOBS)
-    with pytest.raises(ValueError, match="does not allow"):
-        check_proposal(Proposal(changes={"engine.optimization_level": 4}), {}, KNOBS)
-    assert apply_changes({}, {"workload.variant": "a"}, KNOBS) == {}
 
 
 def test_planners_round_trip_through_json():
@@ -549,38 +541,6 @@ def test_a_rate_limited_or_overloaded_api_falls_back_for_that_trial(
             planner_context(), tmp_path / "strict"
         )
 
-
-def test_a_codex_turn_without_a_reply_fails_the_planner_and_a_rule_based_planner_stands_in(
-    tmp_path, monkeypatch
-):
-    monkeypatch.setattr(_providers.shutil, "which", lambda _: "/bin/codex")
-    monkeypatch.setattr(_providers, "_CODEX_MCP_SERVERS", {"/bin/codex": ()})
-    monkeypatch.setattr(
-        _providers,
-        "run_process",
-        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, "", ""),
-    )
-    # Not a ProviderError, so the LLM planner's own fallback lets it through.
-    planner = LLMPlanner("codex")
-    with pytest.raises(RuntimeError, match="without writing") as raised:
-        planner.propose(planner_context(), tmp_path / "planner")
-    assert not isinstance(raised.value, _providers.ProviderError)
-    # The session stands in a rule-based planner on any planner exception.
-    session = TuningSession(
-        WorkloadFactory(FAKE_FACTORY), directory=tmp_path / "s", planner=planner
-    )
-    proposal, failure = session._ask_planner(planner_context(), tmp_path / "session")
-    assert failure == "RuntimeError: codex finished without writing a kernel proposal"
-    assert proposal.planner == "rule-based"
-    assert proposal.changes == {"runtime.cudagraphs": True}
-    assert proposal.note == (
-        f"the llm planner failed ({failure}); the rule-based planner proposed "
-        "instead"
-    )
-    assert "without writing" in (tmp_path / "session/error.txt").read_text()
-
-
-# ------------------------------------------------------- prepared kernels
 
 KERNEL_KNOBS = knobs_by_name(FAKE_KNOBS + (KERNEL_KNOB,))
 

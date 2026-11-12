@@ -69,12 +69,16 @@ def gpu_utilization() -> float | None:
         return None
 
 
-def wait_for_quiet_gpu(
-    max_wait_s: float, *, threshold: float = 5.0, settle: int = 2
-) -> dict[str, Any]:
-    """Wait until the GPU is idle for ``settle`` consecutive one-second samples.
+# The GPU counts as idle at most this percent busy, for this many consecutive
+# one-second samples.
+_QUIET_GPU_PERCENT = 5.0
+_QUIET_GPU_SAMPLES = 2
 
-    Idle means at most ``threshold`` percent busy. Call it between this
+
+def wait_for_quiet_gpu(max_wait_s: float) -> dict[str, Any]:
+    """Wait until the GPU is idle for :data:`_QUIET_GPU_SAMPLES` consecutive one-second samples.
+
+    Idle means at most :data:`_QUIET_GPU_PERCENT` percent busy. Call it between this
     process's own work, so any load it sees belongs to other jobs. Returns
     the seconds waited and ``quiet``: whether the GPU went idle, or None
     when its utilization cannot be read.
@@ -89,10 +93,10 @@ def wait_for_quiet_gpu(
         utilization = gpu_utilization()
         if utilization is None:
             return record
-        quiet = quiet + 1 if utilization <= threshold else 0
+        quiet = quiet + 1 if utilization <= _QUIET_GPU_PERCENT else 0
         waited = time.monotonic() - start
-        if quiet >= settle or waited >= max_wait_s:
-            record.update(waited_s=waited, quiet=quiet >= settle)
+        if quiet >= _QUIET_GPU_SAMPLES or waited >= max_wait_s:
+            record.update(waited_s=waited, quiet=quiet >= _QUIET_GPU_SAMPLES)
             return record
         time.sleep(1.0)
 
@@ -194,10 +198,8 @@ def export_unsupported(error: BaseException) -> bool:
     """
     if isinstance(error, NotImplementedError):
         return True
-    try:
-        from torch_tensorrt.region import RegionError
-    except ImportError:  # pragma: no cover - the region API ships with the package
-        return False
+    from torch_tensorrt.region import RegionError
+
     return isinstance(error, RegionError) and "is not supported" in str(error)
 
 

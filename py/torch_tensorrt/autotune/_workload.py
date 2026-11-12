@@ -212,22 +212,15 @@ def describe_module(module: torch.nn.Module) -> dict[str, Any]:
         if not isinstance(child, TorchTensorRTModule)
         and isinstance(child, torch.fx.GraphModule)
     ]
-    layers = 0
-    for engine in engines:
-        cuda_engine = getattr(getattr(engine, "engine", None), "cuda_engine", None)
-        layers += int(getattr(cuda_engine, "num_layers", 0) or 0)
-    plugins = 0
-    with contextlib.suppress(Exception):
-        from torch_tensorrt.dynamo.region_compilation._types import get_region_records
+    from torch_tensorrt.dynamo.region_compilation._types import get_region_records
 
-        plugins = sum(
-            1 for record in get_region_records(module) if record.route == "plugin"
-        )
+    plugins = sum(
+        1 for record in get_region_records(module) if record.route == "plugin"
+    )
     return {
         "trt_engines": len(engines),
         "torch_partitions": len(partitions),
         "plugin_regions": plugins,
-        "engine_layers": layers,
     }
 
 

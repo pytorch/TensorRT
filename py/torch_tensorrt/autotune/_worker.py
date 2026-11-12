@@ -64,8 +64,8 @@ def write_json(path: Path, value: Any) -> None:
         raise
 
 
-def save_reference(tree: Any, path: Path) -> dict[str, Any]:
-    """Save reference outputs on the CPU; return a description of them."""
+def save_reference(tree: Any, path: Path) -> None:
+    """Save reference outputs (tensors, numbers and containers of them) on the CPU."""
     leaves, _ = pytree.tree_flatten(tree)
     for leaf in leaves:
         if not isinstance(leaf, (torch.Tensor, int, float, bool)):
@@ -79,16 +79,6 @@ def save_reference(tree: Any, path: Path) -> dict[str, Any]:
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(on_cpu, path)
-    return {
-        "leaves": [
-            (
-                {"shape": list(leaf.shape), "dtype": str(leaf.dtype)}
-                if isinstance(leaf, torch.Tensor)
-                else {"value": leaf}
-            )
-            for leaf in leaves
-        ]
-    }
 
 
 def load_reference(path: Path) -> Any:
@@ -382,9 +372,7 @@ def run_job(request: dict[str, Any]) -> dict[str, Any]:
             "environment": environment(),
         }
         if request["kind"] == "reference":
-            result["reference"] = save_reference(
-                workload.reference(), Path(request["reference_path"])
-            )
+            save_reference(workload.reference(), Path(request["reference_path"]))
         return result
     from torch_tensorrt.region import generated_kernels, missing_kernels
 

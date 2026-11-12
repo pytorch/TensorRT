@@ -5,16 +5,11 @@ from __future__ import annotations
 
 import base64
 import copy
-import json
 import logging
 import pickle
-import re
-import sys
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
-from torch._subclasses.fake_tensor import FakeTensor
-from torch._subclasses.functional_tensor import FunctionalTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -53,208 +48,6 @@ SerializedTorchTensorRTModuleFmt = Tuple[
     List[str],
     List[str],
 ]
-
-
-def _python_engine_runs_eagerly(input_tensors: List[torch.Tensor]) -> bool:
-    """Whether a Python-runtime engine may run outside the custom op.
-
-    True only for the Python runtime in plain eager execution: not inside
-    ``torch.compile``, ``torch.jit.trace`` or a ``torch.func`` transform
-    (``functionalize``, ``vmap``, ``grad``), with no dispatch mode active,
-    including pre-dispatch ones (export, ``make_fx``, fake and functional
-    tensors push one), and with plain tensor inputs that do not require
-    gradients. Anywhere else the ``tensorrt::execute_engine`` op must stand
-    in for the engine, so tracers record it and autograd sees what it sees.
-    """
-    return (
-        not ENABLED_FEATURES.torch_tensorrt_runtime
-        and not torch.compiler.is_compiling()
-        and not torch.jit.is_tracing()
-        and torch._C._len_torch_dispatch_stack() == 0
-        and torch._ops._len_torch_dispatch_stack_pre_dispatch() == 0
-        and torch._C._functorch.peek_interpreter_stack() is None
-        and all(
-            type(tensor) is torch.Tensor and not tensor.requires_grad
-            for tensor in input_tensors
-        )
-    )
-
-
-# TensorRT loads the CUDA module of every QDP AOT plugin layer again each time
-# it runs the engine outside a CUDA graph (observed with TensorRT 11.4): every
-# call pays the load, which waits for the GPU work queued before it, and the
-# modules are never freed. A CUDA graph replays the launches without TensorRT,
-# so neither happens. Remove the warning once TensorRT stops the reloads.
-#
-# Each engine is checked where it runs (see _track_plugin_reloads). The Python
-# runtime's TRTEngine counts its own runs, which also covers programs that call
-# tensorrt::execute_engine without a TorchTensorRTModule, such as an exported
-# program loaded with torch_tensorrt.load. The C++ runtime runs engines out of
-# Python's sight, so TorchTensorRTModule.forward counts its eager calls instead.
-#
-# The warning waits for this many runs outside CUDA graphs, so the warm-up
-# calls made before a capture (three in PyTorch's recipe and in
-# torch.cuda.make_graphed_callables) and short correctness checks do not
-# trigger it.
-_PLUGIN_RELOAD_WARNING_CALLS = 32
-# TensorRT's name for a QDP AOT plugin layer that nobody named, for example
-# "(Unnamed Layer* 2) [PluginV3_V3QUICKAOT]". Myelin appends
-# "_myl<graph>_<index>" to the names of the layers it runs. Matching from the
-# start leaves out layers whose names only mention a plugin layer, such as
-# TensorRT's "Reformatting CopyNode for Input Tensor 0 to <layer>".
-_UNNAMED_PLUGIN_LAYER_NAME = re.compile(
-    r"\(Unnamed Layer\* \d+\) \[PluginV3_V3QUICKAOT\]"
-)
-# Torch-TensorRT's plugin converter names its layers
-# "[<namespace>.<op>.<overload>]-[<node>]" (see _generate_plugin_converter.py),
-# the only Torch-TensorRT layer names that start with an operator overload.
-_PLUGIN_LAYER_NAME = re.compile(r"\[([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.[A-Za-z_]\w*\]-\[")
-# Dispatch modes that trace calls rather than run them. Other modes, such as
-# FlopCounterMode, pass each call on to the engine.
-_TRACING_DISPATCH_MODES = (
-    torch._C._TorchDispatchModeKey.FAKE,
-    torch._C._TorchDispatchModeKey.PROXY,
-    torch._C._TorchDispatchModeKey.FUNCTIONAL,
-)
-
-
-def _registered_for_jit_only(namespace: str, name: str) -> bool:
-    """Whether QDP registered ``namespace::name`` in this process without AOT.
-
-    A JIT plugin calls back into Python on each run instead of loading a module.
-    An engine can only run one that is registered, so a plugin layer whose
-    plugin is not registered here is an AOT one.
-    """
-    for module_name in ("tensorrt.plugin._lib", "tensorrt_bindings.plugin._lib"):
-        registry = getattr(sys.modules.get(module_name), "QDP_REGISTRY", None)
-        if isinstance(registry, dict):
-            descriptor = registry.get(f"{namespace}::{name}")
-            return (
-                descriptor is not None
-                and getattr(descriptor, "aot_impl_func", None) is None
-            )
-    return False
-
-
-def _qdp_aot_plugin_layers(layer_info: str) -> List[str]:
-    """Names of the QDP AOT plugin layers in an engine's layer information.
-
-    ``layer_info`` is the engine inspector's JSON, as ``get_layer_info``
-    returns it, at any profiling verbosity that keeps layer names.
-    """
-    try:
-        layers = json.loads(layer_info).get("Layers", [])
-    except (AttributeError, TypeError, ValueError):
-        return []
-    names = []
-    for layer in layers if isinstance(layers, list) else []:
-        name = layer.get("Name") if isinstance(layer, dict) else layer
-        if not isinstance(name, str):
-            continue
-        match = _PLUGIN_LAYER_NAME.match(name)
-        if _UNNAMED_PLUGIN_LAYER_NAME.match(name) or (
-            match is not None and not _registered_for_jit_only(*match.groups())
-        ):
-            names.append(name)
-    return names
-
-
-def _executes_engine(input_tensors: List[torch.Tensor]) -> bool:
-    """Whether this call runs the engine on the GPU rather than tracing it.
-
-    False inside ``torch.compile``, ``torch.jit.trace``, a ``torch.func``
-    transform, a fake, proxy (``make_fx``), functional or pre-dispatch
-    (export) mode, and for fake or functional tensor inputs. Other dispatch
-    modes, such as ``FlopCounterMode``, and other tensor subclasses, such as
-    ``torch.nn.Parameter``, run the engine.
-    """
-    return (
-        not torch.compiler.is_compiling()
-        and not torch.jit.is_tracing()
-        and torch._ops._len_torch_dispatch_stack_pre_dispatch() == 0
-        and all(
-            torch._C._get_dispatch_mode(key) is None for key in _TRACING_DISPATCH_MODES
-        )
-        and torch._C._functorch.peek_interpreter_stack() is None
-        and not any(
-            isinstance(tensor, (FakeTensor, FunctionalTensor))
-            for tensor in input_tensors
-        )
-    )
-
-
-def _runs_in_cuda_graph() -> bool:
-    """Whether the engine's TensorRT launches go into a CUDA graph.
-
-    Either Torch-TensorRT's CUDA graph mode is on, so the engine captures
-    itself and replays the graph, or the caller is capturing the stream, as
-    ``enable_cudagraphs`` does for a whole module with Torch subgraphs. The
-    global whole-graph mode is not enough: it stays on while that context is
-    open, also for modules that run outside it.
-    """
-    from torch_tensorrt.runtime import get_cudagraphs_mode
-
-    return bool(
-        get_cudagraphs_mode()
-        or (torch.cuda.is_initialized() and torch.cuda.is_current_stream_capturing())
-    )
-
-
-def _track_plugin_reloads(
-    owner: Any, engine_name: str, layer_info: Callable[[], str]
-) -> None:
-    """Count a run of an engine toward the QDP AOT plugin reload warning.
-
-    ``owner`` keeps the state: ``_plugin_reload_check_pending``, which its
-    caller tests before reporting a run, ``_plugin_reload_layers`` and
-    ``_plugin_reload_calls``. A run whose launches go into a CUDA graph ends
-    the check quietly, since replays bypass TensorRT: the engine is then taken
-    to run under CUDA graphs and is not checked again. The first run outside
-    one ends it too when ``layer_info()``, the engine inspector's JSON, lists
-    no QDP AOT plugin layer. Otherwise the warning comes on the
-    ``_PLUGIN_RELOAD_WARNING_CALLS``-th run outside CUDA graphs.
-    """
-    # TensorRT-RTX runs plugins in its own runtime, not known to reload them.
-    if ENABLED_FEATURES.tensorrt_rtx or _runs_in_cuda_graph():
-        owner._plugin_reload_check_pending = False
-        return
-    if owner._plugin_reload_layers is None:
-        try:
-            owner._plugin_reload_layers = _qdp_aot_plugin_layers(layer_info())
-        except Exception:
-            # Only advice depends on the layer list; never fail a run over it.
-            logger.debug(
-                "Could not list the layers of TensorRT engine %s",
-                engine_name,
-                exc_info=True,
-            )
-            owner._plugin_reload_layers = []
-    layers = owner._plugin_reload_layers
-    if not layers:
-        owner._plugin_reload_check_pending = False
-        return
-    owner._plugin_reload_calls += 1
-    if owner._plugin_reload_calls < _PLUGIN_RELOAD_WARNING_CALLS:
-        return
-    owner._plugin_reload_check_pending = False
-    import tensorrt as trt
-
-    logger.warning(
-        "TensorRT engine '%s' has run %d times outside a CUDA graph, and it "
-        "contains %d QDP AOT plugin layer(s), such as '%s'. TensorRT loads the "
-        "CUDA module of each such plugin again every time it runs outside a "
-        "CUDA graph (observed with TensorRT 11.4; installed: %s): each call "
-        "pays the load, which waits for the GPU work queued before it, and "
-        "the modules are never freed. Run the engine under CUDA graphs, with "
-        "torch_tensorrt.runtime.set_cudagraphs_mode(True), "
-        "torch_tensorrt.runtime.enable_cudagraphs(module) or a "
-        "torch.cuda.graph capture. This warning is logged once per engine.",
-        engine_name,
-        owner._plugin_reload_calls,
-        len(layers),
-        layers[0],
-        trt.__version__,
-    )
 
 
 def user_output_count(
@@ -323,12 +116,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     Supports ``torch.save`` / ``torch.load`` via ``get_extra_state`` / ``set_extra_state``.
     """
-
-    # State of the plugin reload warning (see ``_check_plugin_reloads``). As
-    # class attributes they also cover modules pickled before the warning.
-    _plugin_reload_check_pending = True
-    _plugin_reload_layers: Optional[List[str]] = None
-    _plugin_reload_calls = 0
 
     def __init__(
         self,
@@ -706,7 +493,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # The engine re-serializes on demand (see ``_plan_buffer``), so a host copy
             # of the plan, as large as the weights, need not live as long as the module.
             self._serialized_engine = None
-        self._reset_plugin_reload_check()
 
         # Re-apply via the setter: resolves any path-string runtime_cache,
         # dispatches to the engine, and writes back the resolved form.
@@ -826,7 +612,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.engine = None
             self.settings = CompilationSettings()
             self.hardware_compatible = False
-        self._reset_plugin_reload_check()
 
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
@@ -919,13 +704,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         state = (get_state() if get_state else self.__dict__).copy()
         state.pop("_runtime_settings", None)
         state.pop("_implicit_cache_handle", None)
-        # The loaded module runs a new engine, which the warning checks afresh.
-        for name in (
-            "_plugin_reload_check_pending",
-            "_plugin_reload_layers",
-            "_plugin_reload_calls",
-        ):
-            state.pop(name, None)
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -1000,26 +778,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     scalar_tensor = scalar_tensor.unsqueeze(0)
                 input_tensors.append(scalar_tensor.cuda())
 
-        outputs: List[Any]
-        if self.aliased_io and _python_engine_runs_eagerly(input_tensors):
-            # The ``tensorrt::execute_engine`` custom op must clone every output
-            # that aliases an input (PyTorch forbids a custom op from returning
-            # its inputs), so an engine that updates an input in place, such as
-            # a cache, would copy it on every call. Plain eager execution needs
-            # no such protection: run the engine directly and return the
-            # updated inputs.
-            engine: Any = self.engine
-            raw = engine.execute(list(input_tensors))
-            outputs = [raw] if isinstance(raw, torch.Tensor) else list(raw)
-        else:
-            outputs = torch.ops.tensorrt.execute_engine(
-                list(input_tensors), self.engine
-            )
-        # ``is_compiling`` comes first: Dynamo folds it to True, so a traced
-        # forward never reads the flag and installs no guard on it, which
-        # would recompile once the flag clears.
-        if not torch.compiler.is_compiling() and self._plugin_reload_check_pending:
-            self._check_plugin_reloads(input_tensors)
+        outputs: List[Any] = torch.ops.tensorrt.execute_engine(
+            list(input_tensors), self.engine
+        )
 
         # The interpreter may have appended extra "side-effect" outputs to
         # satisfy the network-output requirement of aliased layers (e.g.
@@ -1047,26 +808,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return ()
 
         return tuple(outputs)
-
-    def _reset_plugin_reload_check(self) -> None:
-        """Check a new engine for QDP AOT plugins that run outside CUDA graphs."""
-        self._plugin_reload_check_pending = True
-        self._plugin_reload_layers = None
-        self._plugin_reload_calls = 0
-
-    def _check_plugin_reloads(self, input_tensors: List[torch.Tensor]) -> None:
-        """Count this call toward the QDP AOT plugin reload warning.
-
-        ``forward`` calls this in eager execution until it clears
-        ``_plugin_reload_check_pending``. An engine that counts its own runs,
-        the Python runtime's ``TRTEngine``, ends the module's check at once.
-        Otherwise a call that traces the module leaves the check pending, and
-        ``_track_plugin_reloads`` counts each call that runs the engine.
-        """
-        if getattr(type(self.engine), "_tracks_plugin_reloads", False):
-            self._plugin_reload_check_pending = False
-        elif _executes_engine(input_tensors):
-            _track_plugin_reloads(self, self.name, self.get_layer_info)
 
     def enable_profiling(
         self,
