@@ -233,7 +233,9 @@ python -m pip wheel --no-build-isolation --no-deps \
   carries the pinned ExecuTorch build (`nightly` for a development build, `test` or `pypi` for a
   release), the main wheel's `executorch` extra requires exactly this version of this wheel. A
   Windows release wheel for PyPI records no channel, because PyPI's Windows ExecuTorch is the CPU
-  build.
+  build. The Windows release workflow still builds and uploads the companion as a GitHub artifact,
+  using ExecuTorch from the PyTorch CUDA indexes. Install that companion with the CUDA indexes
+  shown below.
 
 Install the result with PyTorch's indexes for your CUDA version. The ExecuTorch build it pins is
 on one of them: a development build on the nightly index, a release on the test and stable
