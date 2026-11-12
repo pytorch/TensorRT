@@ -71,16 +71,19 @@ Models and input factories must be allowlisted in
 before launching the server. The configured `workspace_root` must exist; the
 server creates `output_root` if needed. Generated `.mcp-runs/` artifacts are
 ignored by Git.
-The server creates `<output_root>/.lowering_pass_candidates` for generated lowering passes.
+The server creates `<output_root>/.graph_transformation_candidates` for
+generated graph transformations.
 The Agent selects one through the MCP request's reserved
-`lowering_pass_candidate_id` field. Model factories do not accept or need to
-know about that field.
+`graph_transformation_candidate_id` field. Model factories do not accept or
+need to know about that field.
 Candidate files are trusted, unrestricted Python and execute with the worker's
 OS credentials. They are not sandboxed; only trusted users and Agents should
 receive both write access to the candidate directory and permission to select
 a candidate ID.
-The included examples define the model and input names `add`, `qwen3_5`, and
-`batched_linear`.
+The included examples define the model and input names `add`, `qwen3_5`,
+`batched_linear`, and `diff`. The `diff` example intentionally retains the
+currently unsupported `aten.diff.default` operator for custom decomposition
+experiments.
 
 ## Set the Cursor API key
 
@@ -195,11 +198,107 @@ task                 Optimization request, or "-" to read stdin
 
 The generated or explicitly supplied output root must not already exist.
 
+## Unsupported operator decomposition demo
+
+The `diff` example exports `torch.diff` as the currently unsupported
+`aten.diff.default` operator. It can be used to let an Agent generate and test
+a targeted `slice + sub` decomposition:
+
+```bash
+python tools/mcp/examples/run_with_cursor.py \
+  "Use torch-tensorrt MCP to compile, validate, and benchmark the diff model with min_block_size=1. Generate a custom decomposition for aten.diff.default if needed." \
+  --model composer-2.5
+```
+
+Output:
+```text
+MCP artifacts: <repo>/.mcp-runs/20261112_001024_5af1cbde
+Running the bounded optimization workflow: discovering MCP tools and locating
+the diff model configuration.
+
+Creating the decomposition candidate and running the candidate pipeline.
+Decomposition enabled TensorRT but compiled latency regressed (~40×). Removing
+the candidate per workflow criteria.
+
+## Optimization result
+
+Added a custom `aten.diff.default` decomposition (`slice` + `sub`) so the diff
+model can lower into a TensorRT partition. Validation passed and an engine was
+built. Compiled wall median was much worse than baseline (PyTorch fallback), so
+the candidate source was removed per the retention rule.
+
+Request settings:
+  model / inputs: diff / diff
+  model_parameters: {} (default)
+  input_parameters: {} (batch 32, width 4096)
+  seed: 0
+  compilation: min_block_size=1 (plus MCP defaults)
+
+Benchmark protocol (baseline and candidate):
+  warmup: 10
+  measured iterations: 100
+  sample_index: 0
+  timing scope: forward_only
+  synchronization: per_invocation
+  sample: batch-32-width-4096
+  input: static fp16 [32, 4096]
+  output: fp16 [32, 4095]
+
+Baseline (no graph_transformation_candidate_id):
+  analyze:   819f36772a9249058331a84b25d9ee31
+  compile:   f7e21315c1d74794bc54b381035c0f7f
+  validate:  23809b16102b4b5293a5dbdb6966b5aa
+  benchmark: 456d6cd1146b4696a5d3b371de96eadd
+  lowered graph: one aten.diff.default assigned to PyTorch
+  TensorRT partitions: 0
+  engines: 0
+  validation: passed (atol=0.01, rtol=0.01, max error=0)
+  compiled wall median: 0.0241125 ms
+  benchmark wall speedup: 0.7477
+
+Candidate decomposition:
+  ID (removed): 29e485f2c9fe1cb46982d38ed73566a3
+  source (deleted): <run-dir>/.graph_transformation_candidates/
+    graph_transformation_candidate_29e485f2c9fe1cb46982d38ed73566a3.py
+  analyze:   b233c9ca1f3b4306b91724d0aa07c0ff
+  compile:   792c57f5e8b8465fb3a668534a7c2caf
+  validate:  86a272ff1ce34e379d1f7811d8158e36
+  benchmark: effaf01d29ed4281a0444ab981e36377
+  transformation: aten.diff.default to 2 x aten.slice.Tensor + aten.sub.Tensor
+  TensorRT coverage: 3/3 eligible, 0 unsupported
+  engines: 1
+  validation: passed with zero mismatches
+  compiled wall median: 0.973067 ms
+  benchmark wall speedup: 0.0205
+
+Baseline-relative compiled speedup:
+  0.0241125 / 0.973067 = 0.025x
+
+The TensorRT path was about 40x slower than the PyTorch-fallback baseline for
+this workload. The lowered graph changed as intended and validation passed, but
+the candidate file was deleted because latency did not improve. All eight jobs
+completed successfully.
+
+Token usage:
+  run ID: run-792cb9d4-cbd5-4106-a224-0a97c84ff1bf
+  status: finished
+  input: 903,784
+  output: 7,337
+  cache read: 853,120
+  cache write: 0
+  total: 911,121
+Run summary: <repo>/.mcp-runs/20261112_001024_5af1cbde/run.json
+```
+
+TensorRT compilation and validation succeeded, but this graph is too small to
+amortize runtime overhead. The example demonstrates custom decomposition and
+end-to-end compilation rather than a performance gain over PyTorch eager.
+
 ## Batched linear optimization demo
 
-The included `batched_linear` example applies the same shared linear projection
-to eight independent inputs. This prompt lets the Agent generate and evaluate
-one lowering-pass optimization:
+The `batched_linear` example applies the same shared linear projection to eight
+independent inputs. This prompt lets the Agent generate and evaluate one graph
+transformation:
 
 ```bash
 python tools/mcp/examples/run_with_cursor.py \
@@ -209,21 +308,19 @@ python tools/mcp/examples/run_with_cursor.py \
 
 Output:
 ```text
-MCP artifacts: <repo>/.mcp-runs/20261111_202427_12606c2e
-Running the Torch-TensorRT optimization workflow: discovering MCP tools and
-inspecting the batched_linear setup.
+MCP artifacts: <repo>/.mcp-runs/20261112_001752_67490569
+Running the bounded graph-transformation workflow for batched_linear_model with
+min_block_size=1. Discovering MCP tools and workspace context.
 
 Starting baseline analyze and compile jobs.
-Baseline shows eight separate aten.linear nodes in one partition. Searching
-for existing batching/fusion passes to model the candidate.
-Creating the batched-linear fusion candidate and running the candidate job
+Creating the graph transformation candidate and running the candidate job
 pipeline.
 
 ## Optimization result
 
-Applied a lowering pass that batches eight shared-weight aten.linear
-projections into one cat → linear → slice pipeline, so TensorRT runs one
-large GEMM instead of eight separate ones.
+Applied a lowering pass that batches eight shared-weight aten.linear branches
+into cat → one linear → eight slices, so TensorRT runs one large GEMM instead
+of eight separate ones.
 
 Request settings:
   model / inputs: batched_linear / batched_linear
@@ -232,63 +329,64 @@ Request settings:
   seed: 0
   compilation: min_block_size=1 plus MCP defaults
 
-Benchmark protocol:
+Benchmark protocol (baseline and candidate):
   warmup: 10
-  measured iterations: 100
+  iterations: 100
   sample_index: 0
   timing scope: forward_only
   synchronization: per_invocation
   sample: branches-8-batch-16-hidden-4096
+  validation: atol=0.01, rtol=0.01
 
-Baseline jobs (no lowering_pass_candidate_id):
-  analyze:   a2c1f5a1d81e4fa2a5c06e1d809aec92
-  compile:   2472d0e96203402991088fc8b715eede
-  validate:  5a0536b7772f4cbe85eebdd2a7813426
-  benchmark: 1be6d7315b694fccaa820e953b8587af
+Baseline jobs (no graph_transformation_candidate_id):
+  analyze:   e7a74275e7c8464a978f63251a468889
+  compile:   80852e5647904da5bc53148c93023d8d
+  validate:  7a9e0840fd5242af99d57bdae4a58f34
+  benchmark: 75b286a603b546a49b4cdcfa4aa233b7
 
 Baseline:
   lowered graph: eight independent aten.linear.default nodes, one shared
     weight, all in partition _run_on_acc_0
   computational nodes: 8
-  compiled wall median: 2.148871 ms
-  validation: passed for all 8 outputs (atol=0.01, rtol=0.01)
+  compiled wall median: 2.12215 ms
+  validation: passed for all 8 outputs
+  benchmark wall speedup: 0.07935
 
 Candidate:
-  ID: c2d23467256047116744296088cc1c6a
-  source: <run-dir>/.lowering_pass_candidates/
-    lowering_pass_candidate_c2d23467256047116744296088cc1c6a.py
-  analyze:   d0fd5eedac9e409996a42c644a7057bf
-  compile:   28ccbff78cf14066965a3f676105a536
-  validate:  a509d28c7fba4a2eb2551ca8c71924bc
-  benchmark: 37a5988a0e014b389917eec60986e2df
+  ID: 8e17b534ec44ba7090477bcd3dac38ea
+  source: <run-dir>/.graph_transformation_candidates/
+    graph_transformation_candidate_8e17b534ec44ba7090477bcd3dac38ea.py
+  analyze:   d2696a8eafce4f0c8350233b7d0bff13
+  compile:   21f67355db3945d2ba5bb3ada94c7d0b
+  validate:  d98f7c34a988426c9f07c74b111196ed
+  benchmark: db36288e5c044ab08373add6d63e1525
   lowered graph: aten.cat → aten.linear → 8 × aten.slice.Tensor
   graph I/O: same 8 inputs, 8 outputs, and shared weight
-  compiled wall median: 1.512608 ms
+  compiled wall median: 1.473453 ms
   validation: passed
+  benchmark wall speedup: 0.11592
 
-Baseline-relative speedup: 2.148871 / 1.512608 = 1.42×
-Latency reduction: approximately 31%
-Benchmark report speedup["wall"]:
-  baseline: 0.0786
-  candidate: 0.1134
-  note: these compare eager PyTorch with each compiled artifact, not the
-    candidate with the baseline.
+Baseline-relative speedup: 2.12215 / 1.473453 = 1.44×
+Latency reduction: approximately 30.5%
 
 The candidate source was retained because the lowered graph changed as
 intended, validation passed, and compiled median latency clearly improved.
 
+Failures: none across baseline or candidate jobs.
+MCP run directory: <repo>/.mcp-runs/20261112_001752_67490569
+
 Token usage
-Run ID: run-593079bf-0bb9-4ab9-9b7f-6d15e82431dd
+Run ID: run-e01627db-5bd1-42fd-9eb2-f273baf8b24c
 Status: finished
-Input: 1,086,806
-Output: 7,381
-Cache read: 1,025,792
+Input: 1,076,406
+Output: 7,958
+Cache read: 1,023,168
 Cache write: 0
-Total: 1,094,187
-Run summary: <run-dir>/run.json
+Total: 1,084,364
+Run summary: <repo>/.mcp-runs/20261112_001752_67490569/run.json
 ```
 
-Job IDs, token usage, and latency depend on the run, model, and hardware. The `speedup["wall"]` value in a benchmark report compares eager PyTorch with
+The `speedup["wall"]` value in a benchmark report compares eager PyTorch with
 that compiled artifact. The Agent instead calculates the optimization speedup
 by dividing the baseline compiled wall median by the candidate compiled wall
 median.

@@ -159,7 +159,7 @@ def execute(
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     if operation in ("analyze", "compile"):
-        policy.load_candidate(model_request.get("lowering_pass_candidate_id"))
+        policy.load_candidate(model_request.get("graph_transformation_candidate_id"))
     model_factory = policy.load_factory(policy.models[model_request["model"]])
     input_factory = policy.load_factory(policy.inputs[model_request["inputs"]])
     emit({"stage": "capture", "message": "Loading configured model and inputs"})

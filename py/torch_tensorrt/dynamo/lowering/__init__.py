@@ -9,5 +9,8 @@ from ._decomposition_groups import (
     torch_disabled_decompositions,
     torch_enabled_decompositions,
 )
-from ._decompositions import get_decompositions  # noqa: F401
+from ._decompositions import (  # noqa: F401
+    get_decompositions,
+    register_torch_trt_decomposition,
+)
 from .passes import *

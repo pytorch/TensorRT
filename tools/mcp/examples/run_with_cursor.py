@@ -295,22 +295,24 @@ def main() -> int:
     prompt = f"""\
 Complete the Torch-TensorRT optimization request below.
 
-For lowering-pass graph optimization, follow this bounded workflow:
+For graph-transformation optimization, follow this bounded workflow:
 1. Run baseline analyze, compile, validate, and benchmark jobs without a
-   lowering_pass_candidate_id request field. Poll every job to a terminal state and
-   retrieve every report. Save the baseline job IDs and benchmark protocol.
+   graph_transformation_candidate_id request field. Poll every job to a terminal
+   state and retrieve every report. Save the baseline job IDs and benchmark
+   protocol.
 2. Inspect the baseline lowered and partitioned evidence. Create one unique
    32-character lowercase hexadecimal candidate ID, then generate the complete
    candidate source as
-   {output_root / ".lowering_pass_candidates"}/lowering_pass_candidate_<lowering_pass_candidate_id>.py.
+   {output_root / ".graph_transformation_candidates"}/graph_transformation_candidate_<graph_transformation_candidate_id>.py.
    Never overwrite an existing candidate file.
 3. Generate at most one semantics-preserving transformation. The generated
-   file must register an @_aten_lowering_pass decorator without an index, use
-   the (gm, settings) signature, preserve graph I/O and node metadata, and call
-   clean_up_graph_after_modifications after graph edits. Do not modify model
-   factories.
+   file may register either one custom Torch-TensorRT decomposition for a
+   specific ATen operator or one @_aten_lowering_pass decorator without an
+   index. A lowering pass must use the (gm, settings) signature, preserve graph
+   I/O and node metadata, and call clean_up_graph_after_modifications after
+   graph edits. Do not modify model factories.
 4. Run candidate analyze and compile jobs with that top-level
-   lowering_pass_candidate_id request field, preserving all baseline model
+   graph_transformation_candidate_id request field, preserving all baseline model
    parameters. Then run validate and benchmark from the candidate compile job.
    Keep the generated source unchanged until all candidate jobs finish.
    Use the same model, inputs, seed, compilation settings, sample, warmup,
@@ -324,7 +326,7 @@ For lowering-pass graph optimization, follow this bounded workflow:
 6. Keep the generated candidate only when the lowered evidence changed as
    intended and compiled median latency clearly improved. Otherwise delete its
    generated source file. Baseline jobs must always omit
-   lowering_pass_candidate_id.
+   graph_transformation_candidate_id.
 
 Use the configured torch-tensorrt MCP execution tools. Report concrete job IDs,
 settings, protocols, compiled latency, calculated baseline-relative speedup,
