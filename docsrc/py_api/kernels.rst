@@ -231,6 +231,12 @@ positive integer. Invalid callbacks, names, and options are rejected before
 compilation. Duplicate operator names are also checked before compilation and
 rechecked under the registration lock.
 
+``pointer_alignment`` declares the byte alignment the kernel may assume for
+tensor pointers. A value above 1 becomes Triton's divisibility hint, which can
+allow vector loads and pipelining, and every pointer the kernel gets must then
+meet it. :func:`triton_op` documents what each value allows and how a pointer
+can end up misaligned.
+
 Registration compiles for the current CUDA device. For a different device,
 register inside ``with torch.cuda.device(device):``. The compiled artifact
 records its target, and conversion and AOT construction reject a different GPU
@@ -245,8 +251,10 @@ to place in those argument slots.  :func:`triton_op` raises
 interleaves scalars between pointers, disagrees with ``meta_fn``'s arity,
 differs from the kernel declaration, contains an unknown pointer dtype or a
 non-``i32`` scalar, or declares scalars without an ``extra_args_fn`` to supply
-them. The launch is also rejected if ``extra_args_fn`` returns the wrong number
-or type of values. Constant scalar values must fit in signed 32-bit integers,
+them, or if ``pointer_alignment`` is not a power of two from 1 to 256 or names
+a parameter that is not a pointer. The launch is also rejected if
+``extra_args_fn`` returns the wrong number or type of values. Constant scalar
+values must fit in signed 32-bit integers,
 including constants wrapped in ``SymInt32``. ``grid`` must return one to three
 dimensions: X must be between 1 and 2**31 - 1, and Y and Z between 1 and 65535.
 These limits are checked for ordinary integers and symbolic constants.
@@ -274,7 +282,8 @@ a positive launch grid and a kernel that masks every load and store.
    the same way, because TensorRT launches plugin kernels with at most 48 KiB
    (`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
    Without an ``eager_fn`` such a kernel could not run at all, so registration
-   fails instead. Fewer ``num_stages`` or smaller tiles reduce the requirement.
+   fails instead. Fewer ``num_stages``, smaller tiles or a smaller
+   ``pointer_alignment`` reduce the requirement.
 
    Triton emits PTX at the ISA version of its own bundled ``ptxas``, which
    can be newer than the installed CUDA driver accepts.  ``triton_op``

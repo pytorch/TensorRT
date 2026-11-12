@@ -379,3 +379,33 @@ def test_unreadable_static_shared_memory_warns_and_is_read_again(monkeypatch, ca
     assert "Could not read the static shared memory" in caplog.text
     with pytest.raises(ValueError, match="on top of 16384"):
         _register._check_aot_shared_mem("add_one", ptx, params, 0)
+
+
+_SCALAR_BETWEEN_POINTERS = _common.analyze_signature(
+    {"x": "*fp32", "n": "i32", "out": "*fp32"}, (1, 1), frontend="kernel"
+)
+
+
+@pytest.mark.parametrize(
+    "alignment,expected",
+    [
+        (1, {"x": 1, "out": 1}),
+        (16, {"x": 16, "out": 16}),
+        ({"x": 16}, {"x": 16, "out": 1}),
+    ],
+)
+def test_pointer_alignment_resolves_per_pointer(alignment, expected):
+    assert (
+        _common.normalize_pointer_alignment(
+            "ns::op", _SCALAR_BETWEEN_POINTERS, alignment, frontend="kernel"
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
+def test_invalid_pointer_alignment_is_rejected(alignment):
+    with pytest.raises(ValueError, match="kernel 'ns::op' pointer_alignment"):
+        _common.normalize_pointer_alignment(
+            "ns::op", _SCALAR_BETWEEN_POINTERS, alignment, frontend="kernel"
+        )
