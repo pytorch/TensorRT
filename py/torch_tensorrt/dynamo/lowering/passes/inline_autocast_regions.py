@@ -441,6 +441,61 @@ def _is_inlined(
     return inlined[node]
 
 
+def log_kept_regions(
+    gm: torch.fx.GraphModule, low_precision_type: torch.dtype, warn: bool = False
+) -> None:
+    """Log the regions of the graph that keep a precision other than
+    low_precision_type, regions with enabled=False or in another dtype. It logs at
+    INFO, since the model's own regions are what "keep" asks for and a model keeps ops
+    in FP32 on purpose with enabled=False. With warn, as under "reclassify", which
+    asks autocast to choose in regions in another dtype, it counts only the regions
+    with enabled=False and those nested in them, which "reclassify_all" can inline,
+    and those in another dtype log as a warning. It analyzes nothing, so it can also
+    count a region that no value inlines, such as one that writes into a buffer."""
+    if not logger.isEnabledFor(logging.WARNING if warn else logging.INFO):
+        return
+    disabled = other = 0
+    # wrap_with_autocast(device_type, dtype, enabled, cache_enabled, body, *operands)
+    regions = [
+        r
+        for r in gm.graph.find_nodes(
+            op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+        )
+        if not warn or not r.args[2]
+    ]
+    while regions:
+        region = regions.pop()
+        if not region.args[2]:
+            disabled += 1
+        elif region.args[1] != low_precision_type:
+            other += 1
+        regions += _body(region).graph.find_nodes(
+            op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+        )
+
+    def count(n: int) -> str:
+        return f"{n} region" + ("" if n == 1 else "s")
+
+    kinds = [f"{count(disabled)} with enabled=False"] if disabled else []
+    if other:
+        kinds.append(f"{count(other)} in a dtype other than {low_precision_type}")
+    if kinds:
+        logger.log(
+            logging.WARNING if warn and other else logging.INFO,
+            "Autocast does not choose the precision of the ops in torch.autocast "
+            f"regions of the model that keep their own: {' and '.join(kinds)}. Set "
+            f'autocast_model_regions="{"reclassify_all" if disabled else "reclassify"}" '
+            "to let autocast choose there too, where it can, and check the accuracy, "
+            "since a model can keep ops in FP32 on purpose."
+            + (
+                " autocast_excluded_nodes can keep the ops of a module in FP32, such "
+                "as a rotary embedding."
+                if disabled
+                else ""
+            ),
+        )
+
+
 def _cast(
     gm: torch.fx.GraphModule,
     value: torch.fx.Node,
@@ -588,7 +643,9 @@ class _MatchInputDtypes(FakeTensorProp):  # type: ignore[misc]
 
 
 def inline_autocast_regions(
-    gm: torch.fx.GraphModule, include_disabled: bool = False
+    gm: torch.fx.GraphModule,
+    include_disabled: bool = False,
+    low_precision_type: Optional[torch.dtype] = None,
 ) -> None:
     """Replace each torch.autocast region of the graph with its body, without the region's autocast.
 
@@ -599,7 +656,8 @@ def inline_autocast_regions(
     each output of a region in the dtype the region gave it. A region whose values
     inlining could change keeps its autocast, see _can_inline. A region that keeps
     its autocast gets its inputs in the dtypes it was traced with. Regions with
-    enabled=False keep theirs too, unless include_disabled.
+    enabled=False keep theirs too, unless include_disabled. With low_precision_type,
+    it logs the regions with enabled=False, see log_kept_regions.
     """
     copied: Dict[torch.fx.Node, bool] = {}
     inlined: Dict[torch.fx.Node, bool] = {}
@@ -619,6 +677,10 @@ def inline_autocast_regions(
         if isinstance(module, torch.fx.GraphModule):
             for node in module.graph.nodes:
                 node.meta.pop(_RAN_AGAIN, None)
+    if low_precision_type is not None and not include_disabled:
+        # On the graph the loop above decided on. With include_disabled, no region
+        # left would be inlined.
+        log_kept_regions(gm, low_precision_type, warn=True)
     if not count:
         return
     # The asserts of the inlined bodies check the dtypes that autocast gave their

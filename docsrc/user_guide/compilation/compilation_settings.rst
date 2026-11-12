@@ -256,6 +256,12 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        dtype other than the dtype of that output, as with ``bfloat16`` regions and
        ``autocast_low_precision_type=torch.float16``. This also happens with
        ``"keep"``.
+       Autocast logs, at INFO level, some of the regions that another value of
+       ``autocast_model_regions`` could let it choose in: under ``"keep"``, regions
+       with ``enabled=False`` or in a dtype other than ``autocast_low_precision_type``,
+       and under ``"reclassify"``, regions with ``enabled=False`` and those nested in
+       them, where one in another dtype logs as a warning. ``"reclassify_all"`` logs
+       nothing. Regions inside a ``torch.no_grad()`` block do not count.
 
 ----
 
