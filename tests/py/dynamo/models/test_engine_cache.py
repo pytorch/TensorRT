@@ -4,10 +4,13 @@
 # type: ignore
 import importlib
 import os
+import pickle
 import shutil
 import tempfile
 import unittest
+from contextlib import ExitStack
 from typing import Optional
+from unittest import mock
 
 import pytest
 import torch
@@ -20,6 +23,8 @@ from torch_tensorrt.dynamo._engine_cache import (
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 assertions = unittest.TestCase()
 
@@ -206,6 +211,96 @@ class TestHashFunction(TestCase):
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
         self.assertNotEqual(hash1, hash2)
+
+    def _hash_on(self, capability, settings, trt_version=None):
+        """Hash one graph as if it were built on a GPU of ``capability``."""
+        x = torch.randn(4, 8)
+        gm = torch.export.export(torch.nn.Linear(8, 8), (x,)).module()
+        with ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(
+                    torch.cuda, "get_device_capability", return_value=capability
+                )
+            )
+            if trt_version is not None:
+                stack.enter_context(mock.patch.object(trt, "__version__", trt_version))
+            return BaseEngineCache.get_hash(
+                gm, (torch_trt.Input(shape=(4, 8)),), settings
+            )
+
+    def test_engine_built_for_another_gpu_is_not_equal(self):
+        """An engine only deserializes on the GPU architecture it was built for, so
+        a cache directory shared by two hosts must not hand one host's engine to the
+        other."""
+        settings = CompilationSettings(
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
+        )
+        self.assertNotEqual(
+            self._hash_on((9, 0), settings), self._hash_on((10, 3), settings)
+        )
+
+    def test_hardware_compatible_engine_ignores_gpu(self):
+        settings = CompilationSettings(
+            immutable_weights=False,
+            hardware_compatible=True,
+            cache_built_engines=True,
+            reuse_cached_engines=True,
+        )
+        self.assertEqual(
+            self._hash_on((9, 0), settings), self._hash_on((10, 3), settings)
+        )
+
+    def test_engine_built_by_another_tensorrt_is_not_equal(self):
+        settings = CompilationSettings(
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
+        )
+        self.assertNotEqual(
+            self._hash_on((9, 0), settings),
+            self._hash_on((9, 0), settings, trt_version="0.0.0"),
+        )
+
+
+class TestUndeserializableCacheEntry(TestCase):
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    def test_entry_that_does_not_deserialize_is_rebuilt(self):
+        """A hit whose engine TensorRT cannot load (another TensorRT version, another
+        GPU) is a miss: compile rebuilds instead of failing inside the refitter."""
+        model = torch.nn.Linear(8, 8).eval().cuda()
+        x = torch.randn(4, 8, device="cuda")
+        exp_program = torch.export.export(model, (x,))
+        engine_cache_dir = tempfile.mkdtemp(prefix="test_undeserializable_entry_")
+        self.addCleanup(shutil.rmtree, engine_cache_dir, ignore_errors=True)
+        engine_cache = MyEngineCache(engine_cache_dir)
+
+        def _compile():
+            return torch_trt.dynamo.compile(
+                exp_program,
+                inputs=[x],
+                min_block_size=1,
+                immutable_weights=False,
+                cache_built_engines=True,
+                reuse_cached_engines=True,
+                custom_engine_cache=engine_cache,
+            )
+
+        _compile()
+        self.assertEqual(len(engine_cache.hashes), 1)
+        # Replace the stored engine with bytes TensorRT cannot deserialize, the way
+        # an entry written for another GPU or by another TensorRT version looks.
+        for name in os.listdir(engine_cache_dir):
+            path = os.path.join(engine_cache_dir, name)
+            with open(path, "rb") as f:
+                unpacked = pickle.loads(f.read())
+            unpacked["serialized_engine"] = b"not a TensorRT engine"
+            with open(path, "wb") as f:
+                f.write(pickle.dumps(unpacked))
+
+        trt_gm = _compile()
+        torch.testing.assert_close(trt_gm(x), model(x), rtol=1e-2, atol=1e-2)
 
 
 class TestEngineCache(TestCase):
