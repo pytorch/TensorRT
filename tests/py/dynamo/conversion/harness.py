@@ -399,6 +399,7 @@ class DispatchTestCase(TRTTestCase):
         require_full_compilation=False,
         disable_tf32=False,
         convert_antialiased_resize=False,
+        grouped_mm_kernel=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -413,6 +414,7 @@ class DispatchTestCase(TRTTestCase):
             require_full_compilation=require_full_compilation,
             disable_tf32=disable_tf32,
             convert_antialiased_resize=convert_antialiased_resize,
+            grouped_mm_kernel=grouped_mm_kernel,
         )
 
         mod = self.generate_graph(

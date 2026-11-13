@@ -263,6 +263,7 @@ def make_dtype_capability_validator(
             if artifact is None
             else lambda device: validate_target(artifact, device)
         ),
+        shared_mem=0 if artifact is None else artifact.shared_mem,
     )
 
 
@@ -374,6 +375,23 @@ def _triton_import() -> Any:
     return triton
 
 
+def _pointer_divisibility_attrs(
+    kernel: Any, pointer_alignment: Mapping[str, int]
+) -> Dict[Tuple[int], Any]:
+    """Give Triton a divisibility hint for each pointer declared aligned.
+
+    A normal Triton launch adds a 16-byte hint for each aligned pointer it is
+    given. An ahead-of-time compile sees no pointers, so without the hint it
+    emits only scalar memory accesses. Keys index the full kernel declaration,
+    constexprs included.
+    """
+    return {
+        (kernel.arg_names.index(name),): [["tt.divisibility", min(alignment, 16)]]
+        for name, alignment in pointer_alignment.items()
+        if alignment > 1
+    }
+
+
 def _compile_within_driver_isa(
     triton: Any,
     kernel: Any,
@@ -381,6 +399,7 @@ def _compile_within_driver_isa(
     constexprs: Dict[str, Any],
     options: Dict[str, Any],
     target: Any,
+    pointer_alignment: Mapping[str, int],
 ) -> Any:
     """Compile ``kernel``, holding the PTX ISA to what the driver can load.
 
@@ -394,11 +413,14 @@ def _compile_within_driver_isa(
     ``ptxas`` can assemble fails the compile outright.
     """
 
+    attrs = _pointer_divisibility_attrs(kernel, pointer_alignment)
+
     def _compile(ptx_version: Optional[int] = None) -> Any:
         src = triton.compiler.ASTSource(
             fn=kernel,
             signature=dict(signature),
             constexprs=dict(constexprs),
+            attrs=attrs,
         )
         opts = dict(options)
         if ptx_version is not None:
@@ -596,6 +618,8 @@ def compile_triton_to_ptx(
     constexprs: Dict[str, Any],
     num_warps: Optional[int] = None,
     num_stages: Optional[int] = None,
+    pointer_alignment: _common.PointerAlignment = 1,
+    arch: Optional[int] = None,
 ) -> CompiledTritonArtifact:
     """Compile a ``@triton.jit`` kernel to PTX ahead of time.
 
@@ -614,12 +638,31 @@ def compile_triton_to_ptx(
             Triton's own choice. Also sets the launch's threads-per-block.
         num_stages: software pipelining depth, forwarded to ``triton.compile``.
             Defaults to Triton's own choice.
+        pointer_alignment: byte alignment the kernel may assume for every
+            pointer, or a mapping from pointer names to alignments, validated
+            as in :func:`triton_op`. Each alignment above 1 becomes Triton's
+            divisibility hint, capped at 16 like Triton's own launcher.
+        arch: the compute capability whose instructions Triton uses, for
+            example 80 for ``mma.sync``. Defaults to the device's. The PTX still
+            targets the device.
 
     Returns:
         An immutable artifact containing unmodified PTX, the entry symbol,
         launch metadata, GPU target, and PTX ISA version.
     """
     validate_compile_options(num_warps, num_stages)
+    # Scalars never get a hint: a divisible n would let masked accesses run past
+    # the end of the buffer.
+    alignments = _common.normalize_pointer_alignment(
+        getattr(kernel, "__name__", "<kernel>"),
+        [
+            name
+            for name, type_str in signature.items()
+            if type_str.strip().startswith("*")
+        ],
+        pointer_alignment,
+        frontend="triton_op",
+    )
     triton = _triton_import()
     target = triton.runtime.driver.active.get_current_target()
     if target.backend != "cuda" or target.warp_size != 32:
@@ -629,14 +672,14 @@ def compile_triton_to_ptx(
 
     # Bind compilation to the recorded device, including when an environment
     # override would otherwise select a different architecture.
-    options: Dict[str, Any] = {"arch": f"sm{target.arch}"}
+    options: Dict[str, Any] = {"arch": f"sm{arch or target.arch}"}
     if num_warps is not None:
         options["num_warps"] = num_warps
     if num_stages is not None:
         options["num_stages"] = num_stages
 
     compiled = _compile_within_driver_isa(
-        triton, kernel, signature, constexprs, options, target
+        triton, kernel, signature, constexprs, options, target, alignments
     )
     # Read back from metadata rather than trusting the request: Triton clamps
     # num_warps to what the kernel can actually use.

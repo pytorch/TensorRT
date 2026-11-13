@@ -21,7 +21,6 @@ from typing import (
     NamedTuple,
     Optional,
     Tuple,
-    Union,
     get_type_hints,
 )
 
@@ -60,8 +59,6 @@ _CUDA_TO_PTX_ISA: Tuple[Tuple[Tuple[int, int], int], ...] = (
 # CuTe's default ISA depends only on its bundled toolchain, so once it exceeds a
 # driver ceiling every later registration can compile at the ceiling directly.
 _DEFAULT_ISA_EXCEEDS: Dict[int, bool] = {}
-
-PointerAlignment = Union[int, Mapping[str, int]]
 
 
 class CompiledCuteDSLArtifact(NamedTuple):
@@ -183,42 +180,13 @@ def validate_config(
     return layout
 
 
-def normalize_pointer_alignment(
-    op_name: str, layout: _common.SignatureLayout, alignment: PointerAlignment
-) -> Dict[str, int]:
-    """Resolve the byte alignment CuTe may assume for each tensor pointer."""
-    pointers = [param.name for param in layout.inputs + layout.outputs]
-    if isinstance(alignment, Mapping):
-        unknown = sorted(set(alignment) - set(pointers), key=str)
-        if unknown:
-            raise ValueError(
-                f"cutedsl_op '{op_name}' pointer_alignment names unknown pointer "
-                f"parameter(s) {unknown}; expected a subset of {pointers}."
-            )
-        resolved = {name: alignment.get(name, 1) for name in pointers}
-    else:
-        resolved = dict.fromkeys(pointers, alignment)
-    for name, value in resolved.items():
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, int)
-            or not 1 <= value <= 256
-            or value & (value - 1)
-        ):
-            raise ValueError(
-                f"cutedsl_op '{op_name}' pointer_alignment for '{name}' must be a "
-                f"power of two between 1 and 256 bytes; got {value!r}."
-            )
-    return resolved
-
-
 def make_capability_validator(
     op_name: str,
     layout: _common.SignatureLayout,
     artifact: CompiledCuteDSLArtifact,
     user_validator: Optional[Callable[..., bool]] = None,
 ) -> Callable[..., bool]:
-    """Check dtypes and the compiled target; declines hardware-compatible engines."""
+    """Check dtypes, shared memory and target; declines hardware-compatible engines."""
     return _common.make_dtype_capability_validator(
         op_name,
         "CuTe DSL",
@@ -226,6 +194,7 @@ def make_capability_validator(
         [param.dtype for param in layout.outputs],
         user_validator,
         target_validator=lambda device: validate_target(artifact, device),
+        shared_mem=artifact.shared_mem,
     )
 
 
