@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import torch
 from torch._inductor.codecache import sha256_hash
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo._settings import (
     _SETTINGS_TO_BE_ENGINE_INVARIANT,
     CompilationSettings,
@@ -98,6 +99,9 @@ class BaseEngineCache(ABC):
                         (node.args, node.kwargs), lambda n: f"%{positions[n]}"
                     )
                     canonical = f"{node.op}_{node.target}{arguments}"
+                    # The stable sort converter builds its engine for this many key values.
+                    if NUM_SORT_KEYS in node.meta:
+                        canonical += f"[{node.meta[NUM_SORT_KEYS]}]"
                     if node.op == "get_attr":
                         attr = functools.reduce(
                             lambda obj, name: getattr(obj, name, None),
