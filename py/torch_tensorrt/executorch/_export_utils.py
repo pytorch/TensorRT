@@ -6,7 +6,7 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from typing import Any, Sequence
+from typing import Any, Sequence, TypeGuard
 
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
@@ -97,6 +97,13 @@ def get_engine_info_from_state(
     return list(state[0] if isinstance(state, tuple) else state)
 
 
+def _has_example_shape(val: Any) -> TypeGuard[torch.Tensor]:
+    """Whether ``val`` is a tensor with a hint for every size."""
+    return isinstance(val, torch.Tensor) and all(
+        has_guarding_hint(dim) for dim in val.shape
+    )
+
+
 def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
     """Whether the engine knows every output shape for this node's input shapes.
 
@@ -109,14 +116,28 @@ def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
     input_shapes = []
     for arg in node.args[0]:
         val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
-        if not isinstance(val, torch.Tensor):
-            return False
-        if not all(has_guarding_hint(dim) for dim in val.shape):
+        if not _has_example_shape(val):
             return False
         input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
     output_shapes = engine_obj.infer_outputs(input_shapes)
     return all(
         -1 not in tuple(getattr(shape, "shape", shape)) for shape in output_shapes
+    )
+
+
+def _traced_output_shapes_are_known(node: Any) -> bool:
+    """Whether every output value export traced for this node has a known shape.
+
+    The answer :func:`_output_shapes_are_known` gets from the live engine, for a
+    node without one, with the same rule for inputs. A data-dependent output size is
+    an unbacked symbol, which has no hint.
+    """
+    input_vals = [
+        arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+        for arg in node.args[0]
+    ]
+    return all(
+        _has_example_shape(val) for val in [*input_vals, *node.meta.get("val", [None])]
     )
 
 
@@ -296,12 +317,16 @@ def validate_engine_program(
 
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
+    The rewrite also takes each output allocator flag cleared here from it; without it
+    such a flag stays set and the backend refuses the engine.
 
     Validation reads each engine's metadata. For an engine marked as needing an
     output allocator it also asks the live engine for its output shapes, which sets
     the node's input shapes on the engine's execution context and creates the context
-    if no run has yet. The records kept in ``resolved`` are metadata-only: their
-    ENGINE_IDX slot is empty. The rewrite reuses them for the
+    if no run has yet. A placeholder carries no live engine, so for one of those it
+    reads the output shapes export traced instead. The records kept in ``resolved``
+    are metadata-only: an execute_engine record's ENGINE_IDX slot is empty, and a
+    placeholder's holds the node of its engine buffer. The rewrite reuses them for the
     plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
@@ -338,13 +363,16 @@ def validate_engine_program(
                 by_engine_node[engine_node] = engine_info
         inference_error = None
         if (
-            node.target is torch.ops.tensorrt.execute_engine.default
-            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
             and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
         ):
             try:
-                shapes_known = _output_shapes_are_known(
-                    _resolve_engine_object(exported_program, node), node
+                shapes_known = (
+                    _output_shapes_are_known(
+                        _resolve_engine_object(exported_program, node), node
+                    )
+                    if engine_node is not None
+                    else _traced_output_shapes_are_known(node)
                 )
             except RuntimeError as error:
                 # The C++ engine raises when it cannot create an output for an
@@ -549,22 +577,44 @@ def replace_execute_engine(
     2 GB, so an inline base64 string breaks recompilation for any engine past that size.
 
     ``resolved`` carries what validate_engine_program already resolved, so the engine is
-    not serialized again here.
+    not serialized again here. A placeholder already in the program takes the output
+    allocator flag from it, so without ``resolved`` a flag validation cleared stays set
+    and the backend refuses that engine.
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         ENGINE_IDX,
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
         SERIALIZATION_LEN,
     )
 
     graph_module = exported_program.graph_module
     execute_engine_op = torch.ops.tensorrt.execute_engine.default
     no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+    records = resolved or {}
+    # A placeholder's own arguments are its record, and the backend refuses one still
+    # marked as needing the output allocator that validation found it does not need.
+    placeholders = [
+        node
+        for node in graph_module.graph.nodes
+        if node.op == "call_function"
+        and _schema_name(node) == "tensorrt::no_op_placeholder_for_execute_engine"
+        and node.name in records
+    ]
+    for node in placeholders:
+        node.update_arg(
+            1 + REQUIRES_OUTPUT_ALLOCATOR_IDX,
+            records[node.name][REQUIRES_OUTPUT_ALLOCATOR_IDX],
+        )
     nodes_to_replace = [
         node
         for node in graph_module.graph.nodes
         if node.op == "call_function" and node.target is execute_engine_op
     ]
     if not nodes_to_replace:
+        if placeholders:
+            # update_arg edits only the graph, so the generated code keeps the old
+            # flag until it is recompiled.
+            graph_module.recompile()
         return exported_program
 
     materialized_engines: dict[torch.fx.Node, tuple[torch.fx.Node, list[str]]] = {}
@@ -577,7 +627,7 @@ def replace_execute_engine(
             # metadata-only record, empty ENGINE_IDX); the engine bytes come from
             # _resolve_engine_tensor, which re-resolves the engine itself rather than
             # reading this record's ENGINE_IDX, so the empty slot is never consumed.
-            engine_info = (resolved or {}).get(node.name)
+            engine_info = records.get(node.name)
             if engine_info is None:
                 engine_info = _resolve_engine_info(
                     exported_program, node, metadata_only=True
