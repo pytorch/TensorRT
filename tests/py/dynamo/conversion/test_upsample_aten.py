@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch_tensorrt
@@ -11,6 +12,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     antialiased_upsample_validator,
 )
+from torch_tensorrt.dynamo.conversion.impl.upsample import _antialias_taps
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
@@ -421,6 +423,138 @@ class TestUpsampleConverter(DispatchTestCase):
             rtol=tolerance[dtype],
             atol=tolerance[dtype],
             use_dynamo_tracer=True,
+            convert_antialiased_resize=True,
+        )
+
+    @parameterized.expand(
+        [
+            ("bilinear", torch.ops.aten._upsample_bilinear2d_aa.default),
+            ("bicubic", torch.ops.aten._upsample_bicubic2d_aa.default),
+        ]
+    )
+    def test_antialias2d_matches_pytorch(self, _, op):
+        # Images are often rounded to uint8 after the resize, and at this 16/13 downscale
+        # many exact results end in .5, so this must stay far below one level. 1e-4,
+        # far below main's 4e-3, covers both modes when TensorRT sums in another order
+        # or without fused multiply-adds: the measured worst case was 6.1e-5 (bicubic).
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return op(x, [234, 416], False, None, None)
+
+        self.run_test(
+            TestModule(),
+            [torch.randint(0, 256, (2, 3, 288, 512)).float()],
+            rtol=0,
+            atol=1e-4,
+            use_dynamo_tracer=True,
+            convert_antialiased_resize=True,
+        )
+
+    def test_antialias2d_float64_compile(self):
+        # Partitioning hands the engine a float32 copy of a float64 input, but the
+        # converter must still weigh it in float64, like ATen.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._upsample_bilinear2d_aa.default(
+                    x, [234, 416], False, None, None
+                )
+
+        module = TestModule()
+        x = torch.randint(0, 256, (2, 3, 288, 512), device="cuda").double()
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(module, (x,)),
+            inputs=(x,),
+            min_block_size=1,
+            truncate_double=True,
+            convert_antialiased_resize=True,
+        )
+        self.assertEqual(
+            [name for name, _ in compiled.named_children()], ["_run_on_acc_0"]
+        )
+        output = compiled(x)
+        torch.testing.assert_close(output, module(x), rtol=0, atol=1e-4)
+
+    @parameterized.expand(
+        [
+            (f"{mode}_{name}", mode, op, *case)
+            for mode, op in (
+                ("bilinear", torch.ops.aten._upsample_bilinear2d_aa.default),
+                ("bicubic", torch.ops.aten._upsample_bicubic2d_aa.default),
+            )
+            for name, *case in (
+                # name, input size, output size, align_corners, scale
+                ("downscale_9x", 1920, 224, False, None),
+                ("upscale", 7, 12, False, None),
+                ("align_corners", 32, 16, True, None),
+                ("scale", 40, 18, False, 0.47),
+            )
+        ]
+    )
+    def test_antialias_taps_match_pytorch(
+        self, _, mode, op, input_size, output_size, align_corners, scale
+    ):
+        indices, weights, in_window = _antialias_taps(
+            input_size, output_size, align_corners, scale, mode
+        )
+        dense = np.zeros((input_size, output_size), dtype=np.float32)
+        outputs, taps = np.nonzero(in_window)
+        dense[indices[outputs, taps], outputs] = weights[outputs, taps]
+        # Resizing the rows of an identity to one row reads out PyTorch's weights
+        # exactly: each output sums a single nonzero product.
+        eye = torch.eye(input_size, device="cuda").view(input_size, 1, 1, input_size)
+        expected = op(eye, [1, output_size], align_corners, None, scale)
+        torch.testing.assert_close(
+            torch.from_numpy(dense),
+            expected.view(input_size, output_size).cpu(),
+            rtol=0,
+            atol=0,
+        )
+
+    def test_antialias2d_empty_windows(self):
+        # Scales that disagree with the output size put the windows of outputs 6 to 19
+        # past the input. PyTorch leaves those outputs undefined, so they must be 0 here,
+        # and the others come from a resize to 6x6 with the same scales.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._upsample_bilinear2d_aa.default(
+                    x, [20, 20], False, 0.5, 0.5
+                )
+
+        module = TestModule()
+        x = torch.randn(1, 2, 10, 10, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(module, (x,)),
+            inputs=(x,),
+            min_block_size=1,
+            convert_antialiased_resize=True,
+        )
+        self.assertEqual(
+            [name for name, _ in compiled.named_children()], ["_run_on_acc_0"]
+        )
+        output = compiled(x)
+        expected = torch.zeros_like(output)
+        expected[..., :6, :6] = torch.ops.aten._upsample_bilinear2d_aa.default(
+            x, [6, 6], False, 0.5, 0.5
+        )
+        torch.testing.assert_close(output, expected, rtol=1e-4, atol=1e-4)
+
+    def test_antialias2d_tensor_meta_only(self):
+        # Without the dynamo tracer the input node carries tensor_meta but no val, and its
+        # dtype must still select float64 weights.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._upsample_bilinear2d_aa.default(
+                    x, [234, 416], False, None, None
+                )
+
+        self.run_test(
+            TestModule(),
+            [torch.randint(0, 256, (2, 3, 288, 512)).to(torch.float64)],
+            rtol=0,
+            atol=1e-4,
+            check_dtype=False,
+            use_dynamo_tracer=False,
+            propagate_shapes=True,
             convert_antialiased_resize=True,
         )
 
