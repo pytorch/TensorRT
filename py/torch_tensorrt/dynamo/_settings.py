@@ -209,7 +209,7 @@ class CompilationSettings:
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         fallback_pytorch_plugin_ops (bool): If True, operators whose converters insert a TensorRT plugin that runs PyTorch (such as aten.index_put with accumulate=True, which uses Torch-TensorRT's ScatterAdd plugin, or a generated plugin without an AOT kernel) run in PyTorch instead of being lowered into a TensorRT engine. An accumulating aten.index_put with one 1-D index then stays in TensorRT through TensorRT's ScatterElements plugin, which needs no PyTorch. This needs float32, float16, bfloat16, int32 or int64 data. The input and the values it receives (the input's shape with the indexed dimension set to the index length) must stay under 2**31 elements, so every dynamic size needs an upper bound in the exported program, such as torch.export.Dim(max=...), that keeps them there. Otherwise the operator runs in PyTorch. Use it for runtimes without PyTorch, such as the ExecuTorch TensorRT runtime. Default is False.
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
-        convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
+        convert_antialiased_resize (Optional[bool]): Which antialiased resizes (F.interpolate with antialias=True) run in TensorRT instead of PyTorch, so they do not split the graph. None converts float32 bilinear downscales with at most 6 input pixels per output pixel along each axis (up to about 3x); upscales stay in PyTorch. In our measurements on A100, H100 and Jetson Orin GPUs with TensorRT 11.4 and a PyTorch 2.16 build for CUDA 13.2, its output matched PyTorch's CUDA kernel bit for bit. On other GPUs, on TensorRT-RTX or with other TensorRT versions it can differ by a few float32 roundings, enough to change a value that is rounded to an integer afterwards. True converts every bilinear and bicubic resize, which can differ from PyTorch in the same way. False keeps them all in PyTorch, as does listing the operator, such as torch.ops.aten._upsample_bilinear2d_aa.default, in torch_executed_ops; use either to get PyTorch's exact output, for example before rounding to uint8. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is None.
         replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -305,7 +305,7 @@ class CompilationSettings:
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
     fallback_pytorch_plugin_ops: bool = FALLBACK_PYTORCH_PLUGIN_OPS
     collapse_high_rank_permutes: bool = COLLAPSE_HIGH_RANK_PERMUTES
-    convert_antialiased_resize: bool = CONVERT_ANTIALIASED_RESIZE
+    convert_antialiased_resize: Optional[bool] = CONVERT_ANTIALIASED_RESIZE
     replace_interleave_stack_with_cat: bool = REPLACE_INTERLEAVE_STACK_WITH_CAT
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
@@ -347,6 +347,8 @@ class CompilationSettings:
         # None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".
         if self.release_weights_after_build is not None:
             self.release_weights_after_build = bool(self.release_weights_after_build)
+        if self.convert_antialiased_resize is not None:
+            self.convert_antialiased_resize = bool(self.convert_antialiased_resize)
         if isinstance(self.autocast_excluded_node_names, str):
             self.autocast_excluded_node_names = {self.autocast_excluded_node_names}
         if self.autocast_model_regions not in ("keep", "reclassify"):
@@ -393,7 +395,9 @@ class CompilationSettings:
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
         state.setdefault("fallback_pytorch_plugin_ops", FALLBACK_PYTORCH_PLUGIN_OPS)
         state.setdefault("collapse_high_rank_permutes", COLLAPSE_HIGH_RANK_PERMUTES)
-        state.setdefault("convert_antialiased_resize", CONVERT_ANTIALIASED_RESIZE)
+        # Settings pickled before this field existed kept antialiased resize in PyTorch,
+        # which today's default no longer does.
+        state.setdefault("convert_antialiased_resize", False)
         state.setdefault(
             "replace_interleave_stack_with_cat", REPLACE_INTERLEAVE_STACK_WITH_CAT
         )

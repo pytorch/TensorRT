@@ -398,7 +398,7 @@ class DispatchTestCase(TRTTestCase):
         attn_bias_is_causal=True,
         require_full_compilation=False,
         disable_tf32=False,
-        convert_antialiased_resize=False,
+        convert_antialiased_resize=None,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -549,7 +549,7 @@ class DispatchTestCase(TRTTestCase):
         check_dtype=True,
         immutable_weights=True,
         torch_export_dynamic_shapes=None,
-        convert_antialiased_resize=False,
+        convert_antialiased_resize=None,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer

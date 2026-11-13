@@ -430,11 +430,22 @@ Graph Partitioning
        engine boundary. Only static shapes are rewritten. Fewer, larger engines can
        need much more time and memory to build and to run, so measure it.
    * - ``convert_antialiased_resize``
-     - ``False``
-     - Run antialiased bilinear and bicubic resize (``F.interpolate`` with
-       ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
-       graph. Only static input and output heights and widths and floating-point
-       inputs are converted. Some sizes run slower than in PyTorch, so measure it.
+     - ``None``
+     - Which antialiased resizes (``F.interpolate`` with ``antialias=True``) run in
+       TensorRT instead of PyTorch, so they do not split the graph. ``None``
+       converts float32 bilinear downscales with at most 6 input pixels per output
+       pixel along each axis (up to about 3x); upscales stay in PyTorch. In our
+       measurements on A100, H100 and Jetson Orin GPUs with TensorRT 11.4 and a
+       PyTorch 2.16 build for CUDA 13.2, its output matched PyTorch's CUDA kernel bit
+       for bit. On other GPUs, on TensorRT-RTX or with other TensorRT versions it can
+       differ by a few float32 roundings, enough to change a value that is rounded to
+       an integer afterwards. ``True`` converts every bilinear and bicubic resize,
+       which can differ from PyTorch in the same way. ``False`` keeps them all in
+       PyTorch, as does listing the operator, such as
+       ``torch.ops.aten._upsample_bilinear2d_aa.default``, in ``torch_executed_ops``;
+       use either to get PyTorch's exact output, for example before rounding to uint8.
+       Only static input and output heights and widths and floating-point inputs are
+       converted. Some sizes run slower than in PyTorch, so measure it.
    * - ``replace_interleave_stack_with_cat``
      - ``False``
      - Write a stack whose only user is a reshape that merges the new axis into a

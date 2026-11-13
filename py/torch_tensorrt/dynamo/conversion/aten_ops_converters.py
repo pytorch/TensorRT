@@ -4871,10 +4871,10 @@ def aten_ops_upsample_bicubic2d(
 def antialiased_upsample_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    # Opt-in: PyTorch's kernel is correct too, and faster for some sizes.
-    if settings is None or not settings.convert_antialiased_resize:
+    convert = None if settings is None else settings.convert_antialiased_resize
+    if convert is not None and not convert:
         _LOGGER.debug(
-            "antialiased resize runs in PyTorch unless convert_antialiased_resize=True"
+            "antialiased resize runs in PyTorch with convert_antialiased_resize=False"
         )
         return False
     meta = node.args[0].meta
@@ -4888,7 +4888,19 @@ def antialiased_upsample_validator(
             "antialiased resize of an integer input is not supported, falling back"
         )
         return False
-    if input_val.dtype == torch.float64 and not settings.truncate_double:
+    # Half-precision inputs round differently from the kernel, and bicubic stays opt-in.
+    if convert is None and (
+        node.target != torch.ops.aten._upsample_bilinear2d_aa.default
+        or input_val.dtype != torch.float32
+    ):
+        _LOGGER.debug(
+            "antialiased resize other than float32 bilinear runs in PyTorch unless "
+            "convert_antialiased_resize=True"
+        )
+        return False
+    if input_val.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
         _LOGGER.debug(
             "antialiased resize of a float64 input needs truncate_double=True, "
             "falling back"
@@ -4901,6 +4913,18 @@ def antialiased_upsample_validator(
             "falling back"
         )
         return False
+    if convert is None:
+        scales = (args_bounds_check(node.args, 3), args_bounds_check(node.args, 4))
+        for n, out, scale in zip(input_val.shape[-2:], node.args[1], scales):
+            if not impl.upsample.antialias_converts_by_default(
+                n, out, node.args[2], scale
+            ):
+                _LOGGER.debug(
+                    "antialiased bilinear upscale, or downscale with more than "
+                    f"{impl.upsample.DEFAULT_MAX_ANTIALIAS_TAPS} taps per output pixel, "
+                    "runs in PyTorch unless convert_antialiased_resize=True"
+                )
+                return False
     return True
 
 
@@ -4926,6 +4950,7 @@ def aten_ops_upsample_antialias(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    meta = ctx.current_node.args[0].meta if ctx.current_node is not None else {}
     return impl.upsample.upsample_antialias(
         ctx,
         target,
@@ -4940,6 +4965,9 @@ def aten_ops_upsample_antialias(
             if target == torch.ops.aten._upsample_bilinear2d_aa.default
             else "bicubic"
         ),
+        # A float64 input arrives here truncated to float32, but ATen weighs it in float64.
+        float64_weights=getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None)
+        == torch.float64,
     )
 
 
