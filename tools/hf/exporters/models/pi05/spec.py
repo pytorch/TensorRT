@@ -5,25 +5,26 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from torch_tensorrt.hf.exporters.models.common.helpers import (
+
+from ...ops import call_engine, fuse_prefix
+from ...spec import (
+    ComponentBundle,
+    EdgeSpec,
+    register_edge_spec,
+)
+from ..common.helpers import (
     causal_lm_flat,
     kv_kwargs,
     split_flat_to_kwargs,
 )
-from torch_tensorrt.hf.exporters.models.common.patches import language_decoder
-from torch_tensorrt.hf.exporters.models.pi05.helpers import (
+from ..common.patches import language_decoder
+from .helpers import (
     _core,
     build_pi05_prefix_embs,
     make_pi05_suffix_position_and_mask,
     pi05_compact_index,
 )
-from torch_tensorrt.hf.exporters.models.pi05.patches import PI05
-from torch_tensorrt.hf.exporters.ops import call_engine, fuse_prefix
-from torch_tensorrt.hf.exporters.spec import (
-    ComponentBundle,
-    EdgeSpec,
-    register_edge_spec,
-)
+from .patches import PI05
 
 
 @register_edge_spec("pi05")
@@ -33,7 +34,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
     def apply_patches(self, model=None):
         """Install vision, language, and action setattr replacements."""
         del model
-        from torch_tensorrt.hf.exporters.plugin.attn_patches import apply_patches
+        from ...plugin.attn_patches import apply_patches
 
         return apply_patches(PI05)
 
@@ -48,7 +49,8 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             OBS_LANGUAGE_ATTENTION_MASK,
             OBS_LANGUAGE_TOKENS,
         )
-        from torch_tensorrt.hf.exporters.data import (
+
+        from ...data import (
             frame_from_test_data,
             load_test_data,
         )
@@ -96,7 +98,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         upstream: Mapping[str, Any],
         config: Any,
     ) -> ComponentBundle:
-        from torch_tensorrt.hf.exporters.plugin.attention import (
+        from ...plugin.attention import (
             ContextAttentionMaskType,
         )
 
