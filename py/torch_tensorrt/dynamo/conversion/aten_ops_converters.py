@@ -5621,9 +5621,16 @@ def _is_bf16(arg: Argument) -> bool:
     return getattr(val, "dtype", None) == torch.bfloat16
 
 
+# Set by the mark_merged_bf16_attention_queries lowering pass on attentions whose bfloat16 query is
+# computed by the same ops from the same inputs as another attention's, which TensorRT merges.
+MERGED_BF16_QUERY = "_merged_bf16_query"
+
+
 def _shares_bf16_query_with_another_attention(node: Node) -> bool:
     if not _is_bf16(node.args[0]):
         return False
+    if node.meta.get(MERGED_BF16_QUERY, False):
+        return True
     query = _pass_through_source(node.args[0])
     return any(
         other is not node
@@ -5704,7 +5711,8 @@ def scaled_dot_product_attention_validator(
         return False
 
     # TensorRT 11.3 and 11.4 crash or fail while building two attention layers that read the same
-    # bfloat16 query (float16 builds). Seen on a Jetson AGX Thor and an H100, and declined on every
+    # bfloat16 query (float16 builds), also when TensorRT merges two identical computations of the
+    # query into one. Seen on a Jetson AGX Thor, an H100 and an RTX 5090, and declined on every
     # version, because the decomposition is always correct.
     if _shares_bf16_query_with_another_attention(node):
         _LOGGER.debug(

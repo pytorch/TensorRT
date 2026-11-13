@@ -17,6 +17,9 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
 from torch_tensorrt.dynamo.lowering.passes.decompose_unsupported_attention import (
     decompose_unsupported_attention,
 )
+from torch_tensorrt.dynamo.lowering.passes.mark_merged_bf16_attention_queries import (
+    mark_merged_bf16_attention_queries,
+)
 
 from ..testing_utilities import lower_graph_testing
 
@@ -785,6 +788,82 @@ class TestDecomposeUnsupportedAttention(TestCase):
         )
         sdpa = torch.ops.aten.scaled_dot_product_attention.default
         self.assertEqual(sum(n.target == sdpa for n in gm.graph.nodes), 2)
+
+    class _QueriesComputedTwice(nn.Module):
+        # Two passes that compute the same query separately, as classifier-free guidance does for
+        # the work before the text joins it. TensorRT merges them into one query.
+        def __init__(self, second_scale=2.0):
+            super().__init__()
+            self.second_scale = second_scale
+
+        def forward(self, q, k1, k2):
+            first = torch.nn.functional.scaled_dot_product_attention(
+                q * 2.0 + 1.0, k1, k1
+            )
+            second = torch.nn.functional.scaled_dot_product_attention(
+                q * self.second_scale + 1.0, k2, k2
+            )
+            return first + second
+
+    def test_attentions_computing_the_same_bf16_query_are_decomposed(self):
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
+        for dtype, second_scale, remaining in (
+            (torch.bfloat16, 2.0, 0),
+            (torch.bfloat16, 3.0, 2),  # different queries
+            (torch.float16, 2.0, 2),  # float16 builds
+        ):
+            with self.subTest(dtype=dtype, second_scale=second_scale):
+                model = self._QueriesComputedTwice(second_scale)
+                inputs = tuple(torch.randn(1, 2, 6, 8, dtype=dtype) for _ in range(3))
+                gm = torch.export.export(model, inputs).module()
+                gm = mark_merged_bf16_attention_queries(gm, settings)
+                gm = decompose_unsupported_attention(gm, settings)
+                self.assertEqual(
+                    sum(n.target == sdpa for n in gm.graph.nodes), remaining
+                )
+                torch.testing.assert_close(
+                    gm(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+                )
+
+    def test_attentions_on_random_queries_are_kept(self):
+        # Two draws of random noise are different queries, though the same ops make them.
+        class RandomQueries(nn.Module):
+            def forward(self, k1, k2):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    torch.randn_like(k1), k1, k1
+                ) + torch.nn.functional.scaled_dot_product_attention(
+                    torch.randn_like(k1), k2, k2
+                )
+
+        inputs = tuple(torch.randn(1, 2, 6, 8, dtype=torch.bfloat16) for _ in range(2))
+        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
+        gm = torch.export.export(RandomQueries(), inputs).module()
+        gm = mark_merged_bf16_attention_queries(gm, settings)
+        gm = decompose_unsupported_attention(gm, settings)
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        self.assertEqual(sum(n.target == sdpa for n in gm.graph.nodes), 2)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_attentions_computing_the_same_bf16_query_build(self):
+        # TensorRT 11.4 crashes (a segfault) while building these as two attention layers.
+        import torch_tensorrt
+
+        model = self._QueriesComputedTwice()
+        inputs = tuple(
+            torch.randn(1, 2, 64, 64, device="cuda", dtype=torch.bfloat16)
+            for _ in range(3)
+        )
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=2e-2, atol=2e-2
+        )
 
     @unittest.skipIf(
         importlib.util.find_spec("modelopt") is None or platform.system() != "Linux",
