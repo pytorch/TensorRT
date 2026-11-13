@@ -425,10 +425,23 @@ Graph Partitioning
      - Rewrite a reshape, permute, reshape chain over more than 8 dimensions
        (TensorRT's limit) as reshapes and permutes of at most 8 dimensions that give
        the same values. Window and patch layouts, such as neighborhood attention and
-       the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits
-       the graph, and the partitioner can then hand many large tensors across one
-       engine boundary. Only static shapes are rewritten. Fewer, larger engines can
-       need much more time and memory to build and to run, so measure it.
+       the Qwen2-VL image patches, build such chains. The Qwen2-VL image patches of
+       newer transformers releases need ``collapse_high_rank_expands`` instead. Left
+       in PyTorch, each one splits the graph, and the partitioner can then hand many
+       large tensors across one engine boundary. Only static shapes are rewritten. Fewer,
+       larger engines can need much more time and memory to build and to run, so
+       measure it.
+   * - ``collapse_high_rank_expands``
+     - ``False``
+     - Rewrite an unsqueeze, expand, reshape chain over more than 8 dimensions
+       (TensorRT's limit) whose expand grows only the new dimension, as a reshape and
+       an expand on 3 dimensions that give the same values. The Qwen2-VL image
+       patches of newer transformers releases build such a chain. Left in PyTorch, it
+       splits the graph. Only static shapes are rewritten, and only when the reshapes
+       that read the expand come back to at most 8 dimensions or start a chain that
+       ``collapse_high_rank_permutes`` rewrites and whose own readers come back to at
+       most 8 dimensions. Fewer, larger engines can need much more time and memory to
+       build and to run, so measure it.
    * - ``convert_antialiased_resize``
      - ``False``
      - Run antialiased bilinear and bicubic resize (``F.interpolate`` with
@@ -550,7 +563,8 @@ rebuilt from scratch:
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
+``collapse_high_rank_expands``, ``convert_antialiased_resize``,
+``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
