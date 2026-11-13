@@ -76,6 +76,45 @@ def test_base_full_compile(ir, tmpdir):
 
 
 @pytest.mark.unit
+def test_save_defaults_to_pickle_protocol_for_large_engines(ir, tmpdir):
+    """``torchtrt.save`` must default to a pickle protocol that can hold an engine > 4 GiB.
+
+    Protocols 2/3 raise ``OverflowError: serializing a string larger than 4 GiB`` once the
+    serialized engine crosses 4 GiB (e.g. an 8B-parameter LLM), which is far too late and too
+    opaque a failure for a call that only ran after a long engine build. Checking the argument
+    forwarded to ``torch.export.save`` avoids having to materialize a 4 GiB engine in a test.
+    """
+    from unittest import mock
+
+    model = torch.nn.Sequential(torch.nn.Linear(8, 8), torch.nn.ReLU()).eval().cuda()
+    x = torch.randn(2, 8).cuda()
+    compile_spec = {
+        "inputs": [torchtrt.Input(x.shape, dtype=torch.float)],
+        "ir": ir,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+    trt_module = torchtrt.dynamo.compile(
+        torchtrt.dynamo.trace(model, **compile_spec), **compile_spec
+    )
+    import functools
+
+    real_save = torch.export.save
+    seen = []
+
+    @functools.wraps(real_save)  # torchtrt.save introspects the target's signature
+    def spy(*args, **kwargs):
+        seen.append(kwargs)
+        return real_save(*args, **kwargs)
+
+    with mock.patch.object(torch.export, "save", spy):
+        torchtrt.save(trt_module, os.path.join(tmpdir, "trt.ep"), retrace=False)
+    assert seen, "torch.export.save was not called"
+    assert seen[-1]["pickle_protocol"] >= 4
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 def test_base_full_compile_multiple_outputs(ir, tmpdir):
     """

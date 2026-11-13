@@ -31,6 +31,7 @@ def tril(
     row: TRTTensor,
     col: TRTTensor,
     sliding_window_size: Optional[int] = None,
+    offset: Union[int, TRTTensor] = 0,
 ) -> TRTTensor:
     """
     Create a lower triangular mask tensor for attention mechanisms.
@@ -112,6 +113,11 @@ def tril(
     mask = impl.elementwise.sub(
         ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
     )
+    if not (isinstance(offset, int) and offset == 0):
+        # Queries are the last ``row`` of ``col`` positions (KV cache): shift the diagonal.
+        mask = impl.elementwise.add(
+            ctx, target, source_ir, name + "_offset", mask, offset
+        )
     ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
     if sliding_window_size is None:
         # return the following lower triangular mask includes the main diagonal:
@@ -135,6 +141,39 @@ def tril(
     # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
     # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
     return mask
+
+
+def _dim(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    tensor: TRTTensor,
+    index: int,
+) -> Union[int, TRTTensor]:
+    """Size of ``tensor`` along ``index``: a python int when static, else a shape tensor."""
+    size = tensor.shape[index]
+    if size >= 0:
+        return size
+    return impl.shape.shape(ctx, target, source_ir, name, tensor, index)
+
+
+def _static_heads(ctx, tensor: TRTTensor, arg_index: int) -> int:
+    """Head count (dim 1) of an SDPA operand: from TensorRT if it knows it, else from the
+    exported graph, else -1.
+
+    TensorRT folds the shape arithmetic of a sliced KV cache and keeps its static head count, but
+    the remote builder's client-side shape inference reports every dim of such a slice as unknown.
+    The exported graph still has the static count, and GQA needs it to fold the query heads.
+    """
+    heads = tensor.shape[1]
+    if heads >= 0:
+        return heads
+    try:
+        meta_heads = ctx.current_node.args[arg_index].meta["val"].shape[1]
+    except (AttributeError, IndexError, KeyError, TypeError):
+        return -1
+    return meta_heads if isinstance(meta_heads, int) else -1
 
 
 @torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
@@ -171,6 +210,55 @@ def scaled_dot_product_attention(
     sliding_window_size = kwargs.get("trt_sliding_window_size", None)
 
     query_dtype = query.dtype
+
+    # Grouped-query attention: query has ``groups`` times more heads than key/value. Instead of
+    # expanding K/V (which would also force the KV cache to be stored expanded), the query heads
+    # that share a KV head are folded into the row dimension:
+    #   [B, Hq, L, D] -> [B, Hkv, groups * L, D]
+    # Row ``g * L + l`` of KV head ``j`` is query head ``j * groups + g`` at position ``l`` (the
+    # same head -> KV head mapping as ``repeat_kv``). The causal bias is tiled ``groups`` times.
+    num_q_heads = _static_heads(ctx, query, 0)
+    num_kv_heads = _static_heads(ctx, key, 1)
+    value_heads = _static_heads(ctx, value, 2)
+    groups: Union[int, TRTTensor] = 1
+    if num_q_heads < 0 and num_kv_heads > 0 and value_heads == num_kv_heads:
+        # TensorRT lost the (static) query head count, e.g. through a broadcast against a dynamic
+        # shaped RoPE table. Recover it as a shape tensor; the group count is then dynamic too.
+        num_q_heads = _dim(ctx, target, source_ir, name + "_q_heads", query, 1)
+        groups = impl.elementwise.floor_divide(
+            ctx, target, source_ir, name + "_groups", num_q_heads, num_kv_heads
+        )
+    elif num_q_heads != num_kv_heads:
+        if (
+            num_kv_heads <= 0
+            or num_q_heads % num_kv_heads != 0
+            or value_heads != num_kv_heads
+        ):
+            raise ValueError(
+                f"Unsupported GQA head counts: query={num_q_heads}, key={num_kv_heads}, "
+                f"value={value_heads}"
+            )
+        groups = num_q_heads // num_kv_heads
+    dynamic_groups = not isinstance(groups, int)
+    q_batch = _dim(ctx, target, source_ir, name + "_q_batch", query, 0)
+    q_len = _dim(ctx, target, source_ir, name + "_q_len", query, 2)
+    head_dim = query.shape[-1]
+    if dynamic_groups or groups > 1:
+        folded_rows = (
+            q_len * groups
+            if isinstance(q_len, int) and not dynamic_groups
+            else impl.elementwise.mul(
+                ctx, target, source_ir, name + "_folded_rows", q_len, groups
+            )
+        )
+        query = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            name + "_fold_q",
+            query,
+            [q_batch, num_kv_heads, folded_rows, head_dim],
+        )
 
     if scale is None:
         scale = query.shape[-1]
@@ -222,36 +310,40 @@ def scaled_dot_product_attention(
             ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
         )
 
-    L, S = query.shape[-2], key.shape[-2]
-    if L >= 0 and S >= 0:
+    L, S = q_len, key.shape[-2]
+    if isinstance(L, int) and S >= 0:
         # static shape
         attn_bias = np.zeros((L, S), dtype=dtype._from(query_dtype).to(np.dtype))
         temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
         attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
+        if not dynamic_groups:
+            attn_bias = np.tile(attn_bias, (groups, 1))
         attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
     else:
         # if any of the L or S is dynamic shape
-        if L < 0:
-            L = impl.shape.shape(ctx, target, source_ir, name + "_shape_0", query, 2)
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
 
-        # generate the mask tensor
-        tril_tensor = tril(
-            ctx, target, source_ir, name + "_tril", L, S, sliding_window_size
+        # generate the mask tensor. The L queries are the last L of the S keys (KV cache), so
+        # query i sees keys <= i + (S - L): this covers prefill (L == S), chunked prefill and
+        # decode (L == 1, everything visible).
+        key_offset = (
+            S - L
+            if isinstance(S, int) and isinstance(L, int)
+            else impl.elementwise.sub(ctx, target, source_ir, name + "_s_minus_l", S, L)
         )
-
+        tril_tensor = tril(
+            ctx,
+            target,
+            source_ir,
+            name + "_tril",
+            L,
+            S,
+            sliding_window_size,
+            key_offset,
+        )
         temp_mask = impl.unary.logical_not(
             ctx, target, source_ir, name + "_logical_not", tril_tensor
-        )
-
-        # This need_mask determines if we want to use the causal mask or not
-        # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
-        # So need_mask will be all False values in this case.
-        # TODO: Implement more general case where L != 1 and S != L
-        need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
-        temp_mask = impl.elementwise.logical_and(
-            ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
         )
         temp_mask_casted = cast_trt_tensor(
             ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
@@ -268,10 +360,38 @@ def scaled_dot_product_attention(
         attn_bias = impl.unary.log(
             ctx, target, source_ir, name + "_log", one_minus_temp_mask
         )
+        if not dynamic_groups and groups > 1:
+            attn_bias = impl.cat.cat(
+                ctx,
+                target,
+                source_ir,
+                name + "_tile_bias",
+                [attn_bias] * groups,
+                dim=0,
+            )
 
+    if dynamic_groups:
+        # No tiling by a dynamic count: view the rows as [groups, L] so the [L, S] bias broadcasts.
+        mm_shape = [
+            q_batch,
+            num_kv_heads,
+            groups,
+            q_len,
+            _dim(ctx, target, source_ir, name + "_s", mm, 3),
+        ]
+        mm = impl.shuffle.reshape(ctx, target, source_ir, name + "_mm_5d", mm, mm_shape)
     scaled_add_attn_bias = impl.elementwise.add(
         ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
     )
+    if dynamic_groups:
+        scaled_add_attn_bias = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            name + "_mm_4d",
+            scaled_add_attn_bias,
+            [q_batch, num_kv_heads, folded_rows, mm_shape[-1]],
+        )
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
@@ -293,6 +413,16 @@ def scaled_dot_product_attention(
     if use_fp32_acc:
         out = cast_trt_tensor(
             ctx, out, query_dtype, name + "_out_cast_to_fp16", target, source_ir
+        )
+
+    if dynamic_groups or groups > 1:
+        out = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            name + "_unfold_out",
+            out,
+            [q_batch, num_q_heads, q_len, head_dim],
         )
 
     return out

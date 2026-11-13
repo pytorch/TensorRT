@@ -20,6 +20,63 @@ _SDPA_TARGETS = {
 }
 
 
+# Ops that only rearrange or broadcast elements. Per-tensor quantization commutes with them, so a
+# quantize_op that reaches SDPA through a chain of these is still "FP8 Q/K/V" for the purposes of
+# the fusion. Typical sources of such ops between the quantizers and SDPA:
+#   * HF's ``repeat_kv`` (unsqueeze -> expand -> reshape) for grouped-query attention, since
+#     ModelOpt quantizes K/V *before* the attention interface expands them,
+#   * [B, L, H, D] <-> [B, H, L, D] transposes / views around the attention call.
+# Anything that changes values (casts, arithmetic, cat, slice-with-padding, ...) is deliberately
+# not listed.
+_LAYOUT_ONLY_OP_NAMES = (
+    "view.default",
+    "_unsafe_view.default",
+    "reshape.default",
+    "_reshape_copy.default",  # what Torch-TensorRT's own lowering turns view/reshape into
+    "transpose.int",
+    "permute.default",
+    "expand.default",
+    "unsqueeze.default",
+    "squeeze.default",
+    "squeeze.dim",
+    "squeeze.dims",
+    "clone.default",
+    "alias.default",
+    "contiguous.default",
+    "view_copy.default",
+    "transpose_copy.int",
+    "permute_copy.default",
+    "expand_copy.default",
+    "unsqueeze_copy.default",
+    "squeeze_copy.default",
+)
+
+
+def _resolve_aten_ops(names):
+    ops = set()
+    for name in names:
+        packet, overload = name.split(".")
+        op = getattr(getattr(torch.ops.aten, packet, None), overload, None)
+        if op is not None:  # not every op exists in every torch version
+            ops.add(op)
+    return ops
+
+
+_LAYOUT_ONLY_TARGETS = _resolve_aten_ops(_LAYOUT_ONLY_OP_NAMES)
+
+
+def _skip_layout_ops(node: object) -> object:
+    """Walk up through shape-only ops and return the node that produced the values."""
+    while (
+        isinstance(node, torch.fx.Node)
+        and node.op == "call_function"
+        and node.target in _LAYOUT_ONLY_TARGETS
+        and len(node.args) > 0
+    ):
+        node = node.args[0]
+    return node
+
+
 def _is_fp8_quantize_op(node: torch.fx.Node) -> bool:
     """Return True when node is a tensorrt.quantize_op with FP8 dtype (exponent_bits=4)."""
     if node.op != "call_function":
@@ -49,6 +106,9 @@ def annotate_fp8_sdpa(
         v_fp8 = quantize_op(v, amax_v, num_bits=8, exponent_bits=4, ...)
         out   = scaled_dot_product_attention(q_fp8, k_fp8, v_fp8, ...)
 
+    Shape-only ops (view / reshape / transpose / permute / expand / ...) between a quantize_op and
+    the SDPA node are looked through, e.g. HF's ``repeat_kv`` for GQA models.
+
     When all three inputs match this pattern the pass sets
     ``node.meta["_fp8_softmax_scale"] = 1/448`` on the SDPA node so the
     attention converter can set ``IAttention.normalization_quantize_to_type
@@ -63,8 +123,8 @@ def annotate_fp8_sdpa(
             continue
         q_node, k_node, v_node = node.args[0], node.args[1], node.args[2]
         if not all(
-            isinstance(n, torch.fx.Node) and _is_fp8_quantize_op(n)
-            for n in (q_node, k_node, v_node)
+            isinstance(src, torch.fx.Node) and _is_fp8_quantize_op(src)
+            for src in (_skip_layout_ops(n) for n in (q_node, k_node, v_node))
         ):
             continue
         node.meta["_fp8_softmax_scale"] = _FP8_E4M3_SOFTMAX_SCALE
