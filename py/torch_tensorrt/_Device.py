@@ -137,7 +137,7 @@ class Device(object):
             return cls(gpu_id=d.index)
 
         elif d is None:
-            return cls(gpu_id=cls._current_device().gpu_id)
+            return cls._current_device()
 
         else:
             return cls(d)
