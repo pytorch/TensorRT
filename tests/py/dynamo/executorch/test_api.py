@@ -3242,6 +3242,9 @@ def _elf_object(architecture: str) -> bytes:
         ("requires_an_unpinned_executorch", False),
         ("requires_no_executorch", False),
         ("requires_a_mismatched_executorch_pin", False),
+        # Only a PyPI wheel may be built against PyPI's unlabelled ExecuTorch.
+        ("labelled_wheel_built_against_unlabelled_executorch", False),
+        ("pypi_release_built_against_unlabelled_executorch", True),
         ("requires_torch_tensorrt", False),
         ("pins_torch", False),
         ("requires_no_tensorrt", False),
@@ -3302,7 +3305,9 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     # whatever the machine happened to have, which is why this group used to skip everywhere except
     # an environment matching the pin, and why a change to the checker could reach CI with a green
     # local run behind it. The label is part of it because the checker compares the whole version.
-    installed_executorch = f"{pin}+cu132"
+    installed_executorch = (
+        pin if case.endswith("_built_against_unlabelled_executorch") else f"{pin}+cu132"
+    )
     dependencies = {
         "executorch": installed_executorch,
         "tensorrt-cu13": tensorrt_version,
@@ -3531,6 +3536,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         ),
         "requires_no_tensorrt": "the build used tensorrt-cu13==",
         "requires_an_unpinned_cuda_runtime": "the build used nvidia-cuda-runtime==",
+        "labelled_wheel_built_against_unlabelled_executorch": "which has no label to require",
     }
     expected_message = expected_messages.get(case)
     if expected_message is not None:

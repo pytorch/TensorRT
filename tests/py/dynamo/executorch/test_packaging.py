@@ -113,6 +113,7 @@ def packaging_build(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", [str(project / "setup.py"), "build_py"])
     state = types.SimpleNamespace(
         project=project,
+        dependency_root=dependency_root,
         versions=versions,
         calls=[],
         builds=[],
@@ -568,6 +569,53 @@ def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
         runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
     else:
         with pytest.raises(SystemExit, match="CUDA build"):
+            runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+
+
+@pytest.mark.parametrize(
+    "metadata,built_as,runtime,allow,refusal",
+    [
+        ("1.6.0", "1.6.0+cu132", "0.2.0", "", None),
+        ("1.6.0", "1.6.0+cu132", "0.2.0+cu130", "", "has a local label"),
+        ("1.6.0", "1.6.0+cu132", "0.2.0+cu130", "1", None),
+        ("1.6.0", "1.6.0+cpu", "0.2.0", "", r"version\.py records 1\.6\.0\+cpu"),
+        ("1.6.0", "1.6.0+cu126", "0.2.0", "", "CUDA build"),
+        ("1.6.0", "1.6.0", "0.2.0", "", "CUDA build"),
+        ("1.6.0", "1.5.1+cu132", "0.2.0", "", "CUDA build"),
+        ("1.6.0+cpu", "1.6.0+cu132", "0.2.0", "", "CUDA build"),
+    ],
+)
+def test_a_cuda_build_whose_metadata_has_no_label_is_read_from_version_py(
+    packaging_build, monkeypatch, metadata, built_as, runtime, allow, refusal
+):
+    """PyPI refuses local labels, so ExecuTorch's CUDA wheel there reports a bare version.
+
+    The wheel's version.py still says which build it is. Reading only the metadata refused that
+    CUDA wheel, while trusting the bare version would accept a processor-only build. A labelled
+    runtime would then require an ExecuTorch with no label, which a processor-only build also
+    satisfies, so only an unlabelled runtime may build against it.
+    """
+    state = packaging_build
+    pins = state.project.parents[1] / "dev_dep_versions.yml"
+    pins.write_text(
+        re.sub(
+            r'__executorch_version__: "[^"]+"',
+            '__executorch_version__: "1.6.0"',
+            pins.read_text(),
+        )
+    )
+    state.versions["executorch"] = metadata
+    (state.dependency_root / "executorch/version.py").write_text(
+        f'__version__ = "{built_as}"\n'
+    )
+    monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", runtime)
+    monkeypatch.setenv("TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", allow)
+    if refusal is None:
+        runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+        # PyPI's ExecuTorch has no label, so a requirement naming one could never be met.
+        assert "executorch==1.6.0" in state.requires
+    else:
+        with pytest.raises(SystemExit, match=refusal):
             runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
 
 
