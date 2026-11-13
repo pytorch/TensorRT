@@ -234,10 +234,21 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        This can be faster, for example when PyTorch autocast keeps a LayerNorm or a
        softmax in FP32, but it overrides a choice of the model author, so check the
        accuracy. Regions with ``enabled=False``, which a model uses to keep ops in FP32,
-       keep their autocast. So do regions whose values inlining would change, such as
-       one that writes into a buffer in place, and regions inside a ``torch.no_grad()``
-       block when the model is exported with grad mode on. Exported under
-       ``torch.no_grad()``, the block leaves nothing in the graph.
+       keep their autocast. ``"reclassify_all"`` removes theirs too, so that autocast can
+       also run those ops in low precision, and the exclusions and calibration above
+       choose which of them stay in FP32. ``"reclassify_all"`` does not tell apart a
+       region that keeps ops in FP32 for correctness, such as rotary embeddings, and
+       calibration may not catch one either, so add the path of the module that runs
+       such a region to ``autocast_excluded_nodes`` as a full match, such as
+       ``^rotary$``. That keeps the ops the module runs directly in FP32, but not
+       those of its submodules, so it works best when the region is the whole
+       ``forward`` of a module. Without the ``$``, the pattern also matches its
+       submodules and any other module whose path starts the same way.
+       With ``"reclassify"`` or ``"reclassify_all"``, regions whose values inlining
+       would change, such as one that writes into a buffer in place, regions inside a
+       ``torch.no_grad()`` block when the model is exported with grad mode on, and
+       regions nested in a region that keeps its autocast, keep their autocast.
+       Exported under ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
        regions.
 

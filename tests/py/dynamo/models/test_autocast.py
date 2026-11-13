@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import base64
+import contextlib
 import copy
 import logging
 import operator
@@ -1667,6 +1668,31 @@ def test_autocast_model_regions():
     )
     torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
 
+    # reclassify_all also inlines the region with enabled=False, so its softmax
+    # can run in float16, and an exclusion keeps it in float32.
+    kwargs.update(autocast_model_regions="reclassify_all")
+    for excluded, dtype in (
+        ({torch.ops.aten.softmax.int}, torch.float32),
+        (set(), torch.float16),
+    ):
+        kwargs.update(autocast_excluded_ops=excluded)
+        ep = pre_export_lowering(
+            torch.export.export(model, (x,)), CompilationSettings(**kwargs)
+        )
+        assert torch.ops.higher_order.wrap_with_autocast not in (
+            n.target for n in ep.graph.nodes
+        )
+        (softmax,) = ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.softmax.int
+        )
+        assert softmax.meta["val"].dtype == dtype
+    # The float32 softmax builds like the region kept above, so build only float16.
+    kwargs.update(autocast_excluded_ops=set())
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
 
 @pytest.mark.unit
 def test_inline_autocast_regions():
@@ -1715,6 +1741,93 @@ def test_inline_autocast_regions():
     matmul = nodes[torch.ops.aten.matmul.default]
     assert matmul.args[1].meta["val"].dtype == torch.float32
     assert not dict(gm.named_children())
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("outer", [None, True, False], ids=["top", "in_fp16", "in_off"])
+def test_inline_autocast_regions_with_enabled_false(outer):
+    from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
+        inline_autocast_regions,
+    )
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+            self.register_buffer("exponent", torch.tensor(2.0))
+
+        def forward(self, x):
+            region = (
+                contextlib.nullcontext()
+                if outer is None
+                else torch.autocast(x.device.type, dtype=torch.float16, enabled=outer)
+            )
+            with region:
+                with torch.autocast(x.device.type, dtype=torch.float16):
+                    y = self.linear(x)
+                with torch.autocast(x.device.type, enabled=False):
+                    s = torch.softmax(y, -1)
+                    # Autocast casts nothing here, so pow keeps float16 under a 0-dim
+                    # float32 exponent.
+                    p = torch.pow(x.half(), self.exponent)
+                    g = s * 2.0
+                with torch.autocast(x.device.type, dtype=torch.float16):
+                    # A write into a new value of the region above.
+                    g.add_(1.0)
+                    return (self.linear(g) + p).float()
+
+    x = torch.randn(2, 8, device="cuda")
+    model = Model().cuda().eval()
+    gm = torch.export.export(model, (x,)).graph_module
+    inline_autocast_regions(gm)
+    # The region with enabled=False stays, and so does the last one, which writes
+    # into its output. Nested, they keep the outer region too.
+    regions = gm.graph.find_nodes(
+        op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+    )
+    assert [r.args[2] for r in regions] == ([False, True] if outer is None else [outer])
+
+    gm = torch.export.export(model, (x,)).graph_module
+    inline_autocast_regions(gm, include_disabled=True)
+    assert not dict(gm.named_children())
+    # softmax gets y as the inlined linear now gives it, without a cast to float16.
+    (softmax,) = gm.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.softmax.int
+    )
+    assert softmax.args[0].target == torch.ops.aten.linear.default
+    assert softmax.meta["val"].dtype == torch.float32
+    (power,) = gm.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.pow.Tensor_Tensor
+    )
+    assert power.meta["val"].dtype == torch.float16
+
+
+@pytest.mark.unit
+def test_inline_autocast_regions_matches_input_dtypes_in_disabled_regions():
+    from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
+        inline_autocast_regions,
+    )
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(8, 8)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = self.linear(x)
+            with torch.autocast(x.device.type, enabled=False):
+                return (y @ x.half().T).float()
+
+    x = torch.randn(2, 8, device="cuda")
+    gm = torch.export.export(Model().cuda().eval(), (x,)).graph_module
+    inline_autocast_regions(gm, include_disabled=True)
+    # The inlined linear gives y in float32, while matmul was traced with its inputs in
+    # one dtype, so it gets them cast to the promoted one.
+    (matmul,) = gm.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.matmul.default
+    )
+    assert {a.meta["val"].dtype for a in matmul.all_input_nodes} == {torch.float32}
 
 
 @pytest.mark.unit
@@ -1784,6 +1897,68 @@ def test_autocast_model_regions_casts_an_output_only_for_ops_outside():
     torch.testing.assert_close(y, torch.full_like(x, float("inf")))
 
 
+@pytest.mark.unit
+def test_autocast_model_regions_keeps_the_output_for_readers_despite_writes():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+            # The next 3 blocks write only into new values.
+            with torch.autocast(x.device.type, enabled=False):
+                s = y.float().add_(1.0)
+            with torch.no_grad():
+                t = y.float().add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).relu_().float()
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                b = (y @ x).float()
+            y.add_(1.0)
+            return a, b, s, t
+
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "relu.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # y.add_ runs after the last region reads y, so no write sends y through the
+    # cast, where x @ x, which is 131072, would be inf.
+    a, b, _, _ = ep.module()(x)
+    torch.testing.assert_close(a, x @ x @ x)
+    torch.testing.assert_close(b, x @ x @ x)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_casts_an_output_for_readers_after_a_write():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x @ x
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = (y @ x).float()
+            # _foreach_zero_ returns nothing, so the next region reads y itself.
+            torch._foreach_zero_([y])
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                b = (y @ x).float()
+            return a, b
+
+    x = torch.full((2, 2), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # The first region reads y before the write, so it gets y as it is, where the
+    # cast would be inf. The second reads y after the write into the cast.
+    a, b = ep.module()(x)
+    torch.testing.assert_close(a, x @ x @ x)
+    torch.testing.assert_close(b, torch.zeros_like(x))
+
+
 @torch.library.custom_op("autocast_regions_test::read_first_rows", mutates_args=())
 def read_first_rows(t: torch.Tensor) -> torch.Tensor:
     # Reads from the start of the storage, which can lie before the view.
@@ -1824,12 +1999,29 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "new_input",
         "read_then_write",
         "write_region_output",
+        "write_between_regions",
+        "foreach_between_regions",
+        "write_in_kept_region",
+        "set_between_regions",
+        "foreach_in_kept_region",
+        "write_between_and_in_region",
+        "foreach_then_region_write",
+        "no_grad_between_regions",
+        "no_grad_write_in_region",
+        "chain",
+        "no_grad_view_between",
+        "no_grad_view_of_outputs",
+        "views_then_new_write",
+        "write_before_disabled",
+        "write_disabled_output",
         "to_copy",
         "pow",
         "fresh",
+        "disabled_cache",
     ],
 )
-def test_autocast_model_regions_keeps_values(case):
+@pytest.mark.parametrize("mode", ["reclassify", "reclassify_all"])
+def test_autocast_model_regions_keeps_values(case, mode):
     class Cache(nn.Module):
         def __init__(self):
             super().__init__()
@@ -1906,6 +2098,36 @@ def test_autocast_model_regions_keeps_values(case):
                     v = y[:, :1]
             v.add_(10.0)
             return y.float()
+
+    class NoGradViewBetween(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+            with torch.no_grad():
+                v = y[:, :1]
+            v.add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (y @ x.T).float()
+
+    class NoGradViewOfOutputs(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                w = v[:, :1]
+            w.add_(10.0)
+            return y.float()
+
+    class ViewsThenNewWrite(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            # This region writes only into a new value, so it does not write into v.
+            with torch.autocast(x.device.type, enabled=False):
+                s = v.float().add_(1.0)
+            return y.float() + s
 
     class ViewOfInput(nn.Module):
         def forward(self, x, pos):
@@ -2028,6 +2250,12 @@ def test_autocast_model_regions_keeps_values(case):
                 # exponent would round to 65504, which is even.
                 return torch.pow(x.sign().half(), self.exponent)
 
+    class DisabledCache(Cache):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, enabled=False):
+                self.cache.index_copy_(0, pos, self.linear(x).half())
+            return self.cache.float()
+
     class Fresh(nn.Module):
         def __init__(self):
             super().__init__()
@@ -2066,12 +2294,122 @@ def test_autocast_model_regions_keeps_values(case):
             with torch.autocast(x.device.type, dtype=torch.float16):
                 return self.linear2(h.relu_()).float()
 
+    class WriteBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class WriteBeforeDisabled(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, enabled=False):
+                return self.linear2(h.float())
+
+    class WriteDisabledOutput(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, enabled=False):
+                h = self.linear1(x)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class ForeachBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class WriteInKeptRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # This region writes into a view of its input, so it keeps its autocast.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class SetBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2] = 0
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class ForeachInKeptRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class WriteBetweenAndInRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class ForeachThenRegionWrite(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            torch._foreach_add_([h], 1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h.relu_()).float()
+
+    class NoGradBetweenRegions(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            with torch.no_grad():
+                h[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(h).float()
+
+    class NoGradWriteInRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # This region writes into h in a torch.no_grad block, so it keeps its
+            # autocast, and the last region reads h after the write.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                with torch.no_grad():
+                    h[:, :2].zero_()
+                a = self.linear2(h)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                b = self.linear2(h)
+            return (a + b).float()
+
+    class Chain(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # Only this region reads h, so it can write into h and is inlined too.
+            # mul runs in float32 too, so the cast of g is a copy.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                g = h.relu_() * 2.0
+            g[:, :2].add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear2(g).float()
+
     class NestedFloat(Fresh):
         def forward(self, x, pos):
             with torch.autocast(x.device.type, dtype=torch.float16):
                 h = self.linear1(x)
-                # This region keeps its autocast. It gets h in float16, as traced,
-                # also when linear1 runs in float32, so float() still copies h.
+                # Under reclassify this region keeps its autocast. It gets h in
+                # float16, as traced, also when linear1 runs in float32, so float()
+                # still copies h. Inlined under reclassify_all, float() keeps its copy.
                 with torch.autocast(x.device.type, enabled=False):
                     y = h.float()
                     y.add_(1.0)
@@ -2148,8 +2486,71 @@ def test_autocast_model_regions_keeps_values(case):
         "new_input": (NewInput, {}),
         "read_then_write": (ReadThenWrite, {}),
         "write_region_output": (WriteRegionOutput, {}),
+        # In the next 11 cases linear1 runs in float32, so its cast to float16 is a copy.
+        "write_between_regions": (
+            WriteBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_between_regions": (
+            ForeachBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "write_in_kept_region": (
+            WriteInKeptRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "set_between_regions": (
+            SetBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_in_kept_region": (
+            ForeachInKeptRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "write_between_and_in_region": (
+            WriteBetweenAndInRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "foreach_then_region_write": (
+            ForeachThenRegionWrite,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "no_grad_between_regions": (
+            NoGradBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "no_grad_write_in_region": (
+            NoGradWriteInRegion,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "chain": (
+            Chain,
+            {
+                "autocast_excluded_nodes": {"^linear1$"},
+                "autocast_excluded_ops": {torch.ops.aten.mul.Tensor},
+            },
+        ),
+        "write_before_disabled": (
+            WriteBeforeDisabled,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "write_disabled_output": (WriteDisabledOutput, {}),
+        # slice stays in float16, so autocast adds no casts around the no_grad block.
+        "no_grad_view_between": (
+            NoGradViewBetween,
+            {"autocast_excluded_node_names": {"matmul.*"}},
+        ),
+        "no_grad_view_of_outputs": (
+            NoGradViewOfOutputs,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "views_then_new_write": (
+            ViewsThenNewWrite,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
         "to_copy": (ToCopy, {}),
         "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
+        "disabled_cache": (DisabledCache, {}),
         "fresh": (Fresh, {}),
     }
     cls, kwargs = models[case]
@@ -2164,28 +2565,64 @@ def test_autocast_model_regions_keeps_values(case):
     settings = CompilationSettings(
         enable_autocast=True,
         autocast_low_precision_type=torch.float16,
-        autocast_model_regions="reclassify",
+        autocast_model_regions=mode,
         **kwargs,
     )
     ep = pre_export_lowering(
         torch.export.export(copy.deepcopy(model), inputs(0)), settings
     )
-    # A region keeps its autocast when inlining would change its values. Regions
-    # with enabled=False (args[2]) always keep theirs.
+    # A region keeps its autocast when inlining would change its values. Under
+    # reclassify, regions with enabled=False (args[2]) always keep theirs.
     kept = any(
-        n.target == torch.ops.higher_order.wrap_with_autocast and n.args[2]
+        n.target == torch.ops.higher_order.wrap_with_autocast
+        and (n.args[2] or mode == "reclassify_all")
         for n in ep.graph.nodes
     )
     inlined = (
         "new_input",
         "read_then_write",
         "write_region_output",
+        "write_between_regions",
+        "foreach_between_regions",
+        "set_between_regions",
+        "foreach_then_region_write",
+        "no_grad_between_regions",
+        "chain",
+        "no_grad_view_between",
+        "views_then_new_write",
+        "write_before_disabled",
         "to_copy",
         "read_only_views",
         "nested_float",
         "read_in_disabled",
     )
+    if mode == "reclassify":
+        inlined += ("disabled_cache",)
+    else:
+        # Under reclassify, the region writes into the output of a kept region.
+        inlined += ("write_disabled_output",)
     assert kept == (case not in (*inlined, "pow", "fresh"))
+    if case in (
+        "write_in_kept_region",
+        "foreach_in_kept_region",
+        "write_between_and_in_region",
+        "no_grad_write_in_region",
+    ):
+        # Only the region that writes into its input keeps its autocast.
+        (region,) = [
+            n
+            for n in ep.graph.nodes
+            if n.target == torch.ops.higher_order.wrap_with_autocast and n.args[2]
+        ]
+        body = getattr(ep.graph_module, region.args[4].target)
+        assert any(
+            isinstance(n.target, torch._ops.OpOverload)
+            and any(
+                a.alias_info is not None and a.alias_info.is_write
+                for a in n.target._schema.arguments
+            )
+            for n in body.graph.nodes
+        )
     lowered = ep.module()
     # A second call shows whether the first call's write into a buffer was kept.
     for i in range(2):
@@ -2224,6 +2661,48 @@ def test_autocast_model_regions_excludes_nodes_by_name(pattern, dtype):
     # The region's output already has the name matmul, so inlining renames the op.
     assert matmul.name == "matmul_1"
     assert matmul.meta["val"].dtype == dtype
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "excluded, dtype",
+    [({"^rotary$"}, torch.float32), (set(), torch.float16)],
+    ids=["excluded", "not_excluded"],
+)
+def test_autocast_model_regions_excludes_a_disabled_region_by_module(excluded, dtype):
+    class Rotary(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, enabled=False):
+                return (x.float() @ x.float().T).cos()
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(8, 8)
+            self.rotary = Rotary()
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.fc(x)
+            return self.rotary(h)
+
+    x = torch.randn(8, 8, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify_all",
+        autocast_excluded_nodes=excluded,
+    )
+    ep = pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    assert torch.ops.higher_order.wrap_with_autocast not in (
+        n.target for n in ep.graph.nodes
+    )
+    vals = {n.target: n.meta["val"] for n in ep.graph.nodes}
+    # The region is the whole forward of rotary, so the path of the module keeps the
+    # region's ops in float32, and not the linear before it.
+    assert vals[torch.ops.aten.matmul.default].dtype == dtype
+    assert vals[torch.ops.aten.cos.default].dtype == dtype
+    assert vals[torch.ops.aten.linear.default].dtype == torch.float16
 
 
 @pytest.mark.unit
