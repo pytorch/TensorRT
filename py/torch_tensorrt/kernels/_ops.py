@@ -196,6 +196,7 @@ def triton_op(
     eager_fn: Optional[Callable[..., Any]] = None,
     num_warps: Optional[int] = None,
     num_stages: Optional[int] = None,
+    pointer_alignment: Union[int, Mapping[str, int]] = 1,
     supports_dynamic_shapes: bool = True,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     capability_validator: Optional[Callable[..., Any]] = None,
@@ -248,6 +249,23 @@ def triton_op(
         num_warps: warps per block for the compiled kernel, and hence the
             launch's threads-per-block. Defaults to Triton's own choice.
         num_stages: software pipelining depth. Defaults to Triton's own choice.
+        pointer_alignment: byte alignment the kernel may assume for every tensor
+            pointer, or a mapping from pointer names to alignments (unlisted
+            pointers use 1), as in :func:`cutedsl_op`. Values must be powers of
+            two from 1 to 256. The default of 1 is always safe. Any larger value
+            becomes Triton's divisibility hint for that pointer, capped at 16 as
+            Triton's own launcher does: 16 allows 16-byte loads, asynchronous
+            copies and software pipelining, and 8 allows 8-byte loads. Whoever
+            registers the op then guarantees the alignment for every buffer
+            TensorRT binds to it, engine inputs included. A misaligned pointer
+            raises ``cudaErrorMisalignedAddress``, which is sticky and leaves
+            the process's CUDA context unusable; an offset view such as
+            ``x[1:]`` is misaligned when its byte offset is not a multiple of
+            the declared alignment.
+            Scalar arguments carry no hint, so accesses masked by a runtime
+            size (``off < n``) or offset by a runtime stride can stay scalar;
+            the hint helps when offsets and strides come from constexprs.
+            Pipelining can also raise the kernel's shared memory use.
         capability_validator: optional extra predicate gating conversion. It is
             combined with the dtype check derived from ``signature`` — both
             must pass for the op to be lowered to the plugin.
@@ -258,9 +276,12 @@ def triton_op(
         ValueError: if ``signature`` does not exactly match the kernel's runtime
             declaration order, does not follow the calling convention, has an
             unsupported type, disagrees with ``meta_fn``'s tensor arity, or has
-            no source for its scalar arguments.
+            no source for its scalar arguments, or if ``pointer_alignment`` is
+            not a power of two from 1 to 256 or names a non-pointer parameter.
         RuntimeError: if Triton's compiled launch metadata is incomplete or
-            requires a feature the TensorRT AOT path cannot reproduce.
+            requires a feature the TensorRT AOT path cannot reproduce, or if
+            the kernel needs more than 48 KiB of shared memory and there is no
+            ``eager_fn``.
 
     .. note::
         Compilation targets the current CUDA device. Register inside
@@ -272,7 +293,10 @@ def triton_op(
         ``signature`` (fixed input dtypes) and ``constexprs`` (single config).
         Inputs whose dtypes don't match the compiled ones are declined at
         conversion time, as are ``hardware_compatible=True`` engines, which
-        could run on architectures the PTX does not target. Such inputs can
+        could run on architectures the PTX does not target, and kernels that
+        need more than the 48 KiB of shared memory TensorRT gives plugin
+        kernels (pytorch/TensorRT#5010); without an ``eager_fn`` such a kernel
+        fails registration instead. Such inputs can
         fall back to PyTorch only when the surrounding partition and
         ``eager_fn`` permit it. Multi-config
         autotuning and dtype specialization are follow-up work.
@@ -314,8 +338,22 @@ def triton_op(
         extra_args_fn,
     )
 
+    alignments = _common.normalize_pointer_alignment(
+        op_name,
+        [param.name for param in layout.inputs + layout.outputs],
+        pointer_alignment,
+        frontend="triton_op",
+    )
     artifact = _triton.compile_triton_to_ptx(
-        kernel, signature, constexprs, num_warps=num_warps, num_stages=num_stages
+        kernel,
+        signature,
+        constexprs,
+        num_warps=num_warps,
+        num_stages=num_stages,
+        pointer_alignment=alignments,
+    )
+    _common.require_eager_fn_above_shared_mem_limit(
+        op_name, "triton_op", artifact.shared_mem, eager_fn, RuntimeError
     )
 
     final_validator = _triton.make_dtype_capability_validator(
@@ -576,14 +614,17 @@ def cutedsl_op(
     ``extra_args_fn(inputs, outputs)`` returns one int or ``trtp.SymInt32`` per
     scalar parameter. Use symbolic shapes in both callbacks for dynamic inputs.
     ``block_size`` is a static CUDA thread count or tuple. ``shared_mem`` is the
-    required dynamic shared-memory size in bytes. ``eager_fn`` optionally defines
-    the op's CUDA implementation outside TensorRT.
+    required dynamic shared-memory size in bytes; TensorRT launches plugin
+    kernels with at most 48 KiB, so a larger op is not lowered, and without an
+    ``eager_fn`` it is rejected (pytorch/TensorRT#5010). ``eager_fn`` optionally defines the op's CUDA
+    implementation outside TensorRT.
 
     ``pointer_alignment`` is the byte alignment CuTe may assume for every tensor
     pointer, or a mapping from pointer names to alignments (unlisted pointers
     use 1). The default of 1 is always safe; declaring 16 lets CuTe emit 128-bit
     vectorized loads and stores, but the caller must guarantee every bound
-    buffer meets it, since a misaligned pointer faults at runtime.
+    buffer meets it, since a misaligned pointer raises the sticky
+    ``cudaErrorMisalignedAddress`` and leaves the CUDA context unusable.
 
     Compilation targets the current CUDA device with fixed pointer dtypes.
     Kernels may construct CuTe tensors from their pointers, but descriptor
@@ -616,6 +657,9 @@ def cutedsl_op(
         or not 0 <= shared_mem < 2**31
     ):
         raise ValueError("cutedsl_op shared_mem must be a non-negative i32 byte count.")
+    _common.require_eager_fn_above_shared_mem_limit(
+        op_name, "cutedsl_op", shared_mem, eager_fn
+    )
     schema_info = analyze_op_schema(
         meta_fn,
         schema,
@@ -631,8 +675,11 @@ def cutedsl_op(
         (len(schema_info.tensor_arg_names), schema_info.num_outputs),
         extra_args_fn,
     )
-    alignments = _cutedsl.normalize_pointer_alignment(
-        op_name, layout, pointer_alignment
+    alignments = _common.normalize_pointer_alignment(
+        op_name,
+        [param.name for param in layout.inputs + layout.outputs],
+        pointer_alignment,
+        frontend="cutedsl_op",
     )
     artifact = _cutedsl.compile_to_ptx(
         kernel, constants, layout, block, shared_mem, alignments

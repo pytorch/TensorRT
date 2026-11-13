@@ -97,26 +97,6 @@ def test_ptx_may_declare_wider_pointer_alignment():
     assert _cutedsl._validate_ptx(ptx, layout, (128, 1, 1), 0) == "kernel"
 
 
-@pytest.mark.parametrize(
-    "alignment,expected",
-    [
-        (1, {"x": 1, "out": 1}),
-        (16, {"x": 16, "out": 16}),
-        ({"x": 16}, {"x": 16, "out": 1}),
-    ],
-)
-def test_pointer_alignment_resolves_per_pointer(alignment, expected):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    assert _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment) == expected
-
-
-@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
-def test_invalid_pointer_alignment_is_rejected(alignment):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    with pytest.raises(ValueError, match="pointer_alignment"):
-        _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment)
-
-
 def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
     artifact = _cutedsl.CompiledCuteDSLArtifact(b"", "kernel", (128, 1, 1), 0, (9, 0))
@@ -128,6 +108,120 @@ def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     )
     assert validate(node, SimpleNamespace(hardware_compatible=False))
     assert not validate(node, SimpleNamespace(hardware_compatible=True))
+
+
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_stays_registered_but_is_not_lowered(
+    monkeypatch, caplog
+):
+    from torch_tensorrt.kernels import _register
+
+    captured = {}
+    monkeypatch.setattr(
+        _register,
+        "register_precompiled_qdp_plugin",
+        lambda **kwargs: captured.update(kwargs),
+    )
+    monkeypatch.setattr(
+        _cutedsl,
+        "validate_config",
+        lambda op, kernel, signature, constants, arity, extra: _common.analyze_signature(
+            signature, arity, frontend="cutedsl_op"
+        ),
+    )
+    monkeypatch.setattr(
+        _cutedsl,
+        "compile_to_ptx",
+        lambda kernel, constants, layout, block, shared_mem, alignments: _cutedsl.CompiledCuteDSLArtifact(
+            b"ptx", "kernel", block, shared_mem, (9, 0)
+        ),
+    )
+    monkeypatch.setattr(_cutedsl, "validate_target", lambda *args: None)
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    def eager(x):
+        return x.clone()
+
+    ttk.cutedsl_op(
+        "ttk_test::cutedsl_shared_mem_limit",
+        object(),
+        {"x": "*fp32", "out": "*fp32"},
+        meta,
+        grid=lambda i, o: 1,
+        block_size=128,
+        shared_mem=64 * 1024,
+        eager_fn=eager,
+    )
+
+    assert captured["eager_fn"] is eager
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        value = torch.empty(4, device="meta")
+        node = SimpleNamespace(
+            args=(SimpleNamespace(meta={"val": value}),), meta={"val": value}
+        )
+        assert captured["capability_validator"](node) is False
+    assert "65536 bytes of dynamic shared memory" in caplog.text
+
+
+@skip_no_qdp
+def test_pointer_alignment_covers_only_pointer_parameters(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        _cutedsl,
+        "validate_config",
+        lambda op, kernel, signature, constants, arity, extra: _common.analyze_signature(
+            signature, arity, frontend="cutedsl_op"
+        ),
+    )
+
+    def compile_stub(kernel, constants, layout, block, shared_mem, alignments):
+        seen.update(alignments)
+        raise RuntimeError("stop after resolving the alignment")
+
+    monkeypatch.setattr(_cutedsl, "compile_to_ptx", compile_stub)
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    with pytest.raises(RuntimeError, match="stop after"):
+        ttk.cutedsl_op(
+            "ttk_test::align",
+            object(),
+            SIGNATURE,
+            meta,
+            grid=lambda i, o: 1,
+            block_size=128,
+            extra_args_fn=lambda i, o: [1],
+            pointer_alignment={"x": 16},
+        )
+    assert seen == {"x": 16, "out": 1}
+
+
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_without_eager_fn_is_rejected(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        _cutedsl,
+        "compile_to_ptx",
+        lambda *args: pytest.fail("compiled an op that could never run"),
+    )
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    with pytest.raises(ValueError, match="65536 bytes.*no PyTorch fallback"):
+        ttk.cutedsl_op(
+            "ttk_test::cutedsl_shared_mem_no_eager",
+            object(),
+            {"x": "*fp32", "out": "*fp32"},
+            meta,
+            grid=lambda i, o: 1,
+            block_size=128,
+            shared_mem=64 * 1024,
+        )
 
 
 def _cached_kernel(x, n, out, block):
