@@ -430,6 +430,47 @@ The same README lists the rules a C++ caller has to keep (threads, buffers, stre
 errors, and the known issues. ``examples/executorch_reference_runner/`` is a complete C++
 example.
 
+With ``alloc_graph_output=False`` (see `Keep inputs and outputs on the GPU`_), the program does not
+allocate its outputs. Before the first call, give it one persistent buffer per output on the
+engine's GPU. Every ``forward`` call then writes each output into its buffer. If a buffer is
+missing, the first call fails.
+
+Make the GPU ``input`` like the output buffer in the snippet below, from ``input_tensor_meta(0)``,
+fill it with your data, and reuse it from call to call. Set runtime options (see
+`Setting a runtime option`_) before you call ``method_meta``. ``cudaMalloc`` needs the CUDA
+toolkit, so add ``find_package(CUDAToolkit REQUIRED)`` and link ``CUDA::cudart``. The snippet
+assumes the engine's GPU is the current device.
+For output 0 (the statements go in ``main()``):
+
+.. code-block:: cpp
+
+    #include <cuda_runtime.h>
+
+    #include <executorch/extension/module/module.h>
+    #include <executorch/extension/tensor/tensor.h>
+
+    using namespace executorch::extension;
+    using namespace executorch::runtime;
+
+    Module module("device_resident.pte");
+
+    const auto meta = module.method_meta("forward")->output_tensor_meta(0);
+    void* data = nullptr;
+    cudaMalloc(&data, meta->nbytes());
+    auto output = from_blob(data, {meta->sizes().begin(), meta->sizes().end()}, meta->scalar_type());
+    if (module.set_output(output, 0) != Error::Ok) {
+      return 1;
+    }
+
+    for (int step = 0; step < num_steps; ++step) {
+      // Each call writes into data.
+      if (!module.forward(input).ok()) {
+        return 1;
+      }
+    }
+
+``examples/executorch_module_consumer/main.cpp`` makes the same calls for every input and output.
+
 ----
 
 Runtime Options
