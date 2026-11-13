@@ -117,39 +117,49 @@ class TestInputAsOutput(TestCase):
 
 
 class TestLoweringPassMembership(TestCase):
-    def insert_at_end(self):
-        from torch_tensorrt.dynamo.lowering.passes import (
-            ATEN_LOWERING_PASSES,
+    def test_insert_at_end_and_accept_settings(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+            ATEN_POST_LOWERING_PASSES,
             _aten_lowering_pass,
             _remove_lowering_pass,
         )
 
         @_aten_lowering_pass
-        def identity_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+        def identity_pass(
+            gm: torch.fx.GraphModule, settings: CompilationSettings
+        ) -> torch.fx.GraphModule:
+            self.assertIsInstance(settings, CompilationSettings)
             return gm
 
-        self.assertEqual(identity_pass, ATEN_LOWERING_PASSES.passes[-1])
+        try:
+            self.assertEqual(identity_pass, ATEN_POST_LOWERING_PASSES.passes[-1])
+            gm = torch.fx.symbolic_trace(torch.nn.Identity())
+            self.assertIs(identity_pass(gm, CompilationSettings()), gm)
+        finally:
+            _remove_lowering_pass(index=-1)
 
-        _remove_lowering_pass(-1)
+        self.assertNotIn(identity_pass, ATEN_POST_LOWERING_PASSES.passes)
 
-        self.assertNotIn(identity_pass, ATEN_LOWERING_PASSES.passes)
-
-    def insert_at_index(self):
-        from torch_tensorrt.dynamo.lowering.passes import (
-            ATEN_LOWERING_PASSES,
+    def test_insert_at_index(self):
+        from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+            ATEN_POST_LOWERING_PASSES,
             _aten_lowering_pass,
             _remove_lowering_pass,
         )
 
         @_aten_lowering_pass(index=0)
-        def identity_pass(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+        def identity_pass(
+            gm: torch.fx.GraphModule, settings: object
+        ) -> torch.fx.GraphModule:
             return gm
 
-        self.assertEqual(identity_pass, ATEN_LOWERING_PASSES.passes[0])
+        try:
+            self.assertEqual(identity_pass, ATEN_POST_LOWERING_PASSES.passes[0])
+        finally:
+            _remove_lowering_pass(index=0)
 
-        _remove_lowering_pass(0)
-
-        self.assertNotIn(identity_pass, ATEN_LOWERING_PASSES.passes)
+        self.assertNotIn(identity_pass, ATEN_POST_LOWERING_PASSES.passes)
 
 
 class TestPrimBroadcastFusion(TestCase):
