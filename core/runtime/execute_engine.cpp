@@ -51,21 +51,6 @@ bool is_switch_required(const RTDevice& curr_device, const RTDevice& engine_devi
   return false;
 }
 
-RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_device, bool hardware_compatible) {
-  auto new_target_device_opt = get_most_compatible_device(engine_device, curr_device, hardware_compatible);
-
-  // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
-  // TODO: I think this logic could be way simpler at execution time since if the tensors arent on the right
-  // device, its not going to run. We should just set device to engine device and maybe reset and memcpy tensors
-  // back to orginal device if needed.
-  TORCHTRT_CHECK(
-      new_target_device_opt,
-      "No compatible device found on system to run program.\n Program targets "
-          << engine_device << "\n Available targets: \n"
-          << get_available_device_list().dump_list() << "\n(runtime.select_cuda_device)");
-  return new_target_device_opt.value();
-}
-
 bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   // Validate whether the current input shapes to the engine has changed
 
@@ -291,6 +276,15 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  // In multi-device safe mode the engine runs on the device it was deserialized on: its execution
+  // context, weights and streams live there, whatever the caller's current device is. Switch for
+  // this call only, before anything below allocates on or reads the current device, and restore
+  // the caller's device on return.
+  c10::optional<c10::cuda::CUDAGuard> engine_device_guard;
+  if (MULTI_DEVICE_SAFE_MODE && is_switch_required(get_current_device(), compiled_engine->device_info)) {
+    engine_device_guard.emplace(static_cast<c10::DeviceIndex>(compiled_engine->device_info.id));
+  }
+
   // All inputs are expected to be on CUDA. Warn and move any that are not. A host-resident
   // shape-tensor input is an exception: TensorRT reads it from host memory, so it is left where it
   // is rather than moved to the device only for setup_input_tensors to copy it back. A shape tensor
@@ -794,28 +788,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
     }
 
-    RTDevice curr_device = get_current_device();
-    LOG_DEBUG("Current Device: " << curr_device);
-
-    // Generic Target Device Prefix
-    std::string target_device = "cuda:";
-
-    if (is_switch_required(curr_device, compiled_engine->device_info)) {
-      // Scan through available CUDA devices and set the CUDA device context correctly
-      RTDevice device =
-          select_rt_device(compiled_engine->device_info, curr_device, compiled_engine->hardware_compatible);
-      set_rt_device(device);
-
-      // Target device is new device
-      target_device += std::to_string(device.id);
-
-      for (auto& in : inputs) {
-        in = in.to(torch::Device(target_device));
-      }
-    } else {
-      // Target device is current device
-      target_device += std::to_string(curr_device.id);
-    }
+    // Target device is the engine's device (made current above)
+    std::string target_device = "cuda:" + std::to_string(compiled_engine->device_info.id);
 
     // For each input, ensure its current device is the desired target device
     for (size_t i = 0; i < inputs.size(); i++) {
