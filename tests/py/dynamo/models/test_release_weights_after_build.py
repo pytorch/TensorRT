@@ -225,6 +225,99 @@ def test_weights_are_released_before_the_next_build(monkeypatch):
     assert released_at_build == [{"unused_head"}, {"unused_head", "w_a"}]
 
 
+@pytest.mark.parametrize("release", [True, False])
+@pytest.mark.parametrize("single_engine", [True, False])
+def test_weights_are_released_before_the_engine_is_serialized(
+    release, single_engine, monkeypatch
+):
+    torch.manual_seed(0)
+    if single_engine:
+        model, names = torch.nn.Linear(16, 16), ("weight", "bias")
+        options = {"require_full_compilation": True}
+    else:
+        model, names = _TwoEngines(), ("w_a", "w_b", "w_shared")
+        options = {"torch_executed_ops": _TORCH_EXECUTED_OPS}
+    model = model.eval().cuda()
+    x = torch.randn(4, 16, device="cuda")
+    with torch.no_grad():
+        expected = model(x)
+    ep = torch.export.export(model, (x,))
+    state = ep.state_dict
+    released_at_serialize = []
+
+    class _RecordingEngine:
+        def __init__(self, engine):
+            self._engine = engine
+
+        def __getattr__(self, attr):
+            return getattr(self._engine, attr)
+
+        def serialize(self):
+            released_at_serialize.append(
+                {n for n in names if not state[n].untyped_storage().nbytes()}
+            )
+            return self._engine.serialize()
+
+    run = _conversion.TRTInterpreter.run
+
+    def run_and_record(self, *args, **kwargs):
+        result = run(self, *args, **kwargs)
+        return result._replace(engine=_RecordingEngine(result.engine))
+
+    monkeypatch.setattr(_conversion.TRTInterpreter, "run", run_and_record)
+    trt_gm = torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        release_weights_after_build=release,
+        **options,
+    )
+    with torch.no_grad():
+        torch.testing.assert_close(trt_gm(x), expected, rtol=1e-2, atol=1e-2)
+    if not release:
+        expected_released = [set()] * (1 if single_engine else 2)
+    elif single_engine:
+        expected_released = [{"weight", "bias"}]
+    else:
+        # w_shared is read by both engines, so it goes only before the second is serialized.
+        expected_released = [{"w_a"}, {"w_a", "w_b", "w_shared"}]
+    assert released_at_serialize == expected_released
+
+
+def test_engine_cache_hit_releases_weights(tmp_path, monkeypatch):
+    hits = []
+    pull_cached_engine = _conversion.pull_cached_engine
+
+    def record_hit(*args, **kwargs):
+        result = pull_cached_engine(*args, **kwargs)
+        hits.append(result is not None)
+        return result
+
+    monkeypatch.setattr(_conversion, "pull_cached_engine", record_hit)
+    x = torch.randn(4, 16, device="cuda")
+    for _ in range(2):
+        # A fresh instance each time: the cached engine is refit with its weights.
+        model = torch.nn.Linear(16, 16).eval().cuda()
+        with torch.no_grad():
+            expected = model(x)
+        ep = torch.export.export(model, (x,))
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            arg_inputs=[x],
+            min_block_size=1,
+            immutable_weights=False,
+            cache_built_engines=True,
+            reuse_cached_engines=True,
+            engine_cache_dir=str(tmp_path),
+            release_weights_after_build=True,
+        )
+        with torch.no_grad():
+            torch.testing.assert_close(trt_gm(x), expected, rtol=1e-2, atol=1e-2)
+        for name, tensor in ep.state_dict.items():
+            assert tensor.numel() == 0, name
+    assert hits == [False, True]
+
+
 @pytest.mark.parametrize("release", [True, None])
 def test_build_frees_its_folded_constants(release, monkeypatch):
     class _Folded(torch.nn.Module):

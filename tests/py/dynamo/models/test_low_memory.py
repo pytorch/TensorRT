@@ -11,6 +11,7 @@ import torch_tensorrt
 from safetensors.torch import save_file
 from torch_tensorrt.dynamo import _low_memory, low_memory
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion import _conversion
 from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
 from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
@@ -222,6 +223,53 @@ def test_compile_with_the_block_settings(tmp_path, monkeypatch):
     exported = torch.export.export(plain, (x,))
     torch_tensorrt.dynamo.compile(exported, inputs=[x.cuda()], min_block_size=1)
     assert plain.proj.weight.untyped_storage().nbytes() > 0
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_mapped_weights_are_dropped_before_the_engine_is_serialized(
+    tmp_path, monkeypatch
+):
+    _weights(tmp_path / "w.safetensors")
+    released, dropped_at_serialize = [], []
+    real = torch_tensorrt.dynamo._weight_release.release_mapped_storage
+
+    def spy(storage):
+        released.append(real(storage))
+        return released[-1]
+
+    class _RecordingEngine:
+        def __init__(self, engine):
+            self._engine = engine
+
+        def __getattr__(self, attr):
+            return getattr(self._engine, attr)
+
+        def serialize(self):
+            dropped_at_serialize.append(bool(released) and None not in released)
+            return self._engine.serialize()
+
+    run = _conversion.TRTInterpreter.run
+
+    def run_and_record(self, *args, **kwargs):
+        result = run(self, *args, **kwargs)
+        return result._replace(engine=_RecordingEngine(result.engine))
+
+    monkeypatch.setattr(
+        torch_tensorrt.dynamo._weight_release, "release_mapped_storage", spy
+    )
+    monkeypatch.setattr(_conversion.TRTInterpreter, "run", run_and_record)
+    x = torch.randn(3, 8)
+    with low_memory(_Model, tmp_path / "w.safetensors") as low_mem:
+        exported = torch.export.export(low_mem.model.eval(), (x,))
+        torch_tensorrt.compile(
+            exported,
+            ir="dynamo",
+            inputs=[x.cuda()],
+            min_block_size=1,
+            **low_mem.compile_settings,
+        )
+    assert dropped_at_serialize == [True]
 
 
 @pytest.mark.unit
