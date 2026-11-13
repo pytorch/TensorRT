@@ -468,6 +468,25 @@ def has_mapped_weights() -> bool:
     return bool(_get_live_mapped_files())
 
 
+def delete_file_when_unmapped(path: Union[str, "os.PathLike[str]"]) -> None:
+    """Delete the file ``path``, mapped once by ``map_weights``, when no tensor views its mapping any more, or
+    when Python exits."""
+    path = os.fspath(path)
+    for mapped in _get_live_mapped_files():
+        mm = mapped.mm()
+        if mm is not None and mapped.path == path:
+            weakref.finalize(mm, _remove_file, path)
+            return
+    raise ValueError(f"{path} is not mapped by map_weights")
+
+
+def _remove_file(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
 def raise_if_mapped_files_changed(tensors: Iterable[torch.Tensor]) -> None:
     """Raise if a file that one of ``tensors`` is mapped from was removed or changed since ``map_weights``
     mapped it. A mapped weight is read when first used: from a file rewritten since, it reads the new
@@ -577,7 +596,7 @@ def save_weights_for_mapping(
     ``meta`` raises. Each chunk is cast to the tensor's dtype and written as it comes. Converting a
     checkpoint this way holds one chunk in memory at a time: build the model on ``meta``, change it as the
     compiled model will be (dtypes, shapes), and let ``source`` read the checkpoint. The file is written
-    under a new, random name next to ``path`` and renamed when complete.
+    under a new, random name next to ``path`` and renamed once it is complete and on the disk.
     """
     tensors: List[Tuple[str, torch.Tensor]] = []
     for slots in _group_tensor_slots_by_memory(module, "save_weights_for_mapping"):
@@ -620,6 +639,10 @@ def save_weights_for_mapping(
                             ) from None
                         not_in_source.append(name)
                 _write_tensor_chunks(f, name, tensor, chunks)
+            f.flush()
+            # On the disk before it is mapped: on unified memory (Jetson), dirty pages can't be reclaimed
+            # until they are written back.
+            os.fsync(f.fileno())
         os.replace(partial, path)
     finally:
         if os.path.exists(partial):
