@@ -277,6 +277,26 @@ Treat a ``.ptd`` file as trusted input, the same as a ``.pte``. The engines in i
     ``.ptd`` holds only the second program's engines, so the first fails to load. Name the file
     after its program, as above, or give each program its own directory.
 
+Keep the engines out of memory during the save
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default ``save()`` copies each engine into memory before it writes the program, so a model with
+large engines needs that much more host memory. On Linux, pass a folder as ``engine_offload_dir``,
+and each engine goes to a file in a private ``torch_tensorrt_engines_*`` directory there and is
+streamed into the ``.pte`` or ``.ptd`` from it:
+
+.. code-block:: python
+
+    torch_tensorrt.save(
+        trt_gm, "model.pte", output_format="executorch", engine_offload_dir="/data/engines"
+    )
+
+The folder is created if missing (its parents are not). It needs room for every engine at once,
+should be on a disk, not a RAM-backed ``tmpfs``, and should be writable only by its owner. The
+directory is removed when the save returns or raises; a process killed during the save can leave
+it behind. ``torch_tensorrt.compile_and_save`` takes the same argument. It always keeps its engines
+in files, in ``TMPDIR`` unless a folder is given.
+
 ----
 
 Run from Python
