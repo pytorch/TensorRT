@@ -6,29 +6,55 @@ from typing import Any
 import pytest
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from exporters import EdgeConfig, EdgeExporter, register_edge_spec
 from exporters.ops import call_engine
 from exporters.spec import ComponentBundle, EdgeSpec, registered_specs
+from torch.export import ExportedProgram
+
+
+def _install_fake_trt(monkeypatch) -> None:
+    monkeypatch.setattr(torch_tensorrt.dynamo, "compile", _fake_trt_compile)
+    monkeypatch.setattr(
+        torch_tensorrt.dynamo,
+        "convert_exported_program_to_serialized_trt_engine",
+        lambda *args, **kwargs: b"fake-engine",
+    )
+
+
+def _fake_trt_compile(exported, arg_inputs=None, **kwargs):
+    del arg_inputs, kwargs
+    return exported.module()
 
 
 @register_edge_spec("dummy_edge")
 class DummySpec(EdgeSpec):
-    components = ("language",)
-
     def prepare_sample_inputs(self, model, raw, config):
         return {"x": raw["x"]}
 
-    def prepare(self, name, model, sample, upstream, config) -> ComponentBundle:
+    def capture_eager_outputs(self, model, sample, config, bench=None):
+        del config
+        from exporters.measure import cuda_ms
+
+        with torch.no_grad():
+            y = model(sample["x"])
+        if bench is not None:
+            bench["language"] = cuda_ms(lambda: model(sample["x"]))
+        return {"language": y}
+
+    def prepare(self, model, sample, config) -> dict[str, ComponentBundle]:
         x = sample["x"]
-        return ComponentBundle(
-            module=model.eval(),
-            trace_args=(x,),
-            save_args=(x,),
-            input_names=["x"],
-            output_names=["y"],
-            model_type="dummy",
-            engine_file="language.engine",
-        )
+        return {
+            "language": ComponentBundle(
+                module=model.eval(),
+                trace_args=(x,),
+                save_args=(x,),
+                input_names=["x"],
+                output_names=["y"],
+                model_type="dummy",
+                engine_file="language.engine",
+            )
+        }
 
     def run(self, engines: Mapping[str, str], sample: Mapping[str, Any]):
         return call_engine(engines["language"], "language", sample["x"])[0]
@@ -44,135 +70,27 @@ def test_builtin_specs_are_registered():
 
 
 @pytest.mark.unit
-def test_edge_exporter_dryrun_runtime(tmp_path):
+def test_edge_exporter_exported_program(tmp_path, monkeypatch):
+    _install_fake_trt(monkeypatch)
     torch.manual_seed(0)
     model = nn.Linear(4, 4)
-    sample = {"x": torch.randn(2, 4)}
-    exporter = EdgeExporter()
-    runtime = exporter.export(
-        model,
-        sample,
-        EdgeConfig(
-            dryrun=True,
-            skip_runtime_export=True,
-            model_type="dummy_edge",
-            engine_dir=tmp_path,
-        ),
-    )
-    assert "language" in exporter.engines
-    assert (tmp_path / "language" / "config.json").is_file()
-    with torch.no_grad():
-        got = runtime(x=sample["x"])
-        expected = model(sample["x"])
-    torch.testing.assert_close(got, expected)
-
-
-@pytest.mark.unit
-def test_edge_exporter_dryrun_exported_program(tmp_path):
-    torch.manual_seed(0)
-    model = nn.Linear(4, 4)
-    # Packing tensors are intermediates, not graph leaves.
     sample = {"x": torch.randn(2, 4) + 1}
     exporter = EdgeExporter()
     program = exporter.export(
         model,
         sample,
         EdgeConfig(
-            dryrun=True,
             model_type="dummy_edge",
             engine_dir=tmp_path,
         ),
     )
-    assert program is not None
+    assert isinstance(program, ExportedProgram)
+    assert "language" in exporter.engines
+    assert (tmp_path / "language" / "config.json").is_file()
     with torch.no_grad():
         out = program.module()(x=sample["x"])
         expected = model(sample["x"])
     torch.testing.assert_close(out, expected)
-
-
-class _NativeAttn(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.linear = nn.Linear(4, 4)
-
-    def forward(self, hidden_states, **kwargs):
-        raise TypeError("cannot unpack non-iterable NoneType object")
-
-
-class _PluginAttn(nn.Module):
-    def __init__(self, inner: nn.Module):
-        super().__init__()
-        self.linear = inner.linear
-
-    def forward(self, hidden_states, **kwargs):
-        return self.linear(hidden_states)
-
-
-class _Layer(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.self_attn = _NativeAttn()
-
-
-class _PatchedWrapper(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.layer = _Layer()
-
-    def forward(self, x):
-        return self.layer.self_attn(x, rope_rotary_cos_sin=x)
-
-
-@register_edge_spec("patch_edge")
-class _PatchSpec(EdgeSpec):
-    components = ("language",)
-
-    def prepare_sample_inputs(self, model, raw, config):
-        return {"x": raw["x"]}
-
-    def prepare(self, name, model, sample, upstream, config) -> ComponentBundle:
-        x = sample["x"]
-
-        def _patch(mod):
-            orig = mod.layer.self_attn
-            mod.layer.self_attn = _PluginAttn(orig).eval()
-            return [(mod.layer, orig)]
-
-        return ComponentBundle(
-            module=model.eval(),
-            trace_args=(x,),
-            save_args=(x,),
-            input_names=["x"],
-            output_names=["y"],
-            patch_fn=_patch,
-            model_type="dummy",
-            engine_file="language.engine",
-        )
-
-    def run(self, engines: Mapping[str, str], sample: Mapping[str, Any]):
-        return call_engine(engines["language"], "language", sample["x"])[0]
-
-
-@pytest.mark.unit
-def test_edge_exporter_dryrun_keeps_attention_patch(tmp_path):
-    """Language wrappers pass plugin kwargs; native HF attention cannot run them."""
-    torch.manual_seed(0)
-    model = _PatchedWrapper()
-    sample = {"x": torch.randn(2, 4)}
-    exporter = EdgeExporter()
-    runtime = exporter.export(
-        model,
-        sample,
-        EdgeConfig(
-            dryrun=True,
-            skip_runtime_export=True,
-            model_type="patch_edge",
-            engine_dir=tmp_path,
-        ),
-    )
-    with torch.no_grad():
-        got = runtime(x=sample["x"])
-    assert got.shape == (2, 4)
 
 
 @pytest.mark.unit
@@ -364,7 +282,7 @@ def test_eagle_vision_patch_extracts_features():
         _patch_eagle_image_features,
     )
 
-    class Dummy:
+    class Dummy(nn.Module):
         def extract_feature(self, pixel_values):
             return pixel_values + 1
 
@@ -380,7 +298,7 @@ def test_eagle_vision_patch_extracts_features():
 def test_groot_patches_live_eagle_class():
     from exporters.models.groot.patches import apply_groot_patches
 
-    class Eagle:
+    class Eagle(nn.Module):
         def extract_feature(self, pixel_values):
             return pixel_values + 1
 
@@ -409,7 +327,7 @@ def test_eagle_vision_keeps_vlm_forward_with_input_ids():
         _patch_eagle_image_features,
     )
 
-    class Dummy:
+    class Dummy(nn.Module):
         def extract_feature(self, pixel_values):
             raise AssertionError("extract_feature should not run")
 
