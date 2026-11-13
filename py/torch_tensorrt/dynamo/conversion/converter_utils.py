@@ -158,8 +158,15 @@ def is_only_operator_on_placeholder(
     )
 
 
+# Sources whose cast to uint8 the _to_copy converter makes as the widened int32 value. TensorRT
+# treats an int8 input as quantized, so the wrap after a cast from int8 fails the build.
+UINT8_CAST_SOURCES = frozenset(
+    {torch.bool, torch.int32, torch.int64, torch.float16, torch.bfloat16, torch.float32}
+)
+
 # Ops that only move data. TensorRT has no uint8 layers for them, so the interpreter widens a
-# uint8 input to int32 first; the values are the same, and nothing computes on them.
+# uint8 input to int32 first, the whole input even when the op keeps only part of it. The
+# values are the same, and nothing computes on them.
 UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.permute.default,
     torch.ops.aten._reshape_copy.default,
@@ -169,6 +176,7 @@ UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.squeeze.dim,
     torch.ops.aten.squeeze.dims,
     torch.ops.aten.expand.default,
+    torch.ops.aten.select.int,
     torch.ops.aten.slice.Tensor,
     torch.ops.aten.cat.default,
     torch.ops.aten.split.Tensor,
@@ -206,12 +214,20 @@ def makes_uint8_tensor(node: torch.fx.Node) -> bool:
     slice_scatter that overwrites the whole tensor with a uint8 source, can hand an
     engine input through as it is, the where converter widens uint8 values first,
     and the interpreter widens the uint8 input of an op that only moves data, so
-    they are left to their converters. A get_attr is not refused: uint8 weights are
-    packed FP4 that the quantization converters read themselves.
+    they are left to their converters. A cast to uint8 from a dtype in
+    UINT8_CAST_SOURCES is left to its converter too, which makes the widened int32
+    value. A get_attr is not refused: uint8 weights are packed FP4 that the
+    quantization converters read themselves.
     """
     if node.op not in CALLABLE_NODE_OPS:
         return False
     if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+        return False
+    if (
+        node.target == torch.ops.aten._to_copy.default
+        and getattr(getattr(node.args[0], "meta", {}).get("val"), "dtype", None)
+        in UINT8_CAST_SOURCES
+    ):
         return False
     if node.target in UINT8_DATA_MOVEMENT_OPS or (
         node.target is operator.getitem

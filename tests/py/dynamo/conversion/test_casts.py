@@ -8,6 +8,9 @@ import torch.nn as nn
 import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    UnsupportedOperatorException,
+)
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     to_copy_dtype_validator,
 )
@@ -182,12 +185,32 @@ class TestToCopyConverter(DispatchTestCase):
             def forward(self, x):
                 return (x > 0.5).to(torch.float64) * 3
 
+        # Inside the engine the uint8 value is int32, so only the graph's dtype shows
+        # that float32 holds it.
+        class Uint8ToDouble(nn.Module):
+            def forward(self, x):
+                return (x * 255).to(torch.uint8).double()
+
+        class CopyUint8IntoDouble(CopyIntoDouble):
+            def forward(self, x):
+                return torch.ops.aten.copy.default(self.dest, (x * 255).to(torch.uint8))
+
         cases = (
-            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5)),
-            (CopyIntoDouble(torch.contiguous_format), torch.randint(9, (2, 3, 4, 5))),
-            (BoolToDouble(), torch.rand(2, 3, 4, 5)),
+            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5), True),
+            (
+                CopyIntoDouble(torch.contiguous_format),
+                torch.randint(9, (2, 3, 4, 5)),
+                True,
+            ),
+            (BoolToDouble(), torch.rand(2, 3, 4, 5), False),
+            (Uint8ToDouble(), torch.rand(2, 3, 4, 5), False),
+            (
+                CopyUint8IntoDouble(torch.contiguous_format),
+                torch.rand(2, 3, 4, 5),
+                False,
+            ),
         )
-        for model, x in cases:
+        for model, x, copy_in_pytorch in cases:
             with self.subTest(type(model).__name__, dtype=x.dtype):
                 model = model.eval().cuda()
                 x = x.cuda()
@@ -197,13 +220,81 @@ class TestToCopyConverter(DispatchTestCase):
                     min_block_size=1,
                     truncate_double=True,
                 )
+                names = [name for name, _ in compiled.named_children()]
+                self.assertEqual(sum("_run_on_acc" in name for name in names), 1)
                 self.assertEqual(
-                    sum("_run_on_acc" in name for name, _ in compiled.named_children()),
-                    1,
+                    any("_run_on_gpu" in name for name in names), copy_in_pytorch
                 )
                 out, expected = compiled(x), model(x)
                 torch.testing.assert_close(out, expected)
                 self.assertEqual(out.stride(), expected.stride())
+
+    def test_to_copy_uint8_stays_in_one_engine(self):
+        # PyTorch truncates toward zero, then wraps modulo 256. Values outside the int64
+        # range, infinity and NaN are unspecified: PyTorch differs on CPU and CUDA.
+        class ToUint8(nn.Module):
+            def forward(self, x):
+                return x.to(torch.uint8), x.to(torch.uint8).float() * 2
+
+        # A cond branch that casts to uint8 can stay in the engine too.
+        class CondCast(nn.Module):
+            def forward(self, pred, x):
+                return torch.cond(
+                    pred, lambda v: v.to(torch.uint8).float(), lambda v: v * 2, (x,)
+                )
+
+        # NHWC frames, so the uint8 value is not contiguous until the slice is copied.
+        class Tiles(nn.Module):
+            def forward(self, frames, other):
+                tiles = frames.permute(0, 3, 1, 2).round().clamp(0, 255)
+                tiles = tiles.to(torch.uint8)[..., 1:3, :].contiguous()
+                return torch.cat([tiles, other], dim=-1).float()
+
+        # 3e9 is past the int32 range, where a cast through int32 would saturate.
+        cases = (
+            (ToUint8(), (torch.tensor([256.7, -1.5, 3e9]),)),
+            (ToUint8(), (torch.tensor([300, -1, -257, 2**40 + 300]),)),
+            (ToUint8(), (torch.tensor([300, -1, -257]).int(),)),
+            (ToUint8(), (torch.tensor([256.7, -1.5, 300.0]).half(),)),
+            (ToUint8(), (torch.tensor([256.7, -1.5, 3e9]).bfloat16(),)),
+            (ToUint8(), (torch.tensor([True, False]),)),
+            (CondCast(), (torch.tensor(True), torch.tensor([1.5, 2.0]))),
+            (
+                Tiles(),
+                (
+                    torch.linspace(-20, 300, 2 * 4 * 5 * 3).reshape(2, 4, 5, 3),
+                    torch.arange(2 * 3 * 2 * 4, dtype=torch.uint8).reshape(2, 3, 2, 4),
+                ),
+            ),
+        )
+        for model, inputs in cases:
+            with self.subTest(type(model).__name__, dtype=inputs[-1].dtype):
+                if inputs[-1].dtype == torch.bfloat16:
+                    skip_if_trt_rtx_turing(self, "bfloat16")
+                inputs = [x.cuda() for x in inputs]
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                )
+                names = [name for name, _ in compiled.named_children()]
+                self.assertEqual(names, ["_run_on_acc_0"])
+                torch.testing.assert_close(
+                    compiled(*inputs), model(*inputs), rtol=0, atol=0
+                )
+
+    def test_to_copy_uint8_math_is_refused_without_fallback(self):
+        # The int32 values standing for uint8 would not wrap: 100 + 200 would give 300.
+        class AddToUint8(nn.Module):
+            def forward(self, x):
+                return (x.to(torch.uint8) + 200).float()
+
+        x = torch.tensor([100.0], device="cuda")
+        with self.assertRaises(UnsupportedOperatorException) as raised:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(AddToUint8(), (x,)), inputs=[x], min_block_size=1
+            )
+        self.assertIn("computes a uint8 result", str(raised.exception.__cause__))
 
     def test_to_copy_multiple_returns(self):
         class ToCopyReturns(nn.Module):
@@ -218,6 +309,20 @@ class TestToCopyConverter(DispatchTestCase):
             ToCopyReturns(),
             inputs,
         )
+
+    def test_to_copy_validator_rejects_int8_to_uint8(self):
+        class AddThenToUint8(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._to_copy.default(x + 1, dtype=torch.uint8)
+
+        x = torch.zeros(4, dtype=torch.int8)
+        exported = torch.export.export(AddThenToUint8(), (x,))
+        node = next(
+            node
+            for node in exported.graph.nodes
+            if node.target is torch.ops.aten._to_copy.default
+        )
+        self.assertFalse(to_copy_dtype_validator(placeholder_only=False)(node))
 
     def test_to_copy_validator_rejects_device_transfer(self):
         class DeviceAndDtypeCopy(nn.Module):

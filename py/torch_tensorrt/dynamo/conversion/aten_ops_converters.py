@@ -41,6 +41,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     node_has_dynamic_shapes,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_CAST_SOURCES,
     args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
@@ -1762,25 +1763,8 @@ def aten_ops_scatter(
     )
 
 
-def select_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    """Keep a select of a uint8 tensor on the PyTorch path.
-
-    TensorRT allows uint8 only at engine inputs and at outputs made by a cast or
-    identity layer, so the gather's uint8 result fails the engine build, as it does
-    for aten.gather.
-    """
-    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
-    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
-        _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
-        return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.select.int,
-    capability_validator=select_validator,
     supports_dynamic_shapes=True,
 )
 def aten_ops_select(
@@ -2308,6 +2292,26 @@ def _truncatable_float64_copy(node: Node, source: Argument) -> bool:
         return False
 
 
+def _float64_copy_dtype(ctx: ConversionContext, dtype: Any, source: int) -> Any:
+    """Return float32 for a float64 copy that _truncatable_float64_copy accepted.
+
+    The _to_copy and aten.copy converters decide from the graph's source dtype, as
+    their validators do: a uint8 source is int32 inside the engine, which
+    impl.cast.to_copy would not truncate. The placeholder converter keeps the rule in
+    impl.cast.to_copy, since a uint8 engine input stays uint8. source is the position
+    of the copied value in the node's arguments.
+    """
+    node = ctx.current_node
+    if (
+        dtype is torch.float64
+        and ctx.compilation_settings.truncate_double
+        and node is not None
+        and _truncatable_float64_copy(node, node.args[source])
+    ):
+        return torch.float32
+    return dtype
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
@@ -2347,9 +2351,21 @@ def to_copy_dtype_validator(
             torch.int64,
             torch.bool,
             torch.int8,
+            torch.uint8,
             torch.float16,
             torch.bfloat16,
         }
+
+        source_meta = getattr(to_copy_node.args[0], "meta", {}).get("val")
+        if (
+            to_copy_node.kwargs.get("dtype") == torch.uint8
+            and getattr(source_meta, "dtype", None) not in UINT8_CAST_SOURCES
+        ):
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node}: no cast to uint8 "
+                f"from {getattr(source_meta, 'dtype', None)}"
+            )
+            return False
 
         # Validate input node has convertible kwargs
         if "dtype" in to_copy_node.kwargs:
@@ -2409,13 +2425,16 @@ def aten_ops_clone_copy_dtype(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # The validator lets a cast to uint8 through only from UINT8_CAST_SOURCES.
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     return impl.cast.to_copy(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         args[0],
-        kwargs.get("dtype", args[0].dtype),
+        _float64_copy_dtype(ctx, kwargs.get("dtype", args[0].dtype), 0),
         force_layer=False,  # force_layer=False results in better performance
     )
 
@@ -2519,6 +2538,8 @@ def aten_ops_clone_copy_placeholder(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     # For clone or copy nodes where the input is also the output,
     # we need to force cast to ensure a layer is added to the TRT engine
     # since TRT engine inputs cannot also be TRT engine outputs
@@ -5170,7 +5191,7 @@ def aten_ops_copy(
         SourceIR.ATEN,
         name,
         src,
-        dest.dtype,
+        _float64_copy_dtype(ctx, dest.dtype, 1),
         force_layer=True,
     )
 
