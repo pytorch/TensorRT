@@ -96,8 +96,8 @@ new_whl_repository(
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.6.0.dev20261105
-    commit = "1daaf36236b3223111d3ae3cd832931ea7de3c62",
+    # executorch==1.6.0.dev20261113
+    commit = "a037f680cc0877637f60bb5b5c63e204f8126e2b",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
