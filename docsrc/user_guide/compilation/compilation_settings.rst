@@ -450,9 +450,13 @@ Graph Partitioning
        plugins, Triton 3.5 or newer and cuda-python installed (cuda-python reads the
        driver's PTX limit). It is not used for hardware-compatible engines or when cross-compiling for Windows. When the
        GPU, the installed packages or these settings rule it out, a warning says why.
-       On GPUs with compute capability 10.0 or newer it uses sm_80 instructions and can
-       be slower than PyTorch's grouped matrix multiply at large row counts, so measure
-       it. Other ops use the dense lowering and ``grouped_mm_dense_max_macs``.
+       On GPUs with compute capability 10.0 or newer it uses sm_80 instructions, except
+       at compute capability 11.0 (Jetson Thor), where it uses the GPU's own ``tcgen05``
+       instructions. On Thor it needs Triton 3.7 or newer: the ptxas that Triton 3.5 and
+       3.6 ship cannot build code for Thor, so there the op follows the dense lowering's
+       rules. It can be slower than PyTorch's grouped matrix multiply at large row
+       counts, so measure it. Other ops use the dense lowering and
+       ``grouped_mm_dense_max_macs``.
    * - ``grouped_mm_dense_max_macs``
      - ``2**38``
      - Leave ``aten._grouped_mm``, the grouped matrix multiply of mixture-of-experts
