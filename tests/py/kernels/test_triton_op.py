@@ -172,6 +172,77 @@ def test_triton_op_forwards_to_registrar(captured_registration):
     assert callable(captured["capability_validator"])
 
 
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_stays_registered_but_is_not_lowered(
+    captured_registration, monkeypatch, caplog
+):
+    from torch_tensorrt.kernels import _common, _triton
+
+    artifact = _triton.CompiledTritonArtifact(
+        b"// ptx bytes",
+        "my_kernel_entry",
+        4,
+        64 * 1024,
+        types.SimpleNamespace(backend="cuda", arch=90, warp_size=32),
+        90,
+    )
+    monkeypatch.setattr(_triton, "compile_triton_to_ptx", lambda *a, **k: artifact)
+    sig = {"x_ptr": "*fp32", "y_ptr": "*fp32"}
+
+    def eager(x):
+        return x.clone()
+
+    ttk.triton_op(
+        "ttk_test::triton_shared_mem_limit",
+        kernel=_FakeKernel(sig),
+        signature=sig,
+        constexprs={},
+        grid=lambda inputs, outputs: (1,),
+        meta_fn=_identity_meta,
+        eager_fn=eager,
+    )
+
+    assert captured_registration["eager_fn"] is eager
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        assert (
+            captured_registration["capability_validator"](
+                _FakeNode([torch.float32], torch.float32)
+            )
+            is False
+        )
+    assert "65536 bytes of dynamic shared memory" in caplog.text
+    assert "fewer pipeline stages" in caplog.text
+
+
+@skip_no_qdp
+def test_kernel_needing_too_much_shared_memory_without_eager_fn_is_rejected(
+    captured_registration, monkeypatch
+):
+    from torch_tensorrt.kernels import _triton
+
+    artifact = _triton.CompiledTritonArtifact(
+        b"// ptx bytes",
+        "my_kernel_entry",
+        4,
+        64 * 1024,
+        types.SimpleNamespace(backend="cuda", arch=90, warp_size=32),
+        90,
+    )
+    monkeypatch.setattr(_triton, "compile_triton_to_ptx", lambda *a, **k: artifact)
+    sig = {"x_ptr": "*fp32", "y_ptr": "*fp32"}
+
+    with pytest.raises(RuntimeError, match="65536 bytes.*no PyTorch fallback"):
+        ttk.triton_op(
+            "ttk_test::triton_shared_mem_no_eager",
+            kernel=_FakeKernel(sig),
+            signature=sig,
+            constexprs={},
+            grid=lambda inputs, outputs: (1,),
+            meta_fn=_identity_meta,
+        )
+    assert captured_registration == {}
+
+
 # ---- No-GPU: signature validation (misuse must not reach the GPU) ----
 
 
@@ -632,6 +703,12 @@ try:
         mask = off < n
         tl.store(y_ptr + off, tl.load(x_ptr + off, mask=mask) + 1, mask=mask)
 
+    @triton.jit
+    def _ttk_big_tile_matmul_kernel(a_ptr, b_ptr, c_ptr, BLOCK: tl.constexpr):
+        tile = tl.arange(0, BLOCK)[:, None] * BLOCK + tl.arange(0, BLOCK)[None, :]
+        product = tl.dot(tl.load(a_ptr + tile), tl.load(b_ptr + tile))
+        tl.store(c_ptr + tile, product.to(tl.float16))
+
 except ImportError:
     triton = None
 
@@ -697,6 +774,55 @@ class TestTritonOpIntegration:
         with torch.no_grad():
             # The plugin is declined, so this runs in PyTorch — and is correct.
             assert torch.allclose(trt(x), x + 1, atol=1e-2, rtol=1e-2)
+
+    def test_kernel_above_48_kib_of_shared_memory_stays_in_pytorch(self, monkeypatch):
+        from torch_tensorrt.kernels import _triton
+
+        compiled = []
+        real_compile = _triton.compile_triton_to_ptx
+
+        def spy(*args, **kwargs):
+            compiled.append(real_compile(*args, **kwargs))
+            return compiled[-1]
+
+        monkeypatch.setattr(_triton, "compile_triton_to_ptx", spy)
+
+        def meta(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+            return torch.empty_like(a)
+
+        ttk.triton_op(
+            "ttk_test::triton_big_tile_matmul",
+            kernel=_ttk_big_tile_matmul_kernel,
+            signature={"a_ptr": "*fp16", "b_ptr": "*fp16", "c_ptr": "*fp16"},
+            constexprs={"BLOCK": 128},
+            grid=lambda inputs, outputs: (1,),
+            meta_fn=meta,
+            eager_fn=lambda a, b: a @ b,
+            num_warps=8,
+        )
+        if compiled[-1].shared_mem <= 48 * 1024:
+            pytest.skip(
+                f"the kernel needs only {compiled[-1].shared_mem} bytes of shared "
+                "memory on this GPU, so it does not exceed the limit"
+            )
+
+        class M(torch.nn.Module):
+            def forward(self, a, b):
+                return torch.ops.ttk_test.triton_big_tile_matmul(a, b)
+
+        a, b = (torch.randn(128, 128, device="cuda", dtype=torch.float16) for _ in "ab")
+        trt = torch_tensorrt.compile(
+            M().cuda().eval(),
+            inputs=[a, b],
+            enabled_precisions={torch.float16},
+            min_block_size=1,
+        )
+        assert any(
+            node.op == "call_function" and "triton_big_tile_matmul" in str(node.target)
+            for node in trt.graph.nodes
+        ), "a kernel TensorRT cannot launch must stay a PyTorch call"
+        with torch.no_grad():
+            torch.testing.assert_close(trt(a, b), a @ b)
 
     def test_serialized_engine_runs_without_triton_in_fresh_process(self, tmp_path):
         """The AOT engine embeds PTX and needs no Triton/Python callback at runtime."""
