@@ -619,6 +619,7 @@ def compile_triton_to_ptx(
     num_warps: Optional[int] = None,
     num_stages: Optional[int] = None,
     pointer_alignment: _common.PointerAlignment = 1,
+    arch: Optional[int] = None,
 ) -> CompiledTritonArtifact:
     """Compile a ``@triton.jit`` kernel to PTX ahead of time.
 
@@ -641,6 +642,9 @@ def compile_triton_to_ptx(
             pointer, or a mapping from pointer names to alignments, validated
             as in :func:`triton_op`. Each alignment above 1 becomes Triton's
             divisibility hint, capped at 16 like Triton's own launcher.
+        arch: the compute capability whose instructions Triton uses, for
+            example 80 for ``mma.sync``. Defaults to the device's. The PTX still
+            targets the device.
 
     Returns:
         An immutable artifact containing unmodified PTX, the entry symbol,
@@ -668,7 +672,7 @@ def compile_triton_to_ptx(
 
     # Bind compilation to the recorded device, including when an environment
     # override would otherwise select a different architecture.
-    options: Dict[str, Any] = {"arch": f"sm{target.arch}"}
+    options: Dict[str, Any] = {"arch": f"sm{arch or target.arch}"}
     if num_warps is not None:
         options["num_warps"] = num_warps
     if num_stages is not None:

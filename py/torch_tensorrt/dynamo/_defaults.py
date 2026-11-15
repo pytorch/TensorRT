@@ -92,6 +92,7 @@ FALLBACK_DATA_DEPENDENT_OPS = False
 FALLBACK_PYTORCH_PLUGIN_OPS = False
 COLLAPSE_HIGH_RANK_PERMUTES = False
 CONVERT_ANTIALIASED_RESIZE = False
+GROUPED_MM_KERNEL = False
 # Above this, the dense aten._grouped_mm lowering was slower than PyTorch's grouped matmul on
 # every GPU measured (H100 and A100).
 GROUPED_MM_DENSE_MAX_MACS = 2**38
