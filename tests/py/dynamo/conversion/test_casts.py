@@ -182,12 +182,29 @@ class TestToCopyConverter(DispatchTestCase):
             def forward(self, x):
                 return (x > 0.5).to(torch.float64) * 3
 
+        # Inside the engine the moved uint8 value is int32, so only the graph's dtype
+        # shows that float32 holds it.
+        class SliceToDouble(nn.Module):
+            def forward(self, x):
+                return x[1:3].double()
+
+        class CopySliceIntoDouble(CopyIntoDouble):
+            def forward(self, x):
+                return torch.ops.aten.copy.default(self.dest, x[1:3])
+
+        frames = torch.randint(256, (4, 3, 4, 5), dtype=torch.uint8)
         cases = (
-            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5)),
-            (CopyIntoDouble(torch.contiguous_format), torch.randint(9, (2, 3, 4, 5))),
-            (BoolToDouble(), torch.rand(2, 3, 4, 5)),
+            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5), True),
+            (
+                CopyIntoDouble(torch.contiguous_format),
+                torch.randint(9, (2, 3, 4, 5)),
+                True,
+            ),
+            (BoolToDouble(), torch.rand(2, 3, 4, 5), False),
+            (SliceToDouble(), frames, False),
+            (CopySliceIntoDouble(torch.contiguous_format), frames, False),
         )
-        for model, x in cases:
+        for model, x, copy_in_pytorch in cases:
             with self.subTest(type(model).__name__, dtype=x.dtype):
                 model = model.eval().cuda()
                 x = x.cuda()
@@ -197,9 +214,10 @@ class TestToCopyConverter(DispatchTestCase):
                     min_block_size=1,
                     truncate_double=True,
                 )
+                names = [name for name, _ in compiled.named_children()]
+                self.assertEqual(sum("_run_on_acc" in name for name in names), 1)
                 self.assertEqual(
-                    sum("_run_on_acc" in name for name, _ in compiled.named_children()),
-                    1,
+                    any("_run_on_gpu" in name for name in names), copy_in_pytorch
                 )
                 out, expected = compiled(x), model(x)
                 torch.testing.assert_close(out, expected)
