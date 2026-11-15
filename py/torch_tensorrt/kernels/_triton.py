@@ -26,6 +26,11 @@ _LOGGER = logging.getLogger(__name__)
 _MIN_TRITON_VERSION = Version("3.5.0")
 
 
+# Tensor memory columns an SM has on sm_100 and sm_110. Triton's loader checks the same
+# limit, except that it allows 576 on sm_107.
+_MAX_TMEM_COLUMNS = 512
+
+
 class CompiledTritonArtifact(NamedTuple):
     """Immutable compiler output; PTX is retained exactly as emitted by Triton."""
 
@@ -564,8 +569,13 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
         unsupported.append("launch_cooperative_grid=True")
     if pdl:
         unsupported.append("launch_pdl=True")
-    if numeric["tmem_size"]:
-        unsupported.append(f"tmem_size={metadata.tmem_size}")
+    # A tcgen05 kernel allocates its tensor memory itself (tcgen05.alloc), so an
+    # ordinary launch serves it; only the per-SM capacity bounds it.
+    if numeric["tmem_size"] > _MAX_TMEM_COLUMNS:
+        unsupported.append(
+            f"tmem_size={metadata.tmem_size} (more than the {_MAX_TMEM_COLUMNS} "
+            "tensor memory columns an SM has)"
+        )
     if tensordesc_meta:
         unsupported.append("tensordesc_meta is non-empty")
     if unsupported:
