@@ -130,11 +130,16 @@ class TestSumConverter(DispatchTestCase):
             def forward(self, x):
                 return x[0].sum()
 
+        class CastThenSum(nn.Module):
+            def forward(self, x):
+                return torch.sum(x.to(torch.uint8), dtype=torch.int64)
+
         frames = torch.full((2, 9_000_001), 255, dtype=torch.uint8, device="cuda")
         cases = (
             (SliceThenSum(), frames),
             (SliceThenSumDim(), frames),
             (SelectThenSum(), frames),
+            (CastThenSum(), frames[0].float()),
         )
         for model, x in cases:
             with self.subTest(type(model).__name__):

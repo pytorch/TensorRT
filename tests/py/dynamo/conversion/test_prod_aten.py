@@ -108,8 +108,15 @@ class TestProdConverter(DispatchTestCase):
             def forward(self, x):
                 return x[1:].prod()
 
+        class CastThenProd(nn.Module):
+            def forward(self, x):
+                return x.to(torch.uint8).prod()
+
         frames = torch.tensor([1, 250, 250, 250, 250], dtype=torch.uint8, device="cuda")
-        cases = ((SliceThenProd(), frames),)
+        cases = (
+            (SliceThenProd(), frames),
+            (CastThenProd(), frames[1:].float()),
+        )
         for model, x in cases:
             with self.subTest(type(model).__name__):
                 compiled = torch_tensorrt.dynamo.compile(
