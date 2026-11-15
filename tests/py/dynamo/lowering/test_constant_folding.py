@@ -57,6 +57,16 @@ class _Select(torch.nn.Module):
         return x + self.weight[0]
 
 
+@torch.library.custom_op("constant_folding_test::quantize", mutates_args=())
+def _quantize(x: torch.Tensor) -> torch.Tensor:
+    raise AssertionError("constant folding ran the quantize op")
+
+
+@_quantize.register_fake
+def _(x: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like(x)
+
+
 class TestConstantFolding(TestCase):
     def _export_and_fold(self, model, example_input):
         exported_program = torch.export.export(model, (example_input,))
@@ -326,6 +336,28 @@ class TestConstantFolding(TestCase):
         targets = [node.target for node in gm.graph.nodes]
         self.assertNotIn(torch.ops.aten.permute.default, targets)
         self.assertIn(dequantize_affine, targets)
+
+    def test_quantization_ops_on_constants_are_not_run(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                return x @ (_quantize(self.weight * 2) + 1)
+
+        gm = torch.export.export(Model(), (torch.randn(4, 4),)).module()
+        quantize = torch.ops.constant_folding_test.quantize.default
+        folder = constant_folding._TorchTensorRTConstantFolder(
+            gm, skip_constructors=False
+        )
+        folder.quantization_ops.add(quantize)
+        folder.run()
+
+        folded = [node.target for node in folder.node_replacements]
+        self.assertIn(torch.ops.aten.mul.Tensor, folded)
+        self.assertNotIn(quantize, folded)
+        self.assertNotIn(torch.ops.aten.add.Tensor, folded)
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
     def test_aliased_view_models_compile_end_to_end(self):

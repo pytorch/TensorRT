@@ -356,6 +356,11 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             pass
 
     def _deduce_value(self, node: torch.fx.Node) -> Any:
+        # The parent computes a node's value before it asks is_impure, so a node that
+        # stays in the graph would still run here. A quantize kernel that cannot run
+        # in this environment would then fail the compile for a value never used.
+        if self.is_impure(node):
+            return self.unknown_value
         # Readers of a constant often repeat the same op on it, such as one cast per
         # step of an unrolled loop under autocast. Keeping a folded result per repeat
         # would hold one copy per reader, so a repeat reuses the first result while
