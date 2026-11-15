@@ -286,12 +286,17 @@ a positive launch grid and a kernel that masks every load and store.
    The AOT launcher currently supports ordinary, non-clustered CUDA launches.
    Registration fails closed if Triton's compiler metadata layout is incomplete
    or reports non-zero global/profile scratch, multiple CTAs per cluster, a
-   non-32 warp size, cooperative launch, programmatic dependent launch, tensor
-   memory, or tensor-descriptor metadata. Zero-sized scratch parameters are
-   retained in Triton's PTX and rely on TensorRT padding unused arguments with
-   null. This launch behavior has been validated with TensorRT 11.2 and Triton
-   3.5.0 and 3.8.0. The general QDP API version requirement above does not imply
-   that this Triton launch behavior has been validated on every earlier release.
+   non-32 warp size, cooperative launch, programmatic dependent launch, more
+   tensor memory columns than an SM has (512, or 576 on sm_107, as in the
+   loader of Triton 3.9), or tensor-descriptor metadata. A kernel that uses tensor memory
+   (``tcgen05`` code) allocates it itself, so an ordinary launch serves it.
+   Zero-sized scratch parameters are retained in Triton's PTX and rely on
+   TensorRT padding unused arguments with null. This launch behavior has been
+   validated with TensorRT 11.2 and Triton 3.5.0 and 3.8.0. Kernels that use
+   tensor memory have been run only on Jetson Thor (sm_110), with TensorRT 11.4
+   and Triton 3.9.0. The general QDP API version requirement above does not
+   imply that this Triton launch behavior has been validated on every earlier
+   release.
 
 Measuring and tuning configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
