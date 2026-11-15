@@ -2624,9 +2624,36 @@ def aten_ops_amin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.sum.default, supports_dynamic_shapes=True)
+def uint8_reduction_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep a sum or prod of a uint8 tensor on the PyTorch path.
+
+    PyTorch reduces uint8 in int64. Inside the engine the values are int32, which sum
+    reduces in int32 and prod in float32, so a large result would be wrong.
+    """
+    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
+    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
+        _LOGGER.debug(f"{node.target} of a uint8 tensor is not supported, falling back")
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.default,
+    capability_validator=uint8_reduction_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.dim_IntList,
+    capability_validator=uint8_reduction_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.prims.sum.default,
+    capability_validator=uint8_reduction_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -2658,8 +2685,16 @@ def aten_ops_sum(
         return sum_
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.prod.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.default,
+    capability_validator=uint8_reduction_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.dim_int,
+    capability_validator=uint8_reduction_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_prod(
     ctx: ConversionContext,
     target: Target,

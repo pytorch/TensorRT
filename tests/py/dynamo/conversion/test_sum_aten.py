@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -113,6 +114,29 @@ class TestSumConverter(DispatchTestCase):
             Sum(),
             inputs,
         )
+
+    def test_sum_of_uint8_runs_in_pytorch(self):
+        # PyTorch sums uint8 in int64. Inside the engine the values are int32, so the
+        # sum would wrap past 2**31.
+        class SliceThenSum(nn.Module):
+            def forward(self, x):
+                return x[:, 1:].sum()
+
+        class SliceThenSumDim(nn.Module):
+            def forward(self, x):
+                return x[:, 1:].sum(dim=1)
+
+        frames = torch.full((2, 9_000_001), 255, dtype=torch.uint8, device="cuda")
+        cases = (
+            (SliceThenSum(), frames),
+            (SliceThenSumDim(), frames),
+        )
+        for model, x in cases:
+            with self.subTest(type(model).__name__):
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1
+                )
+                torch.testing.assert_close(compiled(x), model(x))
 
 
 class TestPrimsSumConverter(DispatchTestCase):

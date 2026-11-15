@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -99,6 +100,22 @@ class TestProdConverter(DispatchTestCase):
             input_specs,
             use_dynamo_tracer=True,
         )
+
+    def test_prod_of_uint8_runs_in_pytorch(self):
+        # PyTorch multiplies uint8 in int64. Inside the engine the values are int32,
+        # which prod rounds to float32, so a result past 2**24 would be wrong.
+        class SliceThenProd(nn.Module):
+            def forward(self, x):
+                return x[1:].prod()
+
+        frames = torch.tensor([1, 250, 250, 250, 250], dtype=torch.uint8, device="cuda")
+        cases = ((SliceThenProd(), frames),)
+        for model, x in cases:
+            with self.subTest(type(model).__name__):
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1
+                )
+                torch.testing.assert_close(compiled(x), model(x))
 
 
 if __name__ == "__main__":
