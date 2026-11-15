@@ -78,6 +78,25 @@ class TestGroupedMMLeftToPyTorch(TestCase):
             atol=1e-2,
         )
 
+    def test_each_compile_warns_once_per_node(self):
+        # The registry runs the validator more than once per node, and a second compile
+        # in the same process leaves the op to PyTorch again.
+        for _ in range(2):
+            with self.assertLogs("torch_tensorrt", level="WARNING") as logs:
+                torch_tensorrt.compile(
+                    self.model,
+                    ir="dynamo",
+                    inputs=[self.x, self.offs],
+                    min_block_size=1,
+                    grouped_mm_dense_max_macs=self.small_limit,
+                )
+            warnings = [
+                record
+                for record in logs.records
+                if "grouped_mm_dense_max_macs" in record.getMessage()
+            ]
+            self.assertEqual(len(warnings), 1)
+
 
 if __name__ == "__main__":
     run_tests()

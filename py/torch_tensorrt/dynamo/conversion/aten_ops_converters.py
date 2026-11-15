@@ -6,6 +6,7 @@
 import functools
 import logging
 import operator
+import weakref
 from typing import (
     Any,
     Callable,
@@ -5084,21 +5085,27 @@ def grouped_mm_validator(
         else GROUPED_MM_DENSE_MAX_MACS
     )
     if max_macs is not None and experts * rows * k * n > max_macs:
-        _warn_grouped_mm_left_to_pytorch(node.name, experts, rows, k, n, max_macs)
+        _warn_grouped_mm_left_to_pytorch(node, experts, rows, k, n, max_macs)
         return False
     return True
 
 
-# The registry runs validators on every lookup, so warn once per node and shape.
-@functools.lru_cache(maxsize=None)
+# The registry runs a validator more than once per node, so warn once per node. Each
+# compile has its own graph, so each compile warns again.
+_grouped_mm_left_to_pytorch_warned: "weakref.WeakSet[Node]" = weakref.WeakSet()
+
+
 def _warn_grouped_mm_left_to_pytorch(
-    name: str, experts: int, rows: int, k: int, n: int, max_macs: int
+    node: Node, experts: int, rows: int, k: int, n: int, max_macs: int
 ) -> None:
+    if node in _grouped_mm_left_to_pytorch_warned:
+        return
+    _grouped_mm_left_to_pytorch_warned.add(node)
     _LOGGER.warning(
         "%s: the dense lowering would multiply all %d rows (K=%d, N=%d) by all %d groups, "
         "%d multiply-adds, above grouped_mm_dense_max_macs=%d, so aten._grouped_mm runs "
         "in PyTorch. Set grouped_mm_dense_max_macs=None to keep it in TensorRT.",
-        name,
+        node.name,
         rows,
         k,
         n,
