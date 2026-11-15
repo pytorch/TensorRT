@@ -126,10 +126,15 @@ class TestSumConverter(DispatchTestCase):
             def forward(self, x):
                 return x[:, 1:].sum(dim=1)
 
+        class SelectThenSum(nn.Module):
+            def forward(self, x):
+                return x[0].sum()
+
         frames = torch.full((2, 9_000_001), 255, dtype=torch.uint8, device="cuda")
         cases = (
             (SliceThenSum(), frames),
             (SliceThenSumDim(), frames),
+            (SelectThenSum(), frames),
         )
         for model, x in cases:
             with self.subTest(type(model).__name__):

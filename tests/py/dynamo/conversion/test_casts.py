@@ -188,6 +188,10 @@ class TestToCopyConverter(DispatchTestCase):
             def forward(self, x):
                 return x[1:3].double()
 
+        class SelectToDouble(nn.Module):
+            def forward(self, x):
+                return x[1].double()
+
         class CopySliceIntoDouble(CopyIntoDouble):
             def forward(self, x):
                 return torch.ops.aten.copy.default(self.dest, x[1:3])
@@ -202,6 +206,7 @@ class TestToCopyConverter(DispatchTestCase):
             ),
             (BoolToDouble(), torch.rand(2, 3, 4, 5), False),
             (SliceToDouble(), frames, False),
+            (SelectToDouble(), frames, False),
             (CopySliceIntoDouble(torch.contiguous_format), frames, False),
         )
         for model, x, copy_in_pytorch in cases:
