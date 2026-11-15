@@ -22,6 +22,11 @@ Dynamo compilation. It is passed (directly or via keyword arguments) to
 
 All parameters have sensible defaults. Change only what you need.
 
+:func:`torch_tensorrt.dynamo.compile` and :func:`torch_tensorrt.compile` raise a
+``TypeError`` for a setting they do not know, such as a misspelled one. The removed
+settings ``enabled_precisions`` and ``use_explicit_typing`` are still accepted with a
+warning, but they have no effect.
+
 ----
 
 Core Parameters

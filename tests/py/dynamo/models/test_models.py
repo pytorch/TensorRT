@@ -172,7 +172,6 @@ def test_resnet18_torch_exec_ops(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
-        "output_format": "exported_program",
         "cache_built_engines": True,
         "reuse_cached_engines": True,
         "torch_executed_ops": {torch.ops.aten.matmul, "torch.ops.aten.add"},

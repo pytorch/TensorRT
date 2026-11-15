@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import collections.abc
 import copy
+import difflib
+import inspect
 import logging
 import operator
 import os
@@ -103,6 +105,57 @@ from torch_tensorrt.dynamo.utils import (
 from torch_tensorrt.reporting import Stage
 
 logger = logging.getLogger(__name__)
+
+# Names the compile entry points accept in **kwargs without an error: the
+# deprecated settings they still read, and ``ir``, which a settings dict shared
+# with torch_tensorrt.compile and torch_tensorrt.dynamo.trace often carries.
+_ACCEPTED_KWARGS = frozenset(
+    {
+        "ir",
+        "debug",
+        "truncate_long_and_double",
+        "refit",
+        "make_refittable",
+        "enable_cross_compile_for_windows",
+    }
+)
+
+# Settings that were removed from the compile entry points. Older scripts still
+# pass them, so they warn instead of failing, but they change nothing.
+_REMOVED_KWARGS = {
+    "enabled_precisions": (
+        "TensorRT builds every layer in the precision of the exported program. Cast "
+        "the model and its inputs to the precision you want, or set "
+        "enable_autocast=True"
+    ),
+    "use_explicit_typing": "strong typing is always on",
+}
+
+
+def _check_kwargs(fn: Any, kwargs: Dict[str, Any]) -> None:
+    """Raise a TypeError for a keyword argument ``fn`` would otherwise drop.
+
+    The compile entry points take ``**kwargs`` only for the deprecated settings,
+    so any other name there, such as a misspelled setting, would be ignored.
+    """
+    params = inspect.signature(fn).parameters
+    for name in kwargs:
+        if name in _ACCEPTED_KWARGS:
+            continue
+        if name in _REMOVED_KWARGS:
+            warnings.warn(
+                f"{fn.__name__}() setting `{name}` was removed and has no effect: "
+                f"{_REMOVED_KWARGS[name]}.",
+                UserWarning,
+                stacklevel=3,
+            )
+            continue
+        known = [p for p, v in params.items() if v.kind is not v.VAR_KEYWORD]
+        close = difflib.get_close_matches(name, known, n=1)
+        hint = f" Did you mean '{close[0]}'?" if close else ""
+        raise TypeError(
+            f"{fn.__name__}() got an unexpected keyword argument '{name}'.{hint}"
+        )
 
 
 @needs_cross_compile  # type: ignore[misc]
@@ -278,6 +331,8 @@ def cross_compile_for_windows(
         raise RuntimeError(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
+
+    _check_kwargs(cross_compile_for_windows, kwargs)
 
     if kwargs.get("debug", False):
         warnings.warn(
@@ -737,6 +792,8 @@ def compile(
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
+
+    _check_kwargs(compile, kwargs)
 
     if kwargs.get("debug", False):
         warnings.warn(
@@ -2385,6 +2442,8 @@ def convert_exported_program_to_serialized_trt_engine(
             absent from the built engine's ``aliased_io``. Either way the buffer would
             silently never update.
     """
+
+    _check_kwargs(convert_exported_program_to_serialized_trt_engine, kwargs)
 
     if kwargs.get("debug", False):
         warnings.warn(

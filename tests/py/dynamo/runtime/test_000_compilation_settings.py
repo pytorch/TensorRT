@@ -104,5 +104,98 @@ class TestEnableTRTFlags(TestCase):
         torch._dynamo.reset()
 
 
+class Small(torch.nn.Module):
+    def forward(self, x):
+        return torch.relu(x * 2 + 1)
+
+
+class TestUnknownSettings(TestCase):
+    def setUp(self):
+        self.x = torch.randn(4, 8).cuda()
+        self.program = torch.export.export(Small().cuda(), (self.x,))
+
+    def test_dynamo_compile_rejects_unknown_setting(self):
+        with self.assertRaisesRegex(
+            TypeError,
+            r"compile\(\) got an unexpected keyword argument 'min_blok_size'\. "
+            r"Did you mean 'min_block_size'\?",
+        ):
+            torch_tensorrt.dynamo.compile(
+                self.program, arg_inputs=[self.x], min_blok_size=1
+            )
+
+    def test_compile_rejects_unknown_setting(self):
+        with self.assertRaisesRegex(TypeError, "'min_blok_size'"):
+            torch_tensorrt.compile(
+                Small().cuda(), ir="dynamo", inputs=[self.x], min_blok_size=1
+            )
+
+    def test_serialized_engine_rejects_unknown_setting(self):
+        with self.assertRaisesRegex(TypeError, "'min_blok_size'"):
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                self.program, arg_inputs=[self.x], min_blok_size=1
+            )
+        with self.assertRaisesRegex(TypeError, "'min_blok_size'"):
+            torch_tensorrt.convert_method_to_trt_engine(
+                Small().cuda(), ir="dynamo", inputs=[self.x], min_blok_size=1
+            )
+
+    def test_unknown_setting_without_a_close_match(self):
+        with self.assertRaises(TypeError) as ctx:
+            torch_tensorrt.dynamo.compile(
+                self.program, arg_inputs=[self.x], not_a_setting=1
+            )
+        self.assertNotIn("Did you mean", str(ctx.exception))
+
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.windows_cross_compile,
+        "Cross compilation for Windows is not available",
+    )
+    def test_cross_compile_for_windows_rejects_unknown_setting(self):
+        with self.assertRaisesRegex(TypeError, "'min_blok_size'"):
+            torch_tensorrt.dynamo.cross_compile_for_windows(
+                self.program, arg_inputs=[self.x], min_blok_size=1
+            )
+
+    def test_removed_setting_warns(self):
+        with self.assertWarnsRegex(UserWarning, "`enabled_precisions` was removed"):
+            trt_gm = torch_tensorrt.dynamo.compile(
+                self.program,
+                arg_inputs=[self.x],
+                min_block_size=1,
+                enabled_precisions={torch.float16},
+            )
+        torch.testing.assert_close(trt_gm(self.x), Small()(self.x))
+        with self.assertWarnsRegex(UserWarning, "`enabled_precisions` was removed"):
+            torch_tensorrt.compile(
+                Small().cuda(),
+                ir="dynamo",
+                inputs=[self.x],
+                min_block_size=1,
+                enabled_precisions={torch.float16},
+            )
+
+    def test_settings_shared_with_trace_accept_ir(self):
+        # One dict often feeds torch_tensorrt.dynamo.trace and compile, with "ir" in it.
+        spec = {"inputs": [self.x], "ir": "dynamo", "min_block_size": 1}
+        program = torch_tensorrt.dynamo.trace(Small().cuda(), **spec)
+        trt_gm = torch_tensorrt.dynamo.compile(program, **spec)
+        torch.testing.assert_close(trt_gm(self.x), Small()(self.x))
+
+    def test_deprecated_setting_and_trace_setting_still_accepted(self):
+        with self.assertWarns(DeprecationWarning):
+            trt_gm = torch_tensorrt.compile(
+                Small().cuda(),
+                ir="dynamo",
+                inputs=[self.x],
+                min_block_size=1,
+                truncate_long_and_double=True,
+                strict=False,
+            )
+        self.assertTrue(
+            any("_run_on_acc" in name for name, _ in trt_gm.named_children())
+        )
+
+
 if __name__ == "__main__":
     run_tests()

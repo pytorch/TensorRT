@@ -107,6 +107,25 @@ def _non_fx_input_interface(
     return all(isinstance(i, (torch.Tensor, Input)) for i in inputs)
 
 
+# Keyword arguments that only torch_tensorrt.dynamo.trace reads.
+_TRACE_ONLY_KWARGS = frozenset({"strict"})
+
+
+def _dynamo_settings(
+    kwargs: Dict[str, Any],
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]],
+) -> Dict[str, Any]:
+    """The keyword arguments of a Dynamo compile entry point, which rejects unknown ones.
+
+    ``enabled_precisions`` is passed on when given, so that the entry point warns that
+    it no longer has an effect.
+    """
+    settings = {k: v for k, v in kwargs.items() if k not in _TRACE_ONLY_KWARGS}
+    if enabled_precisions is not None:
+        settings["enabled_precisions"] = enabled_precisions
+    return settings
+
+
 class _IRType(Enum):
     """Enum to determine the type of IR selected for model compilation"""
 
@@ -359,7 +378,7 @@ def compile(
         trt_graph_module = dynamo_compile(
             exp_program,
             arg_inputs=torchtrt_arg_inputs,
-            **kwargs,
+            **_dynamo_settings(kwargs, enabled_precisions),
         )
         return trt_graph_module
     elif target_ir == _IRType.torch_compile:
@@ -456,7 +475,7 @@ def cross_compile_for_windows(
     trt_gm = dynamo_cross_compile_for_windows(
         exp_program,
         arg_inputs=torchtrt_arg_inputs,
-        **kwargs,
+        **_dynamo_settings(kwargs, enabled_precisions),
     )
 
     dynamo_save_cross_compiled_exported_program(trt_gm, file_path)
@@ -587,7 +606,7 @@ def convert_method_to_trt_engine(
                 exp_program,
                 arg_inputs=tuple(normalized_arg_inputs),
                 kwarg_inputs=torchtrt_kwarg_inputs,
-                **kwargs,
+                **_dynamo_settings(kwargs, enabled_precisions),
             ),
         )
     elif target_ir == _IRType.torch_compile:
