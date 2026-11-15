@@ -216,3 +216,28 @@ def test_kernels_above_48_kib_of_shared_memory_are_declined(
     assert bool(caplog.records) is not accepted
     if not accepted:
         assert "49168 bytes" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "alignment,expected",
+    [
+        (1, {"x": 1, "out": 1}),
+        (16, {"x": 16, "out": 16}),
+        ({"x": 16}, {"x": 16, "out": 1}),
+    ],
+)
+def test_pointer_alignment_resolves_per_pointer(alignment, expected):
+    assert (
+        _common.normalize_pointer_alignment(
+            "ns::op", ["x", "out"], alignment, frontend="kernel"
+        )
+        == expected
+    )
+
+
+@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
+def test_invalid_pointer_alignment_is_rejected(alignment):
+    with pytest.raises(ValueError, match="kernel 'ns::op' pointer_alignment"):
+        _common.normalize_pointer_alignment(
+            "ns::op", ["x", "out"], alignment, frontend="kernel"
+        )

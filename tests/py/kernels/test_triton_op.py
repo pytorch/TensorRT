@@ -1,5 +1,6 @@
 """Tests for triton_op (Triton kernel -> AOT QDP plugin path)."""
 
+import re
 import subprocess
 import sys
 import textwrap
@@ -13,6 +14,7 @@ import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 
 from .conftest import (
+    assert_ran_in_engine,
     register_once,
     skip_no_cuda,
     skip_no_qdp,
@@ -587,6 +589,56 @@ def test_missing_launch_metadata_fails_closed(monkeypatch):
         _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
 
 
+def test_alignment_hint_covers_only_pointers_by_declaration_index():
+    from torch_tensorrt.kernels._triton import _pointer_divisibility_attrs
+
+    kernel = _FakeKernel(["x", "BLOCK", "n", "y"], constexpr_names=["BLOCK"])
+
+    assert _pointer_divisibility_attrs(kernel, {"x": 16, "y": 32}) == {
+        (0,): [["tt.divisibility", 16]],
+        (3,): [["tt.divisibility", 16]],
+    }
+    assert _pointer_divisibility_attrs(kernel, {"x": 8, "y": 1}) == {
+        (0,): [["tt.divisibility", 8]],
+    }
+
+
+@pytest.mark.parametrize("alignment", [{"b": 16}, 24])
+def test_direct_compile_rejects_invalid_pointer_alignment(alignment):
+    from torch_tensorrt.kernels import _triton
+
+    with pytest.raises(ValueError, match="pointer_alignment"):
+        _triton.compile_triton_to_ptx(
+            object(), CAPPING_SIG, {}, pointer_alignment=alignment
+        )
+
+
+@skip_no_qdp
+def test_triton_op_resolves_pointer_alignment_for_the_compile(
+    captured_registration, monkeypatch
+):
+    from torch_tensorrt.kernels import _triton
+
+    seen = {}
+    compile_stub = _triton.compile_triton_to_ptx
+    monkeypatch.setattr(
+        _triton,
+        "compile_triton_to_ptx",
+        lambda *a, **k: seen.update(k) or compile_stub(*a, **k),
+    )
+    sig = {"x_ptr": "*fp32", "y_ptr": "*fp32"}
+    ttk.triton_op(
+        "ttk_test::triton_alignment",
+        kernel=_FakeKernel(sig),
+        signature=sig,
+        constexprs={},
+        grid=lambda inputs, outputs: (1,),
+        meta_fn=_identity_meta,
+        pointer_alignment=1,
+    )
+    assert seen["pointer_alignment"] == {"x_ptr": 1, "y_ptr": 1}
+
+
 @skip_no_qdp
 @pytest.mark.parametrize(
     "grid, error, match",
@@ -709,6 +761,11 @@ try:
         product = tl.dot(tl.load(a_ptr + tile), tl.load(b_ptr + tile))
         tl.store(c_ptr + tile, product.to(tl.float16))
 
+    @triton.jit
+    def _ttk_add_scalar_kernel(BLOCK: tl.constexpr, x_ptr, n, y_ptr):
+        off = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        tl.store(y_ptr + off, tl.load(x_ptr + off) + n)
+
 except ImportError:
     triton = None
 
@@ -824,6 +881,66 @@ class TestTritonOpIntegration:
         with torch.no_grad():
             torch.testing.assert_close(trt(a, b), a @ b)
 
+    def test_aligned_pointers_run_vectorized_in_engine(self, monkeypatch):
+        import tensorrt.plugin as trtp
+
+        from torch_tensorrt.kernels import _triton
+
+        compiled = []
+        real_compile = _triton.compile_triton_to_ptx
+
+        def spy(*args, **kwargs):
+            compiled.append(real_compile(*args, **kwargs))
+            return compiled[-1]
+
+        monkeypatch.setattr(_triton, "compile_triton_to_ptx", spy)
+        op_name = "ttk_test::triton_add_scalar_aligned"
+        # 8 elements per thread at the default 4 warps, enough for 16-byte loads.
+        block = 1024
+
+        def meta(x: torch.Tensor) -> torch.Tensor:
+            return torch.empty_like(x)
+
+        ttk.triton_op(
+            op_name,
+            kernel=_ttk_add_scalar_kernel,
+            signature={"x_ptr": "*fp32", "n": "i32", "y_ptr": "*fp32"},
+            constexprs={"BLOCK": block},
+            grid=lambda inputs, outputs: (
+                trtp.cdiv(inputs[0].shape_expr.numel(), block),
+            ),
+            meta_fn=meta,
+            extra_args_fn=lambda inputs, outputs: [
+                trtp.SymInt32(inputs[0].shape_expr.numel())
+            ],
+            eager_fn=lambda x: x + x.numel(),
+            pointer_alignment=16,
+        )
+        ptx = compiled[-1].ptx.decode()
+        assert "ld.global.v4." in ptx and "st.global.v4." in ptx
+
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.ttk_test.triton_add_scalar_aligned(x)
+
+        # Rows of BLOCK elements keep every access in bounds without a mask.
+        trt = torch_tensorrt.compile(
+            M().cuda().eval(),
+            inputs=[
+                torch_tensorrt.Input(
+                    min_shape=(1, block),
+                    opt_shape=(4, block),
+                    max_shape=(8, block),
+                    dtype=torch.float32,
+                )
+            ],
+            min_block_size=1,
+        )
+        assert_ran_in_engine(trt, op_name)
+        for rows in (1, 3, 8):
+            x = torch.randn(rows, block, device="cuda")
+            torch.testing.assert_close(trt(x), x + x.numel())
+
     def test_serialized_engine_runs_without_triton_in_fresh_process(self, tmp_path):
         """The AOT engine embeds PTX and needs no Triton/Python callback at runtime."""
         op_name = "ttk_test::triton_add_one_serialized"
@@ -934,6 +1051,12 @@ class TestTritonOpIntegration:
         {"num_warps": True},
         {"num_warps": 3},
         {"num_stages": 0},
+        {
+            "pointer_alignment": {"n": 16},
+            "kernel": _FakeKernel(["x", "n", "y"]),
+            "signature": {"x": "*fp32", "n": "i32", "y": "*fp32"},
+            "extra_args_fn": lambda i, o: [1],
+        },
     ],
 )
 def test_invalid_registration_never_compiles(monkeypatch, override):
@@ -952,8 +1075,10 @@ def test_invalid_registration_never_compiles(monkeypatch, override):
         meta_fn=_identity_meta,
     )
     kwargs.update(override)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as error:
         ttk.triton_op(**kwargs)
+    if "pointer_alignment" in override:
+        assert "triton_op 'ttk_test::preflight' pointer_alignment" in str(error.value)
 
 
 def test_duplicate_registration_never_compiles(monkeypatch):
@@ -1073,6 +1198,39 @@ def test_multi_input_output_reduction_dynamic():
         expected = x.float() + y.float()
         torch.testing.assert_close(added, expected.to(dtype))
         torch.testing.assert_close(reduced, expected.sum(-1), atol=1e-4, rtol=1e-4)
+
+
+@skip_no_cuda
+@skip_no_triton
+@pytest.mark.parametrize("alignment", [8, 16])
+def test_alignment_hint_reaches_only_the_declared_pointers(alignment, monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    compiled = []
+    real_compile = triton.compile
+
+    def spy(*args, **kwargs):
+        compiled.append(real_compile(*args, **kwargs))
+        return compiled[-1]
+
+    monkeypatch.setattr(triton, "compile", spy)
+    artifact = _triton.compile_triton_to_ptx(
+        _ttk_add_scalar_kernel,
+        {"x_ptr": "*fp32", "n": "i32", "y_ptr": "*fp32"},
+        {"BLOCK": 1024},
+        num_warps=4,
+        pointer_alignment=alignment,
+    )
+
+    header = next(
+        line for line in compiled[-1].asm["ttir"].splitlines() if "tt.func" in line
+    )
+    params = re.findall(r"%\w+: (.*?) loc\(", header)
+    hint = f"tt.divisibility = {alignment}"
+    hinted = [hint in param for param in params]
+    assert hinted == [True, False, True]
+    ptx = artifact.ptx.decode()
+    assert ("ld.global.v4." in ptx and "st.global.v4." in ptx) is (alignment == 16)
 
 
 def test_conversion_and_aot_reject_target_mismatch(captured_registration, monkeypatch):
