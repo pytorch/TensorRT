@@ -561,7 +561,7 @@ def test_ptx_isa_capped_to_driver(monkeypatch, driver_max, default_isa, expected
         ({"warp_size": 64}, "warp_size=64"),
         ({"launch_cooperative_grid": True}, "launch_cooperative_grid=True"),
         ({"launch_pdl": True}, "launch_pdl=True"),
-        ({"tmem_size": 16}, "tmem_size=16"),
+        ({"tmem_size": 513}, r"tmem_size=513 \(more than the 512 tensor memory"),
         ({"tensordesc_meta": [object()]}, "tensordesc_meta is non-empty"),
         ({"num_warps": 0}, "invalid num_warps"),
         ({"shared": -1}, "invalid shared memory"),
@@ -578,6 +578,16 @@ def test_unsupported_launch_metadata(monkeypatch, metadata, match):
     _stub_triton(monkeypatch, [], **metadata)
     with pytest.raises(RuntimeError, match=match):
         _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+
+
+def test_tensor_memory_within_capacity_is_accepted(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
+    monkeypatch.setattr(_triton, "_triton_default_ptx_version", lambda: None)
+    _stub_triton(monkeypatch, [], tmem_size=512)
+    artifact = _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+    assert artifact.kernel_name == "my_kernel"
 
 
 def test_missing_launch_metadata_fails_closed(monkeypatch):
