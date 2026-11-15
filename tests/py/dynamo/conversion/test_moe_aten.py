@@ -76,6 +76,37 @@ class TestGroupedMMConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
+    @parameterized.expand(
+        [
+            ("kwarg", (8, 8, 8, 8), True),
+            ("positional", (3, 5, 0, 8), False),
+        ]
+    )
+    def test_grouped_mm_constant_offs(self, _, counts, offs_as_kwarg):
+        # Fixed group sizes held in a buffer reach the converter as a constant
+        # torch.Tensor, not an ITensor.
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class FixedGroups(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = nn.Parameter(torch.randn(len(counts), 32, 24))
+                self.register_buffer(
+                    "offs", torch.cumsum(torch.tensor(counts), 0).to(torch.int32)
+                )
+
+            def forward(self, x):
+                if offs_as_kwarg:
+                    return torch.ops.aten._grouped_mm.default(x, self.w, offs=self.offs)
+                return torch.ops.aten._grouped_mm.default(x, self.w, self.offs)
+
+        x = torch.randn(sum(counts), 32, dtype=torch.bfloat16)
+        self.run_test(
+            FixedGroups().to(torch.bfloat16),
+            [x],
+            use_dynamo_tracer=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
