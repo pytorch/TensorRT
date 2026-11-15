@@ -237,8 +237,10 @@ class TestGroupedMMKernel(TestCase):
         ]
     )
     def test_invalid_offsets_stay_in_bounds(self, _, offsets, row_groups):
-        # Such offsets are invalid, but they must not make the engine's kernel read or
-        # write outside mat1 and the output. Guard rows before and after catch either.
+        # Such offsets are invalid, but they must not make the engine's kernel write
+        # outside the output, which the guard rows before and after it would show. A
+        # read outside mat1 only feeds rows that are never stored, and here it lands in
+        # the guard rows of a_all, so this test cannot catch it.
         # Rows past the last offset belong to no group, and the kernel zeroes them
         # instead of leaving stale memory; the output starts as 7.0 to show either.
         groups, k, n, rows, guard = 4, 64, 128, 200, 128
