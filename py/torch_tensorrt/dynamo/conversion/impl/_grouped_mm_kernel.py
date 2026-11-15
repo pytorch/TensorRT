@@ -178,8 +178,9 @@ def _build(pointer: str, groups: int, k: int, n: int, capability: int) -> Any:
         "BLOCK_N": _BLOCK_N,
         "BLOCK_K": _BLOCK_K,
     }
-    # From sm_100 on, Triton's tl.dot uses tensor memory, which a TensorRT
-    # plugin launch cannot set up. sm_80's mma.sync runs on every later GPU.
+    # On sm_100 to sm_110, Triton's tl.dot uses tensor memory, which a TensorRT
+    # plugin launch cannot set up. sm_80's mma.sync runs on every later GPU, and
+    # Triton already uses it on sm_120 and sm_121.
     arch = 80 if capability >= 100 else None
     for num_stages in _NUM_STAGES:
         artifact = _triton.compile_triton_to_ptx(
