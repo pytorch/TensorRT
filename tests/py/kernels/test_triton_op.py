@@ -1,5 +1,6 @@
 """Tests for triton_op (Triton kernel -> AOT QDP plugin path)."""
 
+import contextlib
 import subprocess
 import sys
 import textwrap
@@ -459,7 +460,9 @@ def test_untested_pointer_dtype_rejected():
 CAPPING_SIG = {"a": "*fp32", "b": "i32", "c": "*fp32"}
 
 
-def _stub_triton(monkeypatch, requested, omitted_metadata=(), **extra_metadata):
+def _stub_triton(
+    monkeypatch, requested, omitted_metadata=(), arch=90, **extra_metadata
+):
     """Replace triton.compile with a stub recording each requested ptx_version."""
     from torch_tensorrt.kernels import _triton
 
@@ -493,7 +496,7 @@ def _stub_triton(monkeypatch, requested, omitted_metadata=(), **extra_metadata):
             driver=types.SimpleNamespace(
                 active=types.SimpleNamespace(
                     get_current_target=lambda: types.SimpleNamespace(
-                        backend="cuda", arch=90, warp_size=32
+                        backend="cuda", arch=arch, warp_size=32
                     )
                 )
             )
@@ -559,7 +562,6 @@ def test_ptx_isa_capped_to_driver(monkeypatch, driver_max, default_isa, expected
         ({"warp_size": 64}, "warp_size=64"),
         ({"launch_cooperative_grid": True}, "launch_cooperative_grid=True"),
         ({"launch_pdl": True}, "launch_pdl=True"),
-        ({"tmem_size": 16}, "tmem_size=16"),
         ({"tensordesc_meta": [object()]}, "tensordesc_meta is non-empty"),
         ({"num_warps": 0}, "invalid num_warps"),
         ({"shared": -1}, "invalid shared memory"),
@@ -575,6 +577,29 @@ def test_unsupported_launch_metadata(monkeypatch, metadata, match):
     monkeypatch.setattr(_triton, "_triton_default_ptx_version", lambda: None)
     _stub_triton(monkeypatch, [], **metadata)
     with pytest.raises(RuntimeError, match=match):
+        _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+
+
+@pytest.mark.parametrize(
+    "arch, columns, accepted",
+    [(110, 512, True), (110, 513, False), (107, 576, True), (107, 577, False)],
+)
+def test_tensor_memory_is_bounded_by_what_an_sm_has(
+    monkeypatch, arch, columns, accepted
+):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
+    monkeypatch.setattr(_triton, "_triton_default_ptx_version", lambda: None)
+    _stub_triton(monkeypatch, [], arch=arch, tmem_size=columns)
+    expectation = (
+        contextlib.nullcontext()
+        if accepted
+        else pytest.raises(
+            RuntimeError, match=f"needs {columns} tensor memory columns.*sm_{arch}"
+        )
+    )
+    with expectation:
         _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
 
 
@@ -822,6 +847,42 @@ class TestTritonOpIntegration:
         ), "a kernel TensorRT cannot launch must stay a PyTorch call"
         with torch.no_grad():
             torch.testing.assert_close(trt(a, b), a @ b)
+
+    def test_tensor_memory_kernel_registers(self, monkeypatch):
+        from triton.backends.compiler import GPUTarget
+
+        from torch_tensorrt.kernels import _triton
+
+        compiled = []
+        real_compile = _triton.compile_triton_to_ptx
+
+        def spy(*args, **kwargs):
+            compiled.append(real_compile(*args, **kwargs))
+            return compiled[-1]
+
+        monkeypatch.setattr(_triton, "compile_triton_to_ptx", spy)
+        # Registration never loads the PTX, so a tcgen05 kernel for sm_100 registers
+        # on any GPU, and the driver's PTX limit does not apply to it.
+        monkeypatch.setattr(
+            triton.runtime.driver.active,
+            "get_current_target",
+            lambda: GPUTarget("cuda", 100, 32),
+        )
+        monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
+
+        def meta(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+            return torch.empty_like(a)
+
+        # No eager_fn, so registration also requires the kernel to fit in 48 KiB.
+        ttk.triton_op(
+            "ttk_test::triton_tensor_memory_matmul",
+            kernel=_ttk_big_tile_matmul_kernel,
+            signature={"a_ptr": "*fp16", "b_ptr": "*fp16", "c_ptr": "*fp16"},
+            constexprs={"BLOCK": 64},
+            grid=lambda inputs, outputs: (1,),
+            meta_fn=meta,
+        )
+        assert b"tcgen05.alloc" in compiled[-1].ptx
 
     def test_serialized_engine_runs_without_triton_in_fresh_process(self, tmp_path):
         """The AOT engine embeds PTX and needs no Triton/Python callback at runtime."""
