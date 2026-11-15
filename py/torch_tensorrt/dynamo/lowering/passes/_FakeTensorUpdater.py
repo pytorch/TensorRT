@@ -31,7 +31,13 @@ class FakeTensorUpdater(_torch_FakeTensorUpdater):  # type: ignore[misc]
         # ordinary fake-tensor propagation.
         for node in gm.graph.nodes:
             if node.op == "call_function" and "val" not in node.meta:
-                self.processed_hashes.discard(self.hash_node(node))
+                # TODO: keep only the dict branch once the minimum PyTorch
+                # includes https://github.com/pytorch/pytorch/pull/204337,
+                # which turned ``processed_hashes`` into a dict keyed by node.
+                if isinstance(self.processed_hashes, dict):
+                    self.processed_hashes.pop(node, None)
+                else:
+                    self.processed_hashes.discard(self.hash_node(node))
 
     def incremental_update(self, fake_mode: "FakeTensorMode") -> Any:
         """Wrap incremental_update to accept fake_mode as an argument."""
