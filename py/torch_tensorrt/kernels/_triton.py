@@ -482,7 +482,7 @@ def _launch_metadata_bool(metadata: Any, field: str, kernel_name: str) -> bool:
     return value
 
 
-def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
+def _validate_launch_metadata(compiled: Any, arch: int) -> Tuple[str, int, int]:
     """Refuse Triton launch features the QDP AOT path cannot reproduce.
 
     Triton appends ``global_scratch`` / ``profile_scratch`` pointer params to
@@ -555,6 +555,17 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
             "to avoid Triton scratch buffers to use triton_op."
         )
 
+    # A tcgen05 kernel allocates its tensor memory itself (tcgen05.alloc), so an
+    # ordinary launch serves it up to the columns an SM has, which Triton's own
+    # loader gives as 576 on sm_107 and 512 elsewhere (triton/compiler/compiler.py
+    # in Triton 3.9).
+    tmem_columns = 576 if arch == 107 else 512
+    if numeric["tmem_size"] > tmem_columns:
+        raise RuntimeError(
+            f"Triton kernel '{kernel_name}' needs {numeric['tmem_size']} tensor "
+            f"memory columns, but an SM on sm_{arch} has {tmem_columns}."
+        )
+
     unsupported = []
     if numeric["num_ctas"] != 1:
         unsupported.append(f"num_ctas={metadata.num_ctas}")
@@ -564,8 +575,6 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
         unsupported.append("launch_cooperative_grid=True")
     if pdl:
         unsupported.append("launch_pdl=True")
-    if numeric["tmem_size"]:
-        unsupported.append(f"tmem_size={metadata.tmem_size}")
     if tensordesc_meta:
         unsupported.append("tensordesc_meta is non-empty")
     if unsupported:
@@ -641,7 +650,9 @@ def compile_triton_to_ptx(
     )
     # Read back from metadata rather than trusting the request: Triton clamps
     # num_warps to what the kernel can actually use.
-    kernel_name, compiled_warps, shared_mem = _validate_launch_metadata(compiled)
+    kernel_name, compiled_warps, shared_mem = _validate_launch_metadata(
+        compiled, target.arch
+    )
 
     # Embedded exactly as Triton emitted it. TensorRT sizes the kernel argument
     # buffer from the kernel's own declared ABI and pads the slots it wasn't
