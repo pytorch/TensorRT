@@ -118,8 +118,9 @@ class TestSumConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("all", None, False),
-            ("dim", 1, False),
-            ("dim_keepdim", 1, True),
+            ("empty_dim", [], False),
+            ("dim", [1], False),
+            ("dim_keepdim", [1], True),
         ]
     )
     def test_sum_int32_accumulates_in_int64(self, _, dim, keep_dims):
@@ -129,10 +130,26 @@ class TestSumConverter(DispatchTestCase):
             def forward(self, x):
                 if dim is None:
                     return torch.ops.aten.sum.default(x)
-                return torch.ops.aten.sum.dim_IntList(x, [dim], keep_dims)
+                return torch.ops.aten.sum.dim_IntList(x, dim, keep_dims)
 
         inputs = [torch.full((2, 4), 2**30 + 1, dtype=torch.int32)]
         self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("input", lambda x: torch.ops.aten.sum.default(x), torch.uint8),
+            ("slice", lambda x: torch.ops.aten.sum.default(x[:, 1:]), torch.uint8),
+            ("slice_dim", lambda x: x[:, 1:].sum(dim=1), torch.uint8),
+        ]
+    )
+    def test_sum_uint8_accumulates_in_int64(self, _, reduce, dtype):
+        # Each total is past 2**31. After a slice the engine holds uint8 values as int32.
+        class Sum(nn.Module):
+            def forward(self, x):
+                return reduce(x)
+
+        inputs = [torch.full((2, 9_000_001), 255, dtype=dtype)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
 
     def test_sum_bool_accumulates_in_int64(self):
         # The count is int64 in the engine too, so its square does not wrap.

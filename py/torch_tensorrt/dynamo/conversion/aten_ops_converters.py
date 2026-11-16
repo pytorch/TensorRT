@@ -2614,9 +2614,11 @@ def sum_prod_validator(
 ) -> bool:
     """Keep a sum or prod on the PyTorch path when TensorRT cannot compute it.
 
-    TensorRT treats int8 as a quantized type, so it cannot reduce or cast an int8 input,
-    and it cannot reduce into int8, uint8, int16 or bool. A float64 result runs as
-    float32 only with truncate_double, from a type float32 holds exactly, as for _to_copy.
+    TensorRT treats int8 as a quantized type, so it cannot reduce or cast an int8 input.
+    TensorRT-RTX can, but gets the same rule. A result in int8, uint8 or bool is left to
+    PyTorch too, and TensorRT has no int16. These cases are rare, and one simple rule is
+    worth more here than running them in TensorRT. A float64 result runs as float32 only
+    with truncate_double, from a type float32 holds exactly, as for _to_copy.
     """
     input_dtype = getattr(getattr(node.args[0], "meta", {}).get("val"), "dtype", None)
     output_dtype = getattr(node.meta.get("val"), "dtype", None)
