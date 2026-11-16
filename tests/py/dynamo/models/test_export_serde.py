@@ -797,3 +797,127 @@ def test_save_load_extra_files(ir, tmpdir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+
+class _FoldedArgsModule(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = torch.nn.Linear(8, 8)
+
+    def forward(self, x, scale: float = 1.0, mask=None, use_relu: bool = False):
+        out = self.linear(x)
+        if use_relu:
+            out = torch.relu(out)
+        out = out * scale
+        return out if mask is None else out * mask
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"scale": 2.0, "mask": None},
+        {"mask": None},
+        {"scale": 2.0},
+        {"use_relu": True},
+    ],
+    ids=["float_and_none", "none", "float", "bool"],
+)
+@pytest.mark.parametrize("dynamic", [False, True], ids=["static", "dynamic"])
+def test_save_load_folded_non_tensor_inputs(kwargs, dynamic, tmpdir):
+    """
+    Non-tensor user inputs that torch.export folds to constants must be saved
+    as ConstantArgument by save(retrace=False), not TensorArgument (#4941).
+    """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+    model = _FoldedArgsModule().eval().cuda()
+    x = torch.randn(4, 8, device="cuda")
+    dynamic_shapes = None
+    if dynamic:
+        dynamic_shapes = {"x": {0: torch.export.Dim("batch", min=1, max=8)}}
+        dynamic_shapes.update(dict.fromkeys(kwargs))
+    ep = torch.export.export(model, (x,), kwargs, dynamic_shapes=dynamic_shapes)
+    trt_gm = torchtrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        kwarg_inputs={k: v for k, v in kwargs.items() if v is not None},
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
+    loaded = torchtrt.load(trt_ep_path)
+
+    folded = {
+        s.arg.name: s.arg.value
+        for s in loaded.graph_signature.input_specs
+        if isinstance(s.arg, torch.export.graph_signature.ConstantArgument)
+    }
+    assertions.assertEqual(folded, kwargs)
+
+    test_x = torch.randn(2 if dynamic else 4, 8, device="cuda")
+    out = loaded.module()(test_x, **kwargs)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    cos_sim = cosine_similarity(model(test_x, **kwargs), out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_save_load_folded_non_tensor_inputs outputs don't match. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    if "scale" in kwargs:
+        with pytest.raises(Exception, match="scale"):
+            loaded.module()(test_x, **{**kwargs, "scale": 3.0})
+
+
+@pytest.mark.unit
+def test_save_load_folded_input_before_tensor_input(tmpdir):
+    """
+    A folded non-tensor input ahead of the tensor input must still be found as
+    the first user input when lift() inserts the lifted parameters (#4941).
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(8, 8)
+
+        def forward(self, scale: float, x):
+            return self.linear(x) * scale
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+    model = MyModule().eval().cuda()
+    x = torch.randn(4, 8, device="cuda")
+    ep = torch.export.export(model, (2.0, x))
+    trt_gm = torchtrt.dynamo.compile(
+        ep,
+        arg_inputs=[2.0, x],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
+    loaded = torchtrt.load(trt_ep_path)
+
+    placeholders = [n for n in loaded.graph.nodes if n.op == "placeholder"]
+    user_input_names = {
+        s.arg.name
+        for s in loaded.graph_signature.input_specs
+        if s.kind == torch.export.graph_signature.InputKind.USER_INPUT
+    }
+    first_user = next(
+        i for i, n in enumerate(placeholders) if n.name in user_input_names
+    )
+    assertions.assertTrue(
+        all(n.name in user_input_names for n in placeholders[first_user:]),
+        msg="Lifted placeholders were inserted after a user input",
+    )
+
+    out = loaded.module()(2.0, x)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    cos_sim = cosine_similarity(model(2.0, x), out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_save_load_folded_input_before_tensor_input outputs don't match. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
