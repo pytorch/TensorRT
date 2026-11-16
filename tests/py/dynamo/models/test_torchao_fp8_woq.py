@@ -17,6 +17,17 @@ def _has_fp8_gpu() -> bool:
     return major >= 9
 
 
+def _has_mslk() -> bool:
+    # TorchAO's Int4Tensor.from_hp raises "Requires mslk >= 1.0.0" when this import
+    # fails; it does not check the version. A Python-only MSLK install
+    # (MSLK_PYTHON_ONLY=1) reports 0.0.0 but provides it, so test the import itself.
+    try:
+        from mslk.quantize.shuffle import int4_row_quantize_zp  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
 def _promote_float8_woq(model: torch.nn.Module) -> torch.nn.Module:
     from torchao.quantization import dequantize_affine
     from torchao.quantization.quantize_.workflows import Float8Tensor
@@ -172,11 +183,95 @@ def test_linear_fp8_static():
 
 @pytest.mark.unit
 @unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+@pytest.mark.parametrize(
+    "weight_dtype", [torch.int8, torch.float8_e4m3fn], ids=["int8", "float8"]
+)
+def test_dequantize_default_output_dtype(weight_dtype):
+    # torch.export drops output_dtype when it equals the schema default, float32,
+    # so a graph without it must still dequantize to float32.
+    if weight_dtype == torch.float8_e4m3fn and not _has_fp8_gpu():
+        pytest.skip("FP8 GPU (compute capability >= 9.0) is required")
+    from torch._inductor.constant_folding import (
+        _dont_constant_fold,
+        add_dont_constant_fold,
+    )
+
+    if weight_dtype == torch.int8:
+        op = torch.ops.torchao.dequantize_affine.default
+        weight = torch.randint(-128, 128, (128, 64), dtype=torch.int8)
+        scale = torch.rand(128, 1) / 100 + 0.001
+        output_dtype_index = 7
+
+        def dequantize(weight, scale):
+            return op(weight, [1, 64], scale, None, torch.int8)
+
+    else:
+        op = torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+        weight = torch.randn(128, 64).to(torch.float8_e4m3fn)
+        scale = torch.tensor(0.01)
+        output_dtype_index = 2
+
+        def dequantize(weight, scale):
+            return op(weight, scale)
+
+    class DequantizedLinear(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("weight", weight)
+            self.register_buffer("scale", scale)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x @ dequantize(self.weight, self.scale).t()
+
+    model = DequantizedLinear().eval().cuda()
+    example_input = torch.randn(8, 64, device="cuda")
+
+    add_dont_constant_fold(op)
+    try:
+        exp_program = torch.export.export(model, (example_input,), strict=True)
+    finally:
+        if op in _dont_constant_fold:
+            _dont_constant_fold.remove(op)
+
+    dq_nodes = [n for n in exp_program.graph.nodes if n.target == op]
+    assertions.assertEqual(
+        len(dq_nodes), 1, msg="Exported graph is missing the dequantize op"
+    )
+    assertions.assertNotIn("output_dtype", dq_nodes[0].kwargs)
+    assertions.assertLessEqual(len(dq_nodes[0].args), output_dtype_index)
+
+    trt_mod = torchtrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        require_full_compilation=True,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    with torch.no_grad():
+        eager_out = model(example_input)
+        trt_out = trt_mod(example_input)
+    cos_sim = cosine_similarity(eager_out, trt_out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=(
+            "Dequantize with the default output dtype doesn't match eager. "
+            f"Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}"
+        ),
+    )
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
 @unittest.skipIf(
     importlib.util.find_spec("triton") is None,
     "TorchAO INT4 dependencies require Triton, which is unavailable",
 )
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+@unittest.skipIf(not _has_mslk(), "TorchAO INT4 requires mslk >= 1.0.0")
 def test_linear_int4_woq():
     import sys
     from pathlib import Path

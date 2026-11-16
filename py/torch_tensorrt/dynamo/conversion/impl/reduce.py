@@ -17,13 +17,32 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 
 
+def _reduce_0d_as_1d(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    dim: Union[int, Sequence[int]],
+    keepdim: bool,
+) -> Tuple[TRTTensor, Union[int, Sequence[int]], bool]:
+    """TensorRT cannot reduce a 0-d tensor, so reduce it as shape (1,) along that dim. That
+    gives the 0-d result PyTorch returns whatever keepdim says."""
+    if len(input_val.shape) != 0:
+        return input_val, dim, keepdim
+    input_val = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_1d", input_val, (1,)
+    )
+    return input_val, 0, False
+
+
 def amax(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Sequence[int] = [],
+    dim: Union[int, Sequence[int]] = [],
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
@@ -34,6 +53,9 @@ def amax(
     if isinstance(dim, (tuple, list)) and len(dim) == 0:
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
@@ -50,7 +72,7 @@ def amin(
     source_ir: Optional[SourceIR],
     name: str,
     input_val: TRTTensor,
-    dim: Sequence[int] = [],
+    dim: Union[int, Sequence[int]] = [],
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
@@ -61,6 +83,9 @@ def amin(
     if isinstance(dim, (tuple, list)) and len(dim) == 0:
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MIN,
@@ -86,6 +111,9 @@ def sum(
     if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.SUM,
@@ -113,6 +141,9 @@ def prod(
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.PROD,
@@ -141,6 +172,9 @@ def max(
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MAX,
@@ -173,6 +207,9 @@ def min(
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.MIN,
@@ -204,6 +241,9 @@ def mean(
     if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
 
+    input_val, dim, keepdim = _reduce_0d_as_1d(
+        ctx, target, source_ir, name, input_val, dim, keepdim
+    )
     layer = ctx.net.add_reduce(
         input_val,
         trt.ReduceOperation.AVG,

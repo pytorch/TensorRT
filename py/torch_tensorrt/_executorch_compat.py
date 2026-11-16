@@ -51,10 +51,12 @@ def load(path: Union[str, Path]) -> Program:
     except ModuleNotFoundError as error:
         if error.name != "torch_tensorrt_executorch_runtime":
             raise
+        from torch_tensorrt._utils import executorch_runtime_install_command
+
         raise ImportError(
             "Loading an ExecuTorch program requires the Torch-TensorRT delegate "
-            "(torch_tensorrt_executorch_runtime). Install the delegate and ExecuTorch "
-            "from the same release matrix."
+            "(torch_tensorrt_executorch_runtime). "
+            + executorch_runtime_install_command()
         ) from error
     # A companion published before the delegate became a single registration call exposes
     # activate() instead. Accept it so upgrading this wheel alone keeps loading programs.

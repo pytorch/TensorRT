@@ -4,12 +4,15 @@
 import importlib
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
+
+pytestmark = [pytest.mark.trt_api, pytest.mark.trt_rtx_only]
 
 
 @unittest.skipIf(

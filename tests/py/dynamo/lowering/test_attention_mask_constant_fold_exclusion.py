@@ -46,11 +46,16 @@ class TestAttentionMaskConstantFoldExclusion(TestCase):
         return torch.export.export(self.AttentionWithCausalMask(), inputs)
 
     def _assert_only_attention_aranges_survive(
-        self, decompose_attention, disabled_constant_fold_exclusions=()
+        self,
+        decompose_attention,
+        disabled_constant_fold_exclusions=(),
+        decompositions_runs=1,
     ):
-        exported_program = self._export().run_decompositions(
-            get_decompositions(decompose_attention=decompose_attention)
-        )
+        exported_program = self._export()
+        for _ in range(decompositions_runs):
+            exported_program = exported_program.run_decompositions(
+                get_decompositions(decompose_attention=decompose_attention)
+            )
         gm = post_lowering(
             exported_program.module(),
             CompilationSettings(
@@ -78,6 +83,48 @@ class TestAttentionMaskConstantFoldExclusion(TestCase):
     def test_native_attention_mask_aranges_are_not_folded(self):
         self._assert_only_attention_aranges_survive(decompose_attention=False)
 
+    def test_decomposed_attention_mask_aranges_survive_a_second_decomposition(self):
+        self._assert_only_attention_aranges_survive(
+            decompose_attention=True, decompositions_runs=2
+        )
+
+    def test_decomposed_attention_mask_aranges_survive_complex_retrace(self):
+        class AttentionWithComplexOp(self.AttentionWithCausalMask):
+            def forward(self, query, key, value, attention_mask, rotation):
+                attention, unrelated_arange = super().forward(
+                    query, key, value, attention_mask
+                )
+                rotation = torch.view_as_complex(rotation)
+                return attention, unrelated_arange, torch.view_as_real(rotation**2)
+
+        inputs = (
+            torch.randn(1, 2, 8, 16, device="cuda"),
+            torch.randn(1, 2, 8, 16, device="cuda"),
+            torch.randn(1, 2, 8, 16, device="cuda"),
+            torch.ones(8, 8, dtype=torch.bool, device="cuda"),
+            torch.randn(4, 2, device="cuda"),
+        )
+        exported_program = torch.export.export(
+            AttentionWithComplexOp(), inputs
+        ).run_decompositions(get_decompositions(decompose_attention=True))
+        gm = post_lowering(
+            exported_program.module(),
+            CompilationSettings(use_complex_decomposition=True),
+        )
+        arange_nodes = [
+            node
+            for node in gm.graph.nodes
+            if node.op == "call_function"
+            and getattr(node.target, "overloadpacket", None) is torch.ops.aten.arange
+        ]
+        self.assertEqual(len(arange_nodes), 2)
+        self.assertTrue(
+            all(
+                node.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY, False)
+                for node in arange_nodes
+            )
+        )
+
     def test_native_attention_rules_can_be_disabled(self):
         exported_program = self._export().run_decompositions(
             get_decompositions(decompose_attention=False)
@@ -100,9 +147,9 @@ class TestAttentionMaskConstantFoldExclusion(TestCase):
     def test_decomposed_attention_rules_can_be_disabled(self):
         """post_lowering is the only place a rule has to be disabled.
 
-        The decompositions mark unconditionally while tracing, well before any
-        settings object is reachable, so post_lowering revokes those marks
-        instead of the caller having to communicate the setting twice.
+        The decompositions tag unconditionally while tracing, well before any
+        settings object is reachable, and post_lowering skips the disabled rule
+        that would turn the tags into marks, so the caller sets it only once.
         """
         exported_program = self._export().run_decompositions(
             get_decompositions(decompose_attention=True)

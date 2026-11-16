@@ -13,12 +13,9 @@ as an ExecuTorch ``.pte`` file, which can be loaded by the ExecuTorch runtime
 
 Prerequisites
 -------------
-Install Torch-TensorRT with the ExecuTorch extra before running this example::
-
-    pip install -e ".[executorch]" \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
-
-See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
+Install Torch-TensorRT with its ``executorch`` extra, as the Installation section of
+the ExecuTorch deployment guide shows:
+https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#installation
 """
 
 # %%

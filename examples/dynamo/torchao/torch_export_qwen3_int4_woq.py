@@ -21,7 +21,7 @@ LLM examples.
 
 .. code-block:: bash
 
-    pip install torchao transformers accelerate
+    pip install "torchao>=0.17" transformers accelerate
 
     export QWEN3_INT4_MODEL=pytorch/Qwen3-8B-INT4
     python torch_export_qwen3_int4_woq.py
@@ -49,7 +49,18 @@ if sys.path and Path(sys.path[0]).resolve() == Path(_EXAMPLE_DIR):
 
 import torch
 import torch_tensorrt as torchtrt
+import torchao
 from transformers import AutoConfig, AutoTokenizer, Qwen3ForCausalLM
+
+from packaging import version
+
+# The Hub config is rewritten onto Int4WeightOnlyConfig.int4_tile_packed_ntile,
+# which was added in torchao 0.17.
+if version.parse(torchao.__version__).release < (0, 17):
+    raise RuntimeError(
+        f"This example requires torchao>=0.17 (found {torchao.__version__}). "
+        'Install it with: pip install "torchao>=0.17"'
+    )
 
 sys.path.insert(0, _EXAMPLE_DIR)
 from int4_utils import convert_hub_int4_to_symmetric_trt, pre_process_model_for_export

@@ -7,6 +7,7 @@
 
 #include "torch_tensorrt/executorch/PooledScratchInstall.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -137,6 +138,37 @@ bool install_pooled_scratch(nvinfer1::IExecutionContext& ctx, void* buffer, std:
       device_id,
       recorder.getNbErrors() > 0 ? recorder.getErrorDesc(0) : "the refusal could not be recorded");
   return false;
+}
+
+std::size_t pooled_scratch_bytes_for_shapes(nvinfer1::IExecutionContext& ctx, int device_id) {
+  CollectingErrorRecorder recorder;
+  std::size_t need = 0;
+  {
+    const ScopedRecorderAttachment attached(ctx, recorder);
+    need = ctx.updateDeviceMemorySizeForShapes();
+  }
+
+  if (!recorder.anything_reported()) {
+    return need;
+  }
+  const int32_t profile = ctx.getOptimizationProfile();
+  const int64_t bound = ctx.getEngine().getDeviceMemorySizeForProfileV2(profile);
+  // Once per process: an engine whose query keeps failing would otherwise log on every call.
+  static std::atomic_flag logged = ATOMIC_FLAG_INIT;
+  if (!logged.test_and_set(std::memory_order_relaxed)) {
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: TensorRT could not size the activation scratch for the bound shapes on device %d, so this call uses the %lld-byte upper bound of optimization profile %d.",
+        device_id,
+        static_cast<long long>(bound),
+        profile);
+    // ExecuTorch prints 255 characters of a message, so TensorRT's reason gets a line of its own.
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: the scratch size query failed with: %s",
+        recorder.getNbErrors() > 0 ? recorder.getErrorDesc(0) : "the error could not be recorded");
+  }
+  return bound > 0 ? static_cast<std::size_t>(bound) : 0;
 }
 
 } // namespace executorch_backend

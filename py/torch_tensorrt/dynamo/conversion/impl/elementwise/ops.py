@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcast,
-    cast_int_int_div_trt_tensor,
     cast_int_or_float_to_bool,
     cast_trt_tensor,
     get_trt_tensor,
@@ -23,11 +22,37 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
+    python_ints_as_0d,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _input_made_by(
+    node: Optional[torch.fx.Node], target: Target
+) -> Optional[torch.fx.Node]:
+    """The first input of ``node``, if an op ``target`` makes it."""
+    arg = node.args[0] if node is not None and node.args else None
+    return arg if isinstance(arg, torch.fx.Node) and arg.target == target else None
+
+
+def _is_low_precision_norm(node: Optional[torch.fx.Node]) -> bool:
+    """Whether the first input of ``node`` is sum(pow(x.to(dtype), 2)) with ``x``
+    float16 or bfloat16. PyTorch computes the vector norm of such a tensor as the power
+    of 0.5 of this sum, with dtype float32."""
+    total = _input_made_by(node, torch.ops.aten.sum.dim_IntList)
+    square = _input_made_by(total, torch.ops.aten.pow.Tensor_Scalar)
+    cast = _input_made_by(square, torch.ops.aten._to_copy.default)
+    if square is None or cast is None or square.args[1] != 2:
+        return False
+    source = cast.args[0]
+    value = source.meta.get("val") if isinstance(source, torch.fx.Node) else None
+    return isinstance(value, torch.Tensor) and value.dtype in (
+        torch.float16,
+        torch.bfloat16,
+    )
 
 
 def trunc_div(
@@ -54,6 +79,7 @@ def trunc_div(
     Returns:
         A TensorRT tensor represent the result of trunc divide.
     """
+    input, other = python_ints_as_0d(ctx, target, source_ir, name, input, other)
     prod_output = convert_binary_elementwise(
         ctx,
         target,
@@ -72,15 +98,17 @@ def trunc_div(
         prod_output,
     )
 
-    # Convert constant input into ITensor for UnaryOperation
+    # Convert constant input into ITensor for UnaryOperation. A scalar stays 0-d, so a 0-d
+    # tensor does not gain a dim.
     if not isinstance(input, trt.tensorrt.ITensor):
-        input = get_trt_tensor(ctx, input, f"{name}_input")
+        input = get_trt_tensor(ctx, input, f"{name}_input", min_rank=0)
     if not isinstance(other, trt.tensorrt.ITensor):
         other = get_trt_tensor(
             ctx,
             other,
             f"{name}_other",
             dtype=_enums.dtype._from(input.dtype).to(torch.dtype),
+            min_rank=0,
         )
 
     abs_input_output = convert_unary(
@@ -270,7 +298,10 @@ def atan2(
 
     trt_promoted_type = promoted_type.to(trt.DataType)
 
-    pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi", dtype=trt_promoted_type)
+    # A 0-d pi broadcasts to an input of any rank, and keeps a 0-d input 0-d.
+    pi_tensor = get_trt_tensor(
+        ctx, pi_value, f"{name}_pi", dtype=trt_promoted_type, min_rank=0
+    )
 
     if input.dtype != trt_promoted_type:
         input = cast_trt_tensor(ctx, input, trt_promoted_type, f"{name}_input_casted")
@@ -527,6 +558,14 @@ def sub(
     )
 
 
+def _is_float(value: Union[TRTTensor, torch.Tensor, int, float]) -> bool:
+    if isinstance(value, TRTTensor):
+        return value.dtype in (trt.float16, trt.bfloat16, trt.float32)
+    if isinstance(value, torch.Tensor):
+        return bool(value.is_floating_point())
+    return isinstance(value, float)
+
+
 def div(
     ctx: ConversionContext,
     target: Target,
@@ -535,9 +574,35 @@ def div(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
-        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
+    lhs_val, rhs_val = python_ints_as_0d(ctx, target, source_ir, name, lhs_val, rhs_val)
+    # True division of integers gives float32, as in PyTorch. With a float operand,
+    # the binary elementwise promotion already picks its float type. A Python int
+    # becomes a float too, since one outside the int32 range has no int32 constant.
+    if not (_is_float(lhs_val) or _is_float(rhs_val)):
+        if isinstance(lhs_val, TRTTensor):
+            lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, f"{name}_lhs_float")
+        elif isinstance(lhs_val, int):
+            lhs_val = float(lhs_val)
+        if isinstance(rhs_val, TRTTensor):
+            rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, f"{name}_rhs_float")
+        elif isinstance(rhs_val, int):
+            rhs_val = float(rhs_val)
 
+    return convert_binary_elementwise(
+        ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
+    )
+
+
+def prims_div(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    lhs_val: Union[TRTTensor, int, float],
+    rhs_val: Union[TRTTensor, int, float],
+) -> TRTTensor:
+    """prims.div divides floats and truncates integers, keeping them integer."""
+    # TensorRT's DIV does both: it truncates integers toward zero.
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
     )
@@ -551,36 +616,51 @@ def pow(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-
-    lhs_dtype = None
-    rhs_dtype = None
     if isinstance(lhs_val, (int, float)) and isinstance(rhs_val, (int, float)):
         raise ValueError(
             "Both lhs_val and rhs_val are int or float, at least one of them should be a tensor"
         )
-    elif isinstance(lhs_val, (int, float)):
-        # At this point, rhs_val must be a Tensor since we checked both aren't scalars
-        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
-        rhs_dtype = rhs_val.dtype
-        lhs_dtype = rhs_dtype
-    elif isinstance(rhs_val, (int, float)):
-        # At this point, lhs_val must be a Tensor since we checked both aren't scalars
-        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
-        lhs_dtype = lhs_val.dtype
-        rhs_dtype = lhs_dtype
-    else:
-        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
-        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
-        lhs_dtype = lhs_val.dtype
-        rhs_dtype = rhs_val.dtype
-
-    # POW operation supports only float32 and int8 inputs
-    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", lhs_dtype)
-    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", rhs_dtype)
-    out = convert_binary_elementwise(
+    # Keep each operand's own dtype; the binary elementwise path promotes the pair as
+    # PyTorch does, so a float exponent of an integer tensor gives a float.
+    if isinstance(lhs_val, torch.Tensor):
+        lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val")
+    if isinstance(rhs_val, torch.Tensor):
+        rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val")
+    # TensorRT fuses x * x into a reduction that reads it, but not x ** 2, so a sum of
+    # squares (as in a vector norm) would write every square to memory first.
+    if (
+        isinstance(lhs_val, TRTTensor)
+        and isinstance(rhs_val, (int, float))
+        and rhs_val == 2
+        and lhs_val.dtype in (trt.float32, trt.float16, trt.bfloat16)
+    ):
+        return convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            name,
+            trt.ElementWiseOperation.PROD,
+            lhs_val,
+            lhs_val,
+        )
+    # PyTorch computes pow(x, 0.5) with sqrt, so a SQRT matches it for -inf and -0.0,
+    # where a general POW does not. It is also faster. The root of the vector norm of a
+    # float16 or bfloat16 tensor, which PyTorch sums in float32, keeps the POW: its sum
+    # never sees -inf or -0.0, and TensorRT 11.4 can plan more memory for such roots as
+    # a SQRT.
+    if (
+        isinstance(lhs_val, TRTTensor)
+        and isinstance(rhs_val, (int, float))
+        and rhs_val == 0.5
+        and lhs_val.dtype in (trt.float32, trt.float16, trt.bfloat16)
+        and not _is_low_precision_norm(ctx.current_node)
+    ):
+        return convert_unary(
+            ctx, target, source_ir, name, trt.UnaryOperation.SQRT, lhs_val
+        )
+    return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )
-    return out
 
 
 def floor_divide(

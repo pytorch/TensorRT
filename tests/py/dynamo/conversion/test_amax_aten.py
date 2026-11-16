@@ -18,6 +18,7 @@ class TestAmaxConverter(DispatchTestCase):
             ((2, 3, 4, 5), 2, False),
             ((6, 7, 5, 4, 5), 4, False),
             ((1, 5, 2, 1), -1, True),
+            ((), 0, True),
         ]
     )
     def test_amax_dim_int_default(self, input_shape, dim, keep_dims):
@@ -25,7 +26,7 @@ class TestAmaxConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.amax.default(x, dim, keep_dims)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
             Amax(),
             inputs,

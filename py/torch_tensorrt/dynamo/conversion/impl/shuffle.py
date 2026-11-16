@@ -27,8 +27,10 @@ def reshape(
     name: str,
     input: TRTTensor,
     shape: Sequence[int],
+    zero_is_placeholder: bool = True,
 ) -> TRTTensor:
     layer = ctx.net.add_shuffle(input)
+    layer.zero_is_placeholder = zero_is_placeholder
     if all(isinstance(s, int) for s in shape):
         layer.reshape_dims = tuple(shape)
     else:
@@ -293,8 +295,9 @@ def resize(
     input_val = get_trt_tensor(ctx, input, f"{name}_input")
 
     # Calculate the total number of elements for new and current shape
-    new_num_elements = np.prod(sizes)
-    current_num_elements = np.prod(input_val.shape)
+    # np.prod of the empty shape of a 0-d tensor is the float 1.0.
+    new_num_elements = int(np.prod(sizes))
+    current_num_elements = int(np.prod(input_val.shape))
 
     if new_num_elements > current_num_elements:
         # Create a padding tensor with the required size and initialize new elements with zeros

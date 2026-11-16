@@ -302,6 +302,35 @@ class TestHierarchicalAdjacencyPartitioning(TestCase):
             "There should be 2 subgraph running on tensorrt backend",
         )
 
+    def test_hierarchical_adjacency_partition_runs_converter_validators(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_CONVERTERS as CONVERTERS,
+        )
+
+        class CastThroughFloat64(torch.nn.Module):
+            def forward(self, x):
+                x = torch.ops.aten.relu.default(x)
+                x = torch.ops.aten._to_copy.default(x, dtype=torch.float64)
+                x = torch.ops.aten._to_copy.default(x, dtype=torch.float32)
+                return torch.ops.aten.relu.default(x)
+
+        # Without truncate_double, the _to_copy validator refuses the float64 cast.
+        CONVERTERS.set_compilation_settings(CompilationSettings())
+        fx_graph = torch.fx.symbolic_trace(CastThroughFloat64())
+        partitioned_graph, _ = partitioning.hierarchical_adjacency_partition(
+            deepcopy(fx_graph), min_block_size=1
+        )
+        trt_blocks = [
+            submod
+            for name, submod in partitioned_graph.named_children()
+            if "_run_on_acc_tensorrt" in name
+        ]
+        self.assertEqual(len(trt_blocks), 2)
+        for block in trt_blocks:
+            for node in block.graph.nodes:
+                self.assertNotEqual(node.kwargs.get("dtype"), torch.float64)
+
 
 if __name__ == "__main__":
     run_tests()

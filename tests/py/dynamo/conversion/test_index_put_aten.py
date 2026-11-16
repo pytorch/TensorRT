@@ -10,11 +10,6 @@ from torch_tensorrt import ENABLED_FEATURES
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
-# NOTE: accumulate=True with *duplicate* indices is NOT supported in TRT.
-# TensorRT's ScatterMode.ND overwrites on collision — there is no scatter_add
-# reduction mode. The current implementation (scatter into zeros + elementwise
-# add) only gives correct results when every scattered index is unique.
-
 
 class TestIndexPutConverter(DispatchTestCase):
     @parameterized.expand(
@@ -374,7 +369,7 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([5.0, 7.0, 3.0], dtype=torch.float32),
                 accumulate=True,
             ),
-            # bfloat16 + duplicate indices: computation stays in bfloat16 (no forced fp32 cast).
+            # bfloat16 + duplicate indices.
             param(
                 test_name="accumulate_bfloat16_duplicate",
                 source_tensor=torch.zeros([4, 4], dtype=torch.bfloat16),
@@ -409,6 +404,72 @@ class TestIndexPutConverter(DispatchTestCase):
                 value_tensor=torch.tensor([1.0], dtype=torch.float32),
                 accumulate=True,
             ),
+            # A trailing None selects every column, so ScatterAdd still takes it.
+            param(
+                test_name="accumulate_trailing_none",
+                source_tensor=torch.zeros([6, 3], dtype=torch.float32),
+                indices_tensor=(torch.tensor([1, 3, 3], dtype=torch.int64), None),
+                value_tensor=torch.ones([3, 3], dtype=torch.float32),
+                accumulate=True,
+            ),
+            # Values broadcast to input[indices] as in PyTorch, even where one of their
+            # dims happens to have the index length.
+            param(
+                test_name="values_dim_equal_to_index_length",
+                source_tensor=torch.zeros([5, 3, 4], dtype=torch.float32),
+                indices_tensor=(torch.tensor([4, 0, 3, 1]),),
+                value_tensor=torch.arange(4, dtype=torch.float32),
+            ),
+            param(
+                test_name="values_without_leading_free_dim",
+                source_tensor=torch.zeros([4, 4, 3], dtype=torch.float32),
+                indices_tensor=(None, torch.tensor([3, 1, 0, 2])),
+                value_tensor=torch.arange(12, dtype=torch.float32).reshape(4, 3),
+            ),
+            param(
+                test_name="2d_index_before_free_dim",
+                source_tensor=torch.zeros([6, 4], dtype=torch.float32),
+                indices_tensor=(torch.tensor([[0, 2, 5], [4, 1, 3]]),),
+                value_tensor=torch.arange(24, dtype=torch.float32).reshape(2, 3, 4),
+            ),
+            param(
+                test_name="0d_index_after_none",
+                source_tensor=torch.zeros([3, 4], dtype=torch.float32),
+                indices_tensor=(None, torch.tensor(2)),
+                value_tensor=torch.arange(3, dtype=torch.float32),
+            ),
+            param(
+                test_name="2d_bool_mask_after_none",
+                source_tensor=torch.zeros([2, 3, 4], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    torch.tensor(
+                        [
+                            [True, False, False, True],
+                            [False, True, False, False],
+                            [False, False, True, True],
+                        ]
+                    ),
+                ),
+                value_tensor=torch.arange(5, dtype=torch.float32),
+            ),
+            param(
+                test_name="mask_between_nones_after_0d_index",
+                source_tensor=torch.zeros([2, 3, 2, 1], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor(0),
+                    None,
+                    torch.tensor([[True], [False]]),
+                    None,
+                ),
+                value_tensor=torch.tensor(7.0),
+            ),
+            param(
+                test_name="index_after_mask_and_none_past_last_dim",
+                source_tensor=torch.zeros([2, 1, 1], dtype=torch.float32),
+                indices_tensor=(torch.tensor([[True], [False]]), None, torch.tensor(0)),
+                value_tensor=torch.tensor(7.0),
+            ),
         ]
     )
     def test_index_put(
@@ -416,6 +477,10 @@ class TestIndexPutConverter(DispatchTestCase):
     ):
         if accumulate and ENABLED_FEATURES.tensorrt_rtx:
             pytest.skip("ScatterAdd plugin not available in TRT RTX")
+        if ENABLED_FEATURES.tensorrt_rtx and any(
+            index is not None and index.dtype == torch.bool for index in indices_tensor
+        ):
+            pytest.skip("Skipped on tensorrt_rtx due to nonzero not supported")
 
         # Keyed on the case's dtype rather than its index: the generated ids are bare
         # test_index_put_<N>, and there is a commented-out param above, so any index-based
@@ -517,6 +582,501 @@ class TestIndexPutConverter(DispatchTestCase):
         result = trt_engine(source_tensor, indices_tensor, value_tensor)
 
         torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
+
+    def test_bool_mask_with_data_dependent_count(self):
+        # The True count is only known at runtime, while values has a static row count.
+        class AddRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask, :] += values  # Qwen3-VL adds visual embeddings this way
+                return data
+
+        class SetRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask] = values
+                return data
+
+        class SetRowsAtColumns(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask, torch.tensor([0, 2, 4, 5], device=data.device)] = values
+                return data
+
+        values = torch.randn(4, 8, device="cuda")
+        mask = torch.zeros(1, 10, dtype=torch.bool, device="cuda")
+        mask[0, 3:7] = True
+        one_true = torch.zeros(10, dtype=torch.bool, device="cuda")
+        one_true[5] = True
+        cases = [
+            (AddRows(), torch.randn(1, 10, 8, device="cuda"), mask, ()),
+            (SetRows(), torch.randn(10, 8, device="cuda"), mask[0], ()),
+            # One True entry broadcasts across the four column indices.
+            (
+                SetRowsAtColumns(),
+                torch.randn(10, 6, 8, device="cuda"),
+                mask[0],
+                (one_true,),
+            ),
+        ]
+        for model, data, case_mask, other_masks in cases:
+            with self.subTest(type(model).__name__):
+                inputs = (data, case_mask, values)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                for run_mask in (case_mask, *other_masks):
+                    torch.testing.assert_close(
+                        compiled(data, run_mask, values), model(data, run_mask, values)
+                    )
+                # A True count that differs from the value rows fails, as in PyTorch,
+                # which raises IndexError when the op runs outside TensorRT.
+                fewer = case_mask.clone()
+                fewer[..., 6] = False
+                with self.assertRaises((RuntimeError, IndexError)):
+                    compiled(data, fewer, values)
+
+    def test_runtime_length_one_broadcasts(self):
+        # A length known only at runtime that turns out to be 1 repeats, as in PyTorch.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("Skipped on tensorrt_rtx due to nonzero not supported")
+
+        class SetRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(
+                    data, [index], values[values > 0]
+                )
+
+        class SetColumns(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                column = torch.tensor([1], device=data.device)
+                return torch.ops.aten.index_put.default(
+                    data, [None, index, column], values[values > 0]
+                )
+
+        class SetPlanes(torch.nn.Module):
+            def forward(self, data, mask, values):
+                index = mask.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [None, index], values)
+
+        class SetPairs(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                return torch.ops.aten.index_put.default(
+                    data,
+                    [rows.nonzero().squeeze(1), columns.nonzero().squeeze(1)],
+                    values,
+                )
+
+        # Two indices and one value, then no index, run on one engine.
+        mask = torch.tensor([1, 0, 1, 0], device="cuda")
+        no_mask = torch.zeros_like(mask)
+        values = torch.tensor([7.0, -1.0], device="cuda")
+        data_1d = torch.zeros(4, device="cuda")
+        data_3d = torch.zeros(3, 4, 5, device="cuda")
+        scalar = torch.tensor(7.0, device="cuda")
+        cases = [
+            (SetRows(), [(data_1d, mask, values), (data_1d, no_mask, values)]),
+            (SetColumns(), [(data_3d, mask, values), (data_3d, no_mask, values)]),
+            (SetPlanes(), [(data_3d, mask, scalar), (data_3d, no_mask, scalar)]),
+            # One row and two columns broadcast to two pairs.
+            (
+                SetPairs(),
+                [
+                    (
+                        torch.zeros(4, 5, device="cuda"),
+                        torch.tensor([0, 0, 1, 0], device="cuda"),
+                        torch.tensor([1, 0, 0, 1, 0], device="cuda"),
+                        torch.tensor([3.0, 4.0], device="cuda"),
+                    )
+                ],
+            ),
+        ]
+        for case, (model, runs) in enumerate(cases):
+            with self.subTest(type(model).__name__, case=case):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, runs[0]),
+                    arg_inputs=runs[0],
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(left, [])
+                for inputs in runs:
+                    torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
+        # Values with no elements write nothing, and raise as in PyTorch once the index
+        # selects something.
+        empty = (
+            torch.zeros(3, 4, device="cuda"),
+            no_mask,
+            torch.zeros(3, 0, device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(SetPlanes(), empty),
+            arg_inputs=empty,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*empty), SetPlanes()(*empty))
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(empty[0], mask, empty[2])
+
+        # Two values for one selected column raise as in PyTorch rather than lose one.
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(SetColumns(), (data_3d, mask, values)),
+            arg_inputs=(data_3d, mask, values),
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        one_column = torch.tensor([1, 0, 0, 0], device="cuda")
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(data_3d, one_column, torch.tensor([5.0, 6.0], device="cuda"))
+
+    def test_computed_0d_index_and_value(self):
+        # A computed 0-d index or value, such as value + 1, must not gain a dim, or the
+        # values would move.
+        class AddOne(torch.nn.Module):
+            def forward(self, data, index, value):
+                return torch.ops.aten.index_put.default(data, [index], value + 1)
+
+        class NextColumn(torch.nn.Module):
+            def forward(self, data, index, values):
+                return torch.ops.aten.index_put.default(data, [None, index + 1], values)
+
+        class Gate(torch.nn.Module):
+            def forward(self, data, index):
+                return torch.ops.aten.index_put.default(
+                    data, [index > 0], torch.tensor(7.0)
+                )
+
+        index = torch.tensor(1, device="cuda")
+        cases = [
+            (
+                AddOne(),
+                (
+                    torch.arange(4.0, device="cuda"),
+                    index,
+                    torch.tensor(7.0, device="cuda"),
+                ),
+            ),
+            (
+                NextColumn(),
+                (
+                    torch.zeros(3, 4, 5, device="cuda"),
+                    index,
+                    torch.arange(15.0, device="cuda").reshape(3, 5),
+                ),
+            ),
+            # A 0-d mask from a comparison stays a mask.
+            (Gate(), (torch.arange(4.0, device="cuda").reshape(1, 4), index)),
+        ]
+        for model, inputs in cases:
+            with self.subTest(type(model).__name__):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
+    def test_0d_mask_fills_everything_or_nothing(self):
+        # PyTorch runs index_put with a 0-d mask as masked_fill, so the value goes to every
+        # element when the mask is True and to none when it is False.
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("Skipped on tensorrt_rtx due to nonzero not supported")
+
+        class PutWhenPositive(torch.nn.Module):
+            def forward(self, data, index):
+                return torch.ops.aten.index_put.default(
+                    data, [None, index > 0], torch.tensor(7.0)
+                )
+
+        # PyTorch fails inside index_put for values of more than one element, so these
+        # compare with input[mask] = values.
+        class PutRow(torch.nn.Module):
+            def forward(self, data, index, values):
+                return torch.ops.aten.index_put.default(data, [index > 0], values)
+
+        data = torch.arange(6.0, device="cuda").reshape(2, 3)
+        row = torch.arange(10.0, 13.0, device="cuda")
+        positive = torch.tensor(1, device="cuda")
+        cases = [
+            (PutWhenPositive(), (data, positive), None),
+            (PutRow(), (data, positive, row), row.expand(2, 3)),
+        ]
+        for model, inputs, expected in cases:
+            with self.subTest(f"{type(model).__name__}_{inputs[1].item()}"):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                if expected is None:
+                    expected = model(*inputs)
+                torch.testing.assert_close(compiled(*inputs), expected)
+
+        # Values that do not broadcast to the input shape are rejected.
+        for case, inputs in {
+            "more_dims": (data, positive, torch.zeros(1, 2, 3, device="cuda")),
+            "more_rows": (data[:1], positive, torch.zeros(2, 3, device="cuda")),
+            "longer_row": (data[:, :1], positive, row),
+        }.items():
+            with self.subTest(case):
+                with self.assertRaisesRegex(ValueError, "with a 0-d mask"):
+                    torchtrt.dynamo.compile(
+                        torch.export.export(PutRow(), inputs),
+                        arg_inputs=inputs,
+                        min_block_size=1,
+                        pass_through_build_failures=True,
+                    )
+
+        # int64 data stays exact when the mask is False.
+        big = torch.tensor([2**40, 2**40 + 3], device="cuda")
+        with self.subTest("int64_False"):
+
+            class PutFive(torch.nn.Module):
+                def forward(self, data, mask):
+                    return torch.ops.aten.index_put.default(
+                        data, [mask], torch.tensor(5)
+                    )
+
+            inputs = (big, torch.tensor(False, device="cuda"))
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(PutFive(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+            torch.testing.assert_close(compiled(*inputs), big)
+
+        # Values with the input's dynamic batch dim fit the input.
+        class PutScaled(torch.nn.Module):
+            def forward(self, data, index):
+                return torch.ops.aten.index_put.default(data, [index > 0], data * 10)
+
+        batch = torch.export.Dim("batch", min=1, max=8)
+        with self.subTest("dynamic_1"):
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(
+                    PutScaled(), (data, positive), dynamic_shapes=({0: batch}, None)
+                ),
+                arg_inputs=[
+                    torchtrt.Input(
+                        min_shape=(1, 3),
+                        opt_shape=(2, 3),
+                        max_shape=(8, 3),
+                        dtype=torch.float32,
+                    ),
+                    positive,
+                ],
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+            for rows in (2, 5):
+                x = torch.arange(3.0 * rows, device="cuda").reshape(rows, 3)
+                torch.testing.assert_close(compiled(x, positive), x * 10)
+
+        # PyTorch ignores a 0-d mask next to another index, so that index_put runs there.
+        class PutAtRows(torch.nn.Module):
+            def forward(self, data, index, rows):
+                return torch.ops.aten.index_put.default(
+                    data, [index > 0, rows], torch.tensor(7.0)
+                )
+
+        rows = torch.tensor([1], device="cuda")
+        with self.subTest("PutAtRows_1"):
+            inputs = (data, positive, rows)
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(PutAtRows(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+            torch.testing.assert_close(compiled(*inputs), PutAtRows()(*inputs))
+
+    def test_shapes_that_do_not_broadcast_raise(self):
+        # torch.export accepts these, so the converter has to reject them as PyTorch does.
+        class Put(torch.nn.Module):
+            def forward(self, data, a, b, values):
+                return torch.ops.aten.index_put.default(data, [a, b], values)
+
+        class PutOne(torch.nn.Module):
+            def forward(self, data, a, values):
+                return torch.ops.aten.index_put.default(data, [a], values)
+
+        class PutRows(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows = rows.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
+        class PutPairs(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows, columns = rows.nonzero().squeeze(1), columns.nonzero().squeeze(1)
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
+        class PutMesh(torch.nn.Module):
+            def forward(self, data, rows, columns, values):
+                rows, columns = rows.nonzero(), columns.nonzero().T
+                return torch.ops.aten.index_put.default(data, [rows, columns], values)
+
+        def compile_(model, inputs):
+            return torchtrt.dynamo.compile(
+                torch.export.export(model, inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                pass_through_build_failures=True,
+            )
+
+        def cuda(*values):
+            return torch.tensor(values, device="cuda")
+
+        seven = torch.tensor(7.0, device="cuda")
+        at_build = {
+            "index shapes (1, 2) and (1, 3)": (
+                Put(),
+                (
+                    torch.zeros(4, 4, device="cuda"),
+                    cuda([0, 2]),
+                    cuda([0, 1, 2]),
+                    seven,
+                ),
+            ),
+            "two values for rows of three": (
+                PutOne(),
+                (torch.zeros(4, 3, device="cuda"), cuda(0, 2), cuda(5.0, 7.0)),
+            ),
+            "no values for rows of three": (
+                PutPairs(),
+                (
+                    torch.zeros(4, 4, 3, device="cuda"),
+                    cuda(0, 0, 0, 0),
+                    cuda(0, 0, 0, 0),
+                    torch.zeros(0, device="cuda"),
+                ),
+            ),
+            "values with a dim more than x[i]": (
+                PutOne(),
+                (
+                    torch.zeros(4, device="cuda"),
+                    torch.tensor(2, device="cuda"),
+                    seven.reshape(1, 1),
+                ),
+            ),
+            "a mask of two for an input of four": (
+                PutOne(),
+                (
+                    torch.zeros(4, device="cuda"),
+                    torch.tensor([True, True], device="cuda"),
+                    seven,
+                ),
+            ),
+            "two indices for an input of one dim": (
+                Put(),
+                (torch.zeros(4, device="cuda"), cuda(0), cuda(1), seven),
+            ),
+            "values of four for rows of three and an empty index": (
+                PutOne(),
+                (
+                    torch.zeros(4, 3, device="cuda"),
+                    torch.zeros(0, dtype=torch.int64, device="cuda"),
+                    torch.ones(1, 4, device="cuda"),
+                ),
+            ),
+        }
+        for case, (model, inputs) in at_build.items():
+            with self.subTest(case):
+                if ENABLED_FEATURES.tensorrt_rtx and any(
+                    t.dtype == torch.bool for t in inputs
+                ):
+                    self.skipTest(
+                        "Skipped on tensorrt_rtx due to nonzero not supported"
+                    )
+                with self.assertRaises((ValueError, RuntimeError)):
+                    compile_(model, inputs)
+
+        # Sizes that disagree only at runtime fail there.
+        data = torch.zeros(4, 4, device="cuda")
+        two, three = cuda(1, 0, 1, 0), cuda(1, 1, 1, 0)
+        ones = torch.ones(2, 3, device="cuda")
+        at_runtime = {
+            "three rows and two fixed columns": (
+                PutRows(),
+                (two, cuda(0, 2), seven),
+                (three, cuda(0, 2), seven),
+            ),
+            "two rows and three selected columns": (
+                PutPairs(),
+                (two, cuda(0, 1, 0, 1), seven),
+                (two, three, seven),
+            ),
+            "values of shape (2, 3) for three rows and two columns": (
+                PutMesh(),
+                (two, three, ones),
+                (three, two, ones),
+            ),
+        }
+        for case, (model, valid, invalid) in at_runtime.items():
+            compiled = compile_(model, (data, *valid))
+            with self.subTest(case):
+                torch.testing.assert_close(compiled(data, *valid), model(data, *valid))
+                with self.assertRaises((RuntimeError, IndexError)):
+                    compiled(data, *invalid)
+
+    def test_one_element_cpu_value_fills_a_mask_whatever_its_shape(self):
+        # PyTorch runs this as masked_fill, which takes a one-element CPU value as a scalar.
+        class Fill(torch.nn.Module):
+            def forward(self, data, mask):
+                value = torch.full((1, 1, 1), 7.0)
+                return torch.ops.aten.index_put.default(data, [None, mask], value)
+
+        # torch.export takes the CPU value only next to CPU inputs.
+        exported = torch.export.export(
+            Fill(), (torch.zeros(2, 1, 1), torch.ones(1, 1, dtype=torch.bool))
+        )
+        data = torch.zeros(2, 1, 1, device="cuda")
+        masks = [
+            torch.tensor([[True]], device="cuda"),
+            torch.tensor([[False]], device="cuda"),
+        ]
+        compiled = torchtrt.dynamo.compile(
+            exported,
+            arg_inputs=(data, masks[0]),
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        for mask in masks:
+            torch.testing.assert_close(compiled(data, mask), Fill()(data, mask))
+
+        # masked_fill also ignores a None after the mask.
+        class FillWithTrailingNone(torch.nn.Module):
+            def forward(self, data, mask):
+                value = torch.tensor(7.0)
+                return torch.ops.aten.index_put.default(data, [mask, None], value)
+
+        inputs = (
+            torch.zeros(2, 3, device="cuda"),
+            torch.tensor([[True, False, True], [False, True, False]], device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(FillWithTrailingNone(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(*inputs), FillWithTrailingNone()(*inputs))
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
@@ -741,6 +1301,203 @@ class TestIndexPutConverter(DispatchTestCase):
                 f"max diff = {(result - torch_output).abs().max()}"
             )
 
+    @parameterized.expand([(torch.float32,), (torch.float16,), (torch.bfloat16,)])
+    def test_accumulate_needs_no_pytorch_plugin(self, dtype):
+        """With fallback_pytorch_plugin_ops, TensorRT sums duplicates and broadcasts values as eager."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # All 16 indices are row 1, and one 16 x 2 block of values broadcasts over them. Rounding to
+        # 16 bits after each add would keep the 1.0 entries at 2048, so only a float32 sum gives 2064.
+        inputs = (
+            torch.full((3, 16, 2), 2048.0, dtype=dtype, device="cuda"),
+            torch.tensor([1] * 15 + [-2], device="cuda"),
+            torch.tensor([[1.0, 1.0], [2.0, 2.0]] * 8, dtype=dtype, device="cuda"),
+        )
+
+        def compile_with(**settings):
+            compiled = torchtrt.dynamo.compile(
+                torch.export.export(Accumulate(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                **settings,
+            )
+            engines = [
+                module
+                for module in compiled.modules()
+                if isinstance(module, torchtrt.dynamo.runtime.TorchTensorRTModule)
+            ]
+            return compiled, engines
+
+        # Without the setting nothing changes: ScatterAdd, or PyTorch where it is missing.
+        _, engines = compile_with()
+        self.assertTrue(all(engine.pytorch_plugin_ops for engine in engines))
+        trt_mod, (engine,) = compile_with(fallback_pytorch_plugin_ops=True)
+        self.assertEqual(engine.pytorch_plugin_ops, [])
+        # Version 1 is an IPluginV2 and stays its own layer. TensorRT on Thor merges the
+        # IPluginV3 version 2 into a compiler region that needs far more build memory.
+        import tensorrt
+
+        v1 = tensorrt.get_plugin_registry().get_creator("ScatterElements", "1", "")
+        self.assertIn(
+            "[PLUGIN_V2]" if v1 is not None else "[PLUGIN_V3]", engine.get_layer_info()
+        )
+        torch.testing.assert_close(
+            trt_mod(*inputs), Accumulate()(*inputs), rtol=0, atol=0
+        )
+
+    def test_accumulate_values_that_do_not_broadcast_raise(self):
+        """With fallback_pytorch_plugin_ops, values that do not broadcast to x[index] raise, as in eager."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # Two values for rows of three.
+        inputs = (
+            torch.zeros(4, 3, device="cuda"),
+            torch.tensor([0, 2], device="cuda"),
+            torch.tensor([5.0, 7.0], device="cuda"),
+        )
+        with self.assertRaises(RuntimeError):
+            Accumulate()(*inputs)
+        with self.assertRaisesRegex(ValueError, "do not broadcast"):
+            torchtrt.dynamo.compile(
+                torch.export.export(Accumulate(), inputs),
+                arg_inputs=inputs,
+                min_block_size=1,
+                fallback_pytorch_plugin_ops=True,
+                pass_through_build_failures=True,
+            )
+
+        # Four values for rows of three, a count known only at runtime, fail there.
+        class AccumulateSelected(torch.nn.Module):
+            def forward(self, x, index, values, mask):
+                return x.index_put(
+                    (index,), values[mask.nonzero().squeeze(1)], accumulate=True
+                )
+
+        x, index = inputs[:2]
+        values = torch.tensor([5.0, 7.0, 9.0, 11.0], device="cuda")
+        three, four = (
+            torch.tensor([True, True, True, False], device="cuda"),
+            torch.tensor([True, True, True, True], device="cuda"),
+        )
+        compiled = torchtrt.dynamo.compile(
+            torch.export.export(AccumulateSelected(), (x, index, values, three)),
+            arg_inputs=(x, index, values, three),
+            min_block_size=1,
+            fallback_pytorch_plugin_ops=True,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(
+            compiled(x, index, values, three),
+            AccumulateSelected()(x, index, values, three),
+        )
+        with self.assertRaises((RuntimeError, IndexError)):
+            compiled(x, index, values, four)
+
+    def test_accumulate_index_forms_with_fallback_setting(self):
+        """With fallback_pytorch_plugin_ops, a bool mask stays in TensorRT and a 2-D index does not."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        cases = {
+            "bool mask": (
+                torch.zeros(5, 3, device="cuda"),
+                torch.tensor([True, False, True, True, False], device="cuda"),
+                torch.arange(9.0, device="cuda").reshape(3, 3),
+                0,
+            ),
+            # A 2-D index, as in an embedding gradient, runs in PyTorch.
+            "2-D index": (
+                torch.zeros(10, 4, device="cuda"),
+                torch.tensor([[1, 3, 3], [0, 9, 1]], device="cuda"),
+                torch.ones(2, 3, 4, device="cuda"),
+                1,
+            ),
+        }
+        for name, (x, index, values, left_to_pytorch) in cases.items():
+            with self.subTest(name):
+                inputs = (x, index, values)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(Accumulate(), inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), left_to_pytorch)
+                torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
+
+    def test_accumulate_scatter_add_leaves_mask_and_leading_none_to_pytorch(self):
+        """ScatterAdd drops None and casts a bool mask to indices, so these run in PyTorch."""
+        import tensorrt
+
+        if (
+            tensorrt.get_plugin_registry().get_creator(
+                "ScatterAdd", "1", "torch_tensorrt"
+            )
+            is None
+        ):
+            pytest.skip("needs Torch-TensorRT's ScatterAdd plugin")
+
+        class ColumnAccumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return torch.ops.aten.index_put.default(x, [None, index], values, True)
+
+        class MaskAccumulate(torch.nn.Module):
+            def forward(self, x, mask, values):
+                return x.index_put((mask,), values, accumulate=True)
+
+        cases = {
+            "None before the index": (
+                ColumnAccumulate(),
+                torch.zeros(4, 8, device="cuda"),
+                torch.tensor([1, 1, 5], device="cuda"),
+                torch.ones(4, 3, device="cuda"),
+            ),
+            "bool mask": (
+                MaskAccumulate(),
+                torch.zeros(6, 4, device="cuda"),
+                torch.tensor([True, False, True, True, False, True], device="cuda"),
+                torch.ones(4, 4, device="cuda"),
+            ),
+        }
+        for name, (model, *inputs) in cases.items():
+            with self.subTest(name):
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                )
+                # Checked before running, since ScatterAdd aborts the process on these.
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), 1)
+                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+
     def test_accumulate_expanded_values_3d(self):
         """accumulate=True with 3-D source and broadcast mesh indices — mirrors the
         second half of PyTorch's test_index_put_accumulate_expanded_values.
@@ -810,6 +1567,25 @@ class TestIndexPutConverter(DispatchTestCase):
         assert torch.allclose(
             result, torch_output, atol=1e-4, rtol=1e-4
         ), f"Empty-index no-op mismatch: {result} vs {torch_output}"
+
+    def test_zero_size_free_dimension_no_op(self):
+        """A size of 0 in a dimension that is not indexed also leaves nothing to write."""
+
+        class PutRows(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values)
+
+        inputs = (
+            torch.zeros(4, 0, device="cuda"),
+            torch.zeros(2, 0, device="cuda"),
+            torch.tensor([1, 2], device="cuda"),
+        )
+        trt_mod = torchtrt.dynamo.compile(
+            torch.export.export(PutRows(), inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+        )
+        torch.testing.assert_close(trt_mod(*inputs), PutRows()(*inputs))
 
     def test_index_ind_dtype_int_vs_long(self):
         """int32 and int64 index tensors must produce identical results.
@@ -907,6 +1683,120 @@ class TestIndexPutConverter(DispatchTestCase):
         assert torch.allclose(
             result, torch_output, atol=1e-4, rtol=1e-4
         ), f"Non-contiguous accumulate mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_accumulate_dynamic_shape_that_can_reach_2_31_elements(self):
+        """With fallback_pytorch_plugin_ops, a dynamic shape that can reach 2**31 elements runs in PyTorch."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        # ScatterElements reads past its buffers once the updates reach 2**31 elements. The
+        # validator sees only the exported range, so an unbounded one cannot be trusted. A long
+        # index makes the updates larger than the input, and more rows make the input larger.
+        for rows, max_columns, exported_max, index_length, left_to_pytorch in (
+            (4, 2**20, 2**20, 4, 0),
+            (4, 2**29, 2**29, 4, 1),
+            (4, 2**20, None, 4, 1),
+            (4, 2**20, 2**20, 4096, 1),
+            (8, 2**28, 2**28, 4, 1),
+        ):
+            inputs = (
+                torch.zeros(rows, 64, device="cuda"),
+                torch.tensor([0, 0, 1, 3], device="cuda").repeat(index_length // 4),
+                torch.ones(1, 1, device="cuda"),
+            )
+            with self.subTest(
+                rows=rows,
+                max_columns=max_columns,
+                exported_max=exported_max,
+                index_length=index_length,
+            ):
+                columns = torch.export.Dim("columns", min=2, max=exported_max)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(
+                        Accumulate(),
+                        inputs,
+                        dynamic_shapes=({1: columns}, None, None),
+                    ),
+                    arg_inputs=[
+                        torchtrt.Input(
+                            min_shape=(rows, 2),
+                            opt_shape=(rows, 64),
+                            max_shape=(rows, max_columns),
+                            dtype=torch.float32,
+                        ),
+                        *inputs[1:],
+                    ],
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                left = [
+                    node
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                    if node.target is torch.ops.aten.index_put.default
+                ]
+                self.assertEqual(len(left), left_to_pytorch)
+                torch.testing.assert_close(compiled(*inputs), Accumulate()(*inputs))
+
+    def test_accumulate_mask_of_another_length_with_fallback_setting(self):
+        """A bool mask that does not match its dimension stays in PyTorch, which rejects it."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, mask, values):
+                return x.index_put((mask,), values, accumulate=True)
+
+        for length in (3, 5):
+            with self.subTest(length=length):
+                mask = torch.tensor([True, False] * 3, device="cuda")[:length]
+                inputs = (
+                    torch.zeros(4, device="cuda"),
+                    mask,
+                    torch.tensor(7.0, device="cuda"),
+                )
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(Accumulate(), inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    fallback_pytorch_plugin_ops=True,
+                )
+                with self.assertRaises(IndexError):
+                    Accumulate()(*inputs)
+                with self.assertRaises(IndexError):
+                    compiled(*inputs)
+
+    def test_accumulate_serialized_engine_needs_no_pytorch_plugin(self):
+        """The serialized engine export honors fallback_pytorch_plugin_ops too."""
+        if ENABLED_FEATURES.tensorrt_rtx:
+            pytest.skip("TensorRT's ScatterElements plugin is not available in TRT RTX")
+
+        class Accumulate(torch.nn.Module):
+            def forward(self, x, index, values):
+                return x.index_put((index,), values, accumulate=True)
+
+        inputs = (
+            torch.zeros(4, 3, device="cuda"),
+            torch.tensor([0, 2, 2], device="cuda"),
+            torch.ones(3, 3, device="cuda"),
+        )
+        engine = torchtrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+            torch.export.export(Accumulate(), inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            fallback_pytorch_plugin_ops=True,
+        )
+        self.assertFalse(b"ScatterAdd" in engine)
+        self.assertTrue(b"ScatterElements" in engine)
+        trt_mod = torchtrt.dynamo.runtime.TorchTensorRTModule(
+            engine, ["x", "index", "values"], ["output0"]
+        )
+        torch.testing.assert_close(trt_mod(*inputs), Accumulate()(*inputs))
 
     def test_accumulate_expanded_values_broadcast(self):
         """accumulate=True with value broadcasting — 0D scalar and 1D values

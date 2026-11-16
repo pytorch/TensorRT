@@ -339,3 +339,203 @@ Benchmarking Checklist
      - For latency workloads: enable CUDA graphs
    * - ☐
      - For large models: try weight streaming or INT8 quantization
+
+----
+
+Global Performance Tuning
+-------------------------
+
+TensorRT's
+`Global Performance Tuning <https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/tuning.html>`_
+searches internal builder knobs, collectively called a *build route*, for a faster
+engine. Torch-TensorRT exposes this capability for Dynamo TRT partitions.
+
+The feature requires a TensorRT build with Global Performance Tuning support. It is
+available starting with TensorRT 11.1 and is currently unavailable with TensorRT-RTX
+or on Windows. Check the installed build before configuring a sweep:
+
+.. code-block:: python
+
+    from torch_tensorrt.dynamo import is_global_perf_tuning_available
+
+    if not is_global_perf_tuning_available():
+        raise RuntimeError("Global Performance Tuning is unavailable")
+
+Discovering and applying build routes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``get_all_build_routes()`` is the Torch-TensorRT equivalent of
+``trtexec --helpBuildRoute``:
+
+.. code-block:: python
+
+    from torch_tensorrt.dynamo import get_all_build_routes
+
+    knobs = get_all_build_routes()
+    print("tuner version:", knobs["tuner_version"])
+    for knob in knobs["tuner_options"]:
+        print(knob["allowed_values"], knob["default_value"])
+
+A route is a space-separated sequence of ``-knob=value`` tokens. Using ``build_route``
+to apply a known route without running a search:
+
+.. code-block:: python
+
+    trt_model = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        build_route="-slice_fusion=off -kgen:codegen:cuda_tile=1",
+    )
+
+Route expressions use brackets to provide the values to search. They can contain
+Boolean values, finite enums, or an explicit subset of an open-ended integer knob:
+
+.. code-block:: text
+
+    -match_ragged_mha=[on|off]
+    -kgen:codegen:cuda_tile=[0|1|2|3]
+    -cask_fusion:num_tactics=[10|20]
+    -peep:max=[1|2]
+
+For an open-ended knob, Torch-TensorRT searches only the values explicitly listed in
+the expression; it does not invent a range. A fixed token such as
+``-slice_fusion=off`` is included in every route and does not increase the number of
+trials.
+
+Running a sweep
+^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+    trt_model = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        tune_build_routes=(
+            "-match_ragged_mha=[on|off] "
+            "-kgen:codegen:cuda_tile=[0|1|2|3]"
+        ),
+        tuning_search="mixed",
+        accuracy_threshold=0.01,
+        accuracy_algorithm="cos",
+        tuning_cache_file="/tmp/torch_trt_tune.jsonl",
+    )
+
+Tuning is performed independently for each TRT partition. Use
+``require_full_compilation=True`` when the model should be tuned as one engine, which
+is closest to whole-network ``trtexec`` behavior.
+
+The search algorithms are:
+
+* ``fast``: build one baseline, then change one knob at a time. For knobs with
+  ``n_i`` candidate values, this produces ``1 + sum(n_i - 1)`` trials.
+* ``full``: build the Cartesian product of all candidate values. This produces
+  ``product(n_i)`` trials and can become expensive quickly.
+* ``mixed``: run ``fast`` first, then build combinations of only the knobs for which
+  at least one one-at-a-time value was faster than the baseline. Duplicate routes
+  between the two phases are not rebuilt.
+
+If the TensorRT default for a knob is not present in the expression, ``fast`` and
+``mixed`` use the first listed value as that knob's baseline. Timing comparisons are
+strict; any finite value below the baseline marks the knob as improved. Small timing
+fluctuations can therefore expand a ``mixed`` search. Use ``full`` for exhaustive,
+repeatable route coverage, and start with ``fast`` when compile time matters.
+
+``tuning_dry_run=True`` prints the expanded routes without building engines. It
+requires ``tune_build_routes`` or ``tune_build_route_file`` and cannot be combined
+with ``mixed``.
+
+Process isolation
+^^^^^^^^^^^^^^^^^
+
+Each trial is built, checked, and benchmarked in a fresh process created with the
+Python ``spawn`` start method. A TensorRT or driver abort terminates only that child.
+The parent checks the child exit status and the atomically published result before
+continuing to the next route.
+
+Because ``spawn`` imports the main module in each child, executable scripts must use
+the standard entry-point guard:
+
+.. code-block:: python
+
+    def main():
+        torch_tensorrt.compile(...)
+
+
+    if __name__ == "__main__":
+        main()
+
+Without this guard, a child can execute the compile call again while it is still
+starting, causing a multiprocessing bootstrapping error.
+
+Input samples, accuracy, and timing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Torch-TensorRT materializes one deterministic set of example tensors in the parent
+and uses it for every route. Generated samples use a local fixed seed without
+changing the application's RNG state.
+
+When ``accuracy_threshold`` is set, eager Torch reference outputs are computed once
+before the sweep. The outputs are moved to CPU for safe transfer and moved to the
+target GPU in each child for comparison with that trial's TRT outputs. Nested
+``list``, ``tuple``, and ``dict`` outputs are checked tensor by tensor. If any output
+has a non-finite loss or exceeds the threshold, that route cannot win. Setting
+``accuracy_threshold=None`` skips both reference execution and accuracy checking.
+
+Supported metrics are ``l0``, ``l1``, ``l2``, ``lInf``, and ``cos``; lower is better.
+``accuracy_atol`` and ``accuracy_rtol`` apply only to ``l0``. Each successful route is
+warmed up three times and measured ten times with CUDA events. The recorded
+``gpu_time`` is the median latency in milliseconds.
+
+Cache and resume
+^^^^^^^^^^^^^^^^
+
+``tuning_cache_file`` is a base path. For example, ``/tmp/tune.jsonl`` produces one
+``/tmp/tune.<partition_key>.jsonl`` file per TRT partition. The first JSONL row stores
+the sweep configuration and later rows store each completed trial.
+
+Resume an interrupted sweep by supplying only the same base path:
+
+.. code-block:: python
+
+    trt_model = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        tuning_continue=True,
+        tuning_cache_file="/tmp/torch_trt_tune.jsonl",
+    )
+
+Do not combine ``tuning_continue=True`` with a new route expression or
+``tuning_dry_run``. Mixed-search phases are reconstructed from the global iteration
+indices and the completed fast-phase results.
+
+The cache deliberately uses a lightweight graph fingerprint and a simple,
+``trtexec``-like JSONL layout. It is not interchangeable with a ``trtexec`` cache and
+does not fully identify weights, input profiles, compilation settings, or hardware.
+Use a different base path, or remove the old partition files, after changing any of
+those inputs.
+
+Failures and resource usage
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some knob values are model-dependent and may fail to build. Failed children and
+accuracy failures are recorded with ``crash=true`` or a non-empty ``error_message``
+and are excluded from winner selection. If all routes fail, tuning raises an error
+instead of returning an invalid engine.
+
+Trial payload and result files are temporary and are removed after each candidate.
+Only the current winner's engine bytes are retained during a new sweep. When engine
+caching is enabled and the engine is eligible for weight stripping/refit, only the
+final winner is inserted into the configured Engine Cache.
+
+``tuning_timeout_s`` limits search time. When the remaining budget expires, the
+active child is killed and recorded as failed, and no additional search trial is
+started. Use ``-1`` to disable the timeout.
+
+Build-route performance is specific to the model, input profile, GPU, and TensorRT
+version. Re-tune after changing any of them. Full and mixed sweeps can multiply
+compilation time, especially for models with multiple TRT partitions.
+
+See :ref:`global_perf_tuning_attention_example` for a runnable attention example.

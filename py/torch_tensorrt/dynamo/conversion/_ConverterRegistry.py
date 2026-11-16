@@ -85,6 +85,7 @@ class ConverterSupport:
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
+        requires_pytorch_plugin: Boolean flag indicating if the converter inserts a TensorRT plugin whose kernel runs PyTorch (for example Torch-TensorRT's ScatterAdd, or a generated plugin without an AOT kernel), so the engine only runs in a process with PyTorch.
     """
 
     converter_implementation: ConverterImplSignature
@@ -95,6 +96,7 @@ class ConverterSupport:
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
     requires_aliased_plugin_io: bool = False
+    requires_pytorch_plugin: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -209,6 +211,7 @@ def dynamo_tensorrt_converter(
     requires_output_allocator: bool = False,
     requires_native_multidevice: bool = False,
     requires_aliased_plugin_io: bool = False,
+    requires_pytorch_plugin: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -228,6 +231,7 @@ def dynamo_tensorrt_converter(
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_native_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
         requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
+        requires_pytorch_plugin: Boolean flag indicating if the converter inserts a TensorRT plugin whose kernel runs PyTorch (for example Torch-TensorRT's ScatterAdd, or a generated plugin without an AOT kernel), so the engine only runs in a process with PyTorch.
     Returns:
         The converter being decorated
     """
@@ -244,6 +248,7 @@ def dynamo_tensorrt_converter(
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
                 requires_aliased_plugin_io=requires_aliased_plugin_io,
+                requires_pytorch_plugin=requires_pytorch_plugin,
             )
         else:
             assert callable(
@@ -256,6 +261,7 @@ def dynamo_tensorrt_converter(
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
                 requires_aliased_plugin_io=requires_aliased_plugin_io,
+                requires_pytorch_plugin=requires_pytorch_plugin,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -473,6 +479,16 @@ class ConverterRegistry:
                 if isinstance(converters, (list, tuple)):
                     logger.debug(f"Converter options for {key}: {len(converters)}")
                     for i, candidate in enumerate(converters):
+                        if (
+                            candidate.requires_pytorch_plugin
+                            and self.compilation_settings is not None
+                            and self.compilation_settings.fallback_pytorch_plugin_ops
+                        ):
+                            logger.debug(
+                                f"Skipping option {i} for {key}: it inserts a plugin "
+                                "that runs PyTorch and fallback_pytorch_plugin_ops is set"
+                            )
+                            continue
                         # We enable the converter under 4 conditions
                         # 1) capability validator is True
                         # 2) Assume dynamic_shape support is True
@@ -496,6 +512,7 @@ class ConverterRegistry:
                                     "requires_output_allocator": candidate.requires_output_allocator,
                                     "requires_native_multidevice": candidate.requires_native_multidevice,
                                     "requires_aliased_plugin_io": candidate.requires_aliased_plugin_io,
+                                    "requires_pytorch_plugin": candidate.requires_pytorch_plugin,
                                 },
                             )
                         else:
@@ -514,6 +531,7 @@ class ConverterRegistry:
                                 "requires_output_allocator": False,
                                 "requires_native_multidevice": False,
                                 "requires_aliased_plugin_io": False,
+                                "requires_pytorch_plugin": False,
                             },
                         )
 

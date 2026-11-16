@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
@@ -61,6 +62,61 @@ class TestMulConverter(DispatchTestCase):
             mul(),
             inputs,
         )
+
+    @parameterized.expand(
+        [
+            ("one_element", (1,)),
+        ]
+    )
+    def test_mul_0d_tensor_by_constant_tensor(self, _, shape):
+        """A 0-dim tensor times a constant tensor takes the constant's shape. This guards
+        that only a Python scalar next to a 0-dim tensor becomes 0-dim."""
+
+        class mul(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("scale", torch.randn(shape))
+
+            def forward(self, x):
+                return torch.ops.aten.mul.Tensor(
+                    torch.ops.aten.select.int(x, 0, 0), self.scale
+                )
+
+        inputs = [torch.randn(4)]
+        self.run_test(
+            mul(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            ("int_size", lambda a: a[0, 0] * a.shape[0]),
+        ]
+    )
+    def test_mul_0d_tensor_by_dynamic_size_stays_0d(self, _, scaled):
+        """A 0-dim tensor times a size read from a dynamic shape is 0-dim, as with a
+        Python number, so the two can be stacked."""
+
+        class mul(nn.Module):
+            def forward(self, a):
+                return torch.stack([scaled(a), a[0, 1] * 2.0])
+
+        a = torch.randn(4, 3, device="cuda")
+        batch = torch.export.Dim("batch", min=2, max=16)
+        program = torch.export.export(mul(), (a,), dynamic_shapes=({0: batch},))
+        compiled = torch_tensorrt.dynamo.compile(
+            program,
+            arg_inputs=[
+                torch_tensorrt.Input(
+                    min_shape=(2, 3), opt_shape=(4, 3), max_shape=(16, 3)
+                )
+            ],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        for n in (2, 4, 7):
+            x = torch.randn(n, 3, device="cuda")
+            torch.testing.assert_close(compiled(x), mul()(x))
 
 
 if __name__ == "__main__":

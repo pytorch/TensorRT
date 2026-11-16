@@ -43,6 +43,7 @@ repos:
       rev: "v1.15.0"
       hooks:
           - id: mypy
+            additional_dependencies: [types-PyYAML]
             exclude: "^py/torch_tensorrt/fx|^examples|^tests|^py/torch_tensorrt/dynamo/_experimental|^tools|^docs|noxfile.py|setup.py|versions.py"
     - repo: https://github.com/astral-sh/ruff-pre-commit
       # Ruff version.

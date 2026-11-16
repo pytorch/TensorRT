@@ -1,0 +1,14 @@
+{
+  "details": {
+    "completed": 1,
+    "total": 2
+  },
+  "job_id": "example-job",
+  "kind": "progress",
+  "report_type": "event",
+  "schema_version": "0.1",
+  "sequence": 1,
+  "stage": "build",
+  "stage_id": "engine-0",
+  "timestamp": "2026-10-12T00:00:00Z"
+}
