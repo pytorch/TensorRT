@@ -240,6 +240,14 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
        regions.
+   * - ``autocast_vector_norm_in_low_precision``
+     - ``False``
+     - Whether a 2-norm, ``torch.linalg.vector_norm(x)`` as ``F.normalize`` uses it,
+       that autocast runs in the low precision type is written as ``sqrt(sum(x * x))``
+       in that type. By default PyTorch computes it in FP32 for a float16 or bfloat16
+       ``x``, as eager does, which adds casts around it. TensorRT then chooses how to
+       square and sum in float16, and a float16 sum of squares overflows for a norm above
+       about 256, so check the accuracy, or keep such norms in FP32 with the exclusions.
 
 ----
 
@@ -546,6 +554,7 @@ rebuilt from scratch:
 ``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
+``autocast_vector_norm_in_low_precision``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
