@@ -75,6 +75,41 @@ class TestProdConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ("all", None, False),
+            ("dim", 1, False),
+            ("dim_keepdim", 1, True),
+        ]
+    )
+    def test_prod_int32_accumulates_in_int64(self, _, dim, keep_dims):
+        # PyTorch multiplies integers in int64: 250**4 is past 2**31.
+        class Prod(nn.Module):
+            def forward(self, x):
+                if dim is None:
+                    return torch.prod(x)
+                return torch.prod(x, dim, keep_dims)
+
+        inputs = [torch.full((2, 4), 250, dtype=torch.int32)]
+        self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
+
+    def test_prod_bool(self):
+        class Prod(nn.Module):
+            def forward(self, x):
+                return torch.prod(x, 1)
+
+        inputs = [torch.tensor([[True, True], [True, False]])]
+        self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
+
+    def test_prod_int32_is_exact_past_2_24(self):
+        # 4097 * 4097 fits in int32 but is past 2**24, where float32 rounds.
+        class Prod(nn.Module):
+            def forward(self, x):
+                return torch.prod(x, dtype=torch.int32)
+
+        inputs = [torch.tensor([4097, 4097], dtype=torch.int32)]
+        self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
+
+    @parameterized.expand(
+        [
             (0, (2, 3), (2, 4), (3, 5)),
             (1, (2, 3), (2, 4), (3, 5)),
             (2, (2, 2, 4), (2, 3, 4), (3, 4, 5)),

@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -113,6 +114,94 @@ class TestSumConverter(DispatchTestCase):
             Sum(),
             inputs,
         )
+
+    @parameterized.expand(
+        [
+            ("all", None, False),
+            ("dim", 1, False),
+            ("dim_keepdim", 1, True),
+        ]
+    )
+    def test_sum_int32_accumulates_in_int64(self, _, dim, keep_dims):
+        # PyTorch sums integers in int64. This total is past 2**31, and its partial sums
+        # are past 2**24, where float32 rounds.
+        class Sum(nn.Module):
+            def forward(self, x):
+                if dim is None:
+                    return torch.ops.aten.sum.default(x)
+                return torch.ops.aten.sum.dim_IntList(x, [dim], keep_dims)
+
+        inputs = [torch.full((2, 4), 2**30 + 1, dtype=torch.int32)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    def test_sum_bool_accumulates_in_int64(self):
+        # The count is int64 in the engine too, so its square does not wrap.
+        class Sum(nn.Module):
+            def forward(self, x):
+                count = torch.ops.aten.sum.default(x)
+                return count * count
+
+        inputs = [torch.ones(70000, dtype=torch.bool)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("all", None, torch.int64, torch.int32, 2**30 + 1, 8),
+            ("dim", 1, torch.int64, torch.int32, 2**30 + 1, 8),
+            ("int32", None, torch.int32, torch.int32, 2**24 + 1, 4),
+            ("float", None, torch.float32, torch.float16, 1000.0, 4096),
+        ]
+    )
+    def test_sum_dtype(self, _, dim, dtype, input_dtype, value, size):
+        class Sum(nn.Module):
+            def forward(self, x):
+                if dim is None:
+                    return torch.ops.aten.sum.default(x, dtype=dtype)
+                return torch.ops.aten.sum.dim_IntList(x, [dim], dtype=dtype)
+
+        inputs = [torch.full((2, size // 2), value, dtype=input_dtype)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    def test_sum_dtype_int32_wraps(self):
+        # PyTorch wraps the int32 total to 4 before adding the int64 value.
+        class Sum(nn.Module):
+            def forward(self, x, y):
+                return torch.ops.aten.sum.default(x, dtype=torch.int32) + y
+
+        inputs = [
+            torch.full((4,), 2**30 + 1, dtype=torch.int32),
+            torch.ones(1, dtype=torch.int64),
+        ]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("int8_dtype", torch.int32, torch.int8, False),
+            ("int8_input", torch.int8, None, False),
+            ("float64_from_int32", torch.int32, torch.float64, True),
+        ]
+    )
+    def test_sum_without_tensorrt_type_runs_in_pytorch(
+        self, _, input_dtype, dtype, truncate_double
+    ):
+        # TensorRT cannot reduce int8, and float32 cannot hold an int32 sum in place of
+        # float64, so the sum stays in PyTorch.
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.sum(x, dtype=dtype)
+
+        model = Sum().eval().cuda()
+        x = torch.full((300,), 100, dtype=input_dtype, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            truncate_double=truncate_double,
+        )
+        self.assertFalse(
+            any("_run_on_acc" in name for name, _ in compiled.named_children())
+        )
+        torch.testing.assert_close(compiled(x), model(x))
 
 
 class TestPrimsSumConverter(DispatchTestCase):

@@ -133,11 +133,6 @@ def prod(
     dim: Optional[Union[int, Sequence[int]]],
     keepdim: bool,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
-
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
 

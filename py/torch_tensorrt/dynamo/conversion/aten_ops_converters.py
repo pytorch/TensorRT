@@ -2604,9 +2604,100 @@ def aten_ops_amin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.sum.default, supports_dynamic_shapes=True)
+def _sum_prod_dtype(kwargs: Dict[str, Argument]) -> Any:
+    # prims.sum names the argument output_dtype; it means the same as dtype.
+    return kwargs.get("dtype", kwargs.get("output_dtype"))
+
+
+def sum_prod_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep a sum or prod on the PyTorch path when TensorRT cannot compute it.
+
+    TensorRT treats int8 as a quantized type, so it cannot reduce or cast an int8 input,
+    and it cannot reduce into int8, uint8, int16 or bool. A float64 result runs as
+    float32 only with truncate_double, from a type float32 holds exactly, as for _to_copy.
+    """
+    input_dtype = getattr(getattr(node.args[0], "meta", {}).get("val"), "dtype", None)
+    output_dtype = getattr(node.meta.get("val"), "dtype", None)
+    if input_dtype != torch.int8 and (
+        output_dtype
+        in (
+            None,
+            torch.float32,
+            torch.float16,
+            torch.bfloat16,
+            torch.int32,
+            torch.int64,
+        )
+        or (
+            output_dtype == torch.float64
+            and input_dtype in impl.cast.FLOAT64_TRUNCATABLE_SOURCES
+            and settings is not None
+            and settings.truncate_double
+        )
+    ):
+        return True
+    _LOGGER.debug(
+        f"{node.target} from {input_dtype} to {output_dtype} is not supported, falling back"
+    )
+    return False
+
+
+def _sum_prod(
+    ctx: ConversionContext,
+    target: Target,
+    name: str,
+    reduce: Callable[..., TRTTensor],
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+) -> TRTTensor:
+    """Reduce in the dtype PyTorch gives the result: the requested dtype, else int64 for a
+    bool or integer input, except that prims.sum keeps the input dtype.
+
+    TensorRT reduces int32 through float32, which rounds past 2**24, so an integer result
+    is reduced in int64 and then cast, which wraps like PyTorch.
+    """
+    input_val = args[0]
+    dtype = _sum_prod_dtype(kwargs)
+    if dtype is None:
+        dtype = _enums.dtype._from(input_val.dtype).to(torch.dtype)
+        if not dtype.is_floating_point and target != torch.ops.prims.sum.default:
+            dtype = torch.int64
+    elif dtype == torch.float64:
+        dtype = torch.float32
+    accumulate = dtype if dtype.is_floating_point else torch.int64
+    result = reduce(
+        ctx,
+        target,
+        get_ir(target),
+        name,
+        impl.cast.to_copy(
+            ctx, target, SourceIR.ATEN, f"{name}_input", input_val, accumulate
+        ),
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+    return impl.cast.to_copy(
+        ctx, target, SourceIR.ATEN, f"{name}_output", result, dtype
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.dim_IntList,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.prims.sum.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -2614,32 +2705,19 @@ def aten_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    sum_ = impl.reduce.sum(
-        ctx,
-        target,
-        get_ir(target),
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
-
-    if kwargs.get("output_dtype", None) is not None:
-        return impl.cast.to_copy(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name,
-            sum_,
-            kwargs["output_dtype"],
-            force_layer=False,  # force_layer=False results in better performance
-        )
-    else:
-        return sum_
+    return _sum_prod(ctx, target, name, impl.reduce.sum, args, kwargs)
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.prod.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.dim_int,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_prod(
     ctx: ConversionContext,
     target: Target,
@@ -2647,15 +2725,7 @@ def aten_ops_prod(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.prod(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
+    return _sum_prod(ctx, target, name, impl.reduce.prod, args, kwargs)
 
 
 @dynamo_tensorrt_converter(
