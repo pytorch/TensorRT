@@ -100,5 +100,64 @@ class TestOneShotDecomp(unittest.TestCase):
         self.assertFalse(matching_decomp_stamp(exported_program, decomp_fingerprint()))
 
 
+class _ScatterAdd(torch.nn.Module):
+    def forward(
+        self, base: torch.Tensor, index: torch.Tensor, src: torch.Tensor
+    ) -> torch.Tensor:
+        return torch.ops.aten.scatter_add.default(base, 0, index, src)
+
+
+class TestOneShotDecompShapeDependent(unittest.TestCase):
+    """scatter_add decomposes only when the index extent is static, which export
+    cannot know before tracing, so export defers it to compile."""
+
+    def setUp(self) -> None:
+        self.model = _ScatterAdd().eval()
+        self.inputs = (
+            torch.zeros((16, 8)),
+            torch.zeros((4, 8), dtype=torch.int64),
+            torch.ones((16, 8)),
+        )
+
+    def _targets(self, exported_program: torch.export.ExportedProgram) -> set:
+        return {
+            node.target
+            for node in exported_program.graph.nodes
+            if node.op == "call_function"
+        }
+
+    def test_symbolic_extent_exports_and_keeps_scatter_add(self) -> None:
+        index_rows = torch.export.Dim("index_rows", min=1, max=16)
+        exported_program = export_with_tensorrt_decomps(
+            self.model,
+            args=self.inputs,
+            dynamic_shapes={"base": {}, "index": {0: index_rows}, "src": {}},
+        )
+        self.assertTrue(matching_decomp_stamp(exported_program, decomp_fingerprint()))
+        with patch.object(
+            type(exported_program),
+            "run_decompositions",
+            wraps=exported_program.run_decompositions,
+        ) as mocked:
+            lowered = maybe_run_decompositions(exported_program)
+            mocked.assert_not_called()
+        self.assertIn(torch.ops.aten.scatter_add.default, self._targets(lowered))
+
+    def test_static_extent_decomposes_scatter_add_in_compile(self) -> None:
+        exported_program = export_with_tensorrt_decomps(self.model, args=self.inputs)
+        self.assertIn(
+            torch.ops.aten.scatter_add.default, self._targets(exported_program)
+        )
+        with patch.object(
+            type(exported_program),
+            "run_decompositions",
+            wraps=exported_program.run_decompositions,
+        ) as mocked:
+            lowered = maybe_run_decompositions(exported_program)
+            mocked.assert_called_once()
+        self.assertNotIn(torch.ops.aten.scatter_add.default, self._targets(lowered))
+        self.assertTrue(matching_decomp_stamp(lowered, decomp_fingerprint()))
+
+
 if __name__ == "__main__":
     unittest.main()
