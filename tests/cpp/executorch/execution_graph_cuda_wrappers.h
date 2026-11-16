@@ -61,6 +61,7 @@ struct CudaCalls {
   // Each allocation that succeeds is filled with this byte before it is handed back, unless negative.
   int fill_allocations_with = -1;
   size_t free_calls = 0;
+  std::vector<void*> frees;
   size_t memcpy_calls = 0;
   // The copy with this 1-based count fails without being queued.
   size_t fail_memcpy_call = 0;

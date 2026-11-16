@@ -222,6 +222,7 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
 cudaError_t __wrap_cudaFree(void* pointer) {
   if (active_calls && pointer) {
     ++active_calls->free_calls;
+    active_calls->frees.push_back(pointer);
   }
   return __real_cudaFree(pointer);
 }
