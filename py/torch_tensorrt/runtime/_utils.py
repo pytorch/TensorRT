@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Optional, Protocol, Tuple
+from typing import Protocol
 
 import torch
 import torch_tensorrt
@@ -73,70 +73,3 @@ def _is_switch_required(
         return True
 
     return False
-
-
-def _select_rt_device(
-    curr_device_id: int,
-    engine_device_id: int,
-    engine_device_properties: _ComparableDeviceProps,
-) -> Tuple[int, torch._C._CudaDeviceProperties]:
-    """Wraps compatible device check and raises error if none are found"""
-    new_target_device_opt = _get_most_compatible_device(
-        curr_device_id, engine_device_id, engine_device_properties
-    )
-
-    assert (
-        new_target_device_opt is not None
-    ), "Could not find a compatible device on the system to run TRT Engine"
-
-    return new_target_device_opt
-
-
-def _get_most_compatible_device(
-    curr_device_id: int,
-    engine_device_id: int,
-    engine_device_properties: _ComparableDeviceProps,
-) -> Optional[Tuple[int, torch._C._CudaDeviceProperties]]:
-    """Selects a runtime device based on compatibility checks"""
-    all_devices = [
-        (i, torch.cuda.get_device_properties(i))
-        for i in range(torch.cuda.device_count())
-    ]
-    logger.debug(f"All available devices: {all_devices}")
-    target_device_sm = (engine_device_properties.major, engine_device_properties.minor)
-
-    # Any devices with the same SM capability are valid candidates
-    candidate_devices = [
-        (i, device_properties)
-        for i, device_properties in all_devices
-        if (device_properties.major, device_properties.minor) == target_device_sm
-    ]
-
-    logger.debug(f"Found candidate devices: {candidate_devices}")
-
-    # If less than 2 candidates are found, return
-    if len(candidate_devices) <= 1:
-        return candidate_devices[0] if candidate_devices else None
-
-    # If more than 2 candidates are found, select the best match
-    best_match = None
-
-    for candidate in candidate_devices:
-        i, device_properties = candidate
-        # First priority is selecting a candidate which agrees with the current device ID
-        # If such a device is found, we can select it and break out of the loop
-        if device_properties.name == engine_device_properties.name:
-            if i == curr_device_id:
-                best_match = candidate
-                break
-
-            # Second priority is selecting a candidate which agrees with the target device ID
-            # At deserialization time, the current device and target device may not agree
-            elif i == engine_device_id:
-                best_match = candidate
-
-            # If no such GPU ID is found, select the first available candidate GPU
-            elif best_match is None:
-                best_match = candidate
-
-    return best_match
