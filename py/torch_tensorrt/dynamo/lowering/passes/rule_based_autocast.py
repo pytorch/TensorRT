@@ -11,6 +11,7 @@ import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
+from .inline_autocast_regions import warn_about_kept_regions
 from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
     _wait_tensor_op,
@@ -162,6 +163,7 @@ def rule_based_autocast(
         return gm
     if isinstance(autocast_low_precision_type, dtype):
         autocast_low_precision_type = autocast_low_precision_type.to(torch.dtype)
+    warn_about_kept_regions(gm, autocast_low_precision_type)
     autocast_high_precision_type = torch.float32
     autocast_excluded_nodes = settings.autocast_excluded_nodes
     autocast_excluded_ops = settings.autocast_excluded_ops

@@ -262,6 +262,48 @@ def _is_inlined(
     )
 
 
+def warn_about_kept_regions(
+    gm: torch.fx.GraphModule, low_precision_type: torch.dtype
+) -> None:
+    """Warn when regions of the graph keep a precision other than low_precision_type,
+    regions with enabled=False or in another dtype, and another value of
+    autocast_model_regions would inline them. A region that no value inlines, such as
+    one that writes into a buffer, does not count."""
+    disabled = other = 0
+    # wrap_with_autocast(device_type, dtype, enabled, cache_enabled, body, *operands)
+    regions = [
+        r
+        for r in gm.graph.find_nodes(
+            op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+        )
+        if _is_inlined(gm, r, include_disabled=True)
+    ]
+    while regions:
+        region = regions.pop()
+        if not region.args[2]:
+            disabled += 1
+        elif region.args[1] != low_precision_type:
+            other += 1
+        regions += _body(region).graph.find_nodes(
+            op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+        )
+
+    def count(n: int) -> str:
+        return f"{n} region" + ("" if n == 1 else "s")
+
+    kinds = [f"{count(disabled)} with enabled=False"] if disabled else []
+    if other:
+        kinds.append(f"{count(other)} in a dtype other than {low_precision_type}")
+    if kinds:
+        logger.warning(
+            "Autocast does not choose the precision of the ops in torch.autocast "
+            f"regions of the model that keep their own: {' and '.join(kinds)}. Set "
+            f'autocast_model_regions="{"reclassify_all" if disabled else "reclassify"}" '
+            "to let autocast choose there too, and check the accuracy, since a model "
+            "can keep ops in FP32 on purpose."
+        )
+
+
 def _cast(
     gm: torch.fx.GraphModule,
     value: torch.fx.Node,
