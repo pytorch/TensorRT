@@ -3,6 +3,7 @@
 
 import base64
 import copy
+import io
 import logging
 import operator
 import pickle
@@ -1873,6 +1874,34 @@ def test_autocast_model_regions_keeps_the_output_for_readers_after_an_earlier_wr
 
 
 @pytest.mark.unit
+def test_autocast_model_regions_sees_writes_into_operands_that_share_memory():
+    class Model(nn.Module):
+        def forward(self, x):
+            # broadcast_tensors returns views of x, though its schema does not say so.
+            a, b = torch.broadcast_tensors(x, x.T)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v = b[:, :1]
+            with torch.autocast(x.device.type, enabled=False):
+                a.zero_()
+                return v.clone()
+
+    x = torch.full((4, 4), 2.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_ops={
+            torch.ops.aten.numpy_T.default,
+            torch.ops.aten.broadcast_tensors.default,
+        },
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # a.zero_() writes into the memory of v, so the region keeps its autocast and v
+    # is not a cast that misses the write.
+    torch.testing.assert_close(ep.module()(x.clone()), torch.zeros(4, 1, device="cuda"))
+
+
+@pytest.mark.unit
 def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
     class Model(nn.Module):
         def forward(self, x):
@@ -2023,6 +2052,11 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "foreach_then_region_write",
         "no_grad_between_regions",
         "chain",
+        "type_as_in_no_grad",
+        "dropout_in_no_grad",
+        "broadcast_in_no_grad",
+        "einsum_write",
+        "type_as_in_disabled",
         "no_grad_view_between",
         "no_grad_view_of_outputs",
         "views_then_new_write",
@@ -2032,6 +2066,8 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "to_copy",
         "pow",
         "fresh",
+        "write_inner",
+        "write_repeat",
     ],
 )
 def test_autocast_model_regions_keeps_values(case):
@@ -2110,6 +2146,56 @@ def test_autocast_model_regions_keeps_values(case):
                 with torch.autocast(x.device.type, enabled=False):
                     v = y[:, :1]
             v.add_(10.0)
+            return y.float()
+
+    # type_as with the same dtype, dropout with train=False and broadcast_tensors
+    # return v or a view of it, though their schema does not say so.
+    class TypeAsInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                v.type_as(v).add_(10.0)
+            return y.float()
+
+    class DropoutInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                nn.functional.dropout(v, 0.5, False).add_(10.0)
+            return y.float()
+
+    class BroadcastInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                torch.broadcast_tensors(v)[0].add_(10.0)
+            return y.float()
+
+    class EinsumWrite(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(8, 8)
+
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                a = self.fc(x)
+                # einsum returns a view of a.
+                torch.einsum("ij->ji", a).add_(10.0)
+                return (a * 2.0).float()
+
+    class TypeAsInDisabled(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.autocast(x.device.type, enabled=False):
+                v.type_as(v).add_(10.0)
             return y.float()
 
     class NoGradViewBetween(nn.Module):
@@ -2311,6 +2397,25 @@ def test_autocast_model_regions_keeps_values(case):
                 h = self.linear2(self.relu(self.linear1(x)))
                 h.add_(1.0).mul_(2.0)
             return h.float()
+
+    class WriteInner(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # inner gets linear1 in float16 and a weight in float32.
+                h = torch.inner(self.linear1(x), self.linear2.weight)
+                h.add_(1.0)
+            return h.float()
+
+    class WriteRepeat(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # repeat_interleave has a data dependent shape here.
+                y = torch.repeat_interleave(x, pos + 1, dim=0)
+                y.add_(1.0)
+                # A write into an input of the model keeps this region.
+                x.add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return self.linear1(x).float() + y.sum()
 
     class NewInput(Fresh):
         def forward(self, x, pos):
@@ -2579,9 +2684,28 @@ def test_autocast_model_regions_keeps_values(case):
                 }
             },
         ),
+        "type_as_in_no_grad": (
+            TypeAsInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "dropout_in_no_grad": (
+            DropoutInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "broadcast_in_no_grad": (
+            BroadcastInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "einsum_write": (EinsumWrite, {"autocast_excluded_nodes": {"^fc$"}}),
+        "type_as_in_disabled": (
+            TypeAsInDisabled,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
         "to_copy": (ToCopy, {}),
         "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
         "fresh": (Fresh, {}),
+        "write_inner": (WriteInner, {}),
+        "write_repeat": (WriteRepeat, {}),
     }
     cls, kwargs = models[case]
     model = cls().cuda().eval()
@@ -2625,6 +2749,7 @@ def test_autocast_model_regions_keeps_values(case):
         "read_in_disabled",
         "type_as_in_reader",
         "type_as_written_later",
+        "write_inner",
     )
     assert kept == (case not in (*inlined, "pow", "fresh"))
     if case in (
@@ -2653,6 +2778,229 @@ def test_autocast_model_regions_keeps_values(case):
         torch.testing.assert_close(
             lowered(*inputs(i)).float(), model(*inputs(i)), rtol=1e-2, atol=1e-2
         )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda v: v.type_as(v),
+        lambda v: torch.einsum("ij->ji", v),
+        lambda v: torch.broadcast_tensors(torch.zeros_like(v), v)[1],
+        lambda v: torch.nn.functional.dropout(v, training=False),
+        # Its inputs differ in dtype, so it does not run again.
+        lambda v: torch.broadcast_tensors(torch.zeros_like(v, dtype=torch.float), v)[1],
+    ],
+    ids=["type_as", "einsum", "broadcast_tensors", "dropout", "two_dtypes"],
+)
+def test_autocast_model_regions_keeps_values_of_a_loaded_program(op):
+    from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
+        _RAN_AGAIN,
+    )
+
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                # torch.export.load needs the block to return a value.
+                s = op(v).add_(10.0).sum()
+            return y.float(), s
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 8, device="cuda")
+    # A loaded program gives each traced value memory of its own.
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(model, (x,)), buffer)
+    buffer.seek(0)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "slice.*"},
+    )
+    ep = pre_export_lowering(torch.export.load(buffer), settings)
+    torch.testing.assert_close(ep.module()(x)[0], model(x)[0])
+    # The results of the ops that ran again do not stay in the graph.
+    assert not any(
+        _RAN_AGAIN in n.meta
+        for m in ep.graph_module.modules()
+        if isinstance(m, torch.fx.GraphModule)
+        for n in m.graph.nodes
+    )
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_keeps_values_of_a_region_in_a_loaded_program():
+    class Model(nn.Module):
+        def forward(self, x):
+            h = x * 1.0
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # Its inputs differ in dtype, so it does not run again. a is h.
+                a, b = torch.broadcast_tensors(h, h.half())
+                a.add_(10.0)
+                y = (b @ b.T).float()
+            return h[:, :2] * 1.0, y
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 4, device="cuda")
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(model, (x,)), buffer)
+    buffer.seek(0)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"^mul$", "^mul_1$", "slice.*"},
+    )
+    ep = pre_export_lowering(torch.export.load(buffer), settings)
+    torch.testing.assert_close(ep.module()(x)[0], model(x)[0])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "op",
+    [
+        nn.functional.linear,
+        torch.Tensor.type_as,
+        lambda h, w: torch.einsum("ij,kj->ik", h, w),
+    ],
+    ids=["linear", "type_as", "einsum"],
+)
+def test_autocast_model_regions_inlines_a_region_that_writes_in_place_in_a_loaded_program(
+    op,
+):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = nn.Linear(8, 8)
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # The inputs of op differ in dtype, so it does not run again.
+                y = op(self.fc(x), self.fc.weight)
+                y.relu_()
+            return y.float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 8, device="cuda")
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(model, (x,)), buffer)
+    buffer.seek(0)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.load(buffer), settings)
+    assert not ep.graph.find_nodes(
+        op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+    )
+    torch.testing.assert_close(ep.module()(x), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_autocast_model_regions_sees_a_foreach_write_in_a_loaded_program():
+    class Model(nn.Module):
+        def forward(self, x, n):
+            k = n.item()
+            torch._check(k >= 1)
+            torch._check(k <= x.shape[1])
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:k]
+            with torch.no_grad():
+                # Its shape is data dependent, so dropout does not run again, and
+                # _foreach_add_ returns nothing that shows the memory it writes.
+                t = torch.nn.functional.dropout(v, training=False)
+                torch._foreach_add_([t], 10.0)
+                s = t.sum()
+            return y.float(), s
+
+    model = Model().cuda().eval()
+    x, n = torch.randn(1, 8, device="cuda"), torch.tensor(3, device="cuda")
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(model, (x, n)), buffer)
+    buffer.seek(0)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "slice.*"},
+    )
+    ep = pre_export_lowering(torch.export.load(buffer), settings)
+    torch.testing.assert_close(ep.module()(x, n)[0], model(x, n)[0])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("ambient", [False, True], ids=["alone", "in_autocast"])
+def test_autocast_model_regions_sees_an_einsum_view_of_a_float32_value(ambient):
+    class Model(nn.Module):
+        def forward(self, x):
+            h = x * 1.0
+            # In the region, einsum returns a view of a float16 copy of h. Inlined, it
+            # returns a view of h itself.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                t = torch.einsum("ij->ji", h)
+            h.add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (t * 2.0).float()
+
+    x = torch.randn(4, 4, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        # In float32, no cast that autocast adds hides the write into h.
+        autocast_excluded_ops={
+            torch.ops.aten.einsum.default,
+            torch.ops.aten.add_.Tensor,
+            torch.ops.aten.mul.Tensor,
+        },
+    )
+    ep = torch.export.export(Model(), (x,))
+    # The autocast of a caller does not change what lowering finds.
+    with torch.autocast(x.device.type, dtype=torch.float16, enabled=ambient):
+        ep = pre_export_lowering(ep, settings)
+    torch.testing.assert_close(ep.module()(x), Model()(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+def test_aliases_an_input_runs_no_op_again(monkeypatch):
+    """_aliases_an_input reads only the schema, so asking it about every op of a large
+    graph costs nothing extra. Only the inliner runs ops again, see _runs_again."""
+    from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
+        _aliases_an_input,
+        _returns_an_input,
+    )
+
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 4, 3, padding=1)
+
+        def forward(self, x):
+            return self.conv(x).type_as(x)
+
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(Model(), (torch.randn(1, 4, 8, 8),)), buffer)
+    buffer.seek(0)
+    gm = torch.export.load(buffer).graph_module
+    (type_as,) = gm.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.type_as.default
+    )
+    ran = []
+    call = torch._ops.OpOverload.__call__
+    monkeypatch.setattr(
+        torch._ops.OpOverload,
+        "__call__",
+        lambda op, *args, **kwargs: ran.append(op) or call(op, *args, **kwargs),
+    )
+    assert not any(_aliases_an_input(n) for n in gm.graph.nodes)
+    assert not ran
+    assert _returns_an_input(type_as)
+    assert ran
 
 
 @pytest.mark.unit
