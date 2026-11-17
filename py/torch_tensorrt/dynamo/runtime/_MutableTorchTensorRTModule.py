@@ -15,13 +15,13 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch_tensorrt
-from torch.export._trace import _export
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.lowering._export_with_decomps import (
     export_with_tensorrt_decomps,
+    settings_from_kwargs,
 )
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
@@ -424,33 +424,7 @@ class MutableTorchTensorRTModule(object):
             _offload_original_model(self)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
-        enable_autocast = self.additional_settings.get(
-            "enable_autocast", _defaults.ENABLE_AUTOCAST
-        )
-
-        def stock_export() -> torch.export.ExportedProgram:
-            if self.prefer_deferred_runtime_asserts_over_guards:
-                return _export(
-                    self.original_model,
-                    self.arg_inputs,
-                    kwargs=self.kwarg_inputs,
-                    dynamic_shapes=self._get_total_dynamic_shapes(),
-                    strict=self.strict,
-                    prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
-                )
-            return torch.export.export(
-                self.original_model,
-                self.arg_inputs,
-                kwargs=self.kwarg_inputs,
-                dynamic_shapes=self._get_total_dynamic_shapes(),
-                strict=self.strict,
-            )
-
         def export_fn() -> torch.export.ExportedProgram:
-            # Autocast inserts casts in pre_export_lowering after export, so skip
-            # one-shot decomps and let compile() run_decompositions once.
-            if enable_autocast:
-                return stock_export()
             return export_with_tensorrt_decomps(
                 self.original_model,
                 args=tuple(self.arg_inputs),
@@ -458,19 +432,7 @@ class MutableTorchTensorRTModule(object):
                 dynamic_shapes=self._get_total_dynamic_shapes(),
                 strict=self.strict,
                 prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
-                enable_experimental_decompositions=self.additional_settings.get(
-                    "enable_experimental_decompositions",
-                    _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-                ),
-                decompose_attention=self.additional_settings.get(
-                    "decompose_attention", _defaults.DECOMPOSE_ATTENTION
-                ),
-                use_distributed_mode_trace=self.additional_settings.get(
-                    "use_distributed_mode_trace", _defaults.USE_DISTRIBUTED_MODE_TRACE
-                ),
-                use_fp32_acc=self.additional_settings.get(
-                    "use_fp32_acc", _defaults.USE_FP32_ACC
-                ),
+                settings=settings_from_kwargs(self.additional_settings),
             )
 
         # Check if the model has been quantized with modelopt

@@ -456,14 +456,7 @@ def cross_compile_for_windows(
     logger.info("Compilation Settings: %s\n", settings)
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = maybe_run_decompositions(
-        exported_program,
-        enable_experimental_decompositions=enable_experimental_decompositions,
-        decompose_attention=decompose_attention,
-        use_distributed_mode_trace=use_distributed_mode_trace,
-        use_fp32_acc=use_fp32_acc,
-        enable_autocast=settings.enable_autocast,
-    )
+    exported_program = maybe_run_decompositions(exported_program, settings)
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
@@ -953,14 +946,7 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = maybe_run_decompositions(
-        exported_program,
-        enable_experimental_decompositions=enable_experimental_decompositions,
-        decompose_attention=decompose_attention,
-        use_distributed_mode_trace=use_distributed_mode_trace,
-        use_fp32_acc=use_fp32_acc,
-        enable_autocast=enable_autocast,
-    )
+    exported_program = maybe_run_decompositions(exported_program, settings)
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
@@ -2556,14 +2542,7 @@ def convert_exported_program_to_serialized_trt_engine(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = maybe_run_decompositions(
-        exported_program,
-        enable_experimental_decompositions=enable_experimental_decompositions,
-        decompose_attention=decompose_attention,
-        use_distributed_mode_trace=use_distributed_mode_trace,
-        use_fp32_acc=use_fp32_acc,
-        enable_autocast=settings.enable_autocast,
-    )
+    exported_program = maybe_run_decompositions(exported_program, settings)
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
