@@ -21,7 +21,7 @@ import dataclasses
 import functools
 import logging
 from contextlib import contextmanager
-from typing import Any, Callable, Generator, Iterator, Mapping, Optional, cast
+from typing import Any, Callable, Generator, Mapping, Optional, cast
 
 import torch
 from torch.export import ExportedProgram
@@ -102,7 +102,7 @@ def _decomp_table(settings: CompilationSettings) -> dict[Any, Callable[..., Any]
         settings.enable_experimental_decompositions,
         settings.decompose_attention,
         settings.use_distributed_mode_trace,
-        use_fp32_acc=settings.use_fp32_acc,
+        settings.use_fp32_acc,
     )
     return cast(dict[Any, Callable[..., Any]], table)
 
@@ -161,7 +161,7 @@ def _cia_split_apis() -> Optional[tuple[Callable[..., Any], Callable[..., Any]]]
 
 
 @contextmanager
-def _aot_export_with_cia_split() -> Iterator[None]:
+def _aot_export_with_cia_split() -> Generator[None, None, None]:
     """When AOT sees ``decompositions=table``, CIA-split like ``run_decompositions``."""
     import torch.export._trace as export_trace
 
