@@ -470,9 +470,20 @@ std::vector<at::Tensor> TRTEngine::infer_outputs(std::vector<std::vector<int64_t
   TORCHTRT_CHECK(
       (in_binding_names.size() == input_shapes.size()),
       "The number of input shapes provided doesn't match with the number of input names registered.");
-  // Set all input shapes
+  // TensorRT accepts a shape that fits any optimization profile, not only the
+  // active one, so this needs no profile selection.
   for (size_t i = 0; i < input_shapes.size(); i++) {
-    ctx->setInputShape(in_binding_names[i].c_str(), core::util::toDims(input_shapes[i]));
+    // Like the run path, skip shape tensors. Their shape is fixed in the
+    // engine and can differ from the input's (a scalar is declared [1]).
+    if (input_binding_infos[i].is_shape_tensor) {
+      continue;
+    }
+    auto dims = core::util::toDims(input_shapes[i]);
+    TORCHTRT_CHECK(
+        ctx->setInputShape(in_binding_names[i].c_str(), dims),
+        "TensorRT refused shape " << dims << " for input " << in_binding_names[i] << " of engine " << name
+                                  << ", the engine declares "
+                                  << cuda_engine->getTensorShape(in_binding_names[i].c_str()));
   }
   for (size_t i = 0; i < out_binding_names.size(); i++) {
     auto output_shape = core::util::toVec(ctx->getTensorShape(out_binding_names[i].c_str()));

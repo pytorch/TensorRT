@@ -62,6 +62,14 @@ class TRTLogger : public nvinfer1::ILogger {
  * context's allocation strategy is fixed when the context is created, so a
  * later call governs only the methods loaded after it, and a pooled context and
  * a private-scratch one coexist in one process.
+ *
+ * The pool is one per device and belongs to the regular context of the first
+ * pooled engine that runs there, so load every pooled engine on a device in
+ * that context: one loaded in another regular context fails before it runs,
+ * even on its own streams, with or without kCudaGraphsKey. The pool's context
+ * must stay alive while the process uses the pool. With a CUDA 12.5 or newer
+ * driver a pooled call on a stream of another regular context fails before it
+ * sets its shapes or claims the pool.
  */
 inline constexpr char kSharedActivationScratchKey[] = "use_shared_activation_scratch";
 
@@ -90,13 +98,26 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * b"0", overrides the process default, which is false unless set. Any other
  * compile spec value, or the key twice, fails the load. Engines with aliased
  * outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5
- * keep ordinary enqueueV3. An engine on the shared activation scratch pool drops
- * its recorded graph whenever the pool hands it a different buffer, and pays the
- * same stable I/O buffers and copies as any other replaying engine. Caller
- * streams in the current ordinary context can replay, as can a call with no
- * caller stream. Green context and other context streams take the plain path,
- * and the graph is kept unless the scratch buffer, the shapes, or the
- * optimization profile changed.
+ * keep ordinary enqueueV3. A replay reads and writes the buffers it was recorded
+ * on, so keep each input and output in the same device buffer from call to call,
+ * and replays copy nothing. A graph goes on the caller's buffers once a call
+ * brings the buffers of the call before it, and on buffers of its own until
+ * then. When the buffers under a graph on the caller's buffers move, that call
+ * records again on the new ones. When they move a second time, for any shapes,
+ * that graph records on buffers of its own and copies the inputs in and the
+ * outputs out on every call, also after the shapes or the optimization profile
+ * change. The plain graph and the graph of each green context count their own
+ * moves. Host buffers on a GPU that does not read host memory directly, buffers
+ * off a 256-byte boundary, inputs that are not row-major, and outputs that
+ * share memory with an input are still copied on every call.
+ * An engine on the shared activation scratch pool records again whenever the
+ * pool hands it a different buffer. Streams of the current regular context,
+ * green context streams of the engine's device, and calls with no caller stream
+ * replay; the backend README covers the green context and other regular context
+ * cases. The engine keeps the graphs it records on green contexts, so destroy
+ * it before any green context it ran on. A stream of another device fails. An
+ * engine on the shared activation scratch pool also fails on a stream of another
+ * regular context; see kSharedActivationScratchKey.
  */
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 
@@ -135,9 +156,10 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
    * a caller has to know:
    *   - Calls on two such handles on one device are serialized at submission.
    *     The backend does that itself, with a per-device lock held across the
-   *     enqueue. A handle loaded with the option off keeps its own scratch, and
-   *     so does one whose engine needs no activation scratch under any shape;
-   *     neither is affected.
+   *     enqueue, and on a GPU without 64-bit stream memory operations until the
+   *     call has finished. A handle loaded with the option off keeps its own
+   *     scratch, and so does one whose engine needs no activation scratch under
+   *     any shape; neither is affected.
    *   - A call can wait on the host for pooled work submitted earlier on that
    *     device, and a call that grows the pool can wait for an unbounded amount
    *     of it. If the caller parks work that only the caller will release once

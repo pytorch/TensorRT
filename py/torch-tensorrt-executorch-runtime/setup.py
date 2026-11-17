@@ -520,10 +520,11 @@ setup(
     # Capped for the same reason the main manifest is: the pinned ExecuTorch ships no wheel
     # above 3.14, so declaring support past it promises something that cannot resolve.
     python_requires=">=3.11,<3.15",
-    # Exactly what the delegate library links, and nothing else. Each of these three is an ABI
-    # question: the shared object names libexecutorch, libnvinfer and libcudart in its own headers,
-    # so a different build of any of them is a different binary contract, and the local label is the
-    # only part of a version that names the CUDA row they have to share.
+    # Exactly what the delegate library links, and nothing else. Each of these is an ABI question:
+    # the shared object names libexecutorch, libnvinfer, libnvinfer_plugin (shipped by the same
+    # TensorRT wheel) and libcudart in its own headers, so a different build of any of them is a
+    # different binary contract, and the local label is the only part of a version that names the
+    # CUDA row they have to share.
     #
     # Neither PyTorch nor Torch-TensorRT is here, and neither is linked. Torch-TensorRT is needed
     # only by the deprecated forwarder in runtime.py, which imports it lazily and already says which

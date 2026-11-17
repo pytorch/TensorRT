@@ -46,7 +46,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, extract_var_range_info
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ def aten_ops_batch_norm_legit_no_stats(
         input=args[0],
         weight=args[1],
         bias=args[2],
-        training=False,
+        training=args[3],
         momentum=args[4],
         eps=args[5],
         return_mean_rstd=True,
@@ -329,13 +329,14 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
             input_dtypes.append(inp.dtype)
         else:
             # For nodes, get metadata
-            meta = getattr(inp, "meta", {}).get("tensor_meta")
-            if meta is None:
+            meta = getattr(inp, "meta", {})
+            meta_data = meta.get("val", meta.get("tensor_meta"))
+            if meta_data is None:
                 # Can't validate without metadata, allow it
                 return True
-            shape = tuple(meta.shape)
+            shape = tuple(meta_data.shape)
             input_metas.append(shape)
-            input_dtypes.append(meta.dtype)
+            input_dtypes.append(meta_data.dtype)
 
     # Dropping an empty operand also drops it from dtype promotion, so aten_ops_cat works
     # the promoted dtype out over every operand and passes it through. TensorRT has no
@@ -1179,9 +1180,10 @@ else:
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
         # dequantize_affine(input, block_size, scale, zero_point, input_dtype,
         #                   quant_min=None, quant_max=None, output_dtype=...)
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = kwargs.get("output_dtype")
         if output_dtype is None:
-            output_dtype = args[7] if len(args) > 7 else torch.float16
+            output_dtype = args[7] if len(args) > 7 else torch.float32
         input_dtype = args[4] if len(args) > 4 else None
         zero_point = kwargs.get("zero_point")
         if zero_point is None and len(args) > 3:
@@ -1247,8 +1249,9 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        # torch.export drops output_dtype when it equals the schema default, float32.
         output_dtype = (
-            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.bfloat16)
+            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.float32)
         )
         return impl.quantize.dequantize_affine_float8(
             ctx,
@@ -1482,13 +1485,14 @@ def gather_validator(
     """Keep cases the TensorRT gather cannot serve on the PyTorch path.
 
     Element gather needs the index and the data to have the same rank, so a scalar index
-    fails the engine build. An empty index gives the engine a zero size output binding,
-    which TensorRT refuses to enqueue, and every other output of that engine comes back
-    unwritten. A length that comes from the data, such as the output of nonzero, can be
-    zero at run time, so only an index known to be non-empty converts. An engine built for
-    a float64 input expects float32 and rejects the caller's tensor at run time unless
-    truncate_double is set, and a uint8 output fails the engine build outright. All of
-    these run correctly in PyTorch.
+    for data with dims fails the engine build. A 0-d input is reshaped to 1-D for the
+    gather, so it also takes a scalar or 1-D index. An empty index gives the engine a
+    zero size output binding, which TensorRT refuses to enqueue, and every other output
+    of that engine comes back unwritten. A length that comes from the data, such as the
+    output of nonzero, can be zero at run time, so only an index known to be non-empty
+    converts. An engine built for a float64 input expects float32 and rejects the
+    caller's tensor at run time unless truncate_double is set, and a uint8 output fails
+    the engine build outright. All of these run correctly in PyTorch.
     """
 
     def meta_of(arg: Argument) -> Any:
@@ -1507,7 +1511,12 @@ def gather_validator(
         return False
     if data_meta is None:
         return True
-    if index_meta is not None and len(index_meta.shape) != len(data_meta.shape):
+    # A 0-d input also takes a 1-D index, which repeats its one element.
+    if (
+        index_meta is not None
+        and len(index_meta.shape) != len(data_meta.shape)
+        and not (len(data_meta.shape) == 0 and len(index_meta.shape) == 1)
+    ):
         _LOGGER.debug(
             "gather needs the index and the data to have the same rank, falling back"
         )
@@ -1786,6 +1795,89 @@ def aten_ops_select(
     )
 
 
+def _has_fewer_than_2_31_elements(shape: Sequence[Union[int, torch.SymInt]]) -> bool:
+    """Whether a shape stays under 2**31 elements up to the upper bound of each dynamic size.
+
+    A dynamic size with no upper bound in the exported program can grow past it.
+    """
+    numel = functools.reduce(operator.mul, shape, 1)
+    bound = numel if isinstance(numel, int) else extract_var_range_info(numel)["max"]
+    return bound is not None and bound < 2**31
+
+
+def _index_put_scatter_elements_validator(
+    node: torch.fx.Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Validator for accumulate=True with one 1-D index, using TensorRT's ScatterElements plugin.
+
+    That plugin runs without PyTorch, so it takes the node only when fallback_pytorch_plugin_ops
+    skips ScatterAdd. Without that setting the node goes to ScatterAdd, or to PyTorch when
+    ScatterAdd cannot take it, such as with a None before the index.
+    """
+    import tensorrt as trt
+
+    if not (
+        settings is not None
+        and settings.fallback_pytorch_plugin_ops
+        and index_dtype_validator(node, settings)
+        and index_nonbool_validator(node, settings)
+        and args_bounds_check(node.args, 3, False)
+    ):
+        return False
+    positions = [d for d, index in enumerate(node.args[1]) if index is not None]
+    if len(positions) != 1:
+        return False
+    (dim,) = positions
+    index = node.args[1][dim].meta.get("val")
+    data = node.args[0].meta.get("val")
+    if index is None or index.dim() != 1 or data is None:
+        return False
+    # PyTorch rejects a mask whose length is not the dimension's. Once the mask becomes
+    # positions, the engine cannot tell, so leave a mask it cannot prove fits to PyTorch.
+    if index.dtype == torch.bool and not statically_known_true(
+        index.shape[0] == data.shape[dim]
+    ):
+        return False
+    if data.dtype not in (
+        torch.float32,
+        torch.float16,
+        torch.bfloat16,
+        torch.int32,
+        torch.int64,
+    ):
+        return False
+    # The plugin counts elements with 32-bit integers.
+    updates_shape = [*data.shape[:dim], index.shape[0], *data.shape[dim + 1 :]]
+    if not all(
+        _has_fewer_than_2_31_elements(shape) for shape in (data.shape, updates_shape)
+    ):
+        return False
+    return trt.get_plugin_registry().get_creator("ScatterElements", "2", "") is not None
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.index_put.default,
+    capability_validator=_index_put_scatter_elements_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_index_put_scatter_elements(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.select.index_put_scatter_elements(
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
+    )
+
+
 def _scatter_add_plugin_available() -> bool:
     import tensorrt as trt
 
@@ -1806,7 +1898,7 @@ def _index_put_accumulate_validator(
     Requires: dtype/bool checks pass, accumulate=True, and the
     ScatterAdd plugin is present in the TRT plugin registry (registered
     at library init time when torch_tensorrt_runtime is loaded).
-    Supports any number of non-None index tensors.
+    Supports any number of non-None integer index tensors, with no None before them.
     """
     if not (
         index_dtype_validator(node, settings)
@@ -1815,6 +1907,15 @@ def _index_put_accumulate_validator(
         return False
     if not args_bounds_check(node.args, 3, False):
         return False
+    # The plugin hands only the non-None indices to at::index_put, as integers, so a None before
+    # an index or a bool mask would select the wrong elements.
+    positions = [d for d, index in enumerate(node.args[1]) if index is not None]
+    if (
+        not positions
+        or None in node.args[1][: positions[-1]]
+        or index_has_bool_indices(node, settings)
+    ):
+        return False
     return _scatter_add_plugin_available()
 
 
@@ -1822,6 +1923,7 @@ def _index_put_accumulate_validator(
     torch.ops.aten.index_put.default,
     capability_validator=_index_put_accumulate_validator,
     supports_dynamic_shapes=True,
+    requires_pytorch_plugin=True,
 )
 @enforce_tensor_types(
     {
@@ -1847,11 +1949,27 @@ def aten_ops_index_put_accumulate(
     )
 
 
+def index_put_0d_mask_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """PyTorch ignores a 0-d mask next to other indices. The converter does not, so
+    leave that case to PyTorch."""
+    indices = [index for index in node.args[1] if index is not None]
+    if len(indices) < 2:
+        return True
+    for index in indices:
+        val = getattr(index, "meta", {}).get("val")
+        if val is not None and val.dtype == torch.bool and val.dim() == 0:
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
     capability_validator=lambda node, settings: (
         index_dtype_validator(node, settings)
         and index_nonbool_validator(node, settings)
+        and index_put_0d_mask_validator(node, settings)
         and not args_bounds_check(node.args, 3, False)
     ),
     supports_dynamic_shapes=True,
@@ -3165,15 +3283,18 @@ def aten_ops_add(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
             SourceIR.ATEN,
-            name,
+            name + "_alpha",
             other,
             alpha,
         )
@@ -3183,7 +3304,7 @@ def aten_ops_add(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -3255,10 +3376,13 @@ def aten_ops_sub(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    other = args[1]
+    input, other = args[0], args[1]
     alpha = kwargs.get("alpha", 1)
 
     if alpha != 1:
+        input, other = impl.elementwise.python_ints_as_0d(
+            ctx, target, SourceIR.ATEN, name, input, other
+        )
         other = impl.elementwise.mul(
             ctx,
             target,
@@ -3273,7 +3397,7 @@ def aten_ops_sub(
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         other,
     )
 
@@ -3283,7 +3407,6 @@ def aten_ops_sub(
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
     ctx: ConversionContext,
     target: Target,
@@ -3294,7 +3417,7 @@ def aten_ops_div(
     rounding_mode = kwargs.get("rounding_mode")
 
     if rounding_mode is None:
-        return impl.elementwise.div(
+        quotient = impl.elementwise.div(
             ctx,
             target,
             get_ir(target),
@@ -3302,6 +3425,18 @@ def aten_ops_div(
             args[0],
             args[1],
         )
+        # Dividing sizes gives a Python float, which does not widen the tensors it meets.
+        # Sizes are 1-D here, so make the quotient 0-D to get the same type promotion.
+        if (
+            target is operator.truediv
+            and ctx.current_node is not None
+            and isinstance(ctx.current_node.meta.get("val"), (float, torch.SymFloat))
+            and tuple(quotient.shape) == (1,)
+        ):
+            quotient = impl.shuffle.reshape(
+                ctx, target, get_ir(target), f"{name}_scalar", quotient, ()
+            )
+        return quotient
     elif rounding_mode == "floor":
         return impl.elementwise.floor_divide(
             ctx,
@@ -3324,6 +3459,24 @@ def aten_ops_div(
         raise RuntimeError(
             f"Target {target} does not support rounding mode {rounding_mode}"
         )
+
+
+@dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
+def aten_ops_prims_div(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.elementwise.prims_div(
+        ctx,
+        target,
+        get_ir(target),
+        name,
+        args[0],
+        args[1],
+    )
 
 
 @dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
@@ -3483,8 +3636,8 @@ def bitwise_type_validator(
     if node.target in tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if lhs_meta is None or rhs_meta is None:
             return False
 
@@ -3506,7 +3659,7 @@ def bitwise_type_validator(
     elif node.target in scalar_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
+        lhs_meta = lhs_val.meta.get("val", lhs_val.meta.get("tensor_meta"))
         if lhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, rhs_val):
@@ -3516,7 +3669,7 @@ def bitwise_type_validator(
     elif node.target in scalar_tensor_targets:
         lhs_val = node.args[0]
         rhs_val = node.args[1]
-        rhs_meta = rhs_val.meta.get("tensor_meta")
+        rhs_meta = rhs_val.meta.get("val", rhs_val.meta.get("tensor_meta"))
         if rhs_meta is None:
             return False
         if _is_absorbing_bitwise_scalar(node.target, lhs_val):
@@ -3627,7 +3780,7 @@ def bitwise_not_type_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     val = node.args[0]
-    val_meta = val.meta.get("tensor_meta")
+    val_meta = val.meta.get("val", val.meta.get("tensor_meta"))
 
     if val_meta is None:
         return False
@@ -4130,13 +4283,92 @@ def aten_ops_adaptive_avg_poolNd(
     )
 
 
+def adaptive_max_pool_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Only the pooled values are converted, so the indices output must be unused.
+    if not one_user_validator(node):
+        return False
+    input_val = node.args[0].meta.get("val")
+    if input_val is None:
+        return False
+    # Without truncate_double, a float64 engine input does not match the graph.
+    if input_val.dtype == torch.float64 and not (settings and settings.truncate_double):
+        return False
+    # The pooling bins are computed from the sizes when the engine is built, and an empty
+    # output has none.
+    output_size = node.args[1]
+    spatial_size = input_val.shape[-len(output_size) :]
+    if not all(
+        isinstance(size, int) and size > 0 for size in (*spatial_size, *output_size)
+    ):
+        return False
+    # TensorRT-RTX hits an illegal memory access on an output axis larger than its input.
+    return not (
+        ENABLED_FEATURES.tensorrt_rtx
+        and any(out > size for out, size in zip(output_size, spatial_size))
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool2d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.adaptive_max_pool3d.default,
+    capability_validator=adaptive_max_pool_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_adaptive_max_poolNd(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input, output_size = args[0], args[1]
+    spatial_rank = len(output_size)
+    # The bins come from the static spatial sizes the validator checked. TensorRT can
+    # still see -1 for a size it cannot infer, such as a crop with a dynamic start.
+    if any(size == -1 for size in input.shape[-spatial_rank:]):
+        spatial_size = ctx.current_node.args[0].meta["val"].shape[-spatial_rank:]
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - spatial_rank) + list(spatial_size),
+        )
+    output = impl.pool.adaptive_max_poolNd(
+        ctx,
+        target,
+        source_ir=SourceIR.ATEN,
+        name=name,
+        input=input,
+        output_size=output_size,
+    )
+    return output, None
+
+
 def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     k = node.args[1]
+    # For a 0-d input and k=0, PyTorch gives 0-d results, which a TopK layer cannot.
+    value = getattr(node.args[0], "meta", {}).get("val")
+    if k == 0 and isinstance(value, torch.Tensor) and value.dim() == 0:
+        return False
     return topk_sort_validator(k)
 
 
 def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    meta_data = node.args[0].meta.get("tensor_meta")
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
     if meta_data is None:
         return False
     shape = meta_data.shape
@@ -4636,6 +4868,81 @@ def aten_ops_upsample_bicubic2d(
     )
 
 
+def antialiased_upsample_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Opt-in: PyTorch's kernel is correct too, and faster for some sizes.
+    if settings is None or not settings.convert_antialiased_resize:
+        _LOGGER.debug(
+            "antialiased resize runs in PyTorch unless convert_antialiased_resize=True"
+        )
+        return False
+    meta = node.args[0].meta
+    input_val = meta.get("val", meta.get("tensor_meta"))
+    if input_val is None:
+        _LOGGER.debug("antialiased resize needs the input metadata, falling back")
+        return False
+    # Integer inputs would need ATen's rounding, which the float32 sums do not do.
+    if not input_val.dtype.is_floating_point:
+        _LOGGER.debug(
+            "antialiased resize of an integer input is not supported, falling back"
+        )
+        return False
+    if input_val.dtype == torch.float64 and not settings.truncate_double:
+        _LOGGER.debug(
+            "antialiased resize of a float64 input needs truncate_double=True, "
+            "falling back"
+        )
+        return False
+    # The weights come from the spatial sizes, so they must be static.
+    if not all(isinstance(s, int) for s in (*input_val.shape[-2:], *node.args[1])):
+        _LOGGER.debug(
+            "antialiased resize needs a static height, width and output size, "
+            "falling back"
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._upsample_bilinear2d_aa.default,
+    capability_validator=antialiased_upsample_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten._upsample_bicubic2d_aa.default,
+    capability_validator=antialiased_upsample_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_upsample_antialias(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.upsample.upsample_antialias(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        size=args[1],
+        align_corners=args[2],
+        scales=(args_bounds_check(args, 3), args_bounds_check(args, 4)),
+        mode=(
+            "bilinear"
+            if target == torch.ops.aten._upsample_bilinear2d_aa.default
+            else "bicubic"
+        ),
+    )
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.topk.default,
     capability_validator=topk_validator,
@@ -4968,25 +5275,19 @@ def aten_ops_flip(
 def zero_diag_size_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    meta = node.args[0].meta.get("tensor_meta")
-    if meta:
-        input_shape = meta.shape
+    meta = node.args[0].meta
+    meta_data = meta.get("val", meta.get("tensor_meta"))
+    if meta_data is not None:
+        input_shape = meta_data.shape
     else:
         _LOGGER.warning(
             "Meta information of input is missing. Unable to validate diagonal size, falling back to PyTorch operation."
         )
         return False
 
-    if len(node.args) == 1:
-        offset, dim1, dim2 = 0, 0, 1
-    elif len(node.args) == 2:
-        offset, dim1, dim2 = node.args[1], 0, 1
-    else:
-        offset, dim1, dim2 = (
-            node.args[1],
-            node.args[2],
-            node.args[3],
-        )
+    offset = args_bounds_check(node.args, 1, replacement=0)
+    dim1 = args_bounds_check(node.args, 2, replacement=0)
+    dim2 = args_bounds_check(node.args, 3, replacement=1)
     num_dims = len(input_shape)
 
     # Adjust dimensions to be positive and canonicalize
@@ -5259,13 +5560,17 @@ def aten_ops_linear(
 def attention_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject fused attention TensorRT-RTX cannot serve when Turing (SM 7.5) is a target.
+    """Reject fused attention TensorRT cannot serve, so it runs in PyTorch.
 
-    A fused attention op carries the same FP32 GEMMs ``gemm_capability_validator``
-    rejects, but inside the converter, so the graph holds one node and no ``mm``/``bmm``
-    for that guard to see. On Turing TRT-RTX this results in failure. Only the q/k/v
-    dtypes matter, so FP16 attention keeps running on TensorRT.
+    One case is a constant key, see ``_has_constant_key``. The other is TensorRT-RTX
+    when Turing (SM 7.5) is a target. A fused attention op carries the same FP32 GEMMs
+    ``gemm_capability_validator`` rejects, but inside the converter, so the graph holds
+    one node and no ``mm``/``bmm`` for that guard to see. On Turing TRT-RTX this results
+    in failure. Only the q/k/v dtypes matter, so FP16 attention keeps running on TensorRT.
     """
+    if _has_constant_key(node):
+        return False
+
     if not trt_rtx_targets_turing(settings):
         return True
 
@@ -5354,6 +5659,42 @@ def _inputs_quantized_to_fp8(node: Node) -> bool:
     return all(
         isinstance(arg, Node) and _is_fp8_quantize_op(arg) for arg in node.args[:3]
     )
+
+
+def _has_constant_key(node: Node) -> bool:
+    # TensorRT 11.2 to 11.4 give wrong FP16 and BF16 results for an attention layer whose key is a
+    # constant: they fold the transpose of the key into the constant, and the fused kernel output is then
+    # wrong. Seen on an A100 and an H100, and declined on every version. Refittable engines do not fold
+    # the key, but then return NaN for a fully masked row, unlike with an input key, so they are declined
+    # too. FP32 attention does not use that kernel and gives the same results as with an input key. A key
+    # whose shape or offset comes from an input keeps the layer as before; TensorRT can still fold it when
+    # the optimization profile fixes the input sizes the key uses.
+    from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+        _aliases_input,
+    )
+
+    key = source = node.args[1]
+    # Constant folding keeps some views of a constant, such as one that is also a graph output.
+    while (
+        isinstance(source, Node)
+        and (source.target in _PASS_THROUGH_OPS or _aliases_input(source))
+        and source.all_input_nodes == [source.args[0]]
+    ):
+        source = source.args[0]
+    dtype = (
+        getattr(key.meta.get("val"), "dtype", None) if isinstance(key, Node) else None
+    )
+    if (
+        isinstance(source, Node)
+        and source.op == "get_attr"
+        and dtype in (torch.float16, torch.bfloat16)
+    ):
+        _LOGGER.debug(
+            "Declining attention %s: its key is a constant, which TensorRT's attention layer gets wrong.",
+            node.name,
+        )
+        return True
+    return False
 
 
 def scaled_dot_product_attention_validator(

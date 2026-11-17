@@ -39,7 +39,7 @@ struct ProfileTable {
    * least 1; a single-profile engine keeps exactly one row and never switches.
    */
   std::vector<std::vector<InputProfileBounds>> bounds;
-  /// @brief The profile currently loaded into the execution context.
+  /// @brief The profile currently loaded into the execution context, or -1 after a switch that failed.
   int32_t active = 0;
 
   /// @return The engine's optimization profile count.
@@ -137,12 +137,10 @@ inline bool dims_fit(const nvinfer1::Dims& dims, const InputProfileBounds& bound
  * @brief Whether one profile accepts every input shape of an execution.
  *
  * A profile index or bounds row that cannot describe these inputs answers "does
- * not fit" rather than indexing past the end of the table. Neither is reachable
- * from the backend, which builds one row of num_inputs bounds per profile and
- * only ever stores an index this function approved -- but this is installed
- * public API, and on the auto path the answer also happens to be the useful one:
- * a ProfileTable carrying a stale ProfileTable::active rescans from 0 instead of
- * crashing.
+ * not fit" rather than indexing past the end of the table. The backend builds one
+ * row of num_inputs bounds per profile, but it sets ProfileTable::active to -1
+ * before each switch and keeps it there when the switch fails, so this check is
+ * what turns that -1 into a rescan from 0 on the auto path.
  *
  * @param table The engine's profile bounds.
  * @param profile Index of the profile to test.

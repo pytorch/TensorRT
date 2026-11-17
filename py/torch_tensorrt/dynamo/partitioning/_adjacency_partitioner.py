@@ -27,10 +27,14 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
-from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
+from torch_tensorrt.dynamo.partitioning.common import (
+    get_node_module_types,
+    node_in_torch_executed_module,
+)
 from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -52,6 +56,8 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Keep impure refusals out of the counters used to decide full support.
         self.fallback_operators: Dict[str, int] = {}
         self.fallback_reasons: Dict[str, Set[str]] = {}
+        self.node_support: Dict[str, bool] = {}
+        self.node_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
         self.torch_executed_modules = torch_executed_modules
@@ -59,6 +65,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     def _record_fallback(
         self, node: torch.fx.Node, node_name: str, reason: str
     ) -> None:
+        self.node_reasons.setdefault(node.name, set()).add(reason)
         # Structural nodes must not make a fully supported graph report fallback.
         if node.op in CALLABLE_NODE_OPS:
             self.fallback_operators[node_name] = (
@@ -67,6 +74,13 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             self.fallback_reasons.setdefault(node_name, set()).add(reason)
 
     def is_node_supported(
+        self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
+    ) -> bool:
+        supported = self._is_node_supported(submodules, node)
+        self.node_support[node.name] = supported
+        return supported
+
+    def _is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
@@ -108,6 +122,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
             self._record_fallback(node, node_name, "complex tensor dtype")
+            return False
+
+        if makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
             return False
 
         if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
@@ -305,6 +327,10 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                         "Eliminating acc subgraph because it's smaller than the threshold: "
                         f"{len(subgraph.nodes)} < {self.settings.min_acc_module_size}"
                     )
+                    for node in subgraph.nodes:
+                        node.meta["_torchtrt_partition_fallback_reason"] = (
+                            "below_min_block_size"
+                        )
                     if result:
                         result[-1].nodes.extend(subgraph.nodes)
                     else:
@@ -509,7 +535,7 @@ def partition(
         all_module_types = {
             module_type
             for node in gm.graph.nodes
-            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+            for module_type in get_node_module_types(node)
         }
         unmatched = set(torch_executed_modules) - all_module_types
         if unmatched:

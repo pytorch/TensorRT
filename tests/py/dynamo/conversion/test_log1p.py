@@ -7,6 +7,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt._utils import trt_rtx_targets_turing
 
 from .harness import DispatchTestCase
 
@@ -154,6 +155,9 @@ class TestLog1pConverter(DispatchTestCase):
         ]
     )
     def test_log1p_dynamic_dtype(self, _, dtype, truncate_double, engine_count):
+        if dtype == torch.bfloat16 and trt_rtx_targets_turing():
+            engine_count = 0
+
         class Log1p(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.log1p.default(x)

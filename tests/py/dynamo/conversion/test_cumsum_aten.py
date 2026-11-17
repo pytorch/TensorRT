@@ -12,7 +12,7 @@ from torch_tensorrt._utils import (
 )
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCumsumConverter(DispatchTestCase):
@@ -21,6 +21,7 @@ class TestCumsumConverter(DispatchTestCase):
             ((1,), 0),
             ((2,), 0),
             ((3,), -1),
+            ((), -1),
         ]
     )
     def test_cumsum_1D(self, shape, dim):
@@ -272,6 +273,9 @@ class TestCumsumConverter(DispatchTestCase):
         ]
     )
     def test_cumsum_dtype(self, input_dtype, out_dtype):
+        if torch.bfloat16 in (input_dtype, out_dtype):
+            skip_if_trt_rtx_turing(self, "bfloat16")
+
         class Cumsum(nn.Module):
             def forward(self, x):
                 if out_dtype is None:
@@ -315,6 +319,9 @@ class TestCumsumConverter(DispatchTestCase):
 
     @parameterized.expand([(torch.float16,), (torch.bfloat16,)])
     def test_cumsum_dynamic_shape_dtype(self, input_dtype):
+        if input_dtype == torch.bfloat16:
+            skip_if_trt_rtx_turing(self, "bfloat16")
+
         class Cumsum(nn.Module):
             def forward(self, x):
                 return torch.ops.aten.cumsum.default(x, 0)

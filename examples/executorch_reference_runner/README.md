@@ -64,7 +64,7 @@ You need:
 
 ```bash
 # The ExecuTorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-5e379f610e034da507b48da61464679609517b52}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-1daaf36236b3223111d3ae3cd832931ea7de3c62}"
 git clone --filter=blob:none --no-checkout https://github.com/pytorch/executorch.git executorch
 pushd executorch
 git fetch --depth 1 origin "${EXECUTORCH_REF}"

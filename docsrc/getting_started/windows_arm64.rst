@@ -80,7 +80,7 @@ Native build on Windows ARM64
    .. code-block:: bat
 
       python -m pip install --upgrade pip
-      python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
+      python -m pip install numpy packaging pyyaml setuptools==77.0.3 wheel fmt build
 
       # Install the Windows ARM64 PyTorch 2.16 nightly.
       python -m pip install --pre "torch>=2.16.0.dev,<2.17.0" --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
@@ -170,7 +170,7 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
    .. code-block:: bat
       python -m pip install --upgrade pip
 
-      python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
+      python -m pip install numpy packaging pyyaml setuptools==77.0.3 wheel fmt build
 
       # only for run the setup.py, not use this torch wheelto build windows on arm
       python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132

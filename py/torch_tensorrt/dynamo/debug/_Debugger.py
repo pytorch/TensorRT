@@ -124,6 +124,17 @@ class Debugger:
         self.capture_fx_graph_after = capture_fx_graph_after
 
     def __enter__(self) -> None:
+        from torch_tensorrt.dynamo._reporting import compilation_lock
+
+        self._compiler_lock = compilation_lock()
+        self._compiler_lock.acquire()
+        try:
+            self._enter()
+        except BaseException:
+            self._compiler_lock.release()
+            raise
+
+    def _enter(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             self.rt_level = torch.ops.tensorrt.get_logging_level()
@@ -177,7 +188,12 @@ class Debugger:
         self.set_capture_tensorrt_api_recording_json_file()
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
+        try:
+            self._exit(exc_type, exc_value, exc_tb)
+        finally:
+            self._compiler_lock.release()
 
+    def _exit(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         dictConfig(self.get_logging_config(None))
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             torch.ops.tensorrt.set_logging_level(self.rt_level)

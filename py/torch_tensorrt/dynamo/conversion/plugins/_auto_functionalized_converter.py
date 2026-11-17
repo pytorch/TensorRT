@@ -23,6 +23,7 @@ import logging
 import operator
 from typing import Any, Dict, List, Mapping, NamedTuple, Optional
 
+import tensorrt as trt
 import torch
 from torch.fx.node import Node, map_arg
 from torch_tensorrt.dynamo.conversion._ConversionContext import AliasedOutput, AliasKind
@@ -30,6 +31,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS,
     CallingConvention,
     dynamo_tensorrt_converter,
+)
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
+    get_trt_tensor,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import input_binding_name
 from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
@@ -320,6 +326,112 @@ def _resolve_inner_converter(wrapper: Node) -> Optional[_ResolvedInnerConverter]
     return _ResolvedInnerConverter(converter, calling_convention, info, alias_map)
 
 
+# TensorRT drops a layer of these types when it leaves the data as it is, such as a
+# reshape, a full slice or a 1x1 pooling, and its output stays in its input's memory.
+# A cast to the same type is dropped too. Older TensorRT versions have no squeeze
+# layers, so the types are matched by name. These are the types TensorRT 11.4 was seen
+# to drop, which no API promises, so it may drop others, and a newer version more.
+_MAY_PASS_THROUGH = {
+    "IDENTITY",
+    "PADDING",
+    "POOLING",
+    "RESIZE",
+    "SHUFFLE",
+    "SLICE",
+    "SQUEEZE",
+    "UNSQUEEZE",
+}
+
+# The output of these layers can stay in the memory of any of their inputs: a
+# concatenation of slices of one tensor, and an in-place plugin, which writes into an
+# input.
+_MAY_HOLD_AN_INPUT = {"CONCATENATION", "PLUGIN", "PLUGIN_V2", "PLUGIN_V3"}
+
+
+def _tensors_sharing_memory(ctx: Any, tensor: Any) -> Dict[str, Any]:
+    """The tensors, by name, whose memory TensorRT may keep ``tensor`` in, itself too."""
+    producers: Dict[str, Any] = {}
+    for index in range(ctx.net.num_layers):
+        layer = ctx.net.get_layer(index)
+        for i in range(layer.num_outputs):
+            producers[layer.get_output(i).name] = layer
+    todo: List[Any] = [tensor]
+    found: Dict[str, Any] = {}
+    while todo:
+        tensor = todo.pop()
+        if tensor.name in found:
+            continue
+        found[tensor.name] = tensor
+        layer = producers.get(tensor.name)
+        if layer is None:
+            continue
+        if layer.type.name in _MAY_HOLD_AN_INPUT:
+            inputs = (layer.get_input(i) for i in range(layer.num_inputs))
+            todo += [t for t in inputs if t is not None]
+        elif layer.type.name in _MAY_PASS_THROUGH or (
+            layer.type == trt.LayerType.CAST
+            and layer.get_input(0).dtype == tensor.dtype
+        ):
+            todo.append(layer.get_input(0))
+    return found
+
+
+def _read_by_another_node(ctx: Any, wrapper: Node, shared: Dict[str, Any]) -> bool:
+    """Whether a node other than ``wrapper`` may read the memory of ``shared``."""
+    # A converter such as clone hands back its input, so several nodes can have the
+    # same tensor as their value.
+    nodes = {
+        node
+        for node, value in ctx.node_values.items()
+        if any(
+            isinstance(t, trt.ITensor) and t.name in shared
+            for t in (value if isinstance(value, (list, tuple)) else (value,))
+        )
+    }
+    return not nodes or any(
+        user is not wrapper and user not in nodes
+        for node in nodes
+        for user in node.users
+    )
+
+
+def _mutated_on_purpose(base: Any) -> bool:
+    """Whether the graph means the plugin to write into the memory of ``base``."""
+    # It does for a graph input, and for what an earlier in-place plugin wrote into a
+    # tensor, as when the graph mutates a graph input twice.
+    if not isinstance(base, Node):
+        return False
+    if base.op == "placeholder":
+        return True
+    if base.target is not operator.getitem or not isinstance(base.args[0], Node):
+        return False
+    wrapper, index = base.args[0], base.args[1]
+    op = _inner_op(wrapper)
+    return (
+        wrapper.target in _WRAPPER_TARGETS
+        and hasattr(op, "_schema")
+        and isinstance(index, int)
+        and index >= functionalized_return_count(op._schema)
+    )
+
+
+def _in_own_memory(ctx: Any, name: str, tensor: Any) -> Any:
+    # Unlike the layers above, an elementwise layer keeps an output of its own. TensorRT
+    # takes an int8 elementwise input only as quantized data, so an int8 tensor gets its
+    # own memory from a cast to int32 and back, which TensorRT keeps too.
+    if tensor.dtype == trt.int8:
+        wide = cast_trt_tensor(ctx, tensor, trt.int32, f"{name}_int32")
+        return cast_trt_tensor(ctx, wide, trt.int8, name)
+    op = (
+        trt.ElementWiseOperation.OR
+        if tensor.dtype == trt.bool
+        else trt.ElementWiseOperation.MAX
+    )
+    layer = ctx.net.add_elementwise(tensor, tensor, op)
+    set_layer_name(layer, "auto_functionalized_v2", name, None)
+    return layer.get_output(0)
+
+
 def wrapper_wraps_plugin_op(node: Node, settings: Any) -> bool:
     return _resolve_inner_converter(node) is not None
 
@@ -336,12 +448,54 @@ def _convert_auto_functionalized(
 
     op = args[0]
     op_args = _reconstruct_op_args(op, kwargs)
+    positions = tensor_positions(op._schema)
+    # The plugin writes into the memory of each tensor it mutates. That memory may be
+    # a graph input's only when the graph mutates that input. A converter such as
+    # clone hands back its input, and TensorRT drops layers that leave the data as it
+    # is, so any other tensor that may still hold a graph input, or that another node
+    # may still read, gets memory of its own.
+    # So does a constant, such as a folded clone of a buffer, which TensorRT does not
+    # let a plugin write into.
+    bases = wrapper.kwargs.get("_all_bases", [])
+    base_indices = [
+        wrapper.kwargs.get(f"_{arg.name}_base_index") for arg in op._schema.arguments
+    ]
+    for base_index, tensor_index in _base_to_tensor_arg(op, wrapper.kwargs).items():
+        base, position = bases[base_index], positions[tensor_index]
+        tensor = op_args[position]
+        # With a copy, the writes of several arguments that mutate one tensor do not add
+        # up, and an int8 constant is stored as int32, which the plugin would mutate as
+        # int32. TensorRT lets only a few layers, such as a plugin, read FP8 data. All
+        # of these are left as they are.
+        if (
+            _mutated_on_purpose(base)
+            or base_indices.count(base_index) > 1
+            or (isinstance(tensor, torch.Tensor) and tensor.dtype == torch.int8)
+            or getattr(tensor, "dtype", None) in (torch.float8_e4m3fn, trt.DataType.FP8)
+        ):
+            continue
+        if not isinstance(tensor, trt.ITensor):
+            tensor = get_trt_tensor(
+                ctx, tensor, f"{name}_constant_{position}", min_rank=0
+            )
+        else:
+            # Conversion binds some outputs, such as that of a KV cache update, to the
+            # memory of a network input.
+            shared = _tensors_sharing_memory(ctx, tensor)
+            aliases = {alias.output_tensor.name for alias in ctx.aliased_outputs}
+            if not any(
+                t.is_network_input or name in aliases for name, t in shared.items()
+            ) and not _read_by_another_node(ctx, wrapper, shared):
+                continue
+        op_args[position] = _in_own_memory(ctx, f"{name}_own_memory_{position}", tensor)
     ctx.requires_output_allocator |= resolved.info.get(
         "requires_output_allocator", False
     )
     ctx.requires_native_multidevice |= resolved.info.get(
         "requires_native_multidevice", False
     )
+    if resolved.info.get("requires_pytorch_plugin", False):
+        ctx.pytorch_plugin_ops.add(DYNAMO_CONVERTERS.qualified_name_or_str(op))
     if resolved.calling_convention is CallingConvention.LEGACY:
         result = resolved.converter(ctx.net, op, tuple(op_args), {}, name)
     else:
@@ -358,7 +512,6 @@ def _convert_auto_functionalized(
     # A plugin-level alias may involve a TensorRT copy and need not be reported
     # as an engine I/O alias. Record boundary writeback explicitly so the runtime
     # binds the output to caller storage, including when it is not a model return.
-    positions = tensor_positions(op._schema)
     for output_index, tensor_index in resolved.alias_map.items():
         mutated_input = op_args[positions[tensor_index]]
         binding = input_binding_name(ctx, mutated_input)

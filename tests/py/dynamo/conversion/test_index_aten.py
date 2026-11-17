@@ -113,6 +113,11 @@ class TestIndexConstantConverter(DispatchTestCase):
                 ],
                 torch.randn(2, 2, 2, 2),
             ),
+            (
+                "mask_2d_after_none",
+                [None, torch.tensor([[True, False, True], [False, True, False]])],
+                torch.randn(2, 2, 3),
+            ),
         ]
     )
     @unittest.skipIf(

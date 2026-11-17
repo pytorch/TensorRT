@@ -87,6 +87,65 @@ class TestScatterValueConverter(DispatchTestCase):
         inputs = [input, index]
         self.run_test(TestModule(), inputs, int32_reqd=(dtype == torch.int32))
 
+    @parameterized.expand([("dim_minus_1", -1)])
+    def test_scatter_of_0d_tensor(self, _, dim):
+        # x[0] * 2.0 is 0-d, and so are the index, the sources and the result.
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("constant_src", torch.tensor(9.0))
+
+            def forward(self, x, i):
+                value = torch.ops.aten.mul.Tensor(
+                    torch.ops.aten.select.int(x, 0, 0), 2.0
+                )
+                index = torch.ops.aten.select.int(i, 0, 0)
+                src = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 1), 3.0)
+                return (
+                    torch.ops.aten.scatter.value(value, dim, index, 7.0),
+                    torch.ops.aten.scatter.src(value, dim, index, src),
+                    torch.ops.aten.scatter.src(value, dim, index, self.constant_src),
+                )
+
+        self.run_test(TestModule(), [torch.randn(4), torch.tensor([0])])
+
+    def test_scatter_of_0d_index_into_1d_tensor(self):
+        # i[0] + 1 and x[0] * 3.0 are 0-d, and PyTorch reads them as one element.
+        class TestModule(torch.nn.Module):
+            def forward(self, x, i):
+                index = torch.ops.aten.add.Tensor(torch.ops.aten.select.int(i, 0, 0), 1)
+                src = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 0), 3.0)
+                return (
+                    torch.ops.aten.scatter.value(x, 0, index, 7.0),
+                    torch.ops.aten.scatter.src(x, 0, index, src),
+                )
+
+        self.run_test(TestModule(), [torch.randn(4), torch.tensor([1])])
+
+    def test_scatter_of_0d_source_with_1d_index(self):
+        # x[0] * 3.0 is 0-d, and PyTorch reads it as one element next to a 1-D index.
+        class TestModule(torch.nn.Module):
+            def forward(self, x, i):
+                src = torch.ops.aten.mul.Tensor(torch.ops.aten.select.int(x, 0, 0), 3.0)
+                return torch.ops.aten.scatter.src(x, 0, i, src)
+
+        self.run_test(TestModule(), [torch.randn(4), torch.tensor([1])])
+
+    def test_scatter_of_0d_tensor_with_empty_index(self):
+        # x[0] * 2.0 is 0-d, and an empty index scatters nothing into it.
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("index", torch.tensor([], dtype=torch.int64))
+
+            def forward(self, x):
+                value = torch.ops.aten.mul.Tensor(
+                    torch.ops.aten.select.int(x, 0, 0), 2.0
+                )
+                return torch.ops.aten.scatter.value(value, 0, self.index, 7.0)
+
+        self.run_test(TestModule(), [torch.randn(4)])
+
 
 class TestScatterSrcConverter(DispatchTestCase):
     @parameterized.expand(

@@ -34,8 +34,11 @@ from typing import Any, Iterator, Optional
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
+from torch._guards import detect_fake_mode
+from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx import GraphModule
 from torch.fx.experimental.symbolic_shapes import free_symbols
+from torch.utils import _pytree as pytree
 from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
@@ -150,6 +153,24 @@ def complex_decomposition_adapter(
         gc.collect()
     gm = decomposed_gm
 
+    # A real-mode make_fx retrace gives each constant it records, and each tensor it
+    # computes from constants alone, a fake mode of its own. Later passes trace such
+    # constants together with the graph's other tensors, which needs one fake mode,
+    # so move them into the fake mode of the graph's inputs.
+    fake_mode = detect_fake_mode(flat_args)
+    if fake_mode is not None:
+        for node in gm.graph.nodes:
+            if "val" in node.meta:
+                node.meta["val"] = pytree.tree_map_only(
+                    FakeTensor,
+                    lambda val: (
+                        val
+                        if val.fake_mode is fake_mode
+                        else fake_mode.from_tensor(val, static_shapes=True)
+                    ),
+                    node.meta["val"],
+                )
+
     # The retrace brings back alias nodes. aten.alias has no converter, so the
     # partitioner would split the graph around them.
     gm = remove_alias(gm, settings)
@@ -193,7 +214,6 @@ def _decompose_complex_symbolically(
     """
     from torch._functorch._aot_autograd import complex_decomposition as upstream
     from torch.fx.experimental.proxy_tensor import make_fx
-    from torch.utils import _pytree as pytree
 
     upstream._assert_no_incorrect_aliasing_mutation(gm)
 

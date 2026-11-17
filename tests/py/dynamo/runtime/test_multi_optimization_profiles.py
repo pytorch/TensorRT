@@ -231,6 +231,22 @@ class TestMultiProfileRuntime(TestCase):
             for e in engines:
                 self.assertEqual(e._active_profile_index, PREFILL_IDX)
 
+    def test_infer_outputs_accepts_a_shape_of_another_profile(self):
+        # seq=32 fits only the prefill profile, which a run in auto mode switches
+        # to. infer_outputs must accept it while decode is still active. A build
+        # with the C++ runtime backs the module with the C++ engine, so also drive
+        # the Python engine from the same serialized info.
+        (module,) = [
+            m for m in self.trt_gm.modules() if isinstance(m, TorchTensorRTModule)
+        ]
+        python_engine = TRTEngine(module._pack_engine_info())
+        python_engine._auto_select_profiles = True
+        with optimization_profile(self.trt_gm, "auto"):
+            for engine in (module.engine, python_engine):
+                self.assertEqual(engine._active_profile_index, DECODE_IDX)
+                (output,) = engine.infer_outputs([list(self.prefill_in.shape)])
+                self.assertEqual(list(getattr(output, "shape", output)), [4, 32, 16])
+
     def test_manual_pin_persists_across_calls(self):
         # A manual pin (no "auto") must stick: the engine keeps the pinned
         # profile across invocations instead of re-selecting per call.

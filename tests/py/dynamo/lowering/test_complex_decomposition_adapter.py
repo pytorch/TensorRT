@@ -253,6 +253,50 @@ def test_interior_complex_region_keeps_a_namedtuple_output():
         torch.testing.assert_close(result, expected)
 
 
+@pytest.mark.skipif(
+    not cda.has_complex_decomposition(),
+    reason="decompose_complex_in_graph requires torch>=2.14.dev",
+)
+def test_constants_share_the_fake_mode_of_the_graph():
+    """A pass that traces a constant together with an activation, such as the
+    attention decomposition with a constant mask, needs both in one fake mode."""
+    from torch._subclasses.fake_tensor import FakeTensor
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer(
+                "freqs",
+                torch.complex(torch.randn(1, 2, 1, 1), torch.randn(1, 2, 1, 1)),
+            )
+            self.register_buffer("keep", torch.rand(1, 2, 1, 2) > 0.5)
+
+        def forward(self, x):
+            z = torch.view_as_complex(x.reshape(1, 2, 1, 1, 2))
+            bias = torch.zeros(1, 2, 1, 2).masked_fill(~self.keep, -1.0)
+            return torch.view_as_real(z * self.freqs).flatten(3) + bias
+
+    model = M().eval()
+    x = torch.randn(1, 2, 1, 2)
+    gm = (
+        torch.export.export(model, (x,))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    modes = {
+        id(val.fake_mode)
+        for node in out.graph.nodes
+        for val in torch.utils._pytree.tree_leaves(node.meta.get("val"))
+        if isinstance(val, FakeTensor)
+    }
+    assert len(modes) == 1
+    torch.testing.assert_close(out(x), model(x))
+
+
 # ---------------------------------------------------------------------------
 # feature gate / fallback
 # ---------------------------------------------------------------------------

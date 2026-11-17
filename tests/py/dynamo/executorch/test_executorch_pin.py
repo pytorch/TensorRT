@@ -735,10 +735,8 @@ _NAMING_GATES = {
 
 _BUILD_GATES = {
     "build_linux.yml": "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}",
-    # A Windows release wheel goes to PyPI, where the delegate cannot load.
-    "build_windows.yml": (
-        "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' && !inputs.is-release-wheel }}"
-    ),
+    # Windows release companions also build against ExecuTorch's PyTorch CUDA channel.
+    "build_windows.yml": "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}",
 }
 
 
@@ -1067,7 +1065,7 @@ def test_required_setup_steps_fail_their_suite(monkeypatch) -> None:
     source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
     body = source[source.index('    for step in v["setup"]:') :]
     body = body[: body.index('\n    print(f"==>')]
-    assert 'if step in {"executorch", "cuda-tile"}:' in body, body
+    assert 'if step in {"executorch", "cuda-tile", "cutedsl"}:' in body, body
     assert body.count("return rc") == 1, body
     assert "::warning::setup step" in body, body
 

@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestHistcConverter(DispatchTestCase):
@@ -34,17 +34,21 @@ class TestHistcConverter(DispatchTestCase):
 class TestGroupedMMConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            (16, 32, 24, 4, torch.bfloat16),
-            (32, 64, 48, 8, torch.bfloat16),
+            (16, 32, 24, (3, 5, 0, 8), torch.bfloat16),
+            (32, 64, 48, (3, 5, 0, 4, 6, 0, 5, 9), torch.bfloat16),
         ]
     )
-    def test_grouped_mm(self, rows, k, n, experts, dtype):
+    def test_grouped_mm(self, rows, k, n, counts, dtype):
+        if dtype == torch.bfloat16:
+            skip_if_trt_rtx_turing(self, "bfloat16")
+
         class GroupedMM(nn.Module):
             def forward(self, x, w, offs):
                 return torch.ops.aten._grouped_mm.default(x, w, offs)
 
-        counts = torch.randint(0, max(rows // experts, 1) + 1, (experts,))
-        offs = torch.cumsum(counts, 0).clamp(max=rows).to(torch.int32)
+        experts = len(counts)
+        offs = torch.cumsum(torch.tensor(counts), 0).to(torch.int32)
+        self.assertEqual(offs[-1].item(), rows, "Offsets must cover every output row.")
         x = torch.randn(rows, k, dtype=dtype)
         w = torch.randn(experts, k, n, dtype=dtype)
         self.run_test(
@@ -54,13 +58,16 @@ class TestGroupedMMConverter(DispatchTestCase):
         )
 
     def test_grouped_mm_kwargs_offs(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
         class GroupedMM(nn.Module):
             def forward(self, x, w, offs):
                 return torch.ops.aten._grouped_mm.default(x, w, offs=offs)
 
         rows, k, n, experts = 16, 32, 24, 4
-        counts = torch.tensor([3, 5, 0, 4])
-        offs = torch.cumsum(counts, 0).clamp(max=rows).to(torch.int32)
+        counts = torch.tensor([3, 5, 0, 8])
+        offs = torch.cumsum(counts, 0).to(torch.int32)
+        self.assertEqual(offs[-1].item(), rows, "Offsets must cover every output row.")
         x = torch.randn(rows, k, dtype=torch.bfloat16)
         w = torch.randn(experts, k, n, dtype=torch.bfloat16)
         self.run_test(

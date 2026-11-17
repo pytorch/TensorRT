@@ -1,0 +1,104 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Compiling from Memory-Mapped Weights\n\nTo compile a model, its weights normally have to be loaded into host memory first, all of them, before\nthe first TensorRT engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's\nweights at zero-copy views of a safetensors file. ``torch.export`` reads only shapes, so a weight's\npages become resident only when TensorRT reads them, while it builds the engine that uses the weight.\nThe pages are dropped again once the last engine that reads the weight is built. With the resource\npartitioner, the model is built as several engines, each small enough to build within a host memory\nbudget, so only about one engine's weights are resident at a time.\n\nThis example:\n\n1. writes a model's weights once with ``save_weights_for_mapping``, standing in for a checkpoint;\n2. with ``torch_tensorrt.dynamo.low_memory``, builds the model on the ``meta`` device, so constructing it\n   allocates no weights, maps its weights, and exports and compiles it on the CPU as several engines\n   within a CPU memory budget, watching how much of the weights file is resident;\n3. checks the compiled model against the original.\n\nHow much of the weights file is resident is read from ``/proc/self/smaps``, so it prints on Linux only.\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import os\nimport tempfile\nimport threading\nfrom typing import Any, Callable, Tuple\n\nimport psutil\nimport torch\nimport torch_tensorrt\nfrom torch_tensorrt.dynamo.tools import save_weights_for_mapping\n\n\ndef resident_mib(path: str) -> float:\n    \"\"\"MiB of the file at `path` resident in this process (its mappings' Rss in /proc/self/smaps).\"\"\"\n    if not os.path.exists(\"/proc/self/smaps\"):\n        return float(\"nan\")\n    total, in_file = 0, False\n    for line in open(\"/proc/self/smaps\"):\n        fields = line.split()\n        if fields and \"-\" in fields[0] and len(fields) >= 5:  # a mapping's header line\n            in_file = fields[-1] == path\n        elif in_file and fields[0] == \"Rss:\":\n            total += int(fields[1])\n    return total / 1024\n\n\ndef peak_resident_mib(path: str, fn: Callable[[], Any]) -> Tuple[Any, float]:\n    \"\"\"Run ``fn()`` while sampling ``resident_mib(path)``; return its result and the peak. TensorRT\n    releases the GIL while it builds an engine, so the samples cover the builds.\"\"\"\n    peak, done = [resident_mib(path)], threading.Event()\n\n    def sample() -> None:\n        while not done.is_set():\n            peak[0] = max(peak[0], resident_mib(path))\n            done.wait(0.005)\n\n    sampler = threading.Thread(target=sample)\n    sampler.start()\n    try:\n        result = fn()\n    finally:\n        done.set()\n        sampler.join()\n    return result, peak[0]\n\n\nclass MLP(torch.nn.Module):\n    def __init__(self, width: int = 2048, depth: int = 12) -> None:\n        super().__init__()\n        self.layers = torch.nn.ModuleList(\n            torch.nn.Linear(width, width) for _ in range(depth)\n        )\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        for layer in self.layers:\n            x = torch.relu(layer(x))\n        return x"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Write the weights once\n\nAny safetensors file maps if its tensors have the names, dtypes and shapes the model uses.\n``save_weights_for_mapping`` is for checkpoints whose loader casts, e.g. stored in float32 and run in\nbfloat16: it writes the weights as they are after loading, a tied weight once.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "torch.manual_seed(0)\nreference = MLP().eval()\npath = os.path.join(tempfile.mkdtemp(), \"mlp.safetensors\")\nsave_weights_for_mapping(reference, path)\nprint(f\"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Build, map, export and compile within a memory budget\n\n``low_memory`` builds the model on ``meta``, where it allocates nothing, and maps its weights; every\ntensor must be in the file. Mapping doesn't read the weights, so none of the file is resident yet.\n\nThe mapped weights are CPU tensors, so the model and its example input stay on the CPU through\n``torch.export``. TensorRT takes weights as host pointers and reads each one in place from the mapping:\nthere's no GPU copy and no host copy. A weight's pages are dropped once the last engine that reads it\nis built; the tensor stays valid and is re-read from the file if used.\n\n``enable_resource_partitioning`` splits the model into engines small enough to build within\n``cpu_memory_budget``, the host memory the process may use. Each engine gets up to a quarter of the\nbudget left over after the memory already in use, since building an engine takes a few times its\nweights' size. So a budget of the memory in use now plus the weights' size makes engines of at most\nabout a quarter of the weights, and building them one after another keeps only about one engine's\nweights resident.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "x = torch.randn(4, 2048)\nwith (\n    torch_tensorrt.dynamo.low_memory(\n        lambda: MLP().eval(),\n        path,\n        cpu_memory_budget=psutil.Process().memory_info().rss + os.path.getsize(path),\n    ) as low_mem,\n    torch.no_grad(),\n):\n    print(\n        f\"mapped {low_mem.report.mapped_bytes / 2**20:.0f} MiB; \"\n        f\"resident: {resident_mib(path):.0f} MiB\"\n    )\n    exported = torch.export.export(low_mem.model, (x,))\n    trt_model, peak = peak_resident_mib(\n        path,\n        lambda: torch_tensorrt.dynamo.compile(\n            exported, inputs=[x.cuda()], **low_mem.compile_settings\n        ),\n    )\n    engines = [name for name, _ in trt_model.named_children() if \"_run_on_acc\" in name]\n    # As one engine, without the partitioner, the whole file (192 MiB here) is resident while it builds.\n    # With release_weights_after_build=False, all of it would stay resident after compiling.\n    print(\n        f\"compiled into {len(engines)} engines; at most {peak:.0f} MiB of the weights file was \"\n        f\"resident, {resident_mib(path):.0f} MiB is now\"\n    )"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Check the result\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "with torch.no_grad():\n    expected = reference(x)\n    actual = trt_model(x.cuda()).cpu()\ntorch.testing.assert_close(actual, expected, rtol=1e-2, atol=1e-2)\nprint(\n    f\"max abs difference from the original model: {(actual - expected).abs().max().item():.2e}\"\n)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "The file must stay in place while the model or its weights are in use: released pages are read from it\nagain. On large models this keeps the host's peak near the largest single engine build instead of the\nwhole model, e.g. pi0.5 (6.7 GiB of bfloat16 weights): host RSS before compilation went from 8.7 to\n2.9 GiB.\n\n"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.18"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

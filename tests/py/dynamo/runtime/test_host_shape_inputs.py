@@ -70,6 +70,15 @@ class TestHostShapeInput(TestCase):
         device_out = self._run_engine(trt_mod, x, 64, "cuda")
         torch.testing.assert_close(host_out, device_out, rtol=1e-5, atol=1e-5)
 
+    def test_infer_outputs_skips_shape_inputs(self):
+        _, trt_mod = self._compile()
+        shapes = [[64] if name == "x" else [] for name in trt_mod.input_binding_names]
+        # A build with the C++ runtime backs the module with the C++ engine, so
+        # also drive the Python engine from the same serialized info.
+        for engine in (trt_mod.engine, TRTEngine(trt_mod._pack_engine_info())):
+            outputs = engine.infer_outputs(shapes)
+            self.assertEqual([list(getattr(o, "shape", o)) for o in outputs], [[1]])
+
     def test_python_runtime_keeps_every_shape_input(self):
         class ThreeShapeInputModel(nn.Module):
             def forward(self, x, a, b, c):

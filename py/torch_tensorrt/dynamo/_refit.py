@@ -112,7 +112,15 @@ def _refit_single_trt_engine_with_gm(
             trt_wt_tensor = trt.Weights(
                 trt_dtype, weight.data_ptr(), torch.numel(weight)
             )
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            if not refitter.set_named_weights(
+                layer_name, trt_wt_tensor, trt_wt_location
+            ):
+                expected = refitter.get_weights_prototype(layer_name)
+                raise AssertionError(
+                    f"TensorRT refused the new weight for {layer_name}: the engine "
+                    f"holds {expected.size} {expected.dtype}, the new weight is "
+                    f"{trt_wt_tensor.size} {trt_dtype}"
+                )
             refitted.add(layer_name)
 
         if len(refitted) != len(weight_list):
@@ -354,8 +362,16 @@ def refit_module_weights(
         for name, submodule in list(new_partitioned_module.named_children()):
             if isinstance(submodule, torch.export._unlift.GuardsFn):
                 new_partitioned_module.delete_submodule(name)
+        # The global partitioner leaves the model's own submodules in place after the engines take over their
+        # weights, and release_weights_after_build empties them: compare and refit the ones the graphs use.
+        new_partitioned_module.delete_all_unused_submodules()
+        used = {
+            str(node.target).split(".")[0]
+            for node in compiled_module.graph.nodes
+            if node.op in ("call_module", "get_attr")
+        }
         assert {sm[0] for sm in new_partitioned_module.named_children()} == {
-            sm[0] for sm in compiled_module.named_children()
+            sm[0] for sm in compiled_module.named_children() if sm[0] in used
         }, "New weights module is not compatible with previously compiled Torch-TensorRT module"
     # 2. TODO: Check the hash of source fx.Graph and new fx.Graph
 
@@ -397,7 +413,9 @@ def refit_module_weights(
             )
 
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
-        submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
+        submodule_inputs = partitioning.construct_submodule_inputs(
+            new_submodule, example_tensors=False
+        )
         logger.debug(
             "Refitting Submodule name: %s\n",
             str(name),
@@ -457,6 +475,23 @@ def refit_module_weights(
         del serialized_engine
         gc.collect()
         torch.cuda.empty_cache()
+
+    # The global partitioner leaves the PyTorch nodes in the top graph, and they can read
+    # state set on the top module itself, such as a folded constant. The loop above only
+    # refits the children, so copy that state over too.
+    if not settings.use_fast_partitioner and not inline_module:
+        with torch.no_grad():
+            for node in new_partitioned_module.graph.nodes:
+                if node.op != "get_attr" or "." in node.target:
+                    continue
+                new_value = getattr(new_partitioned_module, node.target)
+                if not isinstance(new_value, torch.Tensor):
+                    continue
+                value = getattr(compiled_module, node.target)
+                assert (
+                    value.shape == new_value.shape
+                ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
+                value.copy_(new_value)
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))  # move to device for inference

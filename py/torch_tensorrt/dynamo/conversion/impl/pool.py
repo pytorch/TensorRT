@@ -4,6 +4,7 @@
 import math
 from typing import Dict, Optional, Sequence, Union
 
+import numpy as np
 import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
 from tensorrt import ITensor as TRTTensor
@@ -13,6 +14,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_positive_dim,
+    get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
 )
@@ -412,3 +414,81 @@ def adaptive_avg_poolNd(
         )
 
     return output
+
+
+def adaptive_max_poolNd(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    output_size: Sequence[int],
+) -> TRTTensor:
+    spatial_rank = len(output_size)
+    # TensorRT pooling needs a batch dimension in front of the channels.
+    unbatched = len(input.shape) == spatial_rank + 1
+    if unbatched:
+        input = impl.unsqueeze.unsqueeze(
+            ctx, target, source_ir, f"{name}_unsqueeze", input, 0
+        )
+
+    # The max over a box is the max over each of its axes in turn, so pool one axis at a time.
+    # Axes that shrink go first, so an axis that grows does not multiply the size of an
+    # intermediate that another axis then reduces.
+    first_spatial = len(input.shape) - spatial_rank
+    order = sorted(
+        range(spatial_rank),
+        key=lambda i: output_size[i] >= input.shape[first_spatial + i],
+    )
+    for i in order:
+        out_size = output_size[i]
+        dim = first_spatial + i
+        in_size = input.shape[dim]
+        if in_size == out_size:
+            continue
+
+        # PyTorch's bins are [floor(j * in / out), ceil((j + 1) * in / out)). If in is a
+        # multiple of out, or one more, the bins have one length and a fixed step, so a
+        # strided pooling computes them. TensorRT rejects a 2D pooling window of 100000 or
+        # more, and the stride is never larger than the window, so longer bins take the
+        # gather path below.
+        stride = in_size // out_size
+        window = in_size - (out_size - 1) * stride
+        if in_size > out_size and in_size % out_size <= 1 and window < 100000:
+            layer = ctx.net.add_pooling_nd(
+                input=input,
+                type=trt.PoolingType.MAX,
+                window_size=[window if d == i else 1 for d in range(spatial_rank)],
+            )
+            layer.stride_nd = [stride if d == i else 1 for d in range(spatial_rank)]
+            set_layer_name(layer, target, f"{name}_pooling_{dim}", source_ir)
+            input = layer.get_output(0)
+            continue
+
+        # Otherwise gather the members of each bin, padding the shorter ones with their last
+        # member, and take the max.
+        j = np.arange(out_size, dtype=np.int64)
+        starts = j * in_size // out_size
+        ends = ((j + 1) * in_size + out_size - 1) // out_size
+        longest = int((ends - starts).max())
+        members = np.minimum(
+            starts[:, None] + np.arange(longest), ends[:, None] - 1
+        ).astype(np.int32)
+        windows = impl.select.index_select(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_windows_{dim}",
+            input,
+            dim,
+            get_trt_tensor(ctx, members, f"{name}_bin_members_{dim}"),
+        )
+        input = impl.reduce.amax(
+            ctx, target, source_ir, f"{name}_max_{dim}", windows, dim + 1, keepdim=False
+        )
+
+    if unbatched:
+        input = impl.squeeze.squeeze(
+            ctx, target, source_ir, f"{name}_squeeze", input, 0
+        )
+    return input

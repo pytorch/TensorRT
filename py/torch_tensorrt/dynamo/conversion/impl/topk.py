@@ -35,6 +35,11 @@ def argmax_argmin(
 ) -> TRTTensor:
     if input.dtype == trt.int32:
         input = cast_trt_tensor(ctx, input, trt.float32, name, target, source_ir)
+    if len(input.shape) == 0:
+        # TensorRT cannot run topk on a 0-d tensor. As shape (1,) along that dim the
+        # result is 0-d, which PyTorch returns whatever keep_dim says.
+        input = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_1d", input, (1,))
+        dim, keep_dim = 0, False
 
     # Three different cases here:
     # 1. dim == None, flatten input tensor first, keep_dim will be ignore and the output rank == input rank
@@ -197,11 +202,13 @@ def topk(
     sorted: Optional[bool],
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-    # ITopKLayer requires rank >= 2 (same broadcast as argmax_argmin above).
-    is_rank_1 = len(input.shape) == 1
-    if is_rank_1:
+    # ITopKLayer requires rank >= 2 (same broadcast as argmax_argmin above). A 0-d input
+    # is one element, and its results are 0-d again.
+    output_shape = (-1,) if len(input.shape) == 1 else ()
+    low_rank = len(input.shape) <= 1
+    if low_rank:
         input = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_broadcast", input, (*input.shape, 1)
+            ctx, target, source_ir, f"{name}_broadcast", input, (-1, 1)
         )
         dim = 0
 
@@ -219,12 +226,12 @@ def topk(
     values = topk_layer.get_output(0)
     indices = topk_layer.get_output(1)
 
-    if is_rank_1:
+    if low_rank:
         values = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_values_1d", values, (-1,)
+            ctx, target, source_ir, f"{name}_values_1d", values, output_shape
         )
         indices = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_indices_1d", indices, (-1,)
+            ctx, target, source_ir, f"{name}_indices_1d", indices, output_shape
         )
 
     if return_indices:

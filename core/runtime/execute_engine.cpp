@@ -457,6 +457,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
       int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
+      // TensorRT returns -1 and writes no names when it rejects the shapes, such as on a failed assertion.
+      TORCHTRT_CHECK(
+          nbNames >= 0,
+          "Engine " << compiled_engine->name
+                    << " rejected the input shapes, see the TensorRT error above (for example a failed assertion)");
+      names.resize(static_cast<size_t>(nbNames));
       TORCHTRT_CHECK(
           nbNames == 0,
           "The shapes of the inputs: " << names << " of engine " << compiled_engine->name
@@ -669,6 +675,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
       int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
+      // TensorRT returns -1 and writes no names when it rejects the shapes, such as on a failed assertion.
+      TORCHTRT_CHECK(
+          nbNames >= 0,
+          "Engine " << compiled_engine->name
+                    << " rejected the input shapes, see the TensorRT error above (for example a failed assertion)");
+      names.resize(static_cast<size_t>(nbNames));
       TORCHTRT_CHECK(
           nbNames == 0,
           "The shapes of the inputs: " << names << " of engine " << compiled_engine->name

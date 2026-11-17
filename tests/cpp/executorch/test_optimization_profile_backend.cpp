@@ -170,8 +170,10 @@ class Engine {
   // before and after, so a fresh thread can call this with no CUDA call of its own.
   Error execute(int rows, int cols, std::optional<cudaStream_t> stream = std::nullopt) {
     SizesType sizes[] = {rows, cols};
-    TensorImpl in(ScalarType::Float, 2, sizes, input_);
-    TensorImpl out(ScalarType::Float, 2, sizes, output_);
+    DimOrderType dim_order[] = {0, 1};
+    StridesType strides[] = {cols, 1};
+    TensorImpl in(ScalarType::Float, 2, sizes, input_, dim_order, strides);
+    TensorImpl out(ScalarType::Float, 2, sizes, output_, dim_order, strides);
     EValue in_value{Tensor(&in)};
     EValue out_value{Tensor(&out)};
     EValue* args[] = {&in_value, &out_value};

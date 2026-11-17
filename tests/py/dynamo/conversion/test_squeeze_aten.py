@@ -15,6 +15,7 @@ class TestSqueezeConverter(DispatchTestCase):
         [
             ("2d_dim", (0), (2, 1)),
             ("3d_one_dim", (0), (2, 2, 1)),
+            ("0d_dim", -1, ()),
         ]
     )
     def test_squeeze_single_dim(self, _, dim, init_size):
@@ -22,7 +23,7 @@ class TestSqueezeConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.squeeze.dim(x, dim)
 
-        inputs = [torch.randn(*init_size)]
+        inputs = [torch.randn(init_size)]
         self.run_test(
             Squeeze(),
             inputs,
@@ -32,6 +33,7 @@ class TestSqueezeConverter(DispatchTestCase):
         [
             ("3d_two_dim", (0, 1), (2, 1, 1)),
             ("4d_dim", (0, 1, 2), (2, 2, 1, 1)),
+            ("0d_dims", (0,), ()),
         ]
     )
     def test_squeeze_multi_dims(self, _, dim, init_size):
@@ -39,7 +41,7 @@ class TestSqueezeConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.squeeze.dims(x, dim)
 
-        inputs = [torch.randn(*init_size)]
+        inputs = [torch.randn(init_size)]
         self.run_test(
             Squeeze(),
             inputs,

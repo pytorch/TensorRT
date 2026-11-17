@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import ast
+import base64
 import operator
+import pickle
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -23,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     OUTPUT_BINDING_NAMES_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
     SERIALIZATION_LEN,
+    SERIALIZED_METADATA_IDX,
 )
 from torch_tensorrt.executorch.backend import (  # noqa: E402
     TensorRTBackend,
@@ -183,6 +186,32 @@ def test_preprocess_rejects_output_allocator():
     edge_program = _build_edge_program(engine_info)
 
     with pytest.raises(RuntimeError, match="output allocator"):
+        TensorRTBackend.preprocess(edge_program, [])
+
+
+@pytest.mark.unit
+def test_preprocess_rejects_an_engine_with_a_pytorch_plugin():
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
+    engine_info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+        pickle.dumps({"pytorch_plugin_ops": ["aten.index_put.default"]})
+    ).decode("utf-8")
+    edge_program = _build_edge_program(engine_info)
+
+    with pytest.raises(RuntimeError, match="runs aten.index_put.default with TensorRT"):
+        TensorRTBackend.preprocess(edge_program, [])
+
+
+@pytest.mark.unit
+def test_preprocess_rejects_an_engine_saved_without_the_plugin_mark():
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine")
+    engine_info[SERIALIZED_METADATA_IDX] = base64.b64encode(
+        pickle.dumps({"num_user_outputs": 1})
+    ).decode("utf-8")
+    edge_program = _build_edge_program(engine_info)
+
+    with pytest.raises(RuntimeError, match="older Torch-TensorRT"):
         TensorRTBackend.preprocess(edge_program, [])
 
 
@@ -417,6 +446,42 @@ def test_preprocess_rejects_non_placeholder_engine_input():
 
     with pytest.raises(ValueError, match="not delegate runtime placeholders"):
         TensorRTBackend.preprocess(edge_program, [])
+
+
+def _typed_edge_program(input_dtype, output_dtype):
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "out"
+    edge_program = _build_edge_program(engine_info)
+    for node in edge_program.graph_module.graph.nodes:
+        if node.op == "placeholder":
+            node.meta["val"] = torch.empty(3, dtype=input_dtype)
+        elif node.op == "call_function":
+            node.meta["val"] = [torch.empty(3, dtype=output_dtype)]
+    return edge_program
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "input_dtype, output_dtype, message",
+    [
+        (torch.float32, torch.float64, "engine output 'out' is torch.float64"),
+        (torch.int16, torch.float32, "engine input 'x' is torch.int16"),
+    ],
+)
+def test_preprocess_rejects_a_dtype_tensorrt_cannot_bind(
+    input_dtype, output_dtype, message
+):
+    # TensorRT bound such a tensor as another type, so the native runtime would
+    # read the program's buffer as that type and return garbage.
+    edge_program = _typed_edge_program(input_dtype, output_dtype)
+
+    with pytest.raises(ValueError, match=message) as excinfo:
+        TensorRTBackend.preprocess(edge_program, [])
+    assert ("truncate_double=True" in str(excinfo.value)) == (
+        torch.float64 in (input_dtype, output_dtype)
+    )
 
 
 @pytest.mark.unit

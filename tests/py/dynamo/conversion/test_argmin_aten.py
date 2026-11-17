@@ -26,6 +26,7 @@ class TestArgminConverter(DispatchTestCase):
             ("dim_0_keep_dim_true", (4, 4, 4), 0, True),
             ("dim_0_keep_dim_false", (4, 4, 4), 0, False),
             ("dim_negative_keep_dim_true", (1, 2, 3), -1, True),
+            ("0d_dim_negative_keep_dim", (), -1, True),
         ]
     )
     def test_argmin(self, _, input_shape, dim, keep_dim):
@@ -36,7 +37,7 @@ class TestArgminConverter(DispatchTestCase):
             def forward(self, input):
                 return torch.ops.aten.argmin.default(input, dim, keep_dim)
 
-        input = [torch.randn(*input_shape)]
+        input = [torch.randn(input_shape)]
 
         self.run_test(ArgMin(), input)
 

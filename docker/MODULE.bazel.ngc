@@ -10,14 +10,34 @@ module(
 bazel_dep(name = "googletest", version = "1.14.0")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "rules_cc", version = "0.0.9")
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "1.7.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
-python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(
-    ignore_root_user_error = True,
-    python_version = "3.12",
+# Use the container's installed Python for wheel discovery and its local
+# toolchain. A downloaded interpreter does not contain the NGC-installed wheels.
+NGC_PYTHON = "python3"
+
+local_runtime_repo = use_repo_rule("@rules_python//python/local_toolchains:repos.bzl", "local_runtime_repo")
+
+local_runtime_repo(
+    name = "ngc_python_runtime",
+    dev_dependency = True,
+    interpreter_path = NGC_PYTHON,
+    on_failure = "fail",
+)
+
+local_runtime_toolchains_repo = use_repo_rule("@rules_python//python/local_toolchains:repos.bzl", "local_runtime_toolchains_repo")
+
+local_runtime_toolchains_repo(
+    name = "ngc_python_toolchains",
+    dev_dependency = True,
+    runtimes = ["ngc_python_runtime"],
+)
+
+register_toolchains(
+    "@ngc_python_toolchains//:all",
+    dev_dependency = True,
 )
 
 bazel_dep(name = "rules_pkg", version = "1.0.1")
@@ -30,27 +50,27 @@ git_override(
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
 )
 
-local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
-
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
 new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
+
+new_whl_repository = use_repo_rule("//toolchains:new_whl_repository.bzl", "new_whl_repository")
 
 torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
 
 torch_nccl_detect(name = "torch_nccl")
 
-
 # External dependency for torch_tensorrt if you already have precompiled binaries.
-new_local_repository(
+new_whl_repository(
     name = "torch_tensorrt",
     build_file = "@//third_party/torch_tensorrt:BUILD",
-    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
+    package = "torch_tensorrt",
+    python = NGC_PYTHON,
 )
-
 
 # CUDA should be installed on the system locally
 new_local_repository(
@@ -59,28 +79,25 @@ new_local_repository(
     path = "/usr/local/cuda/",
 )
 
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
 
-# NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
+# These packages are resolved using the same Python as the NGC toolchain above.
 
-new_local_repository(
+new_whl_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
-    build_file = "third_party/libtorch/BUILD"
+    build_file = "@//third_party/libtorch:BUILD",
+    package = "torch",
+    python = NGC_PYTHON,
 )
 
 # Use the source revision recorded by the pinned ExecuTorch wheel.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.6.0.dev20261021
-    commit = "5e379f610e034da507b48da61464679609517b52",
-    recursive_init_submodules = True,
+    # executorch==1.6.0.dev20261105
+    commit = "1daaf36236b3223111d3ae3cd832931ea7de3c62",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
@@ -89,32 +106,33 @@ new_git_repository(
         "Get-ChildItem -Recurse -Include BUILD,BUILD.bazel | Where-Object { $_.DirectoryName -ne (Get-Location).Path } | Remove-Item -Force",
         "New-Item -ItemType Directory executorch | Out-Null; Get-ChildItem -Force | Where-Object { $_.Name -notin @('executorch','BUILD','BUILD.bazel','REPO.bazel') } | Copy-Item -Destination executorch -Recurse -Force",
     ],
+    recursive_init_submodules = True,
     remote = "https://github.com/pytorch/executorch.git",
 )
 
-
 # This is a workaround (WAR), not a functional Bazel repository.
 # It directly references a system-installed PyTorch package, which breaks hermeticity
-new_local_repository(
+new_whl_repository(
     name = "torch_l4t",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
-    build_file = "third_party/libtorch/BUILD"
+    build_file = "@//third_party/libtorch:BUILD",
+    package = "torch",
+    python = NGC_PYTHON,
 )
 
 new_local_repository(
-   name = "tensorrt",
-   path = "/usr/",
-   build_file = "@//third_party/tensorrt/local:BUILD"
+    name = "tensorrt",
+    build_file = "@//third_party/tensorrt/local:BUILD",
+    path = "/usr/",
 )
 
 new_local_repository(
-   name = "tensorrt_sbsa",
-   path = "/usr/",
-   build_file = "@//third_party/tensorrt/local:BUILD"
+    name = "tensorrt_sbsa",
+    build_file = "@//third_party/tensorrt/local:BUILD",
+    path = "/usr/",
 )
 
 new_local_repository(
-   name = "tensorrt_l4t",
-   path = "/usr/",
-   build_file = "@//third_party/tensorrt/local:BUILD"
+    name = "tensorrt_l4t",
+    build_file = "@//third_party/tensorrt/local:BUILD",
+    path = "/usr/",
 )
