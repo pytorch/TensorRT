@@ -4,7 +4,7 @@
 import functools
 import logging
 import operator
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
@@ -78,20 +78,52 @@ def _region_output(value: torch.fx.Node) -> Optional[torch.fx.Node]:
     return _body(block).graph.output_node().args[0][value.args[1]]
 
 
-def _base(value: torch.fx.Node) -> torch.fx.Node:
-    """The value whose memory a value shares, through views, in-place ops, nested
-    regions and torch.no_grad blocks."""
+def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The tensor whose memory a value shares directly: the input of a view or an
+    in-place op, or for an output of a region or a torch.no_grad block, the value of
+    its body or the operand that output shares memory with. None for new memory."""
     output = _region_output(value)
     if output is not None:
         base = _base(output)
         placeholders = list(base.graph.find_nodes(op="placeholder"))
         if base not in placeholders:
             return base
-        return _base(_operands(value.args[0])[placeholders.index(base)])
+        return _operands(value.args[0])[placeholders.index(base)]
     op = value.args[0] if value.target == operator.getitem else value
     if _may_return_an_input(op) and not _copies(op):
-        return _base((tensors_written_by(op) or [op.args[0]])[0])
+        return (tensors_written_by(op) or [op.args[0]])[0]
+    return None
+
+
+def _base(value: torch.fx.Node) -> torch.fx.Node:
+    """The value whose memory a value shares, through views, in-place ops, nested
+    regions and torch.no_grad blocks."""
+    # A loop, since a chain of in-place ops can be longer than the recursion limit.
+    while (source := _source(value)) is not None:
+        value = source
     return value
+
+
+def _sharing(gm: torch.fx.GraphModule, value: torch.fx.Node) -> Set[torch.fx.Node]:
+    """The values of gm that share the memory of value. They follow, through views,
+    in-place ops and regions, from the value of gm that value follows from, or from
+    the outputs of the region or block whose body gives them that memory."""
+    root = value
+    while (source := _source(root)) is not None and source.graph is gm.graph:
+        root = source
+    base = _base(root)
+    shared = (
+        {root} if base is root else {g for g in root.args[0].users if _base(g) is base}
+    )
+    todo = list(shared)
+    while todo:
+        n = todo.pop()
+        for u in n.users:
+            for c in (u, *(g for g in u.users if g.target == operator.getitem)):
+                if c not in shared and _source(c) is n:
+                    shared.add(c)
+                    todo.append(c)
+    return shared
 
 
 def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
@@ -109,16 +141,11 @@ def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     ]
 
 
-def _first_write(
-    gm: torch.fx.GraphModule, value: torch.fx.Node
-) -> Optional[torch.fx.Node]:
-    """The first op of gm that may write in place into the memory of value, through
-    value or any tensor that shares that memory."""
-    base = _base(value)
-    shared = {n for n in gm.graph.nodes if _base(n) is base}
-    return next(
-        (n for n in gm.graph.nodes if not shared.isdisjoint(_written_by(n))), None
-    )
+def _writers(gm: torch.fx.GraphModule, value: torch.fx.Node) -> Set[torch.fx.Node]:
+    """The ops of gm that may write in place into the memory of value, through value
+    or any tensor that shares that memory. Such an op takes one of those tensors."""
+    shared = _sharing(gm, value)
+    return {u for n in shared for u in n.users if not shared.isdisjoint(_written_by(u))}
 
 
 def _may_read_storage(node: torch.fx.Node) -> bool:
@@ -148,12 +175,7 @@ def _may_read_storage(node: torch.fx.Node) -> bool:
 def _reads_storage(gm: torch.fx.GraphModule, value: torch.fx.Node) -> bool:
     """Whether an op of gm can read the memory around the elements of value, through
     value or any tensor that shares that memory."""
-    base = _base(value)
-    shared = {n for n in gm.graph.nodes if _base(n) is base}
-    return any(
-        not shared.isdisjoint(n.all_input_nodes) and _may_read_storage(n)
-        for n in gm.graph.nodes
-    )
+    return any(_may_read_storage(u) for n in _sharing(gm, value) for u in n.users)
 
 
 def _writes_only_a_new_value(
@@ -237,7 +259,7 @@ def _can_inline(
         output, base = outputs[user.args[1]], bases[user.args[1]]
         if (
             bases.count(base) > 1 or base in placeholders or base is not output
-        ) and _first_write(gm, user) is not None:
+        ) and _writers(gm, user):
             return False
         if base is not output and _reads_storage(gm, user):
             return False
@@ -336,7 +358,7 @@ def _inline_region(
                 cast = _cast(gm, output, val.dtype, user)
                 cast.meta["val"] = val
                 readers = {u for u in user.users if u in regions}
-                first = _first_write(gm, user) if readers else None
+                first = min(_writers(gm, user), default=None) if readers else None
                 readers = {u for u in readers if first is None or u <= first}
                 user.replace_all_uses_with(
                     cast, delete_user_cb=lambda u: u not in readers
