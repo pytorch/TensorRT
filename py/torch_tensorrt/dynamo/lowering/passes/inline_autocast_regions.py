@@ -352,9 +352,9 @@ def _inline_region(
                 )
         # Each user of a region takes one of its outputs with getitem. Ops get the
         # output in the dtype the region gave it, which the rest of the graph expects,
-        # and regions inlined in this round too get it as it is. When another op may
-        # write into the output before such a region reads it, it writes into the
-        # cast, so that region gets the cast too.
+        # and regions inlined in this round too get it as it is. When another op after
+        # the region may write into the output before such a region reads it, it
+        # writes into the cast, so that region gets the cast too.
         for user in list(region.users):
             output = env[outputs[user.args[1]]]
             val = user.meta.get("val")
@@ -362,8 +362,10 @@ def _inline_region(
                 cast = _cast(gm, output, val.dtype, user)
                 cast.meta["val"] = val
                 readers = {u for u in user.users if u in regions}
-                first = min(_writers(gm, user), default=None) if readers else None
-                readers = {u for u in readers if first is None or u <= first}
+                writes = (
+                    [w for w in _writers(gm, user) if w > region] if readers else []
+                )
+                readers = {u for u in readers if all(u <= w for w in writes)}
                 user.replace_all_uses_with(
                     cast, delete_user_cb=lambda u: u not in readers
                 )
