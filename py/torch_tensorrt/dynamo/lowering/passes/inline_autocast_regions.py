@@ -10,6 +10,7 @@ import torch
 from torch._export.utils import _detect_fake_mode_from_gm
 from torch.fx.experimental.const_fold import get_unique_attr_name_in_module
 from torch.fx.passes.fake_tensor_prop import FakeTensorProp
+from torch.multiprocessing.reductions import StorageWeakRef
 
 from .pass_utils import (
     clean_up_graph_after_modifications,
@@ -25,9 +26,32 @@ logger = logging.getLogger(__name__)
 NAME_IN_REGION = "_torch_tensorrt_name_in_autocast_region"
 
 
+def _storages(value: Any) -> Set[StorageWeakRef]:
+    """The memory of the tensors in the traced value of a node."""
+    val = value.meta.get("val") if isinstance(value, torch.fx.Node) else None
+    return {
+        StorageWeakRef(v.untyped_storage())
+        for v in (val if isinstance(val, (list, tuple)) else [val])
+        if isinstance(v, torch.Tensor) and torch._C._has_storage(v)
+    }
+
+
+def _inputs_sharing_memory(
+    op: torch.fx.Node, value: torch.fx.Node
+) -> List[torch.fx.Node]:
+    """The inputs of op whose memory value, op or a getitem of it, shares in the
+    traced values."""
+    storages = _storages(value)
+    return [a for a in op.all_input_nodes if not storages.isdisjoint(_storages(a))]
+
+
 def _aliases_an_input(node: torch.fx.Node) -> bool:
-    return isinstance(node.target, torch._ops.OpOverload) and any(
-        r.alias_info is not None for r in node.target._schema.returns
+    """Whether an op can return an input or a view of it. Some ops, such as type_as
+    with the same dtype, dropout with train=False and broadcast_tensors, do so though
+    their schema does not say it, which the traced values show."""
+    return isinstance(node.target, torch._ops.OpOverload) and (
+        any(r.alias_info is not None for r in node.target._schema.returns)
+        or bool(_inputs_sharing_memory(node, node))
     )
 
 
@@ -91,7 +115,9 @@ def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
         return _operands(value.args[0])[placeholders.index(base)]
     op = value.args[0] if value.target == operator.getitem else value
     if _may_return_an_input(op) and not _copies(op):
-        return (tensors_written_by(op) or [op.args[0]])[0]
+        return (
+            tensors_written_by(op) or _inputs_sharing_memory(op, value) or [op.args[0]]
+        )[0]
     return None
 
 

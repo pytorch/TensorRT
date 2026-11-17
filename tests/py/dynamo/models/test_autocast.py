@@ -1873,6 +1873,34 @@ def test_autocast_model_regions_keeps_the_output_for_readers_after_an_earlier_wr
 
 
 @pytest.mark.unit
+def test_autocast_model_regions_sees_writes_into_operands_that_share_memory():
+    class Model(nn.Module):
+        def forward(self, x):
+            # broadcast_tensors returns views of x, though its schema does not say so.
+            a, b = torch.broadcast_tensors(x, x.T)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v = b[:, :1]
+            with torch.autocast(x.device.type, enabled=False):
+                a.zero_()
+                return v.clone()
+
+    x = torch.full((4, 4), 2.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_ops={
+            torch.ops.aten.numpy_T.default,
+            torch.ops.aten.broadcast_tensors.default,
+        },
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # a.zero_() writes into the memory of v, so the region keeps its autocast and v
+    # is not a cast that misses the write.
+    torch.testing.assert_close(ep.module()(x.clone()), torch.zeros(4, 1, device="cuda"))
+
+
+@pytest.mark.unit
 def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
     class Model(nn.Module):
         def forward(self, x):
@@ -1948,6 +1976,10 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "foreach_then_region_write",
         "no_grad_between_regions",
         "chain",
+        "type_as_in_no_grad",
+        "dropout_in_no_grad",
+        "broadcast_in_no_grad",
+        "type_as_in_disabled",
         "no_grad_view_between",
         "no_grad_view_of_outputs",
         "views_then_new_write",
@@ -2034,6 +2066,44 @@ def test_autocast_model_regions_keeps_values(case):
                 with torch.autocast(x.device.type, enabled=False):
                     v = y[:, :1]
             v.add_(10.0)
+            return y.float()
+
+    # type_as with the same dtype, dropout with train=False and broadcast_tensors
+    # return v or a view of it, though their schema does not say so.
+    class TypeAsInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                v.type_as(v).add_(10.0)
+            return y.float()
+
+    class DropoutInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                nn.functional.dropout(v, 0.5, False).add_(10.0)
+            return y.float()
+
+    class BroadcastInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.no_grad():
+                torch.broadcast_tensors(v)[0].add_(10.0)
+            return y.float()
+
+    class TypeAsInDisabled(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:, :1]
+            with torch.autocast(x.device.type, enabled=False):
+                v.type_as(v).add_(10.0)
             return y.float()
 
     class NoGradViewBetween(nn.Module):
@@ -2485,6 +2555,22 @@ def test_autocast_model_regions_keeps_values(case):
                     "add.*",
                 }
             },
+        ),
+        "type_as_in_no_grad": (
+            TypeAsInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "dropout_in_no_grad": (
+            DropoutInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "broadcast_in_no_grad": (
+            BroadcastInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
+        ),
+        "type_as_in_disabled": (
+            TypeAsInDisabled,
+            {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
         ),
         "to_copy": (ToCopy, {}),
         "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
