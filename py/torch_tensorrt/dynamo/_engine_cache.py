@@ -147,13 +147,18 @@ class BaseEngineCache(ABC):
     def _build_environment(settings: CompilationSettings) -> List[str]:
         """What, besides the graph and the settings, decides whether an engine loads.
 
-        A serialized engine only deserializes with the TensorRT version that built it,
+        A serialized engine only deserializes with the TensorRT version that built it
+        (any later version of the same major version when it is version compatible),
         on the platform and, unless it is hardware compatible, the GPU architecture it
         was built for. Without these in the key, a cache directory shared between
         hosts or kept across a TensorRT upgrade returns an engine that cannot be loaded.
         """
+        if settings.version_compatible:
+            tensorrt_version = f"tensorrt_major={trt.__version__.split('.')[0]}"
+        else:
+            tensorrt_version = f"tensorrt={trt.__version__}"
         environment = [
-            f"tensorrt={trt.__version__}",
+            tensorrt_version,
             f"platform={Platform.current_platform()}",
         ]
         if not settings.hardware_compatible:

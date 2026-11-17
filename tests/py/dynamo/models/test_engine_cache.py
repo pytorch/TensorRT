@@ -259,6 +259,24 @@ class TestHashFunction(TestCase):
             self._hash_on((9, 0), settings, trt_version="0.0.0"),
         )
 
+    def test_version_compatible_engine_is_keyed_on_tensorrt_major_version(self):
+        """A version-compatible engine loads on any later TensorRT of the same major
+        version, so an upgrade within it must not rebuild the engine."""
+        settings = CompilationSettings(
+            immutable_weights=False,
+            version_compatible=True,
+            cache_built_engines=True,
+            reuse_cached_engines=True,
+        )
+        self.assertEqual(
+            self._hash_on((9, 0), settings, trt_version="10.3.0.26"),
+            self._hash_on((9, 0), settings, trt_version="10.14.1.48"),
+        )
+        self.assertNotEqual(
+            self._hash_on((9, 0), settings, trt_version="10.14.1.48"),
+            self._hash_on((9, 0), settings, trt_version="11.0.0.1"),
+        )
+
 
 class TestUndeserializableCacheEntry(TestCase):
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
@@ -268,39 +286,51 @@ class TestUndeserializableCacheEntry(TestCase):
     )
     def test_entry_that_does_not_deserialize_is_rebuilt(self):
         """A hit whose engine TensorRT cannot load (another TensorRT version, another
-        GPU) is a miss: compile rebuilds instead of failing inside the refitter."""
+        GPU) is a miss: compile rebuilds instead of failing inside the refitter, or,
+        for a weight-stripped engine, instead of returning the unloadable entry."""
+        from torch_tensorrt.dynamo._refit import refit_module_weights
+
         model = torch.nn.Linear(8, 8).eval().cuda()
         x = torch.randn(4, 8, device="cuda")
         exp_program = torch.export.export(model, (x,))
-        engine_cache_dir = tempfile.mkdtemp(prefix="test_undeserializable_entry_")
-        self.addCleanup(shutil.rmtree, engine_cache_dir, ignore_errors=True)
-        engine_cache = MyEngineCache(engine_cache_dir)
 
-        def _compile():
-            return torch_trt.dynamo.compile(
-                exp_program,
-                inputs=[x],
-                min_block_size=1,
-                immutable_weights=False,
-                cache_built_engines=True,
-                reuse_cached_engines=True,
-                custom_engine_cache=engine_cache,
-            )
+        for strip_engine_weights in (False, True):
+            with self.subTest(strip_engine_weights=strip_engine_weights):
+                engine_cache_dir = tempfile.mkdtemp(
+                    prefix="test_undeserializable_entry_"
+                )
+                self.addCleanup(shutil.rmtree, engine_cache_dir, ignore_errors=True)
+                engine_cache = MyEngineCache(engine_cache_dir)
 
-        _compile()
-        self.assertEqual(len(engine_cache.hashes), 1)
-        # Replace the stored engine with bytes TensorRT cannot deserialize, the way
-        # an entry written for another GPU or by another TensorRT version looks.
-        for name in os.listdir(engine_cache_dir):
-            path = os.path.join(engine_cache_dir, name)
-            with open(path, "rb") as f:
-                unpacked = pickle.loads(f.read())
-            unpacked["serialized_engine"] = b"not a TensorRT engine"
-            with open(path, "wb") as f:
-                f.write(pickle.dumps(unpacked))
+                def _compile():
+                    return torch_trt.dynamo.compile(
+                        exp_program,
+                        inputs=[x],
+                        min_block_size=1,
+                        immutable_weights=False,
+                        strip_engine_weights=strip_engine_weights,
+                        cache_built_engines=True,
+                        reuse_cached_engines=True,
+                        custom_engine_cache=engine_cache,
+                    )
 
-        trt_gm = _compile()
-        torch.testing.assert_close(trt_gm(x), model(x), rtol=1e-2, atol=1e-2)
+                _compile()
+                self.assertEqual(len(engine_cache.hashes), 1)
+                # Replace the stored engine with bytes TensorRT cannot deserialize, the
+                # way an entry written for another GPU or by another TensorRT version
+                # looks.
+                for name in os.listdir(engine_cache_dir):
+                    path = os.path.join(engine_cache_dir, name)
+                    with open(path, "rb") as f:
+                        unpacked = pickle.loads(f.read())
+                    unpacked["serialized_engine"] = b"not a TensorRT engine"
+                    with open(path, "wb") as f:
+                        f.write(pickle.dumps(unpacked))
+
+                trt_gm = _compile()
+                if strip_engine_weights:
+                    trt_gm = refit_module_weights(trt_gm, exp_program)
+                torch.testing.assert_close(trt_gm(x), model(x), rtol=1e-2, atol=1e-2)
 
 
 class TestEngineCache(TestCase):
