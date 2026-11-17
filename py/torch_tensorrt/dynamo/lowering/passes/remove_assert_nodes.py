@@ -5,6 +5,9 @@ import logging
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    runs_on_decomposed_graph,
+)
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -28,6 +31,7 @@ def apply_remove_assert_nodes(gm: torch.fx.GraphModule) -> bool:
     return count > 0
 
 
+@runs_on_decomposed_graph
 def remove_assert_nodes(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:

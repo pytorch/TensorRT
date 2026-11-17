@@ -275,14 +275,7 @@ def refit_module_weights(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
     new_weight_module = pre_export_lowering(new_weight_module, settings)
-    new_weight_module = maybe_run_decompositions(
-        new_weight_module,
-        enable_experimental_decompositions=settings.enable_experimental_decompositions,
-        decompose_attention=settings.decompose_attention,
-        use_distributed_mode_trace=settings.use_distributed_mode_trace,
-        use_fp32_acc=settings.use_fp32_acc,
-        enable_autocast=settings.enable_autocast,
-    )
+    new_weight_module = maybe_run_decompositions(new_weight_module, settings)
     new_weight_module = remove_alias_from_exported_program(new_weight_module)
     new_gm = new_weight_module.module()
 

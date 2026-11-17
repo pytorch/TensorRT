@@ -2,113 +2,66 @@
 
 Stock ``torch.export`` captures without Torch-TRT's decomp table;
 ``dynamo.compile`` then calls ``ExportedProgram.run_decompositions``, which
-re-traces. ``dynamo.trace`` uses this helper so the default
-``torch_tensorrt.compile(nn.Module)`` path is one trace. ``compile`` skips
-``run_decompositions`` when the exported program already carries a matching
-table fingerprint — no user-facing flag. Autocast is the exception: it inserts
-cast nodes in ``pre_export_lowering`` after export, so that path does not stamp
-during ``trace`` and always runs ``run_decompositions`` once after lowering.
+re-traces the whole program. ``dynamo.trace`` uses this helper so the default
+``torch_tensorrt.compile(nn.Module)`` path is one trace.
+
+``compile`` decides from the graph itself whether decomposition is still needed: it
+runs ``run_decompositions`` unless the program is already post-dispatch ATen IR with
+no op that its table would rewrite. That holds whatever produced the program and
+whatever settings ``trace`` was given. An op that a table already tried and left in
+place, such as ``_fused_rms_norm`` on CUDA, where its decomposition never applies,
+is recorded on the program and not counted, since rerunning would not remove it.
+
+``pre_export_lowering`` runs between the two. If any of its passes needs the graph
+before Torch-TRT decompositions under the given settings (see
+``passes._undecomposed_graph``), ``trace`` exports without them and ``compile``
+decomposes after the passes have run.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import functools
-import inspect
 import logging
 from contextlib import contextmanager
-from typing import Any, Callable, Iterator, Mapping, Optional, cast
+from typing import Any, Callable, Generator, Mapping, Optional, cast
 
 import torch
 from torch.export import ExportedProgram
 from torch.export._trace import _export
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._decomposition_filter import (
-    SHAPE_DEPENDENT_DECOMPOSITIONS,
     filter_decomposition_table,
 )
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+    pre_export_lowering_needs_undecomposed_graph,
+)
 
 logger = logging.getLogger(__name__)
 
-_STAMP_KEY = "torch_tensorrt_decomp_fingerprint"
-_STAMP_VERSION = 1
-# Stamp entry naming the ops whose decomposition export left for compile.
-_DEFERRED_KEY = "deferred"
+# Graph meta naming the ops of the decomp table already applied to the program.
+_APPLIED_KEY = "torch_tensorrt_applied_decompositions"
 
 
-def decomp_fingerprint(
-    enable_experimental_decompositions: bool = False,
-    decompose_attention: bool = False,
-    use_distributed_mode_trace: bool = False,
-    use_fp32_acc: bool = False,
-) -> dict[str, Any]:
-    """Stable id for the decomp table ``compile`` would apply."""
-    return {
-        "v": _STAMP_VERSION,
-        "experimental": bool(enable_experimental_decompositions),
-        "attention": bool(decompose_attention),
-        "distributed": bool(use_distributed_mode_trace),
-        "fp32_acc": bool(use_fp32_acc),
-    }
+def settings_from_kwargs(kwargs: Mapping[str, Any]) -> CompilationSettings:
+    """The settings that the compile keyword arguments in ``kwargs`` give.
 
-
-def stamp_exported_program(
-    exported_program: ExportedProgram,
-    fingerprint: dict[str, Any],
-    deferred: tuple[str, ...] = (),
-) -> ExportedProgram:
-    """Record the decomp table applied to ``exported_program``.
-
-    ``deferred`` names ops of that table whose decomposition was left out, because
-    whether it applies depends on shapes only known after tracing.
+    ``dynamo.trace`` takes the same keyword arguments as ``compile``, and ignores
+    the ones that are not settings.
     """
-    stamp = {**fingerprint, _DEFERRED_KEY: tuple(deferred)}
-    exported_program.graph_module.meta[_STAMP_KEY] = dict(stamp)
-    graph_meta = getattr(exported_program.graph_module.graph, "meta", None)
-    if isinstance(graph_meta, dict):
-        graph_meta[_STAMP_KEY] = dict(stamp)
-    return exported_program
+    names = {field.name for field in dataclasses.fields(CompilationSettings)}
+    return CompilationSettings(**{k: v for k, v in kwargs.items() if k in names})
 
 
-def _read_stamp(exported_program: ExportedProgram) -> Optional[dict[str, Any]]:
-    for meta in (
-        exported_program.graph_module.meta,
-        getattr(exported_program.graph_module.graph, "meta", None),
-    ):
-        if isinstance(meta, dict) and isinstance(meta.get(_STAMP_KEY), dict):
-            return cast(dict[str, Any], meta[_STAMP_KEY])
-    return None
-
-
-def _decomp_table(
-    enable_experimental_decompositions: bool,
-    decompose_attention: bool,
-    use_distributed_mode_trace: bool,
-    use_fp32_acc: bool,
-) -> dict[Any, Callable[..., Any]]:
-    if "use_fp32_acc" in inspect.signature(get_decompositions).parameters:
-        table = get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
-        )
-    else:
-        table = get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-        )
+def _decomp_table(settings: CompilationSettings) -> dict[Any, Callable[..., Any]]:
+    table = get_decompositions(
+        settings.enable_experimental_decompositions,
+        settings.decompose_attention,
+        settings.use_distributed_mode_trace,
+        settings.use_fp32_acc,
+    )
     return cast(dict[Any, Callable[..., Any]], table)
-
-
-def matching_decomp_stamp(
-    exported_program: ExportedProgram, fingerprint: dict[str, Any]
-) -> bool:
-    """Whether ``exported_program`` was decomposed with the table ``fingerprint`` names."""
-    stamp = _read_stamp(exported_program)
-    if stamp is None:
-        return False
-    return {k: v for k, v in stamp.items() if k != _DEFERRED_KEY} == fingerprint
 
 
 def _graph_targets(graph_module: torch.fx.GraphModule) -> set[Any]:
@@ -122,17 +75,41 @@ def _graph_targets(graph_module: torch.fx.GraphModule) -> set[Any]:
     }
 
 
-def _has_pending_deferred_ops(
+def _is_post_dispatch_aten(exported_program: ExportedProgram) -> bool:
+    """Whether ``exported_program`` is functional post-dispatch ATen IR.
+
+    Stock ``torch.export`` gives training IR, which can hold in-place and composite
+    ops outside the decomp table; ``run_decompositions`` functionalizes those
+    whatever the table holds, so the graph's ops alone cannot tell it is done.
+    """
+    verifiers = getattr(exported_program, "verifiers", None)
+    return bool(verifiers) and getattr(verifiers[0], "dialect", None) == "ATEN"
+
+
+def _record_applied(
     exported_program: ExportedProgram, table: Mapping[Any, Any]
-) -> bool:
-    """Whether the graph has an op that export deferred and ``table`` still decomposes."""
-    stamp = _read_stamp(exported_program)
-    deferred = set(stamp[_DEFERRED_KEY]) if stamp is not None else set()
-    if not deferred:
-        return False
-    return any(
-        str(target) in deferred and target in table
+) -> ExportedProgram:
+    """Record that ``table`` has been applied to ``exported_program``."""
+    exported_program.graph_module.meta[_APPLIED_KEY] = tuple(
+        sorted(str(op) for op in table)
+    )
+    return exported_program
+
+
+def _applied(exported_program: ExportedProgram) -> frozenset[str]:
+    return frozenset(exported_program.graph_module.meta.get(_APPLIED_KEY, ()))
+
+
+def pending_decompositions(
+    exported_program: ExportedProgram, table: Mapping[Any, Any]
+) -> list[str]:
+    """The ops in ``exported_program``, subgraphs included, that ``table`` rewrites
+    and that no table applied to the program has already tried."""
+    applied = _applied(exported_program)
+    return sorted(
+        str(target)
         for target in _graph_targets(exported_program.graph_module)
+        if target in table and str(target) not in applied
     )
 
 
@@ -151,7 +128,7 @@ def _cia_split_apis() -> Optional[tuple[Callable[..., Any], Callable[..., Any]]]
 
 
 @contextmanager
-def _aot_export_with_cia_split() -> Iterator[None]:
+def _aot_export_with_cia_split() -> Generator[None, None, None]:
     """When AOT sees ``decompositions=table``, CIA-split like ``run_decompositions``."""
     import torch.export._trace as export_trace
 
@@ -190,7 +167,7 @@ def _aot_export_with_cia_split() -> Iterator[None]:
 @contextmanager
 def _export_to_aten_ir_with_decomp_table(
     decomp_table: dict[Any, Callable[..., Any]],
-) -> Iterator[None]:
+) -> Generator[None, None, None]:
     """Thread ``decomp_table`` into ``_export_to_aten_ir`` (public ``export`` omits it)."""
     import torch.export._trace as export_trace
 
@@ -212,55 +189,33 @@ def _export_to_aten_ir_with_decomp_table(
 
 
 def maybe_run_decompositions(
-    exported_program: ExportedProgram,
-    *,
-    enable_experimental_decompositions: bool = False,
-    decompose_attention: bool = False,
-    use_distributed_mode_trace: bool = False,
-    use_fp32_acc: bool = False,
-    enable_autocast: bool = False,
+    exported_program: ExportedProgram, settings: CompilationSettings
 ) -> ExportedProgram:
-    """Run ``run_decompositions`` unless ``trace`` already applied the same table.
+    """Run ``run_decompositions`` unless the graph needs nothing from it.
 
-    Always runs when ``enable_autocast`` is set. ``pre_export_lowering`` inserts
-    cast nodes after export, so a stamp from ``dynamo.trace`` is stale. Also runs
-    when the graph has an op whose decomposition export deferred, and
-    ``filter_decomposition_table`` keeps that decomposition for this graph.
+    Call after ``pre_export_lowering``. Skips only when the program is already
+    post-dispatch ATen IR, as ``dynamo.trace`` produces, and has no op that the
+    decomp table for ``settings``, filtered for this graph, would rewrite and that
+    the table ``trace`` applied did not already try. Ops that a different
+    ``settings`` decomposes were not in that table, so they rerun it.
     """
-    fingerprint = decomp_fingerprint(
-        enable_experimental_decompositions,
-        decompose_attention,
-        use_distributed_mode_trace,
-        use_fp32_acc,
-    )
     table = filter_decomposition_table(
-        _decomp_table(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc,
-        ),
-        exported_program.graph_module,
+        _decomp_table(settings), exported_program.graph_module
     )
-    if enable_autocast:
-        logger.warning(
-            "Running run_decompositions after autocast: pre_export_lowering may have "
-            "inserted ops that were not present during dynamo.trace"
-        )
-    elif matching_decomp_stamp(exported_program, fingerprint):
-        if not _has_pending_deferred_ops(exported_program, table):
+    if not _is_post_dispatch_aten(exported_program):
+        logger.info("Running run_decompositions: the graph is not yet ATen IR")
+    else:
+        pending = pending_decompositions(exported_program, table)
+        if not pending:
             logger.info(
-                "Skipping run_decompositions: exported program already has the matching "
-                "Torch-TRT decomp table from dynamo.trace"
+                "Skipping run_decompositions: the graph has no op the Torch-TRT "
+                "decomp table rewrites"
             )
             return exported_program
         logger.info(
-            "Running run_decompositions: the graph has ops whose decomposition "
-            "dynamo.trace deferred until the graph shapes were known"
+            "Running run_decompositions: the graph still has %s", ", ".join(pending)
         )
-
-    exported_program = exported_program.run_decompositions(table)
-    return stamp_exported_program(exported_program, fingerprint)
+    return _record_applied(exported_program.run_decompositions(table), table)
 
 
 def export_with_tensorrt_decomps(
@@ -271,54 +226,54 @@ def export_with_tensorrt_decomps(
     strict: bool = False,
     dynamic_shapes: Any = None,
     prefer_deferred_runtime_asserts_over_guards: bool = False,
-    enable_experimental_decompositions: bool = False,
-    decompose_attention: bool = False,
-    use_distributed_mode_trace: bool = False,
-    use_fp32_acc: bool = False,
+    settings: CompilationSettings = CompilationSettings(),
 ) -> ExportedProgram:
     """Capture ``mod`` and apply Torch-TRT decompositions in a single AOT trace.
 
-    Falls back to stock ``torch.export.export`` (no stamp) if this PyTorch build
+    Exports with stock ``torch.export`` instead when a pre-export lowering pass
+    needs the graph undecomposed under ``settings``, or when this PyTorch build
     cannot thread a decomp table through export.
     """
     export_kwargs = dict(kwargs or {})
-    fingerprint = decomp_fingerprint(
-        enable_experimental_decompositions,
-        decompose_attention,
-        use_distributed_mode_trace,
-        use_fp32_acc,
-    )
-    table = _decomp_table(
-        enable_experimental_decompositions,
-        decompose_attention,
-        use_distributed_mode_trace,
-        use_fp32_acc,
-    )
-    # Whether these apply depends on graph shapes (a decomposition that loops over
-    # a symbolic extent would specialize it and fail export), so compile decides
-    # once it can run filter_decomposition_table on the traced graph.
-    deferred = tuple(str(op) for op in SHAPE_DEPENDENT_DECOMPOSITIONS if op in table)
-    for op in SHAPE_DEPENDENT_DECOMPOSITIONS:
-        table.pop(op, None)
+    needs_undecomposed = pre_export_lowering_needs_undecomposed_graph(settings)
     can_inject = (
         _cia_split_apis() is not None
         and hasattr(torch.export._trace, "_export_to_aten_ir")
         and hasattr(torch.export._trace, "_aot_export_joint_with_descriptors")
     )
-    if not can_inject:
-        logger.warning(
-            "Cannot apply Torch-TRT decomps during export on this PyTorch build; "
-            "falling back to torch.export. compile() will run_decompositions."
-        )
+    if needs_undecomposed or not can_inject:
+        if needs_undecomposed:
+            logger.info(
+                "Exporting without Torch-TRT decomps: a pre-export lowering pass "
+                "needs the graph undecomposed; compile() will run_decompositions."
+            )
+        else:
+            logger.warning(
+                "Cannot apply Torch-TRT decomps during export on this PyTorch build; "
+                "falling back to torch.export. compile() will run_decompositions."
+            )
+        # As MutableTorchTensorRTModule exported before one-shot decomposition.
+        if prefer_deferred_runtime_asserts_over_guards:
+            return _export(
+                mod,
+                args=args,
+                kwargs=export_kwargs,
+                dynamic_shapes=dynamic_shapes,
+                strict=strict,
+                prefer_deferred_runtime_asserts_over_guards=True,
+            )
         return torch.export.export(
             mod,
             args=args,
             kwargs=export_kwargs,
             dynamic_shapes=dynamic_shapes,
             strict=strict,
-            prefer_deferred_runtime_asserts_over_guards=prefer_deferred_runtime_asserts_over_guards,
         )
 
+    # A decomposition that cannot apply to a node, such as scatter_add over a
+    # symbolic extent, declines and leaves the op in place; recording the table
+    # keeps compile from retracing for it.
+    table = _decomp_table(settings)
     logger.info(
         "export_with_tensorrt_decomps: exporting with decomp_table (%d entries)",
         len(table),
@@ -333,4 +288,4 @@ def export_with_tensorrt_decomps(
                 strict=strict,
                 prefer_deferred_runtime_asserts_over_guards=prefer_deferred_runtime_asserts_over_guards,
             )
-    return stamp_exported_program(exported_program, fingerprint, deferred)
+    return _record_applied(exported_program, table)

@@ -296,6 +296,13 @@ def scatter_add_decomposition(
     index: torch.Tensor,
     src_tensor: torch.Tensor,
 ) -> torch.Tensor:
+    # Both decompositions below unroll the extent of index along dim, which would
+    # specialize a symbolic extent and fail export. Decline, so the op stays for
+    # partitioning to fall back to Torch, as filter_decomposition_table does when it
+    # sees the traced graph. Declining here also covers dynamo.trace, which
+    # decomposes before any graph exists to filter.
+    if not isinstance(index.shape[dim], int):
+        return NotImplemented
     if _use_integer_scatter_add(input_tensor, dim, index, src_tensor):
         return _scatter_add_integer_decomposition(input_tensor, dim, index, src_tensor)
 

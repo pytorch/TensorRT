@@ -9,13 +9,6 @@ import torch
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 
-# Decompositions that filter_decomposition_table may drop depending on the shapes
-# in the graph. Code that decomposes before the graph exists (one-shot export in
-# dynamo.trace) must leave these for after tracing, when the filter can run.
-SHAPE_DEPENDENT_DECOMPOSITIONS: tuple[OpOverload, ...] = (
-    torch.ops.aten.scatter_add.default,
-)
-
 
 def _has_symbolic_scatter_add_extent(graph_module: torch.fx.GraphModule) -> bool:
     """Return whether scatter_add would require unrolling a symbolic extent."""
