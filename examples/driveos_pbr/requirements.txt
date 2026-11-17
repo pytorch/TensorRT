@@ -1,0 +1,6 @@
+# The pinned Torch ARM64 wheel is supplied in bundle/authoring/wheels.
+transformers==4.55.4
+huggingface-hub==0.34.4
+tokenizers==0.21.4
+safetensors==0.6.2
+numpy==2.1.0
