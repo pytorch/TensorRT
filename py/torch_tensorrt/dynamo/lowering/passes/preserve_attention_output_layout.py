@@ -7,8 +7,8 @@ import torch
 from torch._prims_common import is_contiguous_or_false
 from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering.passes._undecomposed_ops import (
-    needs_undecomposed_ops,
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    needs_undecomposed_graph,
 )
 
 logger = logging.getLogger(__name__)
@@ -61,13 +61,7 @@ def _preserve_layouts(graph: torch.fx.Graph) -> int:
     return count
 
 
-@needs_undecomposed_ops(
-    lambda settings: (
-        (torch.ops.aten.scaled_dot_product_attention.default,)
-        if settings.decompose_attention
-        else ()
-    )
-)
+@needs_undecomposed_graph(when=lambda settings: settings.decompose_attention)
 def preserve_attention_output_layout(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:

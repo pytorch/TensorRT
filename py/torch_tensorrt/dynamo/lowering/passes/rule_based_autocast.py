@@ -10,9 +10,8 @@ import torch
 import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering.passes._undecomposed_ops import (
-    ALL_OPS,
-    needs_undecomposed_ops,
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    needs_undecomposed_graph,
 )
 
 from .nodeclassifier import NodeClassifier, NodeNameSetRule
@@ -154,7 +153,7 @@ def _keep_tiny_constants_nonzero(
 
 # Autocast inserts casts, which decompose, anywhere in the graph, and
 # pre_export_lowering calibrates it on the graph as exported.
-@needs_undecomposed_ops(lambda settings: ALL_OPS if settings.enable_autocast else ())
+@needs_undecomposed_graph(when=lambda settings: settings.enable_autocast)
 def rule_based_autocast(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:

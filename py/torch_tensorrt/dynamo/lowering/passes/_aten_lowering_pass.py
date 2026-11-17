@@ -11,9 +11,8 @@ from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
-from torch_tensorrt.dynamo.lowering.passes._undecomposed_ops import (
-    UndecomposedOps,
-    undecomposed_ops_for,
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    any_needs_undecomposed_graph,
 )
 from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
     mark_constant_fold_exclusions,
@@ -360,15 +359,13 @@ def pre_export_lowering(
     return ep
 
 
-def pre_export_lowering_undecomposed_ops(
-    settings: CompilationSettings,
-) -> UndecomposedOps:
-    """The ops pre_export_lowering must see undecomposed under ``settings``.
+def pre_export_lowering_needs_undecomposed_graph(settings: CompilationSettings) -> bool:
+    """Whether pre_export_lowering needs the graph before Torch-TRT decompositions.
 
-    ``dynamo.trace`` leaves these out of its one-shot decomposition, and
-    ``ALL_OPS`` means it must export without Torch-TRT decompositions at all.
+    If so, ``dynamo.trace`` exports without them and ``compile`` decomposes after
+    pre_export_lowering.
     """
-    return undecomposed_ops_for(ATEN_PRE_LOWERING_PASSES.passes, settings)
+    return any_needs_undecomposed_graph(ATEN_PRE_LOWERING_PASSES.passes, settings)
 
 
 def dump_lowering_passes() -> str:
