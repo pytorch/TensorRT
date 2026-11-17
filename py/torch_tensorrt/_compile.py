@@ -29,6 +29,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
+from torch_tensorrt._jit_compat import torchscript_api
 from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
@@ -264,7 +265,7 @@ def compile(
             logger.info(
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
-            ts_mod = torch.jit.script(module)
+            ts_mod = torchscript_api("script")(module)
         assert _non_fx_input_interface(input_list)
         compiled_ts_module: torch.jit.ScriptModule = torchscript_compile(
             ts_mod,
@@ -537,7 +538,7 @@ def convert_method_to_trt_engine(
             logger.info(
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
-            ts_mod = torch.jit.script(module)
+            ts_mod = torchscript_api("script")(module)
         serialized_engine: bytes = ts_convert_method_to_trt_engine(
             ts_mod,
             inputs=arg_inputs,
@@ -695,7 +696,7 @@ def load(
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
         ts_module = function_overload_with_kwargs(
-            torch.jit.load,
+            torchscript_api("load"),
             file_path,
             _extra_files=extra_files,
             **kwargs,
@@ -1183,7 +1184,7 @@ def save(
                     "Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save."
                 )
             function_overload_with_kwargs(
-                torch.jit.save,
+                torchscript_api("save"),
                 module,
                 file_path,
                 _extra_files=extra_files,
@@ -1261,11 +1262,11 @@ def save(
     elif module_type == _ModuleType.fx:
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
-            module_ts = torch.jit.trace(
+            module_ts = torchscript_api("trace")(
                 module, arg_inputs, example_kwarg_inputs=kwarg_inputs
             )
             function_overload_with_kwargs(
-                torch.jit.save,
+                torchscript_api("save"),
                 module_ts,
                 file_path,
                 _extra_files=extra_files,
