@@ -1848,6 +1848,31 @@ def test_autocast_model_regions_casts_an_output_for_readers_after_a_write():
 
 
 @pytest.mark.unit
+def test_autocast_model_regions_keeps_the_output_for_readers_after_an_earlier_write():
+    class Model(nn.Module):
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                t = x @ x
+                t.add_(1.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                v = t[:, :1]
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (v @ x[:1]).float()
+
+    x = torch.full((4, 4), 256.0, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "add.*", "slice.*"},
+    )
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    # add_ writes into t before the second region makes v, so the last region gets v
+    # as it is, where the cast of 262145 to float16 would be inf.
+    torch.testing.assert_close(ep.module()(x), (x @ x + 1.0)[:, :1] @ x[:1])
+
+
+@pytest.mark.unit
 def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
     class Model(nn.Module):
         def forward(self, x):
