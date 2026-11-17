@@ -317,6 +317,7 @@ def _writes_only_a_new_value(
     value: Any,
     writer: torch.fx.Node,
     operands: Dict[torch.fx.Node, Tuple[Any, torch.fx.Node]],
+    include_disabled: bool,
     inlined: Dict[torch.fx.Node, bool],
 ) -> bool:
     """Whether writer can write in place into value: a new tensor, or the result of
@@ -345,7 +346,9 @@ def _writes_only_a_new_value(
         output = _region_output(value)
         if output is not None:
             # The output of a region that gets inlined too is a value of its body.
-            if not _is_inlined(value.graph.owning_module, value.args[0], inlined):
+            if not _is_inlined(
+                value.graph.owning_module, value.args[0], include_disabled, inlined
+            ):
                 return False
             value, writer = output, output.graph.output_node()
             continue
@@ -364,6 +367,7 @@ def _writes_only_a_new_value(
 def _can_inline(
     gm: torch.fx.GraphModule,
     region: torch.fx.Node,
+    include_disabled: bool,
     inlined: Dict[torch.fx.Node, bool],
     operands: Optional[Dict[torch.fx.Node, Tuple[Any, torch.fx.Node]]] = None,
 ) -> bool:
@@ -407,11 +411,11 @@ def _can_inline(
         if node.target == torch.ops.aten.view.dtype:
             return False
         if node.target == torch.ops.higher_order.wrap_with_autocast and not (
-            _can_inline(body, node, inlined, operands)
+            _can_inline(body, node, include_disabled, inlined, operands)
         ):
             return False
         if not all(
-            _writes_only_a_new_value(w, node, operands, inlined)
+            _writes_only_a_new_value(w, node, operands, include_disabled, inlined)
             for w in tensors_written_by(node)
         ):
             return False
@@ -419,17 +423,20 @@ def _can_inline(
 
 
 def _is_inlined(
-    gm: torch.fx.GraphModule, node: torch.fx.Node, inlined: Dict[torch.fx.Node, bool]
+    gm: torch.fx.GraphModule,
+    node: torch.fx.Node,
+    include_disabled: bool,
+    inlined: Dict[torch.fx.Node, bool],
 ) -> bool:
     """Whether node is a region that gets inlined. A region with enabled=False is
-    how a model keeps ops in FP32, so it keeps its autocast. inlined keeps the
-    answers for the graph as it is, since each write into the output of a region
-    asks about that region again."""
+    how a model keeps ops in FP32, so it keeps its autocast unless include_disabled.
+    inlined keeps the answers for the graph as it is, since each write into the
+    output of a region asks about that region again."""
     if node not in inlined:
         inlined[node] = (
             node.target == torch.ops.higher_order.wrap_with_autocast
-            and bool(node.args[2])
-            and _can_inline(gm, node, inlined)
+            and (include_disabled or bool(node.args[2]))
+            and _can_inline(gm, node, include_disabled, inlined)
         )
     return inlined[node]
 
@@ -485,8 +492,8 @@ def _inline_region(
                     else:
                         env[node].update_kwarg("copy", True)
                 # Ops such as matmul and lerp need their floating point inputs in one
-                # dtype. Autocast gave them one when it has a kernel for the op, which
-                # casts them, or when they all had one dtype in the region.
+                # dtype. Autocast gave them one when it ran and has a kernel for the op,
+                # which casts them, or when they all had one dtype in the region.
                 dtypes = {
                     a.meta["val"].dtype
                     for a in node.all_input_nodes
@@ -494,7 +501,8 @@ def _inline_region(
                     and a.meta["val"].is_floating_point()
                 }
                 copied[env[node]] = len(dtypes) == 1 or (
-                    isinstance(node.target, torch._ops.OpOverload)
+                    bool(region.args[2])
+                    and isinstance(node.target, torch._ops.OpOverload)
                     and node.target.has_kernel_for_dispatch_key(autocast_key)
                 )
         # Each user of a region takes one of its outputs with getitem. Ops get the
@@ -528,7 +536,7 @@ def _inline_region(
 
 class _MatchInputDtypes(FakeTensorProp):  # type: ignore[misc]
     """FakeTensorProp that also casts floating point inputs that differ in dtype, of
-    the given ops that autocast gave them in one dtype, to their promoted dtype.
+    the given ops that had them in one dtype in their region, to their promoted dtype.
     Other ops keep inputs that differ, such as a float8 matmul with float32 scales.
     A region that keeps its autocast gets its inputs in the dtypes it was traced with.
     """
@@ -579,22 +587,27 @@ class _MatchInputDtypes(FakeTensorProp):  # type: ignore[misc]
         return super().run_node(n)
 
 
-def inline_autocast_regions(gm: torch.fx.GraphModule) -> None:
+def inline_autocast_regions(
+    gm: torch.fx.GraphModule, include_disabled: bool = False
+) -> None:
     """Replace each torch.autocast region of the graph with its body, without the region's autocast.
 
     Torch-TensorRT autocast then chooses the precision of the body's ops like that
-    of any other op. Where autocast gave the floating point inputs of an op one
-    dtype, by casting them as for matmul or by computing them in it, and they now
-    differ, they are cast to their promoted dtype. The rest of the graph gets
+    of any other op. Where the floating point inputs of an op had one dtype in its
+    region, because autocast cast them as for matmul or because they were computed
+    in one dtype, and they now differ, they are cast to their promoted dtype. The rest of the graph gets
     each output of a region in the dtype the region gave it. A region whose values
     inlining could change keeps its autocast, see _can_inline. A region that keeps
-    its autocast gets its inputs in the dtypes it was traced with.
+    its autocast gets its inputs in the dtypes it was traced with. Regions with
+    enabled=False keep theirs too, unless include_disabled.
     """
     copied: Dict[torch.fx.Node, bool] = {}
     inlined: Dict[torch.fx.Node, bool] = {}
     count = 0
     while regions := [
-        node for node in gm.graph.nodes if _is_inlined(gm, node, inlined)
+        node
+        for node in gm.graph.nodes
+        if _is_inlined(gm, node, include_disabled, inlined)
     ]:
         inlining = set(regions)
         for region in regions:
