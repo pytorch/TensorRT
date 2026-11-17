@@ -6,7 +6,6 @@ from __future__ import annotations
 import ctypes
 import functools
 import gc
-import importlib.util
 import logging
 import os
 import platform
@@ -28,7 +27,9 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
+import tensorrt as trt
 import torch
+from packaging import version
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
@@ -41,9 +42,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
-
-import tensorrt as trt
-from packaging import version
 
 from .types import TRTDataType
 
@@ -1113,20 +1111,19 @@ def trim_host_heap() -> None:
 
 
 def is_quantized_by_modelopt(model: torch.nn.Module) -> bool:
-    """
-    Check if the model has been quantized by NVIDIA ModelOpt library.
-    If ModelOpt is installed, use its function to check if the model is quantized.
-    Otherwise, do name/module-string checks. A caveat is that it can break if ModelOpt renames things.
-    """
-    if importlib.util.find_spec("modelopt") is not None:
-        from modelopt.torch.quantization.utils import is_quantized
+    """Recognize ModelOpt quantizers without importing an optional dependency.
 
-        return bool(is_quantized(model))
-
-    for m in model.modules():
-        cls = type(m)
-        if cls.__name__ == "TensorQuantizer" and cls.__module__.startswith(
-            "modelopt.torch.quantization"
-        ):
-            return True
+    ModelOpt's check is TensorQuantizer membership. Walking the MRO preserves
+    that check for user subclasses too, without initializing ModelOpt merely
+    to export an unrelated model. Actual quantized export still imports its
+    required ModelOpt context, and propagates dependency failures there.
+    """
+    namespace = "modelopt.torch.quantization"
+    for module in model.modules():
+        for cls in type(module).__mro__:
+            if cls.__name__ == "TensorQuantizer" and (
+                cls.__module__ == namespace
+                or cls.__module__.startswith(namespace + ".")
+            ):
+                return True
     return False

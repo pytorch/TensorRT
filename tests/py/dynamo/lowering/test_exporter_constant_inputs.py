@@ -61,8 +61,8 @@ def test_constant_input_signature_survives_save_load(
             expected = native(x, constant=different)
         else:
             expected = native(x, different)
-    except (RuntimeError, ValueError):
-        with pytest.raises((RuntimeError, ValueError)):
+    except (RuntimeError, ValueError, AssertionError):
+        with pytest.raises((RuntimeError, ValueError, AssertionError)):
             if keyword:
                 loaded(x, constant=different)
             else:
@@ -129,3 +129,70 @@ def test_zero_dimensional_tensor_input_is_not_a_constant():
     saved.seek(0)
     loaded = torch.export.load(saved).module()
     torch.testing.assert_close(loaded(x, torch.tensor(3.0)), x * 3)
+
+
+@pytest.mark.unit
+def test_rebuilt_program_preserves_generated_input_guards():
+    class Model(torch.nn.Module):
+        def forward(self, x, scale):
+            return x * scale
+
+    x = torch.randn(2, 4)
+    original = torch.export.export(
+        Model(),
+        (x, 2.0),
+        dynamic_shapes={
+            "x": {0: torch.export.Dim("batch", min=1, max=8)},
+            "scale": None,
+        },
+    )
+    rebuilt = create_trt_exp_program(original.module())
+    assert rebuilt.range_constraints == original.range_constraints
+    assert not any(n.op == "call_module" for n in rebuilt.graph.nodes)
+    saved = io.BytesIO()
+    torch.export.save(rebuilt, saved)
+    saved.seek(0)
+    loaded = torch.export.load(saved).module()
+    for size in (1, 2, 5, 8):
+        inputs = torch.randn(size, 4)
+        torch.testing.assert_close(loaded(inputs, 2.0), original.module()(inputs, 2.0))
+    for inputs, scale in [(torch.randn(9, 4), 2.0), (x, 3.0)]:
+        with pytest.raises((RuntimeError, ValueError, AssertionError)):
+            original.module()(inputs, scale)
+        with pytest.raises((RuntimeError, ValueError, AssertionError)):
+            loaded(inputs, scale)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("inherit_guard", [False, True])
+def test_user_module_named_like_an_export_guard_is_not_removed(inherit_guard):
+    from torch._export.verifier import SpecViolationError
+    from torch.export import _unlift
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return x + 1
+
+    base = (
+        getattr(_unlift, "GuardsFn", torch.nn.Module)
+        if inherit_guard
+        else torch.nn.Module
+    )
+
+    class UserGuard(base):
+        _is_impure = True
+
+        def forward(self, *args):
+            return None
+
+    graph = torch.export.export(Model(), (torch.randn(2, 4),)).module()
+    graph.add_submodule("_guards_fn", UserGuard())
+    if not any(
+        n.op == "call_module" and n.target == "_guards_fn" for n in graph.graph.nodes
+    ):
+        first = next(n for n in graph.graph.nodes if n.op == "call_function")
+        placeholder = next(n for n in graph.graph.nodes if n.op == "placeholder")
+        with graph.graph.inserting_before(first):
+            graph.graph.call_module("_guards_fn", args=(placeholder,))
+    with pytest.raises(SpecViolationError, match="call_module"):
+        create_trt_exp_program(graph)

@@ -7,6 +7,7 @@ from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._jit_compat import torchscript_api
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 
@@ -245,7 +246,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 out = self.fc2(self.fc1(x))
                 return out
 
-        mod = torch.jit.script(Test())
+        mod = torchscript_api("script")(Test())
         if via_ts:
             test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
                 mod, "forward", inputs=[torchtrt.Input((2, 10))]
@@ -272,7 +273,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 out = self.fc2(self.fc1(x))
                 return out
 
-        mod = torch.jit.script(Test())
+        mod = torchscript_api("script")(Test())
         test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
@@ -295,7 +296,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 out = self.fc2(self.fc1(x))
                 return out
 
-        mod = torch.jit.script(Test())
+        mod = torchscript_api("script")(Test())
         test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
             mod, "forward", inputs=[torchtrt.Input((2, 10))]
         )
