@@ -55,7 +55,7 @@ class TestDivConverter(DispatchTestCase):
             ("3d", (2, 1, 2), 2.0),
         ]
     )
-    def test_div_tensor(self, _, shape, scalar):
+    def test_div_tensor_scalar(self, _, shape, scalar):
         class div(nn.Module):
             def forward(self, lhs_val):
                 return torch.ops.aten.div.Tensor(lhs_val, scalar)
@@ -68,12 +68,52 @@ class TestDivConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ("int64_int64", torch.int64, torch.int64),
+            ("int32_int64", torch.int32, torch.int64),
+            ("bool_int64", torch.bool, torch.int64),
+        ]
+    )
+    def test_div_tensor_integer(self, _, lhs_dtype, rhs_dtype):
+        # true division of integers gives a floating point result
+        class div(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.div.Tensor(lhs_val, rhs_val)
+
+        inputs = [
+            torch.randint(-10, 10, (2, 3)).to(lhs_dtype),
+            torch.randint(1, 5, (2, 3)).to(rhs_dtype),
+        ]
+        self.run_test(
+            div(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            ("int64", torch.int64, 3),
+            ("int32", torch.int32, -4),
+            ("bool_divisor", torch.int64, True),
+        ]
+    )
+    def test_div_tensor_integer_scalar(self, _, dtype, scalar):
+        class div(nn.Module):
+            def forward(self, lhs_val):
+                return torch.ops.aten.div.Tensor(lhs_val, scalar)
+
+        inputs = [torch.randint(-10, 10, (2, 3)).to(dtype)]
+        self.run_test(
+            div(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
             ("2d", (2, 1), 1.0, None),
             ("3d", (2, 1, 2), 2.0, "trunc"),
             ("3d", (2, 3, 2), -3.0, "floor"),
         ]
     )
-    def test_div_tensor_rounding_mode(self, _, shape, scalar, rounding_mode):
+    def test_div_tensor_scalar_rounding_mode(self, _, shape, scalar, rounding_mode):
         class div(nn.Module):
             def forward(self, lhs_val):
                 return torch.ops.aten.div.Tensor_mode(
