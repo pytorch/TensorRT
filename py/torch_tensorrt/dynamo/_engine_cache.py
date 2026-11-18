@@ -89,7 +89,12 @@ class BaseEngineCache(ABC):
 
             for node in graph.nodes:
                 if node.op == "placeholder":
-                    canonical_nodes.append(f"placeholder_input_{input_counter}")
+                    # truncate_double gives a float64 input a float32 spec, but a
+                    # converter can still build other layers for its float64 metadata.
+                    val = node.meta.get("val", node.meta.get("tensor_meta"))
+                    canonical_nodes.append(
+                        f"placeholder_input_{input_counter}{getattr(val, 'dtype', '')}"
+                    )
                     input_counter += 1
                 else:
                     # A refit replaces weights, not arguments. Nodes go in by
