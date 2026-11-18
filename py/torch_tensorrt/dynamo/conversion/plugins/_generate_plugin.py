@@ -4,6 +4,7 @@
 import inspect
 import itertools
 import logging
+import operator
 import re
 from types import FunctionType
 from typing import Any, Callable, Optional, Tuple
@@ -26,6 +27,12 @@ from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# Torch's symbolic shapes write integer division as its own sympy function
+# (``FloorDiv``), which ``lambdify`` prints by name. Give the generated output
+# shape functions an implementation that ``tensorrt.plugin.ShapeExpr`` (which
+# defines ``//``) and plain ints both accept.
+_SHAPE_EXPR_FUNCTIONS = {"FloorDiv": operator.floordiv}
 
 
 def _patch_trt_validator_issubclass() -> None:
@@ -344,7 +351,9 @@ def _generate_plugin(plugin_name: str) -> None:
                     out_expr = out_dim.node.expr.subs(subs_map)
                 else:
                     out_expr = sympy.Integer(int(out_dim))
-                shape_calc_fns[i] = lambdify(tuple(clean_args), out_expr, "math")
+                shape_calc_fns[i] = lambdify(
+                    tuple(clean_args), out_expr, [_SHAPE_EXPR_FUNCTIONS, "math"]
+                )
 
             # ``TensorDesc.like()`` keeps the input rank, which is wrong for
             # shape-changing ops such as reductions. Use the meta output rank
