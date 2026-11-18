@@ -4,7 +4,7 @@
 import inspect
 import logging
 from operator import attrgetter
-from typing import Any, Callable, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -86,16 +86,52 @@ def _node_output_nbytes(node: torch.fx.Node) -> int:
         return 0
 
 
+def _is_constant_derived(node: torch.fx.Node, memo: Dict[torch.fx.Node, bool]) -> bool:
+    """Whether a node depends only on module tensors (no runtime inputs)."""
+    if node in memo:
+        return memo[node]
+    memo[node] = False  # guards against cycles
+    if node.op == "get_attr":
+        result = True
+    elif node.op == "call_function":
+        result = all(_is_constant_derived(arg, memo) for arg in node.all_input_nodes)
+    else:
+        result = False
+    memo[node] = result
+    return result
+
+
+def _any_user_can_fold(node: torch.fx.Node, memo: Dict[torch.fx.Node, bool]) -> bool:
+    """Whether some consumer of a view could itself be constant folded.
+
+    A consumer folds when all of its inputs are constant-derived. Views of the
+    allowlist are looked through, since they are skipped or folded together.
+    """
+    for user in node.users:
+        if user.op != "call_function":
+            continue
+        if user.target in _SAFE_ALIASED_FOLD_SKIP_OPS:
+            if _any_user_can_fold(user, memo):
+                return True
+        elif _is_constant_derived(user, memo):
+            return True
+    return False
+
+
 def skip_large_aliased_view_fold(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
     """Inductor ``skip_folding_node_fn``: True → do not execute this fold.
 
     Matches the install skip: only large, converter-safe views of module tensors
     remain in the graph. Unknown and unsupported operations still fold normally.
+    A view is only skipped when none of its consumers could fold, so skipping
+    never prevents a downstream constant from being produced.
     """
     if node.op != "call_function" or node.target not in _SAFE_ALIASED_FOLD_SKIP_OPS:
         return False
     output_is_large = _node_output_nbytes(node) > _MAX_CONSTANT_FOLD_BYTES
-    return output_is_large and _is_module_attr_view(gm, node)
+    if not (output_is_large and _is_module_attr_view(gm, node)):
+        return False
+    return not _any_user_can_fold(node, {})
 
 
 def _tensor_reuses_module_storage(

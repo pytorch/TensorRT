@@ -46,6 +46,31 @@ class _WeightPermute(torch.nn.Module):
         return value + self.weight.permute(1, 0)
 
 
+class _WeightPermuteScaled(torch.nn.Module):
+    def __init__(self, rows: int) -> None:
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.ones(rows, rows))
+
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        return value + self.weight.permute(1, 0) * 2.0
+
+
+class _WeightPermuteChain(_WeightPermuteScaled):
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        return value + self.weight.permute(1, 0).to(torch.float16).float() * 2.0
+
+
+class _WeightPermuteMixed(_WeightPermuteScaled):
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        permuted = self.weight.permute(1, 0)
+        return value + permuted + permuted * 2.0
+
+
+class _WeightPermuteTwice(_WeightPermuteScaled):
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        return value + self.weight.permute(1, 0).permute(1, 0)
+
+
 class _WeightAdd(torch.nn.Module):
     def __init__(self, rows: int = 32) -> None:
         super().__init__()
@@ -108,11 +133,10 @@ class _CountingFolder(_TorchTensorRTConstantFolder):
         self.executed_targets: list[object] = []
 
     def run_node(self, node: torch.fx.Node) -> object:
-        skip_fn = getattr(self, "skip_folding_node_fn", None)
-        skipping = skip_fn is not None and node.op == "call_function" and skip_fn(node)
-        if node.op == "call_function" and not skipping:
+        result = super().run_node(node)
+        if node.op == "call_function" and result is not self.unknown_value:
             self.executed_targets.append(node.target)
-        return super().run_node(node)
+        return result
 
 
 class TestSkipAliasedFoldExecute(unittest.TestCase):
@@ -245,6 +269,45 @@ class TestSkipAliasedFoldExecute(unittest.TestCase):
                 folder.run()
                 self.assertIn(target, folder.executed_targets)
                 self.assertIn(node, folder.node_replacements)
+
+    def test_large_permute_with_foldable_consumer_is_folded(self) -> None:
+        rows = 513
+        for model_cls in (_WeightPermuteScaled, _WeightPermuteChain):
+            with self.subTest(model=model_cls.__name__):
+                model = model_cls(rows)
+                example = torch.ones(rows, rows)
+                gm = _exported_gm(model, example)
+                permute_node = _permute_nodes(gm)[0]
+                self.assertFalse(skip_large_aliased_view_fold(gm, permute_node))
+
+                folded = constant_fold(gm, CompilationSettings())
+                targets = _call_targets(folded)
+                self.assertNotIn(torch.ops.aten.mul.Tensor, targets)
+                torch.testing.assert_close(folded(example), model(example))
+
+    def test_large_permute_with_runtime_and_foldable_consumers_is_folded(self) -> None:
+        rows = 513
+        model = _WeightPermuteMixed(rows)
+        gm = _exported_gm(model, torch.ones(rows, rows))
+        permute_node = _permute_nodes(gm)[0]
+        self.assertFalse(skip_large_aliased_view_fold(gm, permute_node))
+
+    def test_chained_large_permutes_are_skipped(self) -> None:
+        rows = 513
+        gm = _exported_gm(_WeightPermuteTwice(rows), torch.ones(rows, rows))
+        for node in _permute_nodes(gm):
+            self.assertTrue(skip_large_aliased_view_fold(gm, node))
+
+    def test_size_boundary(self) -> None:
+        # Exactly the limit folds; one extra element is skipped.
+        side = int((_MAX_CONSTANT_FOLD_BYTES // 4) ** 0.5)
+        self.assertEqual(side * side * 4, _MAX_CONSTANT_FOLD_BYTES)
+        at_limit = _exported_gm(_WeightPermute(side), torch.ones(side, side))
+        self.assertFalse(
+            skip_large_aliased_view_fold(at_limit, _permute_nodes(at_limit)[0])
+        )
+        over = _exported_gm(_WeightPermute(side + 1), torch.ones(side + 1, side + 1))
+        self.assertTrue(skip_large_aliased_view_fold(over, _permute_nodes(over)[0]))
 
     def test_constant_fold_keeps_large_permute_in_graph(self) -> None:
         rows = 513
