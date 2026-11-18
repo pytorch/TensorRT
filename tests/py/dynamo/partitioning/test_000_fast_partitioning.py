@@ -295,6 +295,41 @@ class TestFastPartitioning(TestCase):
         # assert_close also checks that each output is on the same device as eager.
         torch.testing.assert_close(trt_mod(x), expected)
 
+    class _Lookup(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.embed = torch.nn.Embedding(16, 4)
+            self.proj = torch.nn.Linear(4, 4)
+
+        def forward(self, ids):
+            return self.proj(self.embed(ids))
+
+    def _dry_run(self, model, example, use_fast_partitioner):
+        torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (example,)),
+            arg_inputs=[example.cuda()],
+            dryrun=True,
+            min_block_size=1,
+            offload_module_to_cpu=True,
+            # A partition that runs in PyTorch is what offload moves back to the GPU.
+            torch_executed_ops={"torch.ops.aten.embedding.default"},
+            use_fast_partitioner=use_fast_partitioner,
+        )
+
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_dry_run_moves_no_weights(self, _, use_fast_partitioner):
+        model = self._Lookup().eval().cuda()
+        self._dry_run(
+            model, torch.randint(0, 16, (2, 3), device="cuda"), use_fast_partitioner
+        )
+        self.assertEqual({p.device.type for p in model.parameters()}, {"cuda"})
+
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_dry_run_of_weights_on_meta(self, _, use_fast_partitioner):
+        with torch.device("meta"):
+            model = self._Lookup().eval()
+        self._dry_run(model, torch.randint(0, 16, (2, 3)), use_fast_partitioner)
+
 
 if __name__ == "__main__":
     run_tests()
