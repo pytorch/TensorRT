@@ -72,6 +72,26 @@ class TestReshapeConverter(DispatchTestCase):
             input_specs,
         )
 
+    def test_reshape_static_inferred_dim_with_sizes_from_other_input(self):
+        # Sizes from another input leave TensorRT unable to infer the -1 (8) as
+        # static, which split on that dim requires
+        class Reshape(torch.nn.Module):
+            def forward(self, x, mask):
+                y = torch.ops.aten.view.default(x, [mask.shape[0], 4, -1])
+                return torch.ops.aten.split.Tensor(y, 4, -1)
+
+        batch = torch.export.Dim("batch", min=1, max=4)
+        input_specs = [
+            Input(min_shape=(1, 32), opt_shape=(2, 32), max_shape=(4, 32)),
+            Input(min_shape=(1,), opt_shape=(2,), max_shape=(4,)),
+        ]
+        self.run_test_with_dynamic_shape(
+            Reshape(),
+            input_specs,
+            use_dynamo_tracer=True,
+            torch_export_dynamic_shapes={"x": {0: batch}, "mask": {0: batch}},
+        )
+
 
 if __name__ == "__main__":
     run_tests()
