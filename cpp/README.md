@@ -1,22 +1,11 @@
-# C++ API
+# Torch-TensorRT native runtimes
 
-Targets in module create the user facing C++ library for the Torch-TensorRT core.
+The C++ TorchScript compiler and `torchtrtc` CLI have been removed. Compile PyTorch
+models with the Python Dynamo frontend and deploy using AOTInductor or ExecuTorch.
 
-## Building libtorchtrt.so
+`libtorchtrt.so` / `torchtrt.dll` contain the TensorRT runtime operators and
+TorchBind engine registrations used by Dynamo and `torch.export`. The
+`libtorchtrt_runtime.so` / `torchtrt_runtime.dll` runtime names are also available.
 
-### Debug build
-``` shell
-bazel build //cpp/lib:libtorchtrt.so --compilation_mode=dbg
-```
-
-### Release build
-
-``` shell
-bazel build //cpp/lib:libtorchtrt.so -c opt
-```
-
-## Usage
-
-``` c++
-#include "torch_tensorrt/torch_tensorrt.h"
-```
+The standalone ExecuTorch backend and its CMake integration are in
+[`src/torch_tensorrt/executorch`](src/torch_tensorrt/executorch/README.md).

@@ -200,58 +200,9 @@ flags are needed to make sure that ``libtorchtrt_runtime.so`` gets optimized out
 See: ``//examples/torchtrt_aoti_example`` for a full end to end demo of this workflow
 
 
-TorchScript
+C++ deployment
 ~~~~~~~~~~~~~~
 
-TorchScript is a legacy compiler stack for PyTorch that includes a Python-less interpreter for TorchScript programs.
-It has historically been used by Torch-TensorRT to execute models without Python. Even after the transition to TorchDynamo,
-the TorchScript interpreter can continue to be used to run PyTorch models with TensorRT engines outside of Python.
-
-.. code-block:: py
-
-    dynamo_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=[...])
-    ts_model = torch.jit.trace(dynamo_model, inputs=[...])
-    torch.jit.save(ts_model, os.path.join(os.getcwd(), "model.ts"),)
-
-This artifact then can be loaded in a C++ application to be executed with out a Python dependency.
-
-.. code-block:: c++
-
-    #include <fstream>
-    #include <iostream>
-    #include <memory>
-    #include <sstream>
-    #include <vector>
-    #include "torch/script.h"
-
-    int main(int argc, const char* argv[]) {
-        if (argc < 2) {
-            std::cerr << "usage: samplertapp <path-to-pre-built-trt-ts module>\n";
-            return -1;
-        }
-
-        std::string trt_ts_module_path = argv[1];
-
-        torch::jit::Module trt_ts_mod;
-        try {
-            // Deserialize the ScriptModule from a file using torch::jit::load().
-            trt_ts_mod = torch::jit::load(trt_ts_module_path);
-        } catch (const c10::Error& e) {
-            std::cerr << "error loading the model from : " << trt_ts_module_path << std::endl;
-            return -1;
-        }
-
-        std::cout << "Running TRT engine" << std::endl;
-        std::vector<torch::jit::IValue> trt_inputs_ivalues;
-        trt_inputs_ivalues.push_back(at::randint(-5, 5, {1, 3, 5, 5}, {at::kCUDA}).to(torch::kFloat32));
-        torch::jit::IValue trt_results_ivalues = trt_ts_mod.forward(trt_inputs_ivalues);
-        std::cout << "==================TRT outputs================" << std::endl;
-        std::cout << trt_results_ivalues << std::endl;
-        std::cout << "=============================================" << std::endl;
-        std::cout << "TRT engine execution completed. " << std::endl;
-    }
-
-Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
-flags are needed to make sure that ``libtorchtrt_runtime.so`` gets optimized out (see above).
-
-See: ``//examples/torchtrt_runtime_example`` for a full end to end demo of this workflow
+TorchScript compilation and serialization have been removed. Use an AOTInductor
+package (:ref:`aot_inductor`) or an ExecuTorch program (:ref:`executorch_deployment`)
+for deployment in C++.

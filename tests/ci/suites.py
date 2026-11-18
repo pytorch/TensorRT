@@ -218,20 +218,6 @@ _L0: list[Suite] = [
             "standard": {"markers": "trt_api and not trt_rtx_only"},
         },
     ),
-    Suite(
-        "ts-api",
-        tier="l0",
-        lanes=("fast", "full", "nightly"),
-        cwd="tests/py/ts",
-        paths=("api/",),
-        setup=("hub",),
-        variants=("standard",),
-        # g5.8xlarge rather than the default g5.4xlarge validation runner:
-        # this suite was dying on the smaller pod without surfacing a test
-        # failure -- in one run the container hook reported the RPC server
-        # process dying mid-step. Same single A10G, more CPU and RAM.
-        runner="mt-l-x86aavx2-29-113-a10g",
-    ),
 ]
 
 # ── L1 — critical-path / full lane ────────────────────────────────────────────
@@ -293,15 +279,6 @@ _L1: list[Suite] = [
         # The RPC server died on the 41 GiB runner during this suite. Use
         # the same larger RAM runner as torch-compile-backend, with one A10G.
         runner="mt-l-x86aavx2-29-113-a10g",
-    ),
-    Suite(
-        "ts-models",
-        tier="l1",
-        lanes=("full", "nightly"),
-        cwd="tests/py/ts",
-        paths=("models/",),
-        setup=("hub",),
-        variants=("standard",),
     ),
 ]
 
@@ -459,16 +436,6 @@ _L2: list[Suite] = [
         jobs="auto",
         variants=("standard",),
         platforms=("linux-x86_64",),
-    ),
-    Suite(
-        "ts-integrations",
-        tier="l2",
-        lanes=("nightly",),
-        cwd="tests/py/ts",
-        paths=("integrations/",),
-        setup=("hub",),
-        jobs="auto",
-        variants=("standard",),
     ),
     Suite(
         "distributed",

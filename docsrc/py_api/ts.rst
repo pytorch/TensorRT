@@ -1,27 +1,12 @@
 .. _torch_tensorrt_ts_py:
 
-torch_tensorrt.ts
-===================
+TorchScript frontend removed
+===========================
 
-.. currentmodule:: torch_tensorrt.ts
+``torch_tensorrt.ts`` and the ``ir="ts"`` / ``ir="torchscript"`` compilation paths
+have been removed following the removal of PyTorch's public TorchScript APIs.
+Use ``torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)`` and
+:doc:`save an ExportedProgram, AOTInductor package, or ExecuTorch program <../user_guide/runtime_performance/saving_models>`.
 
-.. automodule torch_tensorrt.ts
-   :undoc-members:
-
-.. automodule:: torch_tensorrt.ts
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Functions
-------------
-
-.. autofunction:: compile
-
-.. autofunction:: convert_method_to_trt_engine
-
-.. autofunction:: check_method_op_support
-
-.. autofunction:: embed_engine_in_new_module
-
-.. autofunction:: TensorRTCompileSpec
+Existing TorchScript artifacts cannot be loaded with ``torch_tensorrt.load``.
+Recompile the original PyTorch model with the Dynamo frontend.

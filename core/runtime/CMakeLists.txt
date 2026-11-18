@@ -6,6 +6,8 @@ add_library(${lib_name} OBJECT)
 
 set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/DeviceList.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RuntimeSettings.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TRTRuntimeConfig.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.cpp"
@@ -17,6 +19,8 @@ set(CXX_SRCS
 )
 
 set(HEADER_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/RuntimeSettings.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TRTRuntimeConfig.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TensorRTBindingNames.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"

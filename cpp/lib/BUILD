@@ -33,7 +33,8 @@ cc_binary(
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//cpp:torch_tensorrt",
+        "//core/plugins:torch_tensorrt_plugins",
+        "//core/runtime",
     ],
 )
 
@@ -43,7 +44,8 @@ cc_binary(
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//cpp:torch_tensorrt",
+        "//core/plugins:torch_tensorrt_plugins",
+        "//core/runtime",
     ],
 )
 
