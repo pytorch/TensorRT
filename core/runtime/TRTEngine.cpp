@@ -114,6 +114,15 @@ void TRTEngine::record_active_input_tensor_stream_usage(const c10::cuda::CUDAStr
   }
 }
 
+c10::intrusive_ptr<TRTEngine> TRTEngine::create(
+    const std::string& mod_name,
+    std::string_view serialized_engine,
+    const RTDevice& cuda_device,
+    const std::vector<std::string>& in_binding_names,
+    const std::vector<std::string>& out_binding_names) {
+  return c10::make_intrusive<TRTEngine>(mod_name, serialized_engine, cuda_device, in_binding_names, out_binding_names);
+}
+
 TRTEngine::TRTEngine(
     const std::string& serialized_engine,
     const RTDevice& cuda_device,
