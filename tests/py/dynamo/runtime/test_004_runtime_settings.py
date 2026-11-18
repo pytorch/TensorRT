@@ -14,6 +14,7 @@ import torch
 import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._jit_compat import torchscript_api
 from torch_tensorrt.runtime import (
     RuntimeCache,
     RuntimeSettings,
@@ -434,7 +435,9 @@ def _save_load(compiled, inputs):
 
 def _traced_linear():
     """Return a TorchScript module with no TRT engine."""
-    return torch.jit.trace(torch.nn.Linear(3, 3).cuda(), torch.randn(1, 3).cuda())
+    return torchscript_api("trace")(
+        torch.nn.Linear(3, 3).cuda(), torch.randn(1, 3).cuda()
+    )
 
 
 class TestApplyRuntimeSettingsTypeErrors(TestCase):

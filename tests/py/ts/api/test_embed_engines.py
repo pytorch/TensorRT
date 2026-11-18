@@ -7,6 +7,7 @@ from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._jit_compat import torchscript_api
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 try:
@@ -41,7 +42,7 @@ class TestModelToEngineToModel(unittest.TestCase):
             "enabled_precisions": {torch.float},
         }
 
-        self.scripted_model = torch.jit.script(self.model)
+        self.scripted_model = torchscript_api("script")(self.model)
         trt_engine = torchtrt.ts.convert_method_to_trt_engine(
             self.scripted_model, "forward", **compile_spec
         )
@@ -79,7 +80,7 @@ class TestModelToEngineToModel(unittest.TestCase):
             "enabled_precisions": {torch.float},
         }
 
-        self.scripted_model = torch.jit.script(self.model)
+        self.scripted_model = torchscript_api("script")(self.model)
         trt_engine = torchtrt.ts.convert_method_to_trt_engine(
             self.scripted_model, "forward", **compile_spec
         )

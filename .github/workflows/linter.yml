@@ -128,4 +128,7 @@ jobs:
           python3 -m pytest \
             tests/py/dynamo/executorch/test_api.py \
             tests/py/dynamo/executorch/test_load_compatibility.py \
+            tests/py/dynamo/lowering/test_fake_tensor_updater.py \
+            tests/py/dynamo/runtime/test_torchscript_compat.py \
+            tests/py/dynamo/test_modelopt_detection.py \
             -q --no-header -p no:cacheprovider --noconftest -o addopts=""

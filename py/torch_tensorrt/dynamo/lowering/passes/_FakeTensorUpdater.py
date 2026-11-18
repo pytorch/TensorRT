@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+from collections.abc import MutableMapping
 from inspect import signature
 from typing import TYPE_CHECKING, Any
 
@@ -31,7 +32,13 @@ class FakeTensorUpdater(_torch_FakeTensorUpdater):  # type: ignore[misc]
         # ordinary fake-tensor propagation.
         for node in gm.graph.nodes:
             if node.op == "call_function" and "val" not in node.meta:
-                self.processed_hashes.discard(self.hash_node(node))
+                # Newer PyTorch caches hashes by Node; older versions store the
+                # hashes themselves in an OrderedSet. Invalidate the right key
+                # so missing metadata is recomputed on either representation.
+                if isinstance(self.processed_hashes, MutableMapping):
+                    self.processed_hashes.pop(node, None)
+                else:
+                    self.processed_hashes.discard(self.hash_node(node))
 
     def incremental_update(self, fake_mode: "FakeTensorMode") -> Any:
         """Wrap incremental_update to accept fake_mode as an argument."""
