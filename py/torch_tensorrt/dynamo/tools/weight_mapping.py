@@ -40,7 +40,6 @@ from typing import (
     List,
     NamedTuple,
     Optional,
-    Set,
     Tuple,
     Union,
 )
@@ -468,6 +467,25 @@ def has_mapped_weights() -> bool:
     return bool(_get_live_mapped_files())
 
 
+def delete_file_when_unmapped(path: Union[str, "os.PathLike[str]"]) -> None:
+    """Delete the file ``path``, mapped once by ``map_weights``, when no tensor views its mapping any more, or
+    when Python exits."""
+    path = os.fspath(path)
+    for mapped in _get_live_mapped_files():
+        mm = mapped.mm()
+        if mm is not None and mapped.path == path:
+            weakref.finalize(mm, _remove_file, path)
+            return
+    raise ValueError(f"{path} is not mapped by map_weights")
+
+
+def _remove_file(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
 def raise_if_mapped_files_changed(tensors: Iterable[torch.Tensor]) -> None:
     """Raise if a file that one of ``tensors`` is mapped from was removed or changed since ``map_weights``
     mapped it. A mapped weight is read when first used: from a file rewritten since, it reads the new
@@ -577,7 +595,7 @@ def save_weights_for_mapping(
     ``meta`` raises. Each chunk is cast to the tensor's dtype and written as it comes. Converting a
     checkpoint this way holds one chunk in memory at a time: build the model on ``meta``, change it as the
     compiled model will be (dtypes, shapes), and let ``source`` read the checkpoint. The file is written
-    under a new, random name next to ``path`` and renamed when complete.
+    under a new, random name next to ``path`` and renamed once it is complete and on the disk.
     """
     tensors: List[Tuple[str, torch.Tensor]] = []
     for slots in _group_tensor_slots_by_memory(module, "save_weights_for_mapping"):
@@ -620,6 +638,10 @@ def save_weights_for_mapping(
                             ) from None
                         not_in_source.append(name)
                 _write_tensor_chunks(f, name, tensor, chunks)
+            f.flush()
+            # On the disk before it is mapped: on unified memory (Jetson), dirty pages can't be reclaimed
+            # until they are written back.
+            os.fsync(f.fileno())
         os.replace(partial, path)
     finally:
         if os.path.exists(partial):
@@ -687,28 +709,24 @@ def checkpoint_source(
 ) -> WeightSource:
     """A ``source=`` for ``save_weights_for_mapping`` that reads each tensor from the safetensors checkpoint
     ``path``, under ``key(name)`` (the name itself by default), in chunks of at most ``chunk_bytes`` along
-    dimension 0, so no whole checkpoint tensor is ever in memory. The file's dtype may differ; the writer
-    casts each chunk. A name the checkpoint doesn't store raises KeyError. ``path`` may also be a sharded
-    checkpoint's ``model.safetensors.index.json``.
+    dimension 0, so no whole checkpoint tensor is ever in memory. The checkpoint is read, not memory-mapped,
+    so its pages don't count in the process's resident memory. The file's dtype may differ; the writer
+    casts each chunk. A name the checkpoint doesn't store raises KeyError. ``path`` may be a safetensors
+    file, a sharded checkpoint's ``model.safetensors.index.json``, a folder holding one of them, or a
+    Hugging Face Hub repo id.
     """
-    try:
-        from safetensors import safe_open
-    except ImportError as e:
-        raise ImportError(
-            "checkpoint_source reads checkpoints with the safetensors package: pip install safetensors"
-        ) from e
-
-    path = os.fspath(path)
+    path = _resolve_checkpoint_path(os.fspath(path))
     shard_by_name: Dict[str, str] = {}  # for a sharded checkpoint's index
     if path.endswith(".json"):
         with open(path) as f:
             shard_by_name = json.load(f)["weight_map"]
     directory = os.path.dirname(path)
-    # Each file is opened once, with the names it stores.
-    open_files: Dict[str, Tuple[Any, Set[str]]] = {}
+    # Each file's header is read once: its entries, and where its data starts.
+    headers: Dict[str, Tuple[Dict[str, Dict[str, Any]], int]] = {}
 
-    def get_checkpoint_file(stored_name: str) -> Any:
-        """The open safetensors file that stores ``stored_name``; KeyError if none does."""
+    def find_stored_tensor(stored_name: str) -> Tuple[str, Dict[str, Any], int]:
+        """The file that stores ``stored_name``, its header entry and where the file's data starts; KeyError
+        if no file stores it."""
         if shard_by_name and stored_name not in shard_by_name:
             raise KeyError(stored_name)
         file = (
@@ -716,31 +734,119 @@ def checkpoint_source(
             if shard_by_name
             else path
         )
-        if file not in open_files:
-            handle = safe_open(file, framework="pt", device="cpu")
-            open_files[file] = (handle, set(handle.keys()))
-        handle, names = open_files[file]
-        if stored_name not in names:
-            raise KeyError(stored_name)
-        return handle
+        if file not in headers:
+            headers[file] = _read_safetensors_header(file)
+        entries, data_start = headers[file]
+        return file, entries[stored_name], data_start
 
     def read_tensor_chunks(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:
         stored_name = key(name) if key is not None else name
-        checkpoint_file = get_checkpoint_file(stored_name)
-        stored = checkpoint_file.get_slice(stored_name)
-        shape = list(stored.get_shape())
+        file, entry, data_start = find_stored_tensor(stored_name)
+        shape = list(entry["shape"])
         if shape != list(like.shape):
             raise ValueError(
                 f"{name}: {stored_name} in {path} has shape {shape}, the model {list(like.shape)}"
             )
-        if not shape:
-            return [checkpoint_file.get_tensor(stored_name)]
-        if stored.get_dtype() not in _SAFETENSORS_DTYPES:
-            raise ValueError(f"{name}: dtype {stored.get_dtype()} is not supported")
-        row_bytes = _SAFETENSORS_DTYPES[stored.get_dtype()].itemsize
-        for size in shape[1:]:
-            row_bytes *= size
+        dtype = _SAFETENSORS_DTYPES.get(str(entry.get("dtype")))
+        if dtype is None:
+            raise ValueError(f"{name}: dtype {entry.get('dtype')} is not supported")
+        begin, end = entry["data_offsets"]
+        if not shape or begin == end:  # a scalar, or no elements: in one piece
+            return [
+                _read_file_bytes(file, data_start + begin, end - begin, dtype).view(
+                    shape
+                )
+            ]
+        row_bytes = (end - begin) // shape[0]
         rows = max(1, chunk_bytes // max(1, row_bytes))
-        return (stored[i : i + rows] for i in range(0, shape[0], rows))
+        return (
+            _read_file_bytes(
+                file,
+                data_start + begin + i * row_bytes,
+                min(rows, shape[0] - i) * row_bytes,
+                dtype,
+            ).view(-1, *shape[1:])
+            for i in range(0, shape[0], rows)
+        )
 
     return read_tensor_chunks
+
+
+def _read_file_bytes(
+    path: str, offset: int, nbytes: int, dtype: torch.dtype
+) -> torch.Tensor:
+    """``nbytes`` of the file ``path`` from ``offset``, read into a new tensor of ``dtype``."""
+    data = torch.empty(nbytes, dtype=torch.uint8)
+    view = memoryview(data.numpy())
+    with open(path, "rb", buffering=0) as f:
+        f.seek(offset)
+        read = 0
+        while read < nbytes:
+            n = f.readinto(view[read:])
+            if not n:
+                raise ValueError(f"{path} ends before byte {offset + nbytes}")
+            read += n
+    return data.view(dtype)
+
+
+def _resolve_checkpoint_path(path: str) -> str:
+    """Resolve a local file, checkpoint folder, or Hugging Face Hub repo id to a safetensors file or index."""
+    if os.path.isdir(path):
+        index = os.path.join(path, "model.safetensors.index.json")
+        resolved = (
+            index if os.path.isfile(index) else os.path.join(path, "model.safetensors")
+        )
+        if not os.path.isfile(resolved):
+            raise FileNotFoundError(f"No safetensors checkpoint at {resolved}")
+        return resolved
+    if os.path.isfile(path):
+        return path
+    if _is_hub_repo_id(path):
+        return _download_hub_checkpoint(path)
+    raise FileNotFoundError(f"No safetensors checkpoint at {path}")
+
+
+def _is_hub_repo_id(path: str) -> bool:
+    if (
+        not path
+        or path.endswith((".safetensors", ".json"))
+        or os.path.isabs(path)
+        or path.startswith((".", "~"))
+        or "\\" in path
+        or ":" in path
+    ):
+        return False
+    parts = path.split("/")
+    return 1 <= len(parts) <= 2 and all(parts)
+
+
+def _download_hub_checkpoint(repo_id: str) -> str:
+    try:
+        from huggingface_hub import hf_hub_download, try_to_load_from_cache
+        from huggingface_hub.errors import EntryNotFoundError
+    except ImportError as e:
+        raise ImportError(
+            "Downloading checkpoints from the Hugging Face Hub requires huggingface_hub: "
+            "pip install huggingface_hub"
+        ) from e
+
+    cached_single = try_to_load_from_cache(repo_id, "model.safetensors")
+    if isinstance(cached_single, str):
+        return cached_single
+    cached_index = try_to_load_from_cache(repo_id, "model.safetensors.index.json")
+    if isinstance(cached_index, str):
+        with open(cached_index) as f:
+            shards = sorted(set(json.load(f)["weight_map"].values()))
+        if all(isinstance(try_to_load_from_cache(repo_id, s), str) for s in shards):
+            return cached_index
+
+    try:
+        index_path: str = hf_hub_download(repo_id, "model.safetensors.index.json")
+    except EntryNotFoundError:
+        single_path: str = hf_hub_download(repo_id, "model.safetensors")
+        return single_path
+    with open(index_path) as f:
+        shards = sorted(set(json.load(f)["weight_map"].values()))
+    for shard in shards:
+        hf_hub_download(repo_id, shard)
+    return index_path
