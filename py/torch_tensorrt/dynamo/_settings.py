@@ -344,6 +344,9 @@ class CompilationSettings:
                 f"{self.attn_bias_is_causal!r}"
             )
         self.autocast_excluded_ops = _autocast_op_names(self.autocast_excluded_ops)
+        # A dry run builds and runs no engine, so it moves no weights, which may still be on meta.
+        if self.dryrun:
+            self.offload_module_to_cpu = False
         # None (mapped weights only) is a third value, so a falsy 0 must not read as "not False".
         if self.release_weights_after_build is not None:
             self.release_weights_after_build = bool(self.release_weights_after_build)
