@@ -42,7 +42,6 @@ class TestDynamicShapesKernelStrategyModels(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(
@@ -110,7 +109,6 @@ class TestDynamicShapesKernelStrategyDynamic(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(

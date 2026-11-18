@@ -233,9 +233,7 @@ def compile_tensorrt(
                 model,
                 ir="dynamo",
                 inputs=inputs,
-                use_explicit_typing=True,
                 truncate_double=True,
-                use_python_runtime=True,
                 decompose_attention=decompose_attention,
             )
 

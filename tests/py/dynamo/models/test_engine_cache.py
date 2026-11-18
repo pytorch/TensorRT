@@ -1168,7 +1168,6 @@ class TestAliasedIOCacheRoundTrip(TestCase):
             return torch_trt.dynamo.compile(
                 ep,
                 inputs=list(args),
-                enabled_precisions={torch.float32},
                 min_block_size=1,
                 # Required, not incidental: both cache paths are gated on
                 # `not settings.immutable_weights` and the default is immutable, so

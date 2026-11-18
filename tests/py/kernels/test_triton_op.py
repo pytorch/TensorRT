@@ -8,7 +8,6 @@ import types
 import pytest
 import tensorrt as trt
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 
@@ -600,7 +599,6 @@ def test_constant_grid_bounds(launch_int, values):
 @pytest.mark.parametrize("wrapper, fake", [("SymInt32", False), ("ShapeExpr", True)])
 def test_dynamic_launch_expressions_are_preserved(wrapper, fake):
     import tensorrt.plugin as trtp
-
     from torch_tensorrt.kernels._common import SignatureParam
     from torch_tensorrt.kernels._triton import (
         make_symint32_args,
@@ -687,7 +685,6 @@ class TestTritonOpIntegration:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float16},
             min_block_size=1,
         )
         assert any(
@@ -714,7 +711,6 @@ class TestTritonOpIntegration:
         compiled = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         engine_modules = [
@@ -893,7 +889,6 @@ if triton is not None:
 def test_multi_input_output_reduction_dynamic():
     dtype, spelling = torch.bfloat16, "bf16"
     import tensorrt.plugin as trtp
-
     from torch_tensorrt.kernels import _triton
 
     def meta(x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -939,7 +934,6 @@ def test_multi_input_output_reduction_dynamic():
         inputs=inputs,
         min_block_size=1,
         require_full_compilation=True,
-        enabled_precisions={dtype, torch.float32},
     )
     for shape in [(1, 129), (3, 257), (5, 511)]:
         x, y = [torch.randn(shape, device="cuda", dtype=dtype) for _ in range(2)]

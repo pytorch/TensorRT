@@ -400,7 +400,6 @@ def test_nvfp4_nd_input_quantizer(ir):
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
             )
             expected = model(input_tensor)
             outputs_trt = trt_model(input_tensor)
@@ -463,7 +462,6 @@ def test_fp8_and_input_quantizer(ir):
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
             )
             expected = model(input_tensor)
             outputs_trt = trt_model(input_tensor)
@@ -887,7 +885,6 @@ def test_fp8_mha_fused_kernel(ir):
         torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
             exp_program,
             inputs=[q, k, v],
-            use_explicit_typing=True,
             min_block_size=1,
         )
     )
@@ -914,7 +911,6 @@ def test_fp8_mha_fused_kernel(ir):
         model,
         ir="dynamo",
         inputs=[q, k, v],
-        use_explicit_typing=True,
         min_block_size=1,
     )
     with torch.no_grad():

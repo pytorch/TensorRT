@@ -49,9 +49,7 @@ class TestCudagraphsAliasedIO(TestCase):
             ep,
             ir="dynamo",
             inputs=list(args),
-            enabled_precisions={torch.float32},
             min_block_size=1,
-            use_python_runtime=False,
         )
 
     def test_user_input_kv_capture_and_replay(self):

@@ -12,7 +12,6 @@ The override path is what replaces the old ``custom_cuda_kernel_op`` /
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels._register import _infer_schema
@@ -440,7 +439,6 @@ def test_post_qdp_failure_rolls_back_all_state_and_can_retry(monkeypatch):
     import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -501,7 +499,6 @@ def test_concurrent_same_name_registration_preserves_successful_state(monkeypatc
     import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -679,7 +676,6 @@ class TestOverrideIntegration:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=inputs,
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         for size in [128, 512, 2048]:

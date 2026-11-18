@@ -98,7 +98,6 @@ def test_fallback_data_dependent_ops_conflicts_with_require_full_compilation():
             min_block_size=1,
             fallback_data_dependent_ops=True,
             require_full_compilation=True,
-            use_python_runtime=True,
         )
 
 
@@ -117,7 +116,6 @@ def test_fallback_data_dependent_ops_routes_output_allocator_op_to_torch():
         arg_inputs=list(inputs),
         min_block_size=1,
         fallback_data_dependent_ops=True,
-        use_python_runtime=True,
     )
     targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
     assert torch.ops.aten.nonzero.default in targets

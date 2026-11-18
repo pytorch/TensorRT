@@ -84,9 +84,7 @@ compiled = torch_tensorrt.compile(
     ep,
     ir="dynamo",
     inputs=[x_k.clone(), x_v.clone()],
-    enabled_precisions={torch.float32},
     min_block_size=1,
-    use_python_runtime=False,
 )
 
 
