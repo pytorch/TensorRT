@@ -323,7 +323,10 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
     assert "get_filename_component" in config, config
     # One test for the library, at the fixed distance the wheel installs this file at.
     assert (
-        config.count('EXISTS "${_executorch_backend_tensorrt_root}/lib/') == 1
+        config.count(
+            'EXISTS "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}"'
+        )
+        == 1
     ), config
 
 
@@ -433,6 +436,27 @@ def test_the_cuda_extension_alias_yields_to_a_consumers_own_target() -> None:
     assert "if(NOT TARGET extension_cuda)" in alias.rsplit("elseif", 1)[-1], alias[
         -400:
     ]
+
+
+def test_the_source_built_cuda_extension_gets_executorch_headers_and_core() -> None:
+    """Built standalone from a checkout, extension_cuda failed to compile and then to link.
+
+    Its sources include ExecuTorch's c10 headers, and it links executorch_core, which only an
+    ExecuTorch build in the same project defines. The standalone archive recipe has neither.
+    """
+    source = (
+        Path(__file__).resolve().parents[4]
+        / "cpp/src/torch_tensorrt/executorch/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    branch = source.split("elseif(_executorch_backend_tensorrt_source_root AND")[1]
+    branch = branch.split(
+        '"${_executorch_backend_tensorrt_source_root}/extension/cuda"'
+    )[0]
+    assert "/runtime/core/portable_type/c10" in branch, branch
+    assert "if(NOT TARGET executorch_core)" in branch, branch
+    # A path the parent project set must survive the cache default.
+    assert "if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)" in branch, branch
+    assert "add_library(executorch_core STATIC IMPORTED)" in branch, branch
 
 
 @pytest.mark.parametrize("embed", [True, False])

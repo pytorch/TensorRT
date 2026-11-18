@@ -16,13 +16,16 @@ def _has_symbolic_scatter_add_extent(graph_module: torch.fx.GraphModule) -> bool
         if node.target != torch.ops.aten.scatter_add.default or len(node.args) < 4:
             continue
         dim = node.args[1]
-        src_node = node.args[3]
-        if not isinstance(dim, int) or not isinstance(src_node, torch.fx.Node):
+        # The decomposition loops over the extent of index along dim.
+        index_node = node.args[2]
+        if not isinstance(dim, int) or not isinstance(index_node, torch.fx.Node):
             continue
-        src_val = src_node.meta.get("val", src_node.meta.get("example_value"))
-        if not isinstance(src_val, torch.Tensor) or not src_val.ndim:
+        index_val = index_node.meta.get("val", index_node.meta.get("example_value"))
+        if not isinstance(index_val, torch.Tensor) or not index_val.ndim:
             continue
-        if isinstance(src_val.shape[get_positive_dim(dim, src_val.ndim)], torch.SymInt):
+        if isinstance(
+            index_val.shape[get_positive_dim(dim, index_val.ndim)], torch.SymInt
+        ):
             return True
 
     return False

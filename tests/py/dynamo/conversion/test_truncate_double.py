@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
+import os
+import tempfile
 import unittest
 from unittest.mock import Mock
 
@@ -181,6 +183,62 @@ class TestTruncateDoubleMetadata(TestCase):
         self.assertEqual(engine_node.meta["val"].dtype, torch.float32)
         self.assertEqual(casts[0].meta["val"].dtype, torch.float64)
 
+    def test_input_dtypes_are_read_without_copying_the_inputs(self):
+        tensor32 = torch.empty((2, 3), dtype=torch.float32)
+        tensor64 = torch.empty((2, 3), dtype=torch.float64)
+        values = [tensor32, tensor64, 2]
+
+        subgraph = torch.fx.Graph()
+        inputs = [subgraph.placeholder(name) for name in ("x", "y", "n")]
+        for node, value in zip(inputs, values):
+            node.meta["val"] = value
+        output = subgraph.call_function(
+            torch.ops.aten.add.Tensor, args=tuple(inputs[:2])
+        )
+        output.meta["val"] = tensor64
+        subgraph.output(output)
+        submodule = torch.fx.GraphModule({}, subgraph)
+
+        root = nn.Module()
+        root.add_module("run_on_acc_0", submodule)
+        parent_graph = torch.fx.Graph()
+        parent_inputs = [parent_graph.placeholder(name) for name in ("x", "y", "n")]
+        for node, value in zip(parent_inputs, values):
+            node.meta["val"] = value
+        engine_node = parent_graph.call_module(
+            "run_on_acc_0", args=tuple(parent_inputs)
+        )
+        engine_node.meta["val"] = tensor64
+        parent_graph.output(engine_node)
+        parent = torch.fx.GraphModule(root, parent_graph)
+
+        # Meta tensors have no data, so copying one to another device raises. The size
+        # input is a shape tensor, whose example used to come back as a Python int.
+        input_specs = [
+            Input((2, 3), dtype=torch.float32, torch_tensor=tensor32.to("meta")),
+            Input((2, 3), dtype=torch.float64, torch_tensor=tensor64.to("meta")),
+            Input(
+                min_shape=(1,),
+                opt_shape=(2,),
+                max_shape=(8,),
+                dtype=torch.int64,
+                is_shape_tensor=True,
+            ),
+        ]
+        repaired = repair_double_inputs(
+            parent, submodule, input_specs, torch.device("cpu"), "run_on_acc_0"
+        )
+
+        self.assertEqual(
+            [spec.dtype for spec in repaired],
+            [dtype.float32, dtype.float32, dtype.int64],
+        )
+        self.assertEqual(
+            [spec.torch_tensor.device.type for spec in repaired[:2]], ["meta"] * 2
+        )
+        self.assertEqual(repaired[1].torch_tensor.dtype, torch.float32)
+        self.assertEqual(engine_node.args[1].kwargs["dtype"], torch.float32)
+
     def test_symbolic_shape_metadata_uses_truncated_binding_dtype(self):
         _, submodule, _ = self._make_graphs(with_scalar_output=True)
 
@@ -238,6 +296,41 @@ class TestTruncateDoubleMetadata(TestCase):
             and node.kwargs.get("dtype") == torch.float64
         ]
         self.assertEqual(len(restoring_casts), 1)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "requires CUDA")
+    def test_float64_input_from_pytorch_partition_can_be_saved(self):
+        class IntToDouble(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                # float32 cannot hold every int64, so this cast to float64 stays in
+                # PyTorch and gives the engine after it a float64 input.
+                return (x + 1).double() * 0.5
+
+        model = IntToDouble().eval().cuda()
+        input_tensor = torch.arange(8, device="cuda")
+        exported = torch.export.export(model, (input_tensor,))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[input_tensor],
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+
+        input_cast = next(
+            node
+            for node in compiled.graph.nodes
+            if node.target == torch.ops.aten._to_copy.default
+            and node.kwargs.get("dtype") == torch.float32
+        )
+        self.assertEqual(input_cast.args[0].op, "call_module")
+        self.assertEqual(input_cast.meta["val"].dtype, torch.float32)
+        self.assertEqual(input_cast.meta["val"].shape, input_tensor.shape)
+
+        # Saving without retracing checks that every node has metadata.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            torch_tensorrt.save(
+                compiled, os.path.join(tmpdir, "compiled.ep"), retrace=False
+            )
 
 
 if __name__ == "__main__":

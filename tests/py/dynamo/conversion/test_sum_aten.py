@@ -38,6 +38,7 @@ class TestSumConverter(DispatchTestCase):
             ((6, 7, 5, 4, 5), 4, False),
             ((1, 5, 2, 1), -3, False),
             ((1, 5, 2, 3), -2, True),
+            ((), 0, True),
         ]
     )
     def test_sum_dim_int(self, input_shape, dim, keep_dims):
@@ -45,7 +46,7 @@ class TestSumConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.sum.dim_IntList(x, dim, keep_dims)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
             Sum(),
             inputs,

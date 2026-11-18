@@ -39,7 +39,10 @@ def compiler(monkeypatch):
             "needs_cross_compile": lambda fn: fn,
         },
         "torch_tensorrt._Input": {"Input": type("Input", (), {})},
-        "torch_tensorrt._utils": {"executorch_install_command": lambda: "unused"},
+        "torch_tensorrt._utils": {
+            "executorch_install_command": lambda: "unused",
+            "executorch_runtime_install_command": lambda: "install the exact companion",
+        },
         "torch_tensorrt.dynamo": {},
         "torch_tensorrt.dynamo.runtime": {},
         "torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule": {
@@ -352,6 +355,7 @@ def test_missing_dependency_is_not_misdiagnosed(
         load_legacy(compiler, boundary.path)
     if missing == DELEGATE:
         assert "torch_tensorrt_executorch_runtime" in str(raised.value)
+        assert "install the exact companion" in str(raised.value)
         assert raised.value.__cause__ is error
     else:
         assert raised.value is error

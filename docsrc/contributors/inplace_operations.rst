@@ -22,7 +22,8 @@ Implementation Status
   * The ``aten.slice_scatter.default`` decomposition is disabled; a converter
     handles it directly, emitting ``IKVCacheUpdateLayer`` when the cache is a
     direct network input with a 4-D static shape and write on dim 2,
-    otherwise falling back to a scatter sequence.
+    otherwise falling back to a concatenation for a contiguous write whose
+    source is static on the written dim, and to a scatter sequence otherwise.
   * ``aliased_io`` (mapping ``output_binding -> (input_binding, kind)``) is
     plumbed from the converter through ``TRTInterpreterResult``,
     ``SerializedInterpreterResult``, the Python wrapper, and the serialized
@@ -510,9 +511,9 @@ For a mutation that also matches the KV-cache fast path this is the whole
 point — the engine aliases the output back into the buffer's storage and the
 mutation is observable across calls. For a mutation that does **not** match
 the fast path (wrong rank/shape/dim, dynamic ``s_max``, a plain elementwise
-``copy_``), the converter falls back to the scatter path and the output is
-**not** aliased. The buffer is still lifted to an input and threaded through
-``BufferThreadingModule``, so the mutated value is produced and carried
+``copy_``), the converter falls back to a concatenation or a scatter and the
+output is **not** aliased. The buffer is still lifted to an input and threaded
+through ``BufferThreadingModule``, so the mutated value is produced and carried
 forward correctly, but without the in-place aliasing benefit — behavior is
 equivalent to the pre-existing copy-back, just wired through a binding rather
 than a folded constant. Ordinary functional ``.copy_`` residue that is *not*

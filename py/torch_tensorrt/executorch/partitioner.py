@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
     ZERO_COPY_KV_COMPILE_SPEC_KEY,
     TensorRTBackend,
+    _external_engine_tag,
     _get_engine_info_for_node,
     _get_engine_nodes_in,
     _get_str,
@@ -109,6 +110,53 @@ def normalize_use_cuda_graphs(use_cuda_graphs: bool | None) -> bytes | None:
     return b"1" if use_cuda_graphs else b"0"
 
 
+# Characters every file system accepts in a file name, with no path separator or drive colon. A
+# leading dot or dash would make a hidden file or a name that reads as a command line option.
+_EXTERNAL_ENGINE_DATA_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+# ExecuTorch writes <name>.ptd, and most file systems limit a file name to 255 bytes.
+_MAX_EXTERNAL_ENGINE_DATA_LENGTH = 255 - len(".ptd")
+# Windows opens these as devices, with any extension.
+_WINDOWS_DEVICE_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"{port}{i}" for port in ("COM", "LPT") for i in range(10)]
+)
+
+
+def normalize_external_engine_data(external_engine_data: str | None) -> bytes | None:
+    """Validate the .ptd file name, given without its extension; None embeds every engine."""
+    if external_engine_data is None:
+        return None
+    if not isinstance(external_engine_data, str):
+        raise TypeError(
+            "external_engine_data must be a str or None, got "
+            f"{type(external_engine_data).__name__}."
+        )
+    if not _EXTERNAL_ENGINE_DATA_NAME.fullmatch(external_engine_data):
+        raise ValueError(
+            "external_engine_data must use only ASCII letters, digits, '.', '-' and '_', and "
+            f"start with a letter, a digit or '_', got {external_engine_data!r}."
+        )
+    if len(external_engine_data) > _MAX_EXTERNAL_ENGINE_DATA_LENGTH:
+        raise ValueError(
+            f"external_engine_data must be at most {_MAX_EXTERNAL_ENGINE_DATA_LENGTH} "
+            "characters, so the .ptd file name fits the 255 byte limit, got "
+            f"{len(external_engine_data)}."
+        )
+    # ExecuTorch adds .ptd only when it is missing, so "x.ptd" would share x.ptd with another
+    # backend's "x" data and the second write would replace the first.
+    if external_engine_data.endswith(".ptd"):
+        raise ValueError(
+            "external_engine_data must not end with .ptd, which ExecuTorch adds, got "
+            f"{external_engine_data!r}."
+        )
+    if external_engine_data.split(".")[0].upper() in _WINDOWS_DEVICE_NAMES:
+        raise ValueError(
+            "external_engine_data must not be a Windows device name such as NUL or CON, got "
+            f"{external_engine_data!r}."
+        )
+    return external_engine_data.encode()
+
+
 def _keep_mutated_buffers_above_delegate(exported_program: ExportedProgram) -> None:
     """Undo tag_constant_data freezing a delegate-mutated buffer as constant.
 
@@ -138,11 +186,10 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     each such node becomes its own partition so the backend can serialize
     the engine to the same format as the TRT runtime.
 
-    If `compile_specs` does not already contain a ``target_device`` entry,
-    one defaulting to ``cuda:0`` is auto-appended (mirroring CudaPartitioner).
-    Callers targeting a non-default GPU should pre-populate
-    ``compile_specs`` with the desired ``CompileSpec("target_device",
-    b"cuda:<index>")`` to override the default.
+    If `compile_specs` has no ``target_device`` entry, each partition gets one
+    naming the GPU its own engine was built on, or ``cuda:0`` if that cannot be
+    read. A ``CompileSpec("target_device", b"cuda:<index>")`` in
+    ``compile_specs`` sets it for every partition instead.
 
     Note: ``target_device`` is AOT metadata only -- it drives ExecuTorch's
     PropagateDevicePass tagging at export time. At runtime the C++ backend
@@ -205,6 +252,8 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                 f"{CUDA_GRAPHS_COMPILE_SPEC_KEY} must appear at most once, with the value "
                 f'b"0" or b"1", got {[s.value for s in cuda_graphs]!r}.'
             )
+        # export() checks this name too, but a caller can lower with this partitioner directly.
+        _external_engine_tag(self.compile_specs)
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,

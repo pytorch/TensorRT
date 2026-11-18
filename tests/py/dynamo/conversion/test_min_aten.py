@@ -17,6 +17,7 @@ class TestMinConverter(DispatchTestCase):
             ((3, 2, 4),),
             ((2, 3, 4, 5),),
             ((6, 7, 5, 4, 5),),
+            ((),),
         ]
     )
     def test_min_dim_int_default(self, input_shape):
@@ -24,7 +25,7 @@ class TestMinConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.min.default(x)
 
-        inputs = [torch.randn(*input_shape)]
+        inputs = [torch.randn(input_shape)]
         self.run_test(
             Min(),
             inputs,

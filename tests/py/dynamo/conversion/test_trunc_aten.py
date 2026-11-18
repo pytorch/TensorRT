@@ -13,6 +13,7 @@ from .harness import DispatchTestCase
 class TestTruncConverter(DispatchTestCase):
     @parameterized.expand(
         [
+            ((),),
             ((10,),),
             ((1, 20),),
             ((2, 3, 4),),

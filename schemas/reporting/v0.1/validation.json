@@ -1,0 +1,338 @@
+{
+  "$defs": {
+    "Diagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "invalid_input",
+            "unsupported_operator",
+            "unsupported_environment",
+            "builder_error",
+            "out_of_memory",
+            "timeout",
+            "cancelled",
+            "worker_crash",
+            "serialization_error",
+            "artifact_error",
+            "validation_error",
+            "benchmark_error",
+            "internal_error"
+          ],
+          "type": "string"
+        },
+        "exception_type": {
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "retry_after_change": {
+          "type": "boolean"
+        },
+        "retry_unchanged": {
+          "type": "boolean"
+        },
+        "stage": {
+          "enum": [
+            "environment",
+            "capture",
+            "analysis",
+            "compilation",
+            "lowering",
+            "partitioning",
+            "conversion",
+            "build",
+            "serialization",
+            "save",
+            "validation",
+            "benchmark",
+            "finalization"
+          ],
+          "type": "string"
+        },
+        "suggested_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "message",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "OutputComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_dtype": {
+          "type": "string"
+        },
+        "actual_inf_count": {
+          "type": "integer"
+        },
+        "actual_nan_count": {
+          "type": "integer"
+        },
+        "actual_shape": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "max_abs_error": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_relative_error": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mean_abs_error": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mean_relative_error": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mismatch_count": {
+          "type": "integer"
+        },
+        "numel": {
+          "type": "integer"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reference_dtype": {
+          "type": "string"
+        },
+        "reference_inf_count": {
+          "type": "integer"
+        },
+        "reference_nan_count": {
+          "type": "integer"
+        },
+        "reference_shape": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "sample_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "passed",
+        "path",
+        "sample_id"
+      ],
+      "type": "object"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "atol": {
+          "type": "number"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/OutputComparison"
+          },
+          "type": "array"
+        },
+        "pass_rule": {
+          "type": "string"
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "passed_samples": {
+          "type": "integer"
+        },
+        "profile_points": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "relative_floor": {
+          "type": "number"
+        },
+        "report_type": {
+          "const": "validation"
+        },
+        "rtol": {
+          "type": "number"
+        },
+        "sample_count": {
+          "type": "integer"
+        },
+        "samples": {
+          "items": {
+            "$ref": "#/$defs/ValidationSample"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "skipped"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "ValidationSample": {
+      "additionalProperties": false,
+      "properties": {
+        "input_fingerprint": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/ValidationReport",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

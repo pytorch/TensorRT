@@ -1,0 +1,14 @@
+.. _exhale_variable_TensorRTBackend_8h_1a27092406344aaf7c875381e8b55088b0:
+
+Variable torch_tensorrt::executorch_backend::kCudaGraphsKey
+===========================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h`
+
+
+Variable Documentation
+----------------------
+
+
+.. doxygenvariable:: torch_tensorrt::executorch_backend::kCudaGraphsKey
+   :project: Torch-TensorRT

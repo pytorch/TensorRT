@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
+
 import contextlib
 import functools
 import logging
@@ -16,11 +18,14 @@ _LOGGER = logging.getLogger(__name__)
 # variable on the observer instance, however, contextvars document advice
 # against creating context variables not at module-global level.
 # https://docs.python.org/3/library/contextvars.html#contextvars.ContextVar
-_CALLBACKS: ContextVar[t.Dict["Observer", t.List[t.Callable]]] = ContextVar(
-    "_CALLBACKS", default=None
+_CALLBACKS: ContextVar[dict[object, tuple[t.Callable[..., t.Any], ...]] | None] = (
+    ContextVar("_CALLBACKS", default=None)
 )
 
 TObserverCallback = t.TypeVar("TObserverCallback", bound=t.Callable[..., t.Any])
+P = t.ParamSpec("P")
+R = t.TypeVar("R")
+R_co = t.TypeVar("R_co", covariant=True)
 
 # Whether to rethrow the exception caught while calling observer callbacks.
 # Default to False. True is only used during tests.
@@ -45,49 +50,39 @@ class Observer(t.Generic[TObserverCallback]):
     # the `_CALLBACKS` dictionary.
     unique_id: object = field(default_factory=lambda: object())
 
-    def add(self, callback: TObserverCallback) -> t.ContextManager:
-        self._get_callbacks().append(callback)
+    def add(self, callback: TObserverCallback) -> t.ContextManager[None]:
+        # Context copies share values, so never mutate a registry or callback
+        # collection stored in a ContextVar. Registration is copy-on-write.
+        registry = dict(_CALLBACKS.get() or {})
+        registry[self] = registry.get(self, ()) + (callback,)
+        token = _CALLBACKS.set(registry)
 
         # Cannot decorate the outer `add` directly with `contextmanager`,
         # because if it were not used with a `with` statement, its body won't
         # be executed.
         @contextlib.contextmanager
-        def _add():
+        def _add() -> t.Iterator[None]:
             try:
                 yield
             finally:
-                try:
-                    self._get_callbacks().remove(callback)
-                except ValueError:
-                    # Callback should be in the callbacks list. I'm just being
-                    # extra cautious here. I don't want it to throw and affect
-                    # business logic.
-                    pass
+                _CALLBACKS.reset(token)
 
         return _add()
 
-    def observe(self, *args, **kwargs) -> None:
+    def observe(self, *args: t.Any, **kwargs: t.Any) -> None:
         for callback in self._get_callbacks():
             with _log_error(
                 "Error calling observer callback", rethrow=RETHROW_CALLBACK_EXCEPTION
             ):
                 callback(*args, **kwargs)
 
-    def _get_callbacks(self) -> t.List[t.Callable]:
+    def _get_callbacks(self) -> tuple[TObserverCallback, ...]:
         """
         Gets the callbacks registered in current execution context. Any code
-        that manipulates the returned list (add, remove, iterate) is
-        concurrency safe.
+        that iterates over the returned immutable tuple is concurrency safe.
         """
-        callbacks_dict = _CALLBACKS.get()
-        if callbacks_dict is None:
-            callbacks_dict = {}
-            _CALLBACKS.set(callbacks_dict)
-
-        if self not in callbacks_dict:
-            callbacks_dict[self] = []
-
-        return callbacks_dict[self]
+        callbacks = (_CALLBACKS.get() or {}).get(self, ())
+        return t.cast(tuple[TObserverCallback, ...], callbacks)
 
 
 @dataclass(frozen=True)
@@ -105,13 +100,14 @@ class ObserveContext:
             `CallableObservers.post`)
     """
 
-    callable: t.Callable
-    args: t.List[t.Any]
+    callable: t.Callable[..., t.Any]
+    args: tuple[t.Any, ...]
     kwargs: t.Mapping[str, t.Any]
     return_value: t.Any = None
+    exception: t.Optional[BaseException] = None
 
 
-def observable():
+def observable() -> t.Callable[[t.Callable[P, R]], ObservedCallable[P, R]]:
     """
     A decorator to turn a function into observable
 
@@ -133,9 +129,8 @@ def observable():
     >>> # here it won't print
     """
 
-    def decorator(observed_func: callable) -> ObservedCallable:
-        wrapped_func = _make_observable(orig_func=observed_func)
-        return functools.wraps(observed_func)(wrapped_func)
+    def decorator(observed_func: t.Callable[P, R]) -> ObservedCallable[P, R]:
+        return _make_observable(orig_func=observed_func)
 
     return decorator
 
@@ -146,19 +141,23 @@ class CallableObservers:
     post: Observer[t.Callable[[ObserveContext], None]]
 
 
-class ObservedCallable:
+class ObservedCallable(t.Protocol[P, R_co]):
     """
     Interface for an observed callable
     """
 
-    observers: CallableObservers
-    orig_func: callable
+    @property
+    def observers(self) -> CallableObservers: ...
 
-    def __call__(self, *args, **kwargs) -> t.Any:
-        raise NotImplementedError()
+    @property
+    def orig_func(self) -> t.Callable[P, R_co]: ...
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
 
 
-def _make_observable(orig_func: t.Callable) -> ObservedCallable:
+def _make_observable(
+    orig_func: t.Callable[P, R],
+) -> ObservedCallable[P, R]:
     """
     A wrapper for a callable which is to be observed.
     """
@@ -169,25 +168,30 @@ def _make_observable(orig_func: t.Callable) -> ObservedCallable:
     )
 
     @functools.wraps(orig_func)
-    def observed_func(*args, **kwargs):
+    def observed_func(*args: P.args, **kwargs: P.kwargs) -> R:
         observers.pre.observe(ObserveContext(orig_func, args, kwargs))
-        return_value = None
+        return_value: t.Any = None
+        exception: BaseException | None = None
         try:
-            return_value = orig_func(*args, **kwargs)
-            return return_value
+            result = orig_func(*args, **kwargs)
+            return_value = result
+            return result
+        except BaseException as error:
+            exception = error
+            raise
         finally:
             observers.post.observe(
-                ObserveContext(orig_func, args, kwargs, return_value)
+                ObserveContext(orig_func, args, kwargs, return_value, exception)
             )
 
     observed_func.orig_func = orig_func
     observed_func.observers = observers
 
-    return observed_func
+    return t.cast(ObservedCallable[P, R], observed_func)
 
 
 @contextlib.contextmanager
-def _log_error(msg: str, rethrow: bool = False) -> t.ContextManager:
+def _log_error(msg: str, rethrow: bool = False) -> t.Iterator[None]:
     try:
         yield
     except Exception as e:

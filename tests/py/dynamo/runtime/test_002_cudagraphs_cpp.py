@@ -3,6 +3,9 @@
 
 import itertools
 import os
+import subprocess
+import sys
+import textwrap
 import unittest
 
 import torch
@@ -52,6 +55,119 @@ class TestCudagraphsCPP(TestCase):
         with torch_tensorrt.runtime.enable_cudagraphs(optimized_model) as _:
             self.assertTrue(torch.ops.tensorrt.get_cudagraphs_mode())
         self.assertFalse(torch.ops.tensorrt.get_cudagraphs_mode())
+
+    def test_engine_with_captured_graph_destroys_graph_first(self):
+        if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "On TensorRT-RTX the C++ runtime does not capture a CUDA graph of its own."
+            )
+        # A wrong teardown order can crash the process, so the engine is destroyed in a child.
+        # The profiler records runtime calls but not the driver's module unloads, so the
+        # first cudaFree, cudaFreeAsync or cudaStreamDestroy stands in for the start of
+        # TensorRT's teardown.
+        child = textwrap.dedent("""
+            import gc
+            import torch
+            import torch_tensorrt
+            from torch.profiler import ProfilerActivity, profile
+
+            model = torch.nn.Sequential(torch.nn.Conv2d(3, 8, 3), torch.nn.ReLU()).eval().cuda()
+            x = torch.randn(1, 3, 32, 32, device="cuda")
+            trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
+            torch_tensorrt.runtime.set_cudagraphs_mode(True)
+            trt_model(x)
+            torch.cuda.synchronize()
+            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+                del trt_model
+                gc.collect()
+                torch.cuda.synchronize()
+            events = sorted(prof.events(), key=lambda e: e.time_range.start)
+            print("CUDA_CALLS=" + ",".join(e.name for e in events))
+            """)
+        result = subprocess.run(
+            [sys.executable, "-c", child], capture_output=True, text=True, timeout=600
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+        line = next(
+            l for l in result.stdout.splitlines() if l.startswith("CUDA_CALLS=")
+        )
+        calls = line[len("CUDA_CALLS=") :].split(",")
+        self.assertIn("cudaGraphExecDestroy", calls, msg=calls)
+        teardown = [
+            i
+            for i, c in enumerate(calls)
+            if c in ("cudaFree", "cudaFreeAsync", "cudaStreamDestroy")
+        ]
+        self.assertTrue(
+            teardown, msg=f"no free or stream destroy was recorded: {calls}"
+        )
+        self.assertLess(
+            calls.index("cudaGraphExecDestroy"),
+            teardown[0],
+            msg=f"the graph was destroyed after TensorRT started freeing: {calls}",
+        )
+
+    def test_dropping_execution_context_releases_captured_graph(self):
+        if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "On TensorRT-RTX the C++ runtime does not capture a CUDA graph of its own."
+            )
+        # Replaying a graph captured on a dropped context can crash, so this runs in a child process.
+        # A stale replay does not always crash, so the child also checks that the drop itself
+        # destroys the graph.
+        child = textwrap.dedent("""
+            import torch
+            import torch_tensorrt
+            from torch.profiler import ProfilerActivity, profile
+
+            class Attention(torch.nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.qkv = torch.nn.Linear(64, 192)
+                    self.out = torch.nn.Linear(64, 64)
+
+                def forward(self, x):
+                    q, k, v = self.qkv(x).unflatten(-1, (3, 4, 16)).permute(2, 0, 3, 1, 4)
+                    y = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+                    return self.out(y.transpose(1, 2).flatten(2))
+
+            model = Attention().eval().cuda()
+            x = torch.randn(2, 128, 64, device="cuda")
+            trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
+            engines = [
+                m
+                for m in trt_model.modules()
+                if isinstance(m, torch_tensorrt.runtime.TorchTensorRTModule)
+            ]
+            assert engines
+            torch_tensorrt.runtime.set_cudagraphs_mode(True)
+            with torch.no_grad():
+                expected = model(x)
+                for name, drop_context in (
+                    ("disable_profiling", lambda m: m.disable_profiling()),
+                    ("use_dynamically_allocated_resources", lambda m: m.use_dynamically_allocated_resources(True)),
+                ):
+                    trt_model(x)
+                    trt_model(x)
+                    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+                        for m in engines:
+                            drop_context(m)
+                    calls = [e.name for e in prof.events()]
+                    assert "cudaGraphExecDestroy" in calls, f"{name} kept the graph: {calls}"
+                    torch.testing.assert_close(trt_model(x), expected, rtol=1e-2, atol=1e-2)
+            """)
+        result = subprocess.run(
+            [sys.executable, "-c", child], capture_output=True, text=True, timeout=600
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
 
     def test_cudagraphs_enabled_inference_cpp(self):
         class SampleModel(torch.nn.Module):

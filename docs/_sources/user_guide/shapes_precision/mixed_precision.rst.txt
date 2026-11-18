@@ -93,7 +93,8 @@ keep in FP32 precision to maintain model accuracy while benefiting from reduced 
 Torch-TensorRT Autocast also supports users to specify which nodes to exclude from Autocast, considering some nodes
 might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autocast can cooperate with PyTorch Autocast,
 allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast
-respects the precision of the nodes within PyTorch Autocast context.
+respects the precision of the nodes within PyTorch Autocast context. To let Torch-TensorRT Autocast choose the
+precision inside those contexts too, set ``autocast_model_regions="reclassify"``.
 
 To enable Torch-TensorRT Autocast, we need to set ``enable_autocast=True``.
 On top of that, we can also specify the precision of the nodes to reduce to by ``autocast_low_precision_type``,

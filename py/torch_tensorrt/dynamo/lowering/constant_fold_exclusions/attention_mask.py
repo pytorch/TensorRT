@@ -7,12 +7,10 @@ import torch
 from torch._subclasses.functional_tensor import mb_unwrap_functional_tensor
 from torch.fx.experimental.proxy_tensor import get_proxy_mode, get_proxy_slot
 
-from ._core import (
-    _mark_constant_fold_exclusion,
-    register_constant_fold_exclusion_rule,
-)
+from ._core import register_constant_fold_exclusion_rule
 
 ATTENTION_MASK_ARANGE_RULE_ID = "attention_mask_arange"
+_ATTENTION_MASK_ARANGE_TAG = "_torch_tensorrt_attention_mask_arange"
 
 
 def _is_arange_node(node: torch.fx.Node) -> bool:
@@ -62,7 +60,7 @@ def _find_attention_mask_aranges(
 
 
 def exclude_attn_mask_aranges_from_constant_fold(attn_mask: torch.Tensor) -> None:
-    """Mark aranges behind an attention mask while tracing a decomposition.
+    """Tag aranges behind an attention mask while tracing a decomposition.
 
     ``run_decompositions`` invokes decompositions once for functionalization and
     again while proxy tracing. Only the proxy-tracing invocation has an FX graph
@@ -82,15 +80,18 @@ def exclude_attn_mask_aranges_from_constant_fold(attn_mask: torch.Tensor) -> Non
     mask_node = getattr(proxy, "node", None)
 
     if isinstance(mask_node, torch.fx.Node):
-        _mark_constant_fold_exclusion(
-            _find_attention_mask_aranges(mask_node),
-            ATTENTION_MASK_ARANGE_RULE_ID,
-        )
+        # Retraces keep node.meta["custom"], so the rule below still finds
+        # these aranges after the attention op has been decomposed away.
+        for node in _find_attention_mask_aranges(mask_node):
+            node.meta.setdefault("custom", {})[_ATTENTION_MASK_ARANGE_TAG] = True
 
 
 @register_constant_fold_exclusion_rule(ATTENTION_MASK_ARANGE_RULE_ID)
 def _attention_mask_arange_rule(node: torch.fx.Node) -> Iterable[torch.fx.Node]:
     """Select aranges feeding an attention mask."""
+    if node.meta.get("custom", {}).get(_ATTENTION_MASK_ARANGE_TAG):
+        return (node,)
+
     # Every SDPA overload that takes a mask keeps it at positional index 3.
     # _scaled_dot_product_flash_attention is absent because it has no mask.
     attention_mask_args: dict[Any, tuple[int, str]] = {

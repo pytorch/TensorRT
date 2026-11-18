@@ -100,6 +100,14 @@ def decompose_dynamic_slice_scatter(
                 (view_node, expand_size),
             )
 
+            # slice_scatter writes src in the input's dtype, and scatter requires it.
+            if src_val is not None and src_val.dtype != input_val.dtype:
+                src_node = gm.graph.call_function(
+                    torch.ops.aten._to_copy.default,
+                    (src_node,),
+                    {"dtype": input_val.dtype},
+                )
+
             scatter_node = gm.graph.call_function(
                 torch.ops.aten.scatter.src,
                 (input_node, dim, expand_node, src_node),

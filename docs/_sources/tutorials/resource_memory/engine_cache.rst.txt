@@ -91,7 +91,7 @@ The following changes always require a cache miss (engine rebuild):
 * ``engine_capability``
 * ``immutable_weights`` / ``refit_identical_engine_weights`` / ``enable_weight_streaming``
 * ``tiling_optimization_level`` / ``l2_limit_for_tiling``
-* All ``autocast_*`` settings
+* All ``autocast_*`` settings except ``autocast_calibration_dataloader``
 
 Changes to ``min_block_size``, ``torch_executed_ops``, ``debug``, ``dryrun``,
 ``pass_through_build_failures``, etc. do **not** invalidate cached engines.

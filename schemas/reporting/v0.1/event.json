@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "details": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "progress",
+            "failure"
+          ],
+          "type": "string"
+        },
+        "report_type": {
+          "const": "event"
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "sequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "environment",
+            "capture",
+            "analysis",
+            "compilation",
+            "lowering",
+            "partitioning",
+            "conversion",
+            "build",
+            "serialization",
+            "save",
+            "validation",
+            "benchmark",
+            "finalization"
+          ],
+          "type": "string"
+        },
+        "stage_id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/Event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

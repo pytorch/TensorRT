@@ -1,0 +1,101 @@
+
+.. _file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h:
+
+File OptimizationProfileSelection.h
+===================================
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_torch_tensorrt_executorch>` (``cpp/include/torch_tensorrt/executorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+
+
+Which TensorRT optimization profile an execution runs under. 
+ 
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/torch_tensorrt/executorch/OptimizationProfileSelection.h``)
+-------------------------------------------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h.rst
+
+
+
+Detailed Description
+--------------------
+
+Kept free of ExecuTorch, CUDA, and the engine itself so the policy can be exercised without a GPU; reporting the outcome is left to the caller. 
+
+
+
+Includes
+--------
+
+
+- ``NvInfer.h``
+
+- ``cstdint``
+
+- ``limits``
+
+- ``type_traits``
+
+- ``vector``
+
+
+
+Included By
+-----------
+
+
+- :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h`
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_torch_tensorrt`
+
+- :ref:`namespace_torch_tensorrt__executorch_backend`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable`
+
+
+Enums
+-----
+
+
+- :ref:`exhale_enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840`
+
+- :ref:`exhale_enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135`
+
+- :ref:`exhale_function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e`
+
+- :ref:`exhale_function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92`
+
+- :ref:`exhale_function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c`
+

@@ -1,0 +1,639 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""
+Tensor Parallel LLM (Llama / Qwen): torch.export → save → load TRT engines.
+
+Two modes:
+  export  — torch.export → TRT AOT compile → save per-rank engines to disk
+  load    — load per-rank engines from disk → run inference (no model needed)
+
+**Known limitation**: torch.export does not yet support DTensor-parallelized
+models (sharding propagation fails on symbolic reshapes).  This script
+therefore exports the model *before* DTensor sharding and manually slices
+the weights per-rank, injecting NCCL all-reduce ops via Torch-TensorRT's
+distributed compilation path.
+
+The manual slicing assumes the standard decoder layout
+(``model.model.layers[i].self_attn.{q,k,v,o}_proj`` +
+``mlp.{gate,up,down}_proj``), which both Llama and Qwen2/Qwen3 follow, so the
+same script works for either.
+
+Precision defaults to FP16 autocast. --precision fp32 converts floating weights
+and buffers to FP32 and disables autocast; TensorRT compilation disables TF32.
+Use a separate --save_dir for each precision and re-export when changing it:
+load mode executes the saved engine and does not convert its precision.
+See the "Accuracy check" section in tools/llm/README.md for a runnable comparison
+against a full eager reference, and "Precision findings" for measured logit
+differences and token choices. Export/load do not take tolerance arguments.
+
+Tested ungated models (no HF token needed):
+  Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY
+  Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8
+  meta-llama/Llama-3.2-1B-Instruct - original example (GATED, needs HF token)
+
+Usage
+-----
+# Export mode — single node, 2 GPUs (ungated Qwen, no token needed):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llm_export.py \\
+      --mode export --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
+
+# Load mode — load saved engines + inference (no model download needed):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llm_export.py \\
+      --mode load --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
+
+# FP32 export with static KV cache (use --mode load to reload these engines):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llm_export.py \\
+      --mode export --model Qwen/Qwen2.5-0.5B-Instruct \\
+      --precision fp32 --cache static_v2 --save_dir /tmp/qwen_tp_fp32
+
+# Multi-node export (one GPU per node):
+  torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
+      --rdzv_endpoint=<node0-ip>:29500 \\
+      tools/llm/tensor_parallel_llm_export.py --mode export --save_dir /tmp/llm_tp_engines
+"""
+
+import argparse
+import datetime
+import logging
+import os
+import sys
+import timeit
+from contextlib import ExitStack
+from pathlib import Path
+
+import torch
+import torch.distributed as dist
+import torch.distributed.tensor._dtensor_spec
+import torch.utils._pytree
+from utils import (
+    generate,
+    generate_with_static_cache,
+    record_stats_split,
+    time_generate_split,
+)
+
+# DTensorSpec must be a pytree constant before torch.export traces a TP model.
+torch.utils._pytree.register_constant(
+    torch.distributed.tensor._dtensor_spec.DTensorSpec
+)
+
+
+# One GPU per node: use LOCAL_RANK (defaults to 0).
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+torch.cuda.set_device(local_rank)
+DEVICE = torch.device(f"cuda:{local_rank}")
+
+# 2-hour timeout so TRT engine building doesn't trigger the NCCL watchdog.
+dist.init_process_group(backend="nccl", timeout=datetime.timedelta(hours=2))
+rank = dist.get_rank()
+world_size = dist.get_world_size()
+
+import torch_tensorrt
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
+
+setup_nccl_for_torch_tensorrt()
+
+from torchtrt_ext import register_sdpa
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+logging.basicConfig(
+    level=logging.INFO,
+    format=f"[Rank {rank}] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+# Quiet torch_tensorrt's default verbose output. `--debug` still re-enables
+# Debug-level logging during compile via torch_tensorrt.logging.debug().
+torch_tensorrt.logging.set_level(logging.ERROR)
+logger.info(f"dist init OK  rank={rank}/{world_size}  device={DEVICE}")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _precision_context(args):
+    """Apply the same autocast policy to export, compilation and inference."""
+    precision = getattr(args, "precision", "fp16")
+    if precision == "fp32":
+        # Match disable_tf32=True below for the eager FP32 reference as well.
+        torch.set_float32_matmul_precision("highest")
+    return torch.autocast("cuda", dtype=torch.float16, enabled=precision == "fp16")
+
+
+def _rank_path(save_dir, rank, world_size):
+    return str(Path(save_dir) / f"llama_tp_rank{rank}_of_{world_size}.pt2")
+
+
+def _extract_logits(outputs):
+    """Get logits from HuggingFace output, tuple, or plain tensor."""
+    if hasattr(outputs, "logits"):
+        return outputs.logits
+    if isinstance(outputs, (tuple, list)):
+        return outputs[0]
+    return outputs
+
+
+def time_generate(generate_fn, model, input_ids, max_len, eos_token_id, iterations=5):
+    """Measure end-to-end generation latency over multiple iterations."""
+    timings = []
+    for _ in range(iterations):
+        start = timeit.default_timer()
+        generate_fn(model, input_ids.clone(), max_len, eos_token_id)
+        torch.cuda.synchronize()
+        timings.append(timeit.default_timer() - start)
+    return timings
+
+
+def _pick_generate_fn(args):
+    """Pick the right greedy-decode helper based on the --cache flag."""
+    if args.cache in ("static_v1", "static_v2"):
+        return generate_with_static_cache
+    return generate
+
+
+def record_stats(backend, timings, precision, batch_size=1):
+    import numpy as np
+
+    times = np.array(timings)
+    speeds = batch_size / times
+    return {
+        "Backend": backend,
+        "Model Precision": precision,
+        "Batch size": batch_size,
+        "Median(FPS)": float(np.median(speeds)),
+        "Mean(FPS)": float(np.mean(speeds)),
+        "Median-Latency(ms)": float(np.median(times)) * 1000,
+        "Mean-Latency(ms)": float(np.mean(times)) * 1000,
+        "Latency-StdDev(ms)": float(np.std(times)) * 1000,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Manual weight slicing for export (no DTensor)
+# ---------------------------------------------------------------------------
+
+
+class _RowParallelLinear(torch.nn.Module):
+    """Linear layer followed by NCCL all-reduce (row-parallel pattern).
+
+    Replaces DTensor's RowwiseParallel for the export path.  The all-reduce
+    uses ``_c10d_functional`` ops which torch.export traces correctly.
+    """
+
+    def __init__(self, linear: torch.nn.Linear, group_name: str):
+        super().__init__()
+        self.linear = linear
+        self.group_name = group_name
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.linear(x)
+        out = torch.ops._c10d_functional.all_reduce(out, "sum", self.group_name)
+        out = torch.ops._c10d_functional.wait_tensor(out)
+        return out
+
+
+def get_exportable_model(args, rank, world_size):
+    """Load model, slice weights per-rank, insert explicit all-reduce ops.
+
+    Unlike DTensor-based sharding (which torch.export cannot trace), this
+    manually slices weights and wraps row-parallel layers with explicit
+    _c10d_functional.all_reduce ops that torch.export handles correctly.
+    """
+    logger.info(f"Loading {args.model} (manual shard for export) ...")
+    with torch.no_grad():
+        model = (
+            AutoModelForCausalLM.from_pretrained(
+                args.model,
+                use_cache=False,
+                attn_implementation="sdpa",
+            )
+            .eval()
+            .to(DEVICE)
+        )
+        if getattr(args, "precision", "fp16") == "fp32":
+            # Disabling autocast alone leaves a BF16 checkpoint in BF16. Convert
+            # parameters and buffers before tracing to build an FP32 engine.
+            model = model.float()
+        # Keep SDPA as a single op so the TRT custom converter (and optional
+        # static KV cache lowering pass) can pattern-match it.
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
+
+    # Column/row slicing divides the head dims by world_size, so both head
+    # counts must be divisible. Small-KV models (e.g. Qwen2.5-0.5B has
+    # num_key_value_heads=2) therefore only support up to TP=2. Fail early with
+    # a clear message instead of a downstream reshape/shape mismatch.
+    assert model.config.num_attention_heads % world_size == 0, (
+        f"num_attention_heads ({model.config.num_attention_heads}) must be "
+        f"divisible by world_size ({world_size})."
+    )
+    assert model.config.num_key_value_heads % world_size == 0, (
+        f"num_key_value_heads ({model.config.num_key_value_heads}) must be "
+        f"divisible by world_size ({world_size}). "
+        f"{args.model} caps out at TP={model.config.num_key_value_heads}."
+    )
+
+    # Get the default process group name for NCCL all-reduce.
+    default_pg = dist.distributed_c10d._get_default_group()
+    group_name = default_pg.group_name
+
+    for layer in model.model.layers:
+        attn = layer.self_attn
+        mlp = layer.mlp
+
+        # Column-parallel: slice output dim (dim 0)
+        for proj in [attn.q_proj, attn.k_proj, attn.v_proj, mlp.gate_proj, mlp.up_proj]:
+            w = proj.weight.data
+            chunk = w.shape[0] // world_size
+            proj.weight = torch.nn.Parameter(
+                w[rank * chunk : (rank + 1) * chunk].contiguous()
+            )
+            if proj.bias is not None:
+                b = proj.bias.data
+                proj.bias = torch.nn.Parameter(
+                    b[rank * chunk : (rank + 1) * chunk].contiguous()
+                )
+
+        # Row-parallel: slice input dim (dim 1) + wrap with all-reduce
+        for attr in ["o_proj", "down_proj"]:
+            proj = getattr(attn if attr == "o_proj" else mlp, attr)
+            w = proj.weight.data
+            chunk = w.shape[1] // world_size
+            proj.weight = torch.nn.Parameter(
+                w[:, rank * chunk : (rank + 1) * chunk].contiguous()
+            )
+            setattr(
+                attn if attr == "o_proj" else mlp,
+                attr,
+                _RowParallelLinear(proj, group_name),
+            )
+
+    # Patch head counts for the sharded attention. Each rank now holds only
+    # num_heads // world_size of the projection outputs, so the per-head reshape
+    # must use the per-rank counts.
+    #
+    # Llama-style attention reads self.num_heads / self.num_key_value_heads for
+    # this reshape, so we set them. Qwen3-style attention instead infers the
+    # head count via a `-1` reshape against self.head_dim (so num_heads may be
+    # absent), and derives the GQA repeat from num_key_value_groups -- a ratio
+    # that's invariant under even sharding. Guard every attribute with hasattr
+    # so the same code is correct for both families.
+    heads_per_rank = model.config.num_attention_heads // world_size
+    kv_heads_per_rank = model.config.num_key_value_heads // world_size
+    for layer in model.model.layers:
+        attn = layer.self_attn
+        if hasattr(attn, "num_heads"):
+            attn.num_heads = heads_per_rank
+        if hasattr(attn, "num_key_value_heads"):
+            attn.num_key_value_heads = kv_heads_per_rank
+        if hasattr(attn, "num_key_value_groups"):
+            attn.num_key_value_groups = heads_per_rank // kv_heads_per_rank
+
+    logger.info(f"Weights sliced + all-reduce inserted for rank {rank}/{world_size}.")
+    return model
+
+
+# ---------------------------------------------------------------------------
+# export mode: torch.export → TRT AOT compile → save
+# ---------------------------------------------------------------------------
+
+
+def export_and_save(input_ids, args):
+    """Export model (without DTensor), compile with TRT, save per-rank.
+
+    Since torch.export cannot trace DTensor-parallelized models, we:
+    1. Load the model, manually slice weights per-rank
+    2. Wrap row-parallel layers with explicit _c10d_functional.all_reduce
+    3. torch.export.export() (works: no DTensor, explicit NCCL ops)
+    4. torch_tensorrt.dynamo.compile() with use_distributed_mode_trace=True
+    5. torch_tensorrt.save() per-rank
+    """
+    model = get_exportable_model(args, rank, world_size)
+
+    position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
+    max_seq = args.max_seq_len
+    isl = input_ids.shape[1]
+    batch_size = input_ids.shape[0]
+
+    logger.info("Exporting manually-sharded model with torch.export ...")
+    with torch.no_grad(), _precision_context(args):
+        seq_len = torch.export.Dim("seq_len", min=1, max=max_seq)
+        try:
+            ep = torch.export.export(
+                model,
+                args=(input_ids,),
+                kwargs={"position_ids": position_ids},
+                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                strict=False,
+            )
+        except Exception:
+            logger.warning("Dynamic export failed, trying with deferred asserts ...")
+            ep = torch.export._trace._export(
+                model,
+                args=(input_ids,),
+                kwargs={"position_ids": position_ids},
+                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                strict=False,
+                prefer_deferred_runtime_asserts_over_guards=True,
+            )
+    logger.info("Export succeeded.")
+
+    # Importing these modules registers the static KV cache lowering passes
+    # via @_aten_lowering_pass. Must happen before torch_tensorrt.dynamo.compile.
+    if args.cache == "static_v1":
+        import static_cache_v1  # noqa: F401
+    elif args.cache == "static_v2":
+        import static_cache_v2  # noqa: F401
+
+    logger.info("Compiling exported program with TRT (AOT) ...")
+    # Compile with the same precision used during export and verification;
+    # additionally enable verbose Torch-TRT logging when --debug is set.
+    with ExitStack() as _compile_stack:
+        _compile_stack.enter_context(_precision_context(args))
+        if args.debug:
+            _compile_stack.enter_context(torch_tensorrt.logging.debug())
+        trt_model = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=[
+                torch_tensorrt.Input(
+                    min_shape=(batch_size, 1),
+                    opt_shape=(batch_size, isl),
+                    max_shape=(batch_size, max_seq),
+                    dtype=torch.int64,
+                    name="input_ids",
+                ),
+            ],
+            kwarg_inputs={
+                "position_ids": torch_tensorrt.Input(
+                    min_shape=(1, 1),
+                    opt_shape=(1, isl),
+                    max_shape=(1, max_seq),
+                    dtype=torch.int64,
+                    name="position_ids",
+                ),
+            },
+            use_fp32_acc=True,
+            device=DEVICE,
+            disable_tf32=True,
+            use_python_runtime=False,
+            min_block_size=1,
+            use_distributed_mode_trace=True,
+            assume_dynamic_shape_support=True,
+        )
+
+    # Eagerly initialize the NCCL communicator so TRT's bind_nccl_comm()
+    # finds a non-null ncclComm_t when the first execute_engine() call runs.
+    # _c10d_functional.all_reduce (used by the ref model below) does not
+    # trigger eager_connect_single_device, so getCommPtr() would still return
+    # 0 without this call, causing TRT's getCommunicator() to assert.
+    from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
+
+    initialize_nccl_comm()
+    logger.info("NCCL communicator eagerly initialized for export verification")
+
+    # Verify
+    if args.cache:
+        # With KV cache, the engine takes (input_ids, position_ids, *kv_cache,
+        # start_idx, end_idx) and the reference model doesn't. The README's
+        # "Accuracy check" snippet compares saved cached engines against an
+        # unsharded reference with identical token histories.
+        logger.info("For cached-model logit validation, run the README accuracy check.")
+    else:
+        logger.info("Verifying compiled model ...")
+        with torch.no_grad(), _precision_context(args):
+            ref = _extract_logits(model(input_ids, position_ids=position_ids))
+            trt = _extract_logits(trt_model(input_ids, position_ids=position_ids))
+        logger.info(
+            f"Max logit diff: {(ref.float() - trt.float()).abs().max().item():.6f}"
+        )
+
+    if args.cache:
+        # Cache lowering adds positional KV/index inputs and flat tensor outputs.
+        # Its original HF pytree metadata still describes position_ids as a kwarg
+        # and only logits as an output; saving that metadata breaks the loaded API.
+        trt_model.graph.set_codegen(torch.fx.graph.CodeGen())
+        trt_model.recompile()
+
+    # Save outside autocast — serialization doesn't need it and retrace=True
+    # would fail (execute_engine has no AutocastCUDA kernel for torch.export).
+    save_path = _rank_path(args.save_dir, rank, world_size)
+    Path(args.save_dir).mkdir(parents=True, exist_ok=True)
+    logger.info(f"Saving TRT engine to {save_path} ...")
+    torch_tensorrt.save(trt_model, save_path, retrace=False)
+
+    dist.barrier()
+    logger.info("All ranks saved.")
+
+    del model
+    torch.cuda.empty_cache()
+    return trt_model
+
+
+# ---------------------------------------------------------------------------
+# load mode: load per-rank engines → inference
+# ---------------------------------------------------------------------------
+
+
+def load_and_run(input_ids, tokenizer, args):
+    """Load saved per-rank TRT engine and run inference. Returns the engine so
+    the caller can explicitly delete it before tearing down the process group."""
+    # HuggingFace output types must be pytree-registered before torch.export.load
+    # can deserialize the saved ExportedProgram's output spec.
+    # Eagerly initialize PyTorch's NCCL communicator so TRT's
+    # bind_nccl_comm() can extract the ncclComm_t on first engine execution.
+    from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
+    from transformers.modeling_outputs import CausalLMOutputWithPast  # noqa: F401
+
+    initialize_nccl_comm()
+    logger.info("NCCL communicator eagerly initialized")
+
+    save_path = _rank_path(args.save_dir, rank, world_size)
+    logger.info(f"Loading TRT engine from {save_path} ...")
+    loaded = torch_tensorrt.load(save_path)
+    trt_model = loaded.module()
+    logger.info("Engine loaded.")
+
+    max_len = input_ids.shape[1] + args.num_tokens
+    gen_fn = _pick_generate_fn(args)
+    loaded_tokens = gen_fn(
+        trt_model,
+        input_ids.clone(),
+        max_len,
+        tokenizer.eos_token_id,
+    )
+
+    if rank == 0:
+        print("\n===== TensorRT-TP (loaded from disk) =====")
+        print(tokenizer.decode(loaded_tokens[0], skip_special_tokens=True))
+        sys.stdout.flush()
+
+    return trt_model, loaded_tokens
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="LLM (Llama/Qwen) TP: torch.export → save → load with TRT engines"
+    )
+    parser.add_argument(
+        "--model",
+        default="Qwen/Qwen3-1.7B",
+        help="HF model id. All ungated unless noted. Tested options:\n"
+        "  Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY\n"
+        "  Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8\n"
+        "  meta-llama/Llama-3.2-1B-Instruct - original example (GATED, needs HF token)",
+    )
+    parser.add_argument(
+        "--precision",
+        choices=["fp16", "fp32"],
+        default="fp16",
+        help="FP16 autocast or FP32 weights/operations. Re-export into a separate save directory when changing precision.",
+    )
+    parser.add_argument("--prompt", default="What is tensor parallelism?")
+    parser.add_argument("--num_tokens", type=int, default=128)
+    parser.add_argument(
+        "--mode",
+        required=True,
+        choices=["export", "load"],
+        help="export: AOT compile + save engines | load: load engines + infer",
+    )
+    parser.add_argument("--save_dir", default="/tmp/llm_tp_engines")
+    parser.add_argument(
+        "--cache",
+        choices=["", "static_v1", "static_v2"],
+        default="",
+        help="KV cache lowering pass. '' disables cache (full-seq recompute).",
+    )
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument(
+        "--benchmark", action="store_true", help="Measure generation latency"
+    )
+    parser.add_argument(
+        "--iterations", type=int, default=5, help="Benchmark iterations"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=1, help="Batch size for benchmarking"
+    )
+    parser.add_argument(
+        "--isl", type=int, default=2048, help="Input sequence length for benchmarking"
+    )
+    parser.add_argument(
+        "--warmup", type=int, default=3, help="Untimed benchmark iterations"
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Benchmark input seed")
+    args = parser.parse_args()
+    if args.benchmark and (
+        args.iterations < 1
+        or args.warmup < 0
+        or args.isl < 1
+        or args.num_tokens < 1
+        or args.batch_size < 1
+    ):
+        parser.error(
+            "Benchmark sizes and iterations must be positive; warmup must be nonnegative"
+        )
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    if args.benchmark:
+        # Every shard must receive the same input; seed rank 0 for repeatable runs.
+        shape = (args.batch_size, args.isl)
+        if rank == 0:
+            generator = torch.Generator().manual_seed(args.seed)
+            input_ids = torch.randint(
+                tokenizer.vocab_size, shape, generator=generator, dtype=torch.int64
+            ).to(DEVICE)
+        else:
+            input_ids = torch.empty(shape, dtype=torch.int64, device=DEVICE)
+        dist.broadcast(input_ids, src=0)
+    else:
+        input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
+    max_len = input_ids.shape[1] + args.num_tokens
+    args.max_seq_len = max_len
+
+    trt_model = None
+    with torch.inference_mode(), _precision_context(args):
+        gen_fn = _pick_generate_fn(args)
+
+        if args.mode == "export":
+            trt_model = export_and_save(input_ids.clone(), args)
+
+            logger.info("Running freshly compiled model ...")
+            trt_tokens = gen_fn(
+                trt_model,
+                input_ids.clone(),
+                max_len,
+                tokenizer.eos_token_id,
+            )
+            if not args.benchmark:
+                if rank == 0:
+                    print("\n===== TensorRT-TP (freshly compiled) =====")
+                    print(tokenizer.decode(trt_tokens[0], skip_special_tokens=True))
+                    sys.stdout.flush()
+            else:
+                # All ranks must participate in the benchmark loop.
+                use_cache = args.cache in ("static_v1", "static_v2")
+                trt_results = time_generate_split(
+                    model=trt_model,
+                    inputs=input_ids.clone(),
+                    output_seq_length=max_len,
+                    eos_token_id=tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                    use_cache=use_cache,
+                    warmup=args.warmup,
+                )
+                if rank == 0:
+                    stats = record_stats_split(
+                        "TensorRT-TP (export)",
+                        trt_results,
+                        args.precision.upper(),
+                        batch_size=args.batch_size,
+                    )
+                    print("\n=========TensorRT-TP (export) PERFORMANCE============")
+                    print(stats)
+                    sys.stdout.flush()
+
+        elif args.mode == "load":
+            trt_model, _ = load_and_run(input_ids, tokenizer, args)
+            if args.benchmark:
+                # All ranks must participate — the decode loop contains NCCL
+                # all-reduce ops that require every rank to call in lockstep.
+                use_cache = args.cache in ("static_v1", "static_v2")
+                trt_results = time_generate_split(
+                    model=trt_model,
+                    inputs=input_ids.clone(),
+                    output_seq_length=max_len,
+                    eos_token_id=tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                    use_cache=use_cache,
+                    warmup=args.warmup,
+                )
+                if rank == 0:
+                    stats = record_stats_split(
+                        "TensorRT-TP (load)",
+                        trt_results,
+                        args.precision.upper(),
+                        batch_size=args.batch_size,
+                    )
+                    print("\n=========TensorRT-TP (load) PERFORMANCE============")
+                    print(stats)
+                    sys.stdout.flush()
+
+    # Delete the TRT engine before destroying the process group — the engine
+    # holds a reference to the NCCL communicator and will segfault if NCCL is
+    # torn down first.
+    # del trt_model
+    # torch.cuda.empty_cache()
+    dist.destroy_process_group()
+    logger.info("Done.")
+    # Bypass Python GC — TRT/CUDA destructors can segfault during interpreter shutdown.
+    os._exit(0)

@@ -7,6 +7,8 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo import CompilationSettings
+from torch_tensorrt.dynamo.conversion import convert_module
 
 from .harness import DispatchTestCase
 
@@ -101,6 +103,30 @@ class TestIsNanConverter(DispatchTestCase):
             isnan(),
             inputs,
         )
+
+    def test_isnan_of_a_constant_without_constant_folding(self):
+        """isnan of a constant compares the constant with itself, which gives a constant."""
+
+        class IsNanOfBuffer(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("c", torch.tensor([1.0, float("nan"), 2.0]))
+
+            def forward(self, x):
+                return torch.ops.aten.add.Tensor(
+                    x, torch.ops.aten.isnan.default(self.c)
+                )
+
+        x = torch.randn(3).cuda()
+        module = torch.export.export(IsNanOfBuffer().cuda(), (x,)).module()
+        for node in list(module.graph.nodes):
+            if node.op == "call_module" and node.target == "_guards_fn":
+                module.graph.erase_node(node)
+        module.recompile()
+        trt_module = convert_module(
+            module, [Input.from_tensor(x)], CompilationSettings(min_block_size=1)
+        )
+        torch.testing.assert_close(trt_module(x), module(x))
 
 
 if __name__ == "__main__":

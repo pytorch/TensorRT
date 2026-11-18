@@ -4,12 +4,12 @@
 """
 torch_tensorrt.kernels  (experimental)
 =======================================
-Register custom CUDA C++, precompiled PTX, Triton, and cuTile kernels as TensorRT
+Register CUDA C++, precompiled PTX, Triton, cuTile, and CuTe DSL kernels as TensorRT
 Quick Deployable Plugins (QDP). Tensor-only kernels use AOT plugin launches;
 declarative CUDA kernels with ``ScalarInput`` use TensorRT's QDP JIT path so
 runtime scalar attributes can be forwarded by value.
 
-The module exposes four registration entry points:
+The module exposes five registration entry points:
 
 ``cuda_kernel_op`` — fully declarative for the common cases, with optional
     overrides for everything else. Describe the kernel via :class:`KernelSpec`
@@ -35,6 +35,11 @@ The module exposes four registration entry points:
     ``(ptr, extents..., strides...)`` layout into TensorRT's launch order, and
     derives the AOT launch — so you only supply the array ``signature``, the
     ``ct.Constant`` values, a ``grid``, and a ``meta_fn``.
+
+``cutedsl_op`` — register a pointer-based ``@cute.kernel`` CuTe DSL program.
+    Supply a pointer/``i32`` signature, ``cutlass.Constexpr`` constants, launch grid
+    and block size, and a ``meta_fn``. The frontend compiles and embeds PTX
+    through the same AOT plugin backend.
 
 Minimal example — declarative ``cuda_kernel_op``::
 
@@ -79,7 +84,13 @@ from torch_tensorrt.kernels._dsl import (
     SameAs,
     ScalarInput,
 )
-from torch_tensorrt.kernels._ops import cuda_kernel_op, cutile_op, ptx_op, triton_op
+from torch_tensorrt.kernels._ops import (
+    cuda_kernel_op,
+    cutedsl_op,
+    cutile_op,
+    ptx_op,
+    triton_op,
+)
 
 __all__ = [
     "Custom",
@@ -94,6 +105,7 @@ __all__ = [
     "SameAs",
     "ScalarInput",
     "cuda_kernel_op",
+    "cutedsl_op",
     "cutile_op",
     "ptx_op",
     "triton_op",

@@ -33,6 +33,8 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     SerializedTensorRTEngineFmt,
+    create_cpp_engine,
+    plan_buffer,
     serialize_binding_names,
     serialize_device_info,
 )
@@ -128,6 +130,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
         num_user_outputs: Optional[int] = None,
+        pytorch_plugin_ops: Optional[List[str]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -148,6 +151,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
+            pytorch_plugin_ops (List[str]): Operators the engine runs with TensorRT plugins whose kernels run PyTorch, ``[]`` if none. ExecuTorch export refuses an engine that does not set it, because it cannot tell whether the engine needs PyTorch
 
         Example:
 
@@ -185,6 +189,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.name = name
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
+        if serialized_engine is not None and (
+            settings.lazy_engine_init or settings.enable_cross_compile_for_windows
+        ):
+            # Held until the engine is set up, and the module may be pickled or deep
+            # copied before then, which TensorRT's buffer type does not support.
+            serialized_engine = bytes(plan_buffer(serialized_engine))
         self.serialized_engine = serialized_engine
         self.engine: Optional[Any] = None
         self.requires_output_allocator = requires_output_allocator
@@ -201,6 +211,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
         self.num_user_outputs = num_user_outputs
+        self.pytorch_plugin_ops: Optional[List[str]] = (
+            None if pytorch_plugin_ops is None else list(pytorch_plugin_ops)
+        )
         self.target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -220,12 +233,13 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # The C++ TRTEngine is not safely deep-copyable for distributed (NCCL)
         # engines — creating a new execution context during copy can crash at
         # destruction time.  Since the exporter only reads the engine (never
-        # executes it), sharing the same C++ object is safe.
+        # executes it), sharing the same C++ object is safe. A plan is never modified either,
+        # and copying a memory-mapped one (compile_and_save) would read it in.
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k == "engine":
+            if k in ("engine", "_serialized_engine"):
                 object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
             else:
                 object.__setattr__(result, k, copy.deepcopy(v, memo))
@@ -237,7 +251,32 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return torch.device(f"cuda:{self.settings.device.gpu_id}")
         return torch.device(f"cuda:{torch.cuda.current_device()}")
 
-    def _pack_engine_info(self) -> List[str | bytes]:
+    @property
+    def serialized_engine(self) -> Optional[bytes]:
+        """The serialized TensorRT engine.
+
+        Once the C++ runtime holds the engine, the module stops keeping a host copy of
+        the plan, which is as large as the weights. Reading this property then
+        serializes the engine again, so each read costs a full copy.
+        """
+        plan = self._plan_buffer()
+        if plan is None or isinstance(plan, bytes):
+            return plan
+        return bytes(plan_buffer(plan))
+
+    @serialized_engine.setter
+    def serialized_engine(self, serialized_engine: Optional[Any]) -> None:
+        self._serialized_engine = serialized_engine
+
+    def _plan_buffer(self) -> Optional[Any]:
+        """The plan without copying it: the retained buffer, else a view of a fresh serialization."""
+        if self._serialized_engine is not None:
+            return self._serialized_engine
+        if self.engine is not None and ENABLED_FEATURES.torch_tensorrt_runtime:
+            return self.engine.serialized_engine_tensor()
+        return None
+
+    def _pack_engine_info(self) -> List[Any]:
         target_device = (
             self.settings.device
             if self.settings.device is not None
@@ -247,13 +286,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
             "num_user_outputs": self.num_user_outputs,
+            "pytorch_plugin_ops": self.pytorch_plugin_ops,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
                 else self.engine.are_output_tensors_unowned()
             ),
         }
-        engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
+        engine_info: List[Any] = [""] * SERIALIZATION_LEN
         engine_info[ABI_TARGET_IDX] = (
             torch.ops.tensorrt.ABI_VERSION()
             if ENABLED_FEATURES.torch_tensorrt_runtime
@@ -267,8 +307,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if ENABLED_FEATURES.torch_tensorrt_runtime
             else serialize_device_info(target_device)
         )
-        assert self.serialized_engine is not None
-        engine_info[ENGINE_IDX] = self.serialized_engine
+        plan = self._plan_buffer()
+        assert plan is not None
+        engine_info[ENGINE_IDX] = plan
         engine_info[INPUT_BINDING_NAMES_IDX] = serialize_binding_names(
             self.input_binding_names
         )
@@ -447,12 +488,18 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if not ENABLED_FEATURES.torch_tensorrt_runtime:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
+            # The Python runtime takes the plan as bytes and keeps it.
+            if not isinstance(self._serialized_engine, (bytes, bytearray)):
+                self._serialized_engine = bytes(plan_buffer(self._serialized_engine))
             self.engine = TRTEngine(
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
             )
         else:
-            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+            self.engine = create_cpp_engine(self._pack_engine_info())
+            # The engine re-serializes on demand (see ``_plan_buffer``), so a host copy
+            # of the plan, as large as the weights, need not live as long as the module.
+            self._serialized_engine = None
 
         # Re-apply via the setter: resolves any path-string runtime_cache,
         # dispatches to the engine, and writes back the resolved form.
@@ -501,22 +548,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
-        if self.engine is not None:
+        if self.engine is not None or self._serialized_engine is not None:
             engine_info = self._pack_engine_info()
-            engine_bytes = engine_info[ENGINE_IDX]
-            assert isinstance(engine_bytes, (bytes, bytearray))
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes)
-            return (
-                self.name,
-                engine_info,
-                self.input_binding_names,
-                self.output_binding_names,
+            engine_info[ENGINE_IDX] = base64.b64encode(
+                plan_buffer(engine_info[ENGINE_IDX])
             )
-        elif self.serialized_engine:
-            engine_info = self._pack_engine_info()
-            engine_bytes = engine_info[ENGINE_IDX]
-            assert isinstance(engine_bytes, bytes)
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes)
             return (
                 self.name,
                 engine_info,
@@ -556,6 +592,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
             self.num_user_outputs = metadata.get("num_user_outputs")
+            self.pytorch_plugin_ops = metadata.get("pytorch_plugin_ops")
             self.aliased_io = deserialize_aliased_io(
                 str(serialized_engine_info[ALIASED_IO_IDX])
             )
@@ -574,7 +611,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
                 self.engine = TRTEngine(serialized_engine_info)
             else:
-                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
+                self.engine = create_cpp_engine(serialized_engine_info)
 
             self.engine.set_output_tensors_as_unowned(
                 metadata["output_tensors_are_unowned"]
@@ -678,8 +715,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        if "serialized_engine" in state:
+            state["_serialized_engine"] = state.pop("serialized_engine")
+        state.setdefault("_serialized_engine", None)
         state.setdefault("_runtime_settings", RuntimeSettings(runtime_cache=None))
         state.setdefault("_implicit_cache_handle", None)
+        # A module saved before the mark existed keeps it unknown (None), so the
+        # ExecuTorch save check asks for a recompile instead of guessing.
+        state.setdefault("pytorch_plugin_ops", None)
         set_state = getattr(super(), "__setstate__", None)
         if set_state is not None:
             set_state(state)

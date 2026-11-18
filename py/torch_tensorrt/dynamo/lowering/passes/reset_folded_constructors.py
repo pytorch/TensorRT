@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 # that can be copied without severing an alias to caller-owned state.
 FOLDED_CONSTRUCTOR_META = "folded_constructor"
 
+# Also set by constant folding, on a folded value that reads no parameter: one built from
+# constructors (full, arange, triu), buffers or tensor constants, such as the fixed part of an
+# attention mask, rather than transformed from a weight (w.T, w.to(dtype)).
+FOLDED_WITHOUT_PARAMETERS_META = "folded_without_parameters"
+
 # Marks the copy inserted below, so running this pass again (once per TensorRT
 # submodule after partitioning) does not stack redundant copies.
 _FRESH_COPY_META = "folded_constructor_reset"

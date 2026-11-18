@@ -44,7 +44,13 @@ cmake(
     deps = [
         "@cuda//:cudart",
     ] + select({
-        ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
-        "//conditions:default": ["@tensorrt//:nvinfer"],
+        ":aarch64_linux": [
+            "@tensorrt_sbsa//:nvinfer",
+            "@tensorrt_sbsa//:nvinferplugin",
+        ],
+        "//conditions:default": [
+            "@tensorrt//:nvinfer",
+            "@tensorrt//:nvinferplugin",
+        ],
     }),
 )

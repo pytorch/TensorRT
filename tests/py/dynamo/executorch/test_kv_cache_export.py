@@ -46,7 +46,12 @@ def test_export_exposes_aliased_mutations_only_for_legacy_exporter(
     """
     captured = {}
 
-    def fake_transform(gm, cross_compile_module=False, expose_aliased_mutations=True):
+    def fake_transform(
+        gm,
+        cross_compile_module=False,
+        expose_aliased_mutations=True,
+        share_tensors=False,
+    ):
         captured["expose"] = expose_aliased_mutations
         return gm
 

@@ -287,6 +287,521 @@ class TestUInt8Support(TestCase):
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
+    def test_uint8_arithmetic_after_a_shape_op_in_a_single_engine(self):
+        # The permute runs on a widened int32 copy, where 255 * 2 does not wrap, and a
+        # single-engine build has no PyTorch fallback, so it must refuse the multiply.
+        class Scale(nn.Module):
+            def forward(self, image):
+                return (image.permute(2, 0, 1) * 2) // 3
+
+        image = torch.full((2, 2, 3), 255, dtype=torch.uint8, device="cuda")
+        with self.assertRaises(Exception) as caught:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Scale(), (image,)),
+                arg_inputs=[image],
+                min_block_size=1,
+            )
+        self.assertIn("computes a uint8 result", str(caught.exception.__cause__))
+
+    def test_uint8_index_after_a_shape_op_in_a_single_engine(self):
+        # An index only picks values, so the widened int32 copy gives the same result.
+        class Pick(nn.Module):
+            def forward(self, image, rows):
+                return image.permute(2, 0, 1)[rows].float() / 255
+
+        inputs = (
+            torch.randint(0, 256, (4, 5, 3), dtype=torch.uint8, device="cuda"),
+            torch.tensor([2, 0], device="cuda"),
+        )
+        engine = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Pick(), inputs),
+                arg_inputs=list(inputs),
+                min_block_size=1,
+            )
+        )
+        self.assertTrue(engine)
+
+    def test_uint8_full_overwrite_from_int32_in_a_single_engine(self):
+        # The int32 source stays int32 inside the engine, so it has to wrap as uint8 does.
+        class Overwrite(nn.Module):
+            def forward(self, image, updates):
+                return torch.slice_scatter(image, updates, 0, 0, 2).float()
+
+        inputs = (
+            torch.tensor([[1, 2], [3, 4]], dtype=torch.uint8, device="cuda"),
+            torch.tensor([[-1, 256], [300, 512]], dtype=torch.int32, device="cuda"),
+        )
+        engine = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(Overwrite(), inputs),
+                arg_inputs=list(inputs),
+                min_block_size=1,
+            )
+        )
+        trt_mod = TorchTensorRTModule(bytes(engine), ["image", "updates"], ["output0"])
+        torch.testing.assert_close(trt_mod(*inputs), Overwrite()(*inputs))
+
+    def test_uint8_arithmetic_after_a_shape_op_in_the_hierarchical_partitioner(self):
+        # The permute runs on a widened int32 copy, where 255 * 2 does not wrap, so the
+        # multiply has to stay in PyTorch.
+        from torch_tensorrt.dynamo import partitioning
+        from torch_tensorrt.dynamo._compiler import convert_module
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_CONVERTERS,
+        )
+        from torch_tensorrt.dynamo.lowering import (
+            get_decompositions,
+            post_lowering,
+            pre_export_lowering,
+        )
+
+        class Scale(nn.Module):
+            def forward(self, image):
+                return (image.permute(2, 0, 1) * 2) // 3
+
+        image = torch.full((2, 2, 3), 255, dtype=torch.uint8, device="cuda")
+        settings = CompilationSettings()
+        lowered = pre_export_lowering(torch.export.export(Scale(), (image,)), settings)
+        gm = post_lowering(
+            lowered.run_decompositions(get_decompositions()).module(), settings
+        )
+        DYNAMO_CONVERTERS.set_compilation_settings(settings)
+        partitioned, _ = partitioning.hierarchical_adjacency_partition(
+            gm,
+            min_block_size=1,
+            backend_priority=["tensorrt"],
+            backend_support_map={"tensorrt": DYNAMO_CONVERTERS.keys()},
+        )
+        for name, block in list(partitioned.named_children()):
+            if "_run_on_acc_tensorrt" in name:
+                inputs = partitioning.construct_submodule_inputs(block)
+                setattr(partitioned, name, convert_module(block, inputs, name=name))
+        self.assertEqual(partitioned(image), Scale()(image))
+
+    def test_uint8_shape_op_before_cast(self):
+        # TensorRT has no uint8 layer for these, so the interpreter widens their uint8
+        # input. A partial slice_scatter still writes in PyTorch.
+        shape_ops = {
+            "permute": lambda image: image.permute(2, 0, 1),
+            "unsqueeze": lambda image: image.unsqueeze(0),
+            "slice": lambda image: image[2:6],
+            "stack": lambda image: torch.stack([image, image]),
+            "split": lambda image: torch.split(image, 4)[1],
+            "cat with a uint8 constant": lambda image: torch.cat(
+                [image, torch.zeros(8, 8, 1, dtype=torch.uint8, device=image.device)],
+                -1,
+            ),
+            "full slice_scatter from a permute": lambda image: torch.slice_scatter(
+                image, image.permute(1, 0, 2), 0, 0, 8
+            ),
+            "partial slice_scatter": lambda image: torch.slice_scatter(
+                image, image[:2], 0, 2, 4
+            ),
+        }
+
+        class ImageModule(nn.Module):
+            def __init__(self, shape_op):
+                super().__init__()
+                self.shape_op = shape_op
+
+            def forward(self, image):
+                return self.shape_op(image).float() / 255
+
+        in_tensor = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        for name, shape_op in shape_ops.items():
+            with self.subTest(name):
+                mod = ImageModule(shape_op)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (in_tensor,)),
+                    inputs=[in_tensor],
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=name != "partial slice_scatter",
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                if name == "partial slice_scatter":
+                    # The slice and the cast around the write stay in TensorRT.
+                    engines = [
+                        n for n, _ in trt_mod.named_children() if "_run_on_acc" in n
+                    ]
+                    self.assertEqual(len(engines), 2)
+                torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
+
+    def test_uint8_compared_with_out_of_range_integer(self):
+        # When the result type is uint8, PyTorch converts the integer to uint8 first: -1 equals
+        # 255 and nothing is below 256. Two 0-d tensors, or a uint8 tensor and an integer tensor
+        # with dims, compare as int64 instead.
+        in_tensor = torch.randint(250, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        in_tensor[0] = 0
+        pixel = torch.tensor(255, dtype=torch.uint8, device="cuda")
+        comparisons = {
+            "permuted == -1": (
+                lambda image: image.permute(1, 0, 2) == -1,
+                (in_tensor,),
+            ),
+            "permuted < 256": (
+                lambda image: image.permute(1, 0, 2) < 256,
+                (in_tensor,),
+            ),
+            "permuted <= -1": (
+                lambda image: image.permute(1, 0, 2) <= -1,
+                (in_tensor,),
+            ),
+            "permuted > 256": (
+                lambda image: image.permute(1, 0, 2) > 256,
+                (in_tensor,),
+            ),
+            "permuted >= -2": (
+                lambda image: image.permute(1, 0, 2) >= -2,
+                (in_tensor,),
+            ),
+            "input != 256": (lambda image: image != 256, (in_tensor,)),
+            "permuted == tensor(-1)": (
+                lambda image: image.permute(1, 0, 2) == torch.tensor(-1),
+                (in_tensor,),
+            ),
+            "permuted == int8 tensor(-1)": (
+                lambda image: image.permute(1, 0, 2)
+                == torch.tensor(-1, dtype=torch.int8),
+                (in_tensor,),
+            ),
+            "tensor(-1) == permuted": (
+                lambda image: torch.tensor(-1) == image.permute(1, 0, 2),
+                (in_tensor,),
+            ),
+            "permuted == full((3,), -1)": (
+                lambda image: image.permute(1, 0, 2)
+                == torch.full((3,), -1, device=image.device),
+                (in_tensor,),
+            ),
+            "0-d == tensor(-1)": (lambda value: value == torch.tensor(-1), (pixel,)),
+            "permuted == runtime 0-d -1": (
+                lambda image, other: image.permute(1, 0, 2) == other,
+                (in_tensor, torch.tensor(-1, device="cuda")),
+            ),
+        }
+
+        class Compare(nn.Module):
+            def __init__(self, comparison):
+                super().__init__()
+                self.comparison = comparison
+
+            def forward(self, *inputs):
+                return self.comparison(*inputs)
+
+        for name, (comparison, inputs) in comparisons.items():
+            with self.subTest(name):
+                mod = Compare(comparison)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, inputs),
+                    inputs=list(inputs),
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+        mod = Compare(comparisons["permuted == tensor(-1)"][0])
+        compiled = torch.compile(
+            mod,
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
+        )
+        torch.testing.assert_close(compiled(in_tensor), mod(in_tensor))
+
+    def test_uint8_compared_with_a_dynamic_size(self):
+        # PyTorch converts the size to uint8 as well, so 256 equals 0 and 300 is 44.
+        comparisons = {
+            "permuted == size + 252": lambda image: image.permute(0)
+            == image.shape[0] + 252,
+            "input < size": lambda image: image < image.shape[0],
+        }
+
+        class Compare(nn.Module):
+            def __init__(self, comparison):
+                super().__init__()
+                self.comparison = comparison
+
+            def forward(self, image):
+                return self.comparison(image)
+
+        images = [torch.arange(n, device="cuda").to(torch.uint8) for n in (4, 300)]
+        for name, comparison in comparisons.items():
+            with self.subTest(name):
+                mod = Compare(comparison)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(
+                        mod,
+                        (images[0],),
+                        dynamic_shapes=({0: torch.export.Dim("n", min=2, max=300)},),
+                    ),
+                    inputs=[
+                        torch_tensorrt.Input(
+                            min_shape=(2,),
+                            opt_shape=(4,),
+                            max_shape=(300,),
+                            dtype=torch.uint8,
+                        )
+                    ],
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                for image in images:
+                    torch.testing.assert_close(trt_mod(image), mod(image))
+
+    def test_uint8_compared_with_runtime_integer_near_its_limits(self):
+        # PyTorch converts the runtime integer to uint8, so only its value modulo 256 counts.
+        in_tensor = torch.tensor(
+            [[0, 128], [254, 255]], dtype=torch.uint8, device="cuda"
+        )
+        values = {
+            "int32 max": (2**31 - 1, torch.int32),
+            "int32 max - 1": (2**31 - 2, torch.int32),
+            "int32 max - 127": (2**31 - 128, torch.int32),
+            "int32 min": (-(2**31), torch.int32),
+            "-2**30": (-(2**30), torch.int32),
+            "int64 max": (2**63 - 1, torch.int64),
+            "int64 min": (-(2**63), torch.int64),
+        }
+
+        class Compare(nn.Module):
+            def forward(self, image, other):
+                return image.permute(1, 0) == other
+
+        for name, (value, dtype) in values.items():
+            with self.subTest(name):
+                inputs = (in_tensor, torch.tensor(value, dtype=dtype, device="cuda"))
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(Compare(), inputs),
+                    inputs=list(inputs),
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), Compare()(*inputs))
+
+    def test_uint8_where(self):
+        # The where converter widens uint8 values before it reshapes a value of
+        # lower rank or makes a constant, which TensorRT cannot do in uint8.
+        class Select(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b).float() * 2
+
+        class SelectThenPermute(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b).permute(2, 0, 1).float()
+
+        class SelectBackground(nn.Module):
+            def __init__(self, background):
+                super().__init__()
+                self.register_buffer("background", background)
+
+            def forward(self, mask, a):
+                return torch.where(mask, a, self.background).float() * 2
+
+        mask = torch.rand(8, 8, 3, device="cuda") > 0.5
+        a, b = (
+            torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+            for _ in range(2)
+        )
+        flags = torch.arange(192, device="cuda").reshape(8, 8, 3) % 2 == 0
+        c = torch.randn(8, 8, 3, device="cuda")
+        cases = {
+            "uint8": (Select(), (mask, a, b)),
+            "uint8, then permuted": (SelectThenPermute(), (mask, a, b)),
+            "bool": (Select(), (mask, a, flags)),
+            "bool of lower rank": (Select(), (mask, a, flags[0, 0])),
+            "bool constant": (SelectBackground(flags), (mask, a)),
+            "uint8 of lower rank": (Select(), (mask, a, b[0, 0])),
+            "uint8 constant": (SelectBackground(b), (mask, a)),
+            "uint8 of lower rank, float output": (Select(), (mask, b[0, 0], c)),
+            "uint8 constant, float output": (SelectBackground(b), (mask, c)),
+            # A 0-d int64 value keeps the uint8 result type, so PyTorch wraps it to uint8.
+            "int64 0-d constant": (
+                SelectBackground(torch.tensor(-1, device="cuda")),
+                (mask, a),
+            ),
+            "int64 0-d input": (Select(), (mask, a, torch.tensor(300, device="cuda"))),
+            # An int64 tensor makes the result int64, so nothing is wrapped.
+            "int64 tensor": (
+                Select(),
+                (mask, a, torch.full_like(b, -1, dtype=torch.int64)),
+            ),
+        }
+        for name, (mod, inputs) in cases.items():
+            with self.subTest(name):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, inputs),
+                    inputs=list(inputs),
+                    min_block_size=1,
+                    require_full_compilation=True,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+        # A select runs in PyTorch, and so does a where in torch_executed_ops, so uint8
+        # data reaches the next engine as an input, which the interpreter widens.
+        class SelectThenUnsqueeze(nn.Module):
+            def forward(self, mask, a, b):
+                return torch.where(mask, a, b)[..., 0].unsqueeze(0).float()
+
+        partial = {
+            "select, then unsqueezed": (SelectThenUnsqueeze(), {}),
+            "where in PyTorch, then permuted": (
+                SelectThenPermute(),
+                {"torch_executed_ops": {torch.ops.aten.where.self}},
+            ),
+        }
+        for name, (mod, settings) in partial.items():
+            with self.subTest(name):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (mask, a, b)),
+                    inputs=[mask, a, b],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    **settings,
+                )
+                torch.testing.assert_close(trt_mod(mask, a, b), mod(mask, a, b))
+
+        # torch.compile converts in a fake mode, and 114 becomes a uint8 constant.
+        class Fill(nn.Module):
+            def forward(self, mask, a):
+                return torch.where(mask, a, 114)
+
+        compiled = torch.compile(
+            Fill(),
+            backend="tensorrt",
+            options={"min_block_size": 1, "pass_through_build_failures": True},
+        )
+        torch.testing.assert_close(compiled(mask, a), Fill()(mask, a))
+
+    def test_uint8_full_overwrite_from_float(self):
+        class Overwrite(nn.Module):
+            def forward(self, image, values):
+                return torch.slice_scatter(image, values, 0, 0, 8).float() / 255
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        values = torch.randint(0, 256, (8, 8, 3), device="cuda").float()
+        mod = Overwrite()
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, (image, values)),
+            arg_inputs=[image, values],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(trt_mod(image, values), mod(image, values))
+
+    def test_uint8_in_cond_branch(self):
+        class CondModule(nn.Module):
+            def __init__(self, shape_op):
+                super().__init__()
+                self.shape_op = shape_op
+
+            def forward(self, image, flag):
+                return torch.cond(
+                    flag.sum() > 0,
+                    lambda image: self.shape_op(image).float() / 255,
+                    lambda image: self.shape_op(image).float() / 127,
+                    (image,),
+                )
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        flag = torch.ones(2, device="cuda")
+        for name, shape_op in (
+            ("permute", lambda image: image.permute(2, 0, 1)),
+            ("cast only", lambda image: image),
+        ):
+            with self.subTest(name):
+                mod = CondModule(shape_op)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (image, flag)),
+                    arg_inputs=[image, flag],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(image, flag), mod(image, flag))
+
+    def test_uint8_buffer_write(self):
+        class Cache(nn.Module):
+            def __init__(self, kv_dim):
+                super().__init__()
+                self.kv_dim = kv_dim
+                self.register_buffer(
+                    "cache", torch.zeros(1, 2, 8, 4, dtype=torch.uint8)
+                )
+
+            def forward(self, update):
+                if self.kv_dim:
+                    self.cache[:, :, 2:4] = update
+                else:
+                    self.cache[:, 1:2] = update
+                return self.cache.float() * 2
+
+        update = torch.randint(0, 256, (1, 1, 8, 4), dtype=torch.uint8, device="cuda")
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(Cache(False).cuda(), (update,)),
+            arg_inputs=[update],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(update)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, Cache(False).cuda()(update))
+
+        # A write on the KV cache dim runs in PyTorch, so the engine cannot alias the
+        # buffer, and a copy-back would leave it stale on direct calls.
+        update = torch.randint(0, 256, (1, 2, 2, 4), dtype=torch.uint8, device="cuda")
+        with self.assertRaisesRegex(
+            RuntimeError, "write-back would be silently dropped"
+        ):
+            torch_tensorrt.dynamo.compile(
+                torch.export.export(Cache(True).cuda(), (update,)),
+                arg_inputs=[update],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+            )
+
+        # The engine returns the widened permute twice: as the buffer write and as
+        # the clone of the buffer.
+        class Frame(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("frame", torch.zeros(8, 8, 3, dtype=torch.uint8))
+
+            def forward(self, image):
+                self.frame[:] = image.permute(1, 0, 2)
+                return self.frame.clone()
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(Frame().cuda(), (image,)),
+            arg_inputs=[image],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(image)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, Frame().cuda()(image))
+
     def test_uint8_output(self):
         trt_mod = _build_engine(
             trt.float32, lambda network, x: network.add_cast(x, trt.uint8)

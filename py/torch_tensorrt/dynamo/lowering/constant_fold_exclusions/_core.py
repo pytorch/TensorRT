@@ -15,8 +15,7 @@ def _mark_constant_fold_exclusion(nodes: Iterable[torch.fx.Node], rule_id: str) 
     """Record which rule wants ``nodes`` kept out of constant folding.
 
     The marks carry their rule ID rather than a bare flag so the exclusion pass
-    can revoke the ones belonging to disabled rules, whichever marking path
-    produced them.
+    can revoke the ones belonging to disabled rules.
     """
     for node in nodes:
         node.meta.setdefault(CONSTANT_FOLD_EXCLUSION_META_KEY, set()).add(rule_id)

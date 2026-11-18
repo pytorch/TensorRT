@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS,
     dynamo_tensorrt_converter,
 )
+from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,9 +46,19 @@ def _branch_modules(node: Node) -> Optional[List[torch.fx.GraphModule]]:
 
 
 def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
-    """True if every computational node in ``gm`` (and nested cond branches) has a converter."""
+    """True if every computational node in ``gm`` (and nested cond branches) can run in TensorRT.
+
+    A node needs a converter, and must not make a uint8 tensor, which the partitioners
+    keep in PyTorch for nodes outside a branch. A branch input must not be uint8 either.
+    """
     for node in gm.graph.nodes:
-        if node.op in ("placeholder", "output"):
+        if node.op == "placeholder":
+            # A branch input comes from an IIfConditional input layer, and TensorRT
+            # allows uint8 only at engine inputs and outputs.
+            if getattr(node.meta.get("val"), "dtype", None) == torch.uint8:
+                return False
+            continue
+        if node.op == "output":
             continue
         if node.op == "get_attr":
             try:
@@ -63,6 +74,13 @@ def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
             if node not in DYNAMO_CONVERTERS:
                 _LOGGER.debug(
                     "torch.cond subgraph %s has unsupported op %s",
+                    gm._get_name(),
+                    node.target,
+                )
+                return False
+            if makes_uint8_tensor(node):
+                _LOGGER.debug(
+                    "torch.cond subgraph %s makes a uint8 tensor in %s",
                     gm._get_name(),
                     node.target,
                 )

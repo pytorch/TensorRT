@@ -17,6 +17,8 @@ class TestCopyConverter(DispatchTestCase):
             ((1, 10), (1, 10), False),
             ((2, 3, 4), (2, 3, 4), True),
             ((2, 3, 4, 5), (2, 3, 4, 5), True),
+            ((2, 3), (3,), False),
+            ((2, 3, 4), (2, 1, 4), False),
         ]
     )
     def test_copy_float(self, input_shape, src_shape, non_blocking):
@@ -90,6 +92,23 @@ class TestCopyConverter(DispatchTestCase):
             Copy(),
             input_specs,
         )
+
+    @parameterized.expand([((5,),), ((1, 5),)])
+    def test_dynamic_shape_copy_broadcast(self, src_shape):
+        class Copy(nn.Module):
+            def forward(self, input, src):
+                return torch.ops.aten.copy.default(input, src)
+
+        input_specs = [
+            Input(
+                min_shape=(1, 5),
+                opt_shape=(3, 5),
+                max_shape=(8, 5),
+                dtype=torch.float32,
+            ),
+            Input(shape=src_shape, dtype=torch.float32),
+        ]
+        self.run_test_with_dynamic_shape(Copy(), input_specs)
 
     def test_copy_mixed_dtype_dest_fp32_src_fp16(self):
         # Regression for pytorch/TensorRT#4265: aten.copy(self, src) returns a

@@ -33,8 +33,6 @@ _ELEMENTWISE_SAFE: FrozenSet[Any] = frozenset(
         torch.ops.aten.add.Tensor,
         torch.ops.aten.sub.Tensor,
         torch.ops.aten.neg.default,
-        torch.ops.aten.mul.Scalar,  # scalar*(re,im) — both parts scaled equally
-        torch.ops.aten.div.Scalar,  # (re,im)/scalar — both parts divided equally
         # Structural / copy — operate on the whole tensor without touching content.
         # Note: permute.default is NOT here; it needs an explicit rewrite to append
         # the trailing real/imag dimension index to the dims list.
@@ -463,7 +461,12 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
-    @_complex_unpacker(torch.ops.aten.mul.Tensor, torch.ops.aten.div.Tensor)
+    @_complex_unpacker(
+        torch.ops.aten.mul.Tensor,
+        torch.ops.aten.div.Tensor,
+        torch.ops.aten.mul.Scalar,
+        torch.ops.aten.div.Scalar,
+    )
     def _rewrite_mul_div_tensor(self, node: Node) -> bool:
         arg0_is_node = isinstance(node.args[0], torch.fx.Node)
         arg1_is_node = isinstance(node.args[1], torch.fx.Node)
@@ -471,13 +474,29 @@ class ComplexGraphRewriter:
         if not arg0_is_node and not arg1_is_node:
             return False  # both scalars
 
-        if node.target == torch.ops.aten.mul.Tensor and (
-            not arg0_is_node or not arg1_is_node
+        if node.target in (torch.ops.aten.mul.Scalar, torch.ops.aten.div.Scalar) and (
+            arg1_is_node
         ):
-            return False  # scalar * complex — elementwise-safe
+            return False  # symbolic real scalar: elementwise-safe
 
-        if node.target == torch.ops.aten.div.Tensor and not arg1_is_node:
-            return False  # complex / scalar — elementwise-safe
+        is_mul = node.target in (torch.ops.aten.mul.Tensor, torch.ops.aten.mul.Scalar)
+        if is_mul and (not arg0_is_node or not arg1_is_node):
+            z_node, scalar = (
+                (node.args[0], node.args[1])
+                if arg0_is_node
+                else (node.args[1], node.args[0])
+            )
+            if isinstance(scalar, complex):
+                return self._rewrite_mul_complex_scalar(node, z_node, scalar)
+            return False  # real scalar * complex: elementwise-safe
+
+        if not is_mul and not arg1_is_node:
+            c = node.args[1]
+            if isinstance(c, complex):
+                # Python raises on 1 / 0j; nan is what CUDA eager returns for it.
+                inverse = 1 / c if c else complex("nan+nanj")
+                return self._rewrite_mul_complex_scalar(node, node.args[0], inverse)
+            return False  # complex / real scalar: elementwise-safe
 
         if node.target == torch.ops.aten.div.Tensor and not arg0_is_node:
             # scalar / complex: s/(a+bi) = (s*a/(a²+b²)) + i*(-s*b/(a²+b²))
@@ -625,21 +644,63 @@ class ComplexGraphRewriter:
                 return True
         return False
 
-    @_complex_unpacker(torch.ops.aten.add.Tensor, torch.ops.aten.sub.Tensor)
-    def _rewrite_add_sub_tensor_scalar(self, node: Node) -> bool:
+    def _rewrite_mul_complex_scalar(self, node: Node, z_node: Node, c: complex) -> bool:
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            if self._is_complex_layout_node(z_node):
+                # (a+bi)(x+yi) = (ax-by) + (ay+bx)i
+                re, im = self._inline_select_re_im(b, z_node)
+                re_x = b(torch.ops.aten.mul.Tensor, re, c.real)
+                im_y = b(torch.ops.aten.mul.Tensor, im, c.imag)
+                out_re = b(torch.ops.aten.sub.Tensor, re_x, im_y)
+                re_y = b(torch.ops.aten.mul.Tensor, re, c.imag)
+                im_x = b(torch.ops.aten.mul.Tensor, im, c.real)
+                out_im = b(torch.ops.aten.add.Tensor, re_y, im_x)
+            else:
+                # a(x+yi) = ax + ayi for a real tensor a
+                out_re = b(torch.ops.aten.mul.Tensor, z_node, c.real)
+                out_im = b(torch.ops.aten.mul.Tensor, z_node, c.imag)
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(
+        torch.ops.aten.add.Tensor,
+        torch.ops.aten.sub.Tensor,
+        torch.ops.aten.add.Scalar,
+        torch.ops.aten.sub.Scalar,
+    )
+    def _rewrite_add_sub_scalar(self, node: Node) -> bool:
         # add.Tensor(z1, z2): tensor+tensor is componentwise on the [..., 2]
         # real layout — real and imag parts are handled independently — so no
         # rewrite is needed.  Return True (handled, no modification).
-        # add.Tensor(z, scalar): scalar applies to real part only, so we must
-        # explicitly rewrite.
-        # tensor+tensor: componentwise on [..., 2] layout — no rewrite needed
+        # (a+bi) ± (x+yi) = (a±x) + (b±y)i, so a real scalar touches only the
+        # real part and a complex scalar adds its parts separately.
         if len(node.args) < 2 or isinstance(node.args[1], torch.fx.Node):
             return True
         inp, scalar = node.args[0], node.args[1]
+        scalar = scalar * node.kwargs.get("alpha", 1)
+        s_re, s_im = (
+            (scalar.real, scalar.imag) if isinstance(scalar, complex) else (scalar, 0)
+        )
         with SubgraphBuilder(self.gm.graph, node) as b:
-            re = b(torch.ops.aten.select.int, inp, -1, 0)
-            im = b(torch.ops.aten.select.int, inp, -1, 1)
-            new_re = b(node.target, re, scalar)
+            if self._is_complex_layout_node(inp):
+                re, im = self._inline_select_re_im(b, inp)
+                if s_im:
+                    im = b(node.target, im, s_im)
+            else:
+                re, im = inp, None
+            new_re = b(node.target, re, s_re)
+            if im is None:
+                # A real tensor has no imaginary part, so the result's is ±y. Fill
+                # it like new_re, which already has the promoted float dtype.
+                is_add = node.target in (
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.add.Scalar,
+                )
+                im = b(
+                    torch.ops.aten.full_like.default, new_re, s_im if is_add else -s_im
+                )
             out = self._inline_cat_re_im(b, new_re, im)
             node.replace_all_uses_with(out)
             out.meta["is_complex_layout"] = True
@@ -706,23 +767,6 @@ class ComplexGraphRewriter:
         extra = list(node.args[3:])
         with SubgraphBuilder(self.gm.graph, node) as b:
             out = b(torch.ops.aten.mean.dim, inp, new_dims, keepdim, *extra)
-            node.replace_all_uses_with(out)
-            out.meta["is_complex_layout"] = True
-            self.gm.graph.erase_node(node)
-            return True
-
-    @_complex_unpacker(torch.ops.aten.prod.dim_int)
-    def _rewrite_prod_dim(self, node: Node) -> bool:
-        # prod.dim_int(inp, dim, keepdim=False, dtype=None)
-        inp = node.args[0]
-        dim = node.args[1]
-        if dim >= 0:
-            return False  # positive dim — pass-through is correct
-        new_dim = dim - 1
-        keepdim = node.args[2] if len(node.args) > 2 else False
-        extra = list(node.args[3:])
-        with SubgraphBuilder(self.gm.graph, node) as b:
-            out = b(torch.ops.aten.prod.dim_int, inp, new_dim, keepdim, *extra)
             node.replace_all_uses_with(out)
             out.meta["is_complex_layout"] = True
             self.gm.graph.erase_node(node)
@@ -915,6 +959,15 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
+    @_complex_unpacker(torch.ops.aten.complex.default)
+    def _rewrite_complex(self, node: Node) -> bool:
+        # complex(re, im) is the [..., 2] layout of its two real inputs.
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = self._inline_cat_re_im(b, node.args[0], node.args[1])
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
     @_complex_unpacker(torch.ops.aten.polar.default)
     def _rewrite_polar(self, node: Node) -> bool:
         # polar(r, theta) = r*cos(theta) + i*r*sin(theta)
@@ -925,19 +978,6 @@ class ComplexGraphRewriter:
             out_re = b(torch.ops.aten.mul.Tensor, r_arg, cos_t)
             out_im = b(torch.ops.aten.mul.Tensor, r_arg, sin_t)
             out = self._inline_cat_re_im(b, out_re, out_im)
-            node.replace_all_uses_with(out)
-            self.gm.graph.erase_node(node)
-            return True
-
-    @_complex_unpacker(torch.ops.aten.add.Scalar, torch.ops.aten.sub.Scalar)
-    def _rewrite_add_sub_scalar(self, node: Node) -> bool:
-        # (a+bi) ± s = (a±s) + bi — scalar applies to real part only
-        inp, scalar = node.args[0], node.args[1]
-        with SubgraphBuilder(self.gm.graph, node) as b:
-            re = b(torch.ops.aten.select.int, inp, -1, 0)
-            im = b(torch.ops.aten.select.int, inp, -1, 1)
-            new_re = b(node.target, re, scalar)
-            out = self._inline_cat_re_im(b, new_re, im)
             node.replace_all_uses_with(out)
             self.gm.graph.erase_node(node)
             return True

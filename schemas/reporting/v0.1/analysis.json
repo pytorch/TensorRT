@@ -1,0 +1,356 @@
+{
+  "$defs": {
+    "AnalysisReport": {
+      "additionalProperties": false,
+      "properties": {
+        "capture_performed": {
+          "type": "boolean"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "type": "array"
+        },
+        "coverage": {
+          "$ref": "#/$defs/Coverage"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "graph_stage": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "model_execution_performed": {
+          "type": "boolean"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/NodeDecision"
+          },
+          "type": "array"
+        },
+        "partitions": {
+          "items": {
+            "$ref": "#/$defs/Partition"
+          },
+          "type": "array"
+        },
+        "report_type": {
+          "const": "analysis"
+        },
+        "requested_settings_satisfiable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "settings": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "skipped"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "skipped"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
+    "Coverage": {
+      "additionalProperties": false,
+      "properties": {
+        "assigned": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "below_min_block_size": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "eligible": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "excluded": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parameters": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "structural": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unsupported": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "invalid_input",
+            "unsupported_operator",
+            "unsupported_environment",
+            "builder_error",
+            "out_of_memory",
+            "timeout",
+            "cancelled",
+            "worker_crash",
+            "serialization_error",
+            "artifact_error",
+            "validation_error",
+            "benchmark_error",
+            "internal_error"
+          ],
+          "type": "string"
+        },
+        "exception_type": {
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "retry_after_change": {
+          "type": "boolean"
+        },
+        "retry_unchanged": {
+          "type": "boolean"
+        },
+        "stage": {
+          "enum": [
+            "environment",
+            "capture",
+            "analysis",
+            "compilation",
+            "lowering",
+            "partitioning",
+            "conversion",
+            "build",
+            "serialization",
+            "save",
+            "validation",
+            "benchmark",
+            "finalization"
+          ],
+          "type": "string"
+        },
+        "suggested_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "message",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "NodeDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "assignment": {
+          "enum": [
+            "tensorrt",
+            "pytorch",
+            "skipped"
+          ],
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "confirmed",
+            "predicted"
+          ],
+          "type": "string"
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "computational",
+            "structural",
+            "parameter",
+            "buffer"
+          ],
+          "type": "string"
+        },
+        "node_id": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source_node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_id",
+        "operator"
+      ],
+      "type": "object"
+    },
+    "Partition": {
+      "additionalProperties": false,
+      "properties": {
+        "input_profiles": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "partition_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "partition_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/AnalysisReport",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

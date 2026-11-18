@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Any
+import threading
+from contextlib import contextmanager
+from typing import Any, Iterator, List
 
 import tensorrt as trt
 import torch
@@ -18,8 +20,32 @@ _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
 class _TRTLogger(trt.ILogger):  # type: ignore[misc]
     def __init__(self) -> None:
         trt.ILogger.__init__(self)
+        self._error_captures: List[List[str]] = []
+        self._lock = threading.Lock()
+
+    @contextmanager
+    def capture_errors(self) -> Iterator[List[str]]:
+        """Collect the errors TensorRT reports, from any thread, while the block runs, so a failure can name them."""
+        errors: List[str] = []
+        with self._lock:
+            self._error_captures.append(errors)
+        try:
+            yield errors
+        finally:
+            with self._lock:
+                # By identity: two open captures can hold equal lists, for example both empty.
+                self._error_captures = [
+                    e for e in self._error_captures if e is not errors
+                ]
 
     def log(self, severity: trt.ILogger.Severity, msg: str) -> None:
+        if severity in (
+            trt.ILogger.Severity.INTERNAL_ERROR,
+            trt.ILogger.Severity.ERROR,
+        ):
+            with self._lock:
+                for errors in self._error_captures:
+                    errors.append(msg)
         # TODO: Move to match once py39 reaches EoL
         if severity == trt.ILogger.Severity.INTERNAL_ERROR:
             _LOGGER.critical(msg)
