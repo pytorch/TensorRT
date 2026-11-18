@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-import torch
 import copy
-import torchvision
+
+import torch
 import torch_tensorrt
+import torchvision
 from torch_tensorrt.fx import InputTensorSpec
 
 
@@ -66,18 +67,6 @@ def test_torch_tensorrt(model, inputs):
         model_fx, ir="fx", inputs=inputs_fx, enabled_precisions={torch.float16}
     )
     result_fp16 = trt_fx_module(*inputs_fx)
-    assert (
-        torch.nn.functional.cosine_similarity(
-            ref_fp16.flatten(), result_fp16.flatten(), dim=0
-        )
-        > 0.99
-    )
-
-    scripted_fx_module = torch.jit.trace(trt_fx_module, example_inputs=inputs_fx)
-    scripted_fx_module.save("/tmp/scripted_fx_module.ts")
-    scripted_fx_module = torch.jit.load("/tmp/scripted_fx_module.ts")
-
-    result_fp16 = scripted_fx_module(*inputs_fx)
     assert (
         torch.nn.functional.cosine_similarity(
             ref_fp16.flatten(), result_fp16.flatten(), dim=0

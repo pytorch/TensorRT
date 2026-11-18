@@ -27,6 +27,7 @@ from typing import (
 )
 
 import torch
+from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
@@ -46,15 +47,7 @@ if ENABLED_FEATURES.fx_frontend:
 else:
     InputType = Union[Input, torch.Tensor]  # type: ignore
 
-if ENABLED_FEATURES.torchscript_frontend:
-    import torch_tensorrt.ts
-    from torch_tensorrt.ts._compiler import compile as torchscript_compile
-    from torch_tensorrt.ts._compiler import (
-        convert_method_to_trt_engine as ts_convert_method_to_trt_engine,
-    )
-
 if ENABLED_FEATURES.dynamo_frontend:
-    from torch.export import ExportedProgram
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
@@ -110,7 +103,6 @@ def _non_fx_input_interface(
 class _IRType(Enum):
     """Enum to determine the type of IR selected for model compilation"""
 
-    ts = 0
     fx = 1
     dynamo = 2
     torch_compile = 3
@@ -121,18 +113,12 @@ class _ModuleType(Enum):
     """Enum to determine the type of model provided as input"""
 
     nn = 0
-    ts = 1
     fx = 2
     ep = 3
 
 
 def _parse_module_type(module: Any) -> _ModuleType:
-    if any(
-        isinstance(module, t)
-        for t in [torch.jit.ScriptModule, torch.jit.ScriptFunction]
-    ):
-        return _ModuleType.ts
-    elif isinstance(module, torch.fx.GraphModule):
+    if isinstance(module, torch.fx.GraphModule):
         return _ModuleType.fx
     elif isinstance(module, ExportedProgram):
         return _ModuleType.ep
@@ -143,23 +129,18 @@ def _parse_module_type(module: Any) -> _ModuleType:
 
 
 def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
-    module_is_tsable = any(module_type == t for t in [_ModuleType.nn, _ModuleType.ts])
     module_is_fxable = any(module_type == t for t in [_ModuleType.nn, _ModuleType.fx])
     module_is_exportable = module_type == _ModuleType.ep
 
-    ir_targets_torchscript = any(ir == opt for opt in ["torchscript", "ts"])
     ir_targets_fx = ir == "fx"
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
 
-    if module_is_tsable and ir_targets_torchscript:
-        if ENABLED_FEATURES.torchscript_frontend:
-            return _IRType.ts
-        else:
-            raise ValueError(
-                "Requested using the TS frontend but the TS frontend is not available in this build of Torch-TensorRT"
-            )
-    elif module_is_fxable and ir_targets_fx:
+    if ir in {"ts", "torchscript"}:
+        raise ValueError(
+            "TorchScript support has been removed. Use ir='dynamo' instead."
+        )
+    if module_is_fxable and ir_targets_fx:
         warnings.warn(
             "FX frontend is deprecated. Please use the Dynamo frontend instead.",
             DeprecationWarning,
@@ -191,18 +172,12 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
             if ENABLED_FEATURES.dynamo_frontend and module_is_fxable:
                 logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
-            elif ENABLED_FEATURES.torchscript_frontend and module_is_tsable:
-                if ENABLED_FEATURES.dynamo_frontend:
-                    logger.warning(
-                        "Input is a torchscript module but the ir was not specified (default=dynamo), please set ir=torchscript to suppress the warning."
-                    )
-                return _IRType.ts
             elif ENABLED_FEATURES.dynamo_frontend and module_is_exportable:
                 logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
             else:
                 raise ValueError(
-                    f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tTorchScript - {ENABLED_FEATURES.torchscript_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})"
+                    f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})"
                 )
         else:
             raise ValueError("Unknown ir was requested")
@@ -216,9 +191,7 @@ def compile(
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     **kwargs: Any,
-) -> (
-    torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
-):
+) -> torch.nn.Module | torch.fx.GraphModule | Callable[..., Any]:
     """Compile a PyTorch module for NVIDIA GPUs using TensorRT
 
     Takes a existing PyTorch module and a set of settings to configure the compiler
@@ -228,7 +201,7 @@ def compile(
     Converts specifically the forward method of a Module
 
     Arguments:
-        module (Union(torch.nn.Module,torch.jit.ScriptModule): Source module
+        module (Union[torch.nn.Module, torch.fx.GraphModule, torch.export.ExportedProgram]): Source module
 
     Keyword Arguments:
         inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
@@ -249,7 +222,7 @@ def compile(
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     Returns:
@@ -257,29 +230,14 @@ def compile(
     """
 
     input_list = inputs if inputs is not None else []
-    # Default for legacy FX/TS frontends; not used for the Dynamo path
+    # Default for the legacy FX frontend; not used for the Dynamo path
     enabled_precisions_set: Set[Union[torch.dtype, dtype]] = (
         enabled_precisions if enabled_precisions is not None else {torch.float32}
     )
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
-    if target_ir == _IRType.ts:
-        ts_mod = module
-        if module_type == _ModuleType.nn:
-            logger.info(
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
-            )
-            ts_mod = torch.jit.script(module)
-        assert _non_fx_input_interface(input_list)
-        compiled_ts_module: torch.jit.ScriptModule = torchscript_compile(
-            ts_mod,
-            inputs=input_list,
-            enabled_precisions=enabled_precisions_set,
-            **kwargs,
-        )
-        return compiled_ts_module
-    elif target_ir == _IRType.fx:
+    if target_ir == _IRType.fx:
         warnings.warn(
             "FX frontend is deprecated. Please use the Dynamo frontend instead.",
             DeprecationWarning,
@@ -489,12 +447,12 @@ def convert_method_to_trt_engine(
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     **kwargs: Any,
 ) -> bytes:
-    """Convert a TorchScript module method to a serialized TensorRT engine
+    """Convert a PyTorch module to a serialized TensorRT engine
 
-    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
+    Converts the forward method of a module to a serialized TensorRT engine.
 
     Arguments:
-        module (Union(torch.nn.Module,torch.jit.ScriptModule): Source module
+        module (Union[torch.nn.Module, torch.fx.GraphModule, torch.export.ExportedProgram]): Source module
 
     Keyword Arguments:
         inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
@@ -516,16 +474,11 @@ def convert_method_to_trt_engine(
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    # Default for legacy TS frontend; not used for the Dynamo path
-    enabled_precisions_set = (
-        enabled_precisions if enabled_precisions is not None else {torch.float}
-    )
-
     if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
@@ -537,22 +490,11 @@ def convert_method_to_trt_engine(
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
-    if target_ir == _IRType.ts:
-        ts_mod = module
-        if module_type == _ModuleType.nn:
-            logger.info(
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
-            )
-            ts_mod = torch.jit.script(module)
-        serialized_engine: bytes = ts_convert_method_to_trt_engine(
-            ts_mod,
-            inputs=arg_inputs,
-            method_name=method_name,
-            enabled_precisions=enabled_precisions_set,
-            **kwargs,
+    if method_name != "forward":
+        raise ValueError(
+            "Only method_name='forward' is supported by the Dynamo frontend."
         )
-        return serialized_engine
-    elif target_ir == _IRType.fx:
+    if target_ir == _IRType.fx:
         raise RuntimeError(
             "convert_method_to_trt_engine call is not supported for ir=fx"
         )
@@ -619,12 +561,12 @@ def load(
     **kwargs: Any,
 ) -> Any:
     """
-    Load a TorchScript, ExportedProgram, or ExecuTorch program.
+    Load an ExportedProgram or ExecuTorch program.
 
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
-        format (Optional[str]): None detects TorchScript and ExportedProgram files.
+        format (Optional[str]): None loads an ExportedProgram file.
             The deprecated ``"executorch"`` option loads a ``.pte`` program.
 
     Example:
@@ -635,7 +577,7 @@ def load(
 
     Raises:
         ImportError: If ExecuTorch format is requested without its runtime dependencies
-        ValueError: If the format is unsupported or neither standard loader accepts the file
+        ValueError: If the format is unsupported or the ExportedProgram loader rejects the file
 
     Note:
         ``format="executorch"`` preserves the legacy ``method_names`` property,
@@ -689,32 +631,11 @@ def load(
         )
         return exp_program
 
-    except Exception:
-        import traceback
-
-        traceback.print_exc()
-        logger.info(
-            f"Loading the provided file {file_path} via torch.export.load() failed with the following error",
-            exc_info=True,
-        )
-
-    try:
-        logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
-        ts_module = function_overload_with_kwargs(
-            torch.jit.load,
-            file_path,
-            _extra_files=extra_files,
-            **kwargs,
-        )
-        return ts_module
     except Exception as e:
-        logger.info(
-            f"Loading the provided file {file_path} via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error: {e}",
-            exc_info=True,
-        )
         raise ValueError(
-            f"The file {file_path} doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
-        )
+            f"The file {file_path} doesn't correspond to a valid ExportedProgram. "
+            "TorchScript loading is no longer supported."
+        ) from e
 
 
 # The keyword arguments save() consumes only for output_format="executorch",
@@ -741,7 +662,7 @@ def save(
     *,
     extra_files: Optional[dict[str, str]] = None,
     output_format: Literal[
-        "exported_program", "torchscript", "aot_inductor", "executorch"
+        "exported_program", "aot_inductor", "executorch"
     ] = "exported_program",
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
@@ -757,11 +678,11 @@ def save(
     Save the model to disk in the specified output format.
 
     Arguments:
-        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule | CudaGraphsTorchTensorRTModule)): Compiled Torch-TensorRT module
+        module (Optional(torch.export.ExportedProgram | torch.fx.GraphModule | CudaGraphsTorchTensorRTModule)): Compiled Torch-TensorRT module
         inputs (Union[torch.Tensor, torch_tensorrt.Input]): Torch input tensors or Input specifications
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
-        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
+        output_format (str): Format to save the model. Options include exported_program | aot_inductor | executorch.
         retrace (Optional[bool]): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
 
                 Defaults to True, except for ``output_format="executorch"``, where it defaults to False:
@@ -910,7 +831,7 @@ def save(
         # is, so writing a .pte needs no example inputs.
         retrace = output_format != "executorch"
     module_type = _parse_module_type(module)
-    accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
+    accepted_formats = {"exported_program", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
         isinstance(input, (torch.Tensor, Input)) for input in arg_inputs
     ):
@@ -949,7 +870,7 @@ def save(
 
     if output_format not in accepted_formats:
         raise ValueError(
-            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch"
+            f"Provided output_format {output_format} is not supported. Supported options are exported_program | aot_inductor | executorch"
         )
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
@@ -1176,49 +1097,142 @@ def save(
 
     if module_type == _ModuleType.nn:
         raise ValueError(
-            "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
+            "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.fx.GraphModule | torch.export.ExportedProgram."
         )
-    elif module_type == _ModuleType.ts:
-        if output_format != "torchscript":
-            raise ValueError(
-                "Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported"
+    elif module_type == _ModuleType.ep:
+        if arg_inputs is not None:
+            logger.warning(
+                "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
             )
-        else:
-            if arg_inputs is not None:
-                logger.warning(
-                    "Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save."
-                )
+        if output_format == "exported_program":
+            from torch_tensorrt.dynamo._exporter import (
+                _declare_aliased_kv_mutations_on_ep,
+            )
+
+            # A retraced exported_program's signature omits the engines'
+            # aliased KV mutations, so declare them here -- before
+            # normalization, which rewrites the engine constants the pass
+            # reads aliased_io from.
+            module = _declare_aliased_kv_mutations_on_ep(module)
+            _normalize_engine_constants_to_python(module)
             function_overload_with_kwargs(
-                torch.jit.save,
+                torch.export.save,
                 module,
                 file_path,
-                _extra_files=extra_files,
+                pickle_protocol=pickle_protocol,
+                extra_files=extra_files,
                 **kwargs,
             )
-    elif module_type == _ModuleType.ep:
-        if output_format == "torchscript":
-            raise ValueError(
-                "Provided model is a torch.export.ExportedProgram but the output_format specified is torchscript. Please verify the output_format"
+        elif output_format == "aot_inductor":
+            if any(
+                getattr(sub, "aliased_io", None)
+                for _sub_name, sub in module.graph_module.named_modules()
+            ):
+                logger.warning(
+                    "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                    "but output_format='aot_inductor' does not declare those aliased "
+                    "outputs as buffer mutations. The saved program's signature will "
+                    "not reflect the in-place update."
+                )
+            inductor_configs = {}
+            if "inductor_configs" in kwargs:
+                inductor_configs = kwargs["inductor_configs"]
+
+            torch._inductor.aoti_compile_and_package(
+                module,
+                inductor_configs=inductor_configs,
+                package_path=file_path,
+            )
+        elif output_format == "executorch":
+            _save_as_executorch(
+                module,
+                file_path,
+                partitioners=executorch_partitioners,
+                compile_specs=executorch_compile_specs,
+                backend_config=executorch_backend_config,
+                constant_methods=executorch_constant_methods,
+                transform_passes=executorch_transform_passes,
+                compile_config=executorch_compile_config,
+                generate_etrecord=executorch_generate_etrecord,
+                weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                use_cuda_graphs=use_cuda_graphs,
+                zero_copy_kv=executorch_zero_copy_kv,
+                external_engine_data=executorch_external_engine_data,
             )
         else:
+            raise RuntimeError(
+                "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+            )
+    elif module_type == _ModuleType.fx:
+        # torch.export truncates the engines' aliased KV outputs at the fx
+        # boundary, so a retraced program's signature omits an update the engine
+        # performs unless the mutations are re-declared; the legacy exporter
+        # instead exposes them at transform time. The declaration pass skips
+        # buffers that already carry a spec, so every branch below can run it
+        # whichever exporter produced the program. aot_inductor is left
+        # undeclared: whether an aliased in-place mutation survives
+        # functionalization under inductor is unverified.
+        #
+        # Copy-back is gated per-branch below: the legacy exporter declares it
+        # itself and consumes the trailing values while doing so.
+        #
+        # The program is discarded once saved, so it can share the module's
+        # tensors instead of copying every weight. Not with a caller's partitioner:
+        # its backend may free what it lowers, as CudaBackend's low_memory_mode
+        # does, and that would free the module's weights.
+        share_tensors = output_format == "exported_program" or (
+            output_format == "executorch" and not executorch_partitioners
+        )
+        if not retrace:
+            from torch_tensorrt.dynamo._exporter import export
+
             if arg_inputs is not None:
                 logger.warning(
-                    "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
-                )
-            if output_format == "exported_program":
-                from torch_tensorrt.dynamo._exporter import (
-                    _declare_aliased_kv_mutations_on_ep,
+                    "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
                 )
 
-                # A retraced exported_program's signature omits the engines'
-                # aliased KV mutations, so declare them here -- before
-                # normalization, which rewrites the engine constants the pass
-                # reads aliased_io from.
-                module = _declare_aliased_kv_mutations_on_ep(module)
-                _normalize_engine_constants_to_python(module)
+            # Default for retrace=False is the legacy exporter (pure graph surgery,
+            # no re-execution). Override with use_legacy_exporter if provided.
+            _use_legacy = (
+                use_legacy_exporter if use_legacy_exporter is not None else True
+            )
+            exp_program = export(
+                module,
+                arg_inputs=arg_tensors,
+                kwarg_inputs=kwarg_tensors,
+                dynamic_shapes=dynamic_shapes,
+                use_legacy_exporter=_use_legacy,
+                share_tensors=share_tensors,
+            )
+
+            from torch_tensorrt.dynamo._exporter import (
+                _declare_aliased_kv_mutations_on_ep,
+            )
+
+            # On this path the legacy exporter is what declares copy-back, except
+            # under output_format="executorch", where torch_tensorrt.executorch
+            # .export() declares it for whatever source shape it is handed. The
+            # remaining combination leaves it undeclared.
+            if (
+                not _use_legacy
+                and output_format != "executorch"
+                and module.meta.get("_copyback_mutation_buffers")
+            ):
+                logger.warning(
+                    "Module has non-KV mutable buffer(s) needing copy-back, but "
+                    "retrace=False with use_legacy_exporter=False does not declare "
+                    "them. The saved program's signature will not reflect those "
+                    "updates. Use the legacy exporter, or retrace=True."
+                )
+
+            if output_format == "exported_program":
+                # Must precede normalization, which rewrites the engine constants
+                # this pass reads aliased_io from.
+                exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
+                _normalize_engine_constants_to_python(exp_program)
                 function_overload_with_kwargs(
                     torch.export.save,
-                    module,
+                    exp_program,
                     file_path,
                     pickle_protocol=pickle_protocol,
                     extra_files=extra_files,
@@ -1227,7 +1241,7 @@ def save(
             elif output_format == "aot_inductor":
                 if any(
                     getattr(sub, "aliased_io", None)
-                    for _sub_name, sub in module.graph_module.named_modules()
+                    for _sub_name, sub in module.named_modules()
                 ):
                     logger.warning(
                         "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
@@ -1240,13 +1254,14 @@ def save(
                     inductor_configs = kwargs["inductor_configs"]
 
                 torch._inductor.aoti_compile_and_package(
-                    module,
+                    exp_program,
                     inductor_configs=inductor_configs,
                     package_path=file_path,
                 )
             elif output_format == "executorch":
+                exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
                 _save_as_executorch(
-                    module,
+                    exp_program,
                     file_path,
                     partitioners=executorch_partitioners,
                     compile_specs=executorch_compile_specs,
@@ -1264,51 +1279,29 @@ def save(
                 raise RuntimeError(
                     "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
                 )
-    elif module_type == _ModuleType.fx:
-        # The module type is torch.fx.GraphModule
-        if output_format == "torchscript":
-            module_ts = torch.jit.trace(
-                module, arg_inputs, example_kwarg_inputs=kwarg_inputs
-            )
-            function_overload_with_kwargs(
-                torch.jit.save,
-                module_ts,
-                file_path,
-                _extra_files=extra_files,
-                **kwargs,
-            )
         else:
-            # torch.export truncates the engines' aliased KV outputs at the fx
-            # boundary, so a retraced program's signature omits an update the engine
-            # performs unless the mutations are re-declared; the legacy exporter
-            # instead exposes them at transform time. The declaration pass skips
-            # buffers that already carry a spec, so every branch below can run it
-            # whichever exporter produced the program. aot_inductor is left
-            # undeclared: whether an aliased in-place mutation survives
-            # functionalization under inductor is unverified.
-            #
-            # Copy-back is gated per-branch below: the legacy exporter declares it
-            # itself and consumes the trailing values while doing so.
-            #
-            # The program is discarded once saved, so it can share the module's
-            # tensors instead of copying every weight. Not with a caller's partitioner:
-            # its backend may free what it lowers, as CudaBackend's low_memory_mode
-            # does, and that would free the module's weights.
-            share_tensors = output_format == "exported_program" or (
-                output_format == "executorch" and not executorch_partitioners
+            # When retrace=True with a TRT-compiled GraphModule that has dynamic shapes,
+            # use torch.export.export on the inlined graph to get a fully
+            # standards-compliant ExportedProgram. Override with use_legacy_exporter
+            # if provided.
+            has_symbolic_metadata = any(
+                isinstance(dim, torch.SymInt)
+                for node in module.graph.nodes
+                if node.op == "placeholder" and "val" in node.meta
+                for dim in getattr(node.meta["val"], "shape", [])
             )
-            if not retrace:
+            _use_legacy = False
+            if has_symbolic_metadata and dynamic_shapes is not None:
                 from torch_tensorrt.dynamo._exporter import export
 
                 if arg_inputs is not None:
-                    logger.warning(
-                        "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
+                    logger.info(
+                        "Provided model is a torch.fx.GraphModule with dynamic shapes and retrace is True. "
+                        "Using existing symbolic metadata instead of retracing. Input specs are not necessary."
                     )
-
-                # Default for retrace=False is the legacy exporter (pure graph surgery,
-                # no re-execution). Override with use_legacy_exporter if provided.
+                # Default for this path is the non-legacy exporter.
                 _use_legacy = (
-                    use_legacy_exporter if use_legacy_exporter is not None else True
+                    use_legacy_exporter if use_legacy_exporter is not None else False
                 )
                 exp_program = export(
                     module,
@@ -1318,211 +1311,100 @@ def save(
                     use_legacy_exporter=_use_legacy,
                     share_tensors=share_tensors,
                 )
-
-                from torch_tensorrt.dynamo._exporter import (
-                    _declare_aliased_kv_mutations_on_ep,
-                )
-
-                # On this path the legacy exporter is what declares copy-back, except
-                # under output_format="executorch", where torch_tensorrt.executorch
-                # .export() declares it for whatever source shape it is handed. The
-                # remaining combination leaves it undeclared.
-                if (
-                    not _use_legacy
-                    and output_format != "executorch"
-                    and module.meta.get("_copyback_mutation_buffers")
-                ):
-                    logger.warning(
-                        "Module has non-KV mutable buffer(s) needing copy-back, but "
-                        "retrace=False with use_legacy_exporter=False does not declare "
-                        "them. The saved program's signature will not reflect those "
-                        "updates. Use the legacy exporter, or retrace=True."
-                    )
-
-                if output_format == "exported_program":
-                    # Must precede normalization, which rewrites the engine constants
-                    # this pass reads aliased_io from.
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
-                    _normalize_engine_constants_to_python(exp_program)
-                    function_overload_with_kwargs(
-                        torch.export.save,
-                        exp_program,
-                        file_path,
-                        pickle_protocol=pickle_protocol,
-                        extra_files=extra_files,
-                        **kwargs,
-                    )
-                elif output_format == "aot_inductor":
-                    if any(
-                        getattr(sub, "aliased_io", None)
-                        for _sub_name, sub in module.named_modules()
-                    ):
-                        logger.warning(
-                            "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
-                            "but output_format='aot_inductor' does not declare those aliased "
-                            "outputs as buffer mutations. The saved program's signature will "
-                            "not reflect the in-place update."
-                        )
-                    inductor_configs = {}
-                    if "inductor_configs" in kwargs:
-                        inductor_configs = kwargs["inductor_configs"]
-
-                    torch._inductor.aoti_compile_and_package(
-                        exp_program,
-                        inductor_configs=inductor_configs,
-                        package_path=file_path,
-                    )
-                elif output_format == "executorch":
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
-                    _save_as_executorch(
-                        exp_program,
-                        file_path,
-                        partitioners=executorch_partitioners,
-                        compile_specs=executorch_compile_specs,
-                        backend_config=executorch_backend_config,
-                        constant_methods=executorch_constant_methods,
-                        transform_passes=executorch_transform_passes,
-                        compile_config=executorch_compile_config,
-                        generate_etrecord=executorch_generate_etrecord,
-                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
-                        use_cuda_graphs=use_cuda_graphs,
-                        zero_copy_kv=executorch_zero_copy_kv,
-                        external_engine_data=executorch_external_engine_data,
-                    )
-                else:
-                    raise RuntimeError(
-                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
-                    )
             else:
-                # When retrace=True with a TRT-compiled GraphModule that has dynamic shapes,
-                # use torch.export.export on the inlined graph to get a fully
-                # standards-compliant ExportedProgram. Override with use_legacy_exporter
-                # if provided.
-                has_symbolic_metadata = any(
-                    isinstance(dim, torch.SymInt)
-                    for node in module.graph.nodes
-                    if node.op == "placeholder" and "val" in node.meta
-                    for dim in getattr(node.meta["val"], "shape", [])
-                )
-                _use_legacy = False
-                if has_symbolic_metadata and dynamic_shapes is not None:
-                    from torch_tensorrt.dynamo._exporter import export
-
-                    if arg_inputs is not None:
-                        logger.info(
-                            "Provided model is a torch.fx.GraphModule with dynamic shapes and retrace is True. "
-                            "Using existing symbolic metadata instead of retracing. Input specs are not necessary."
-                        )
-                    # Default for this path is the non-legacy exporter.
-                    _use_legacy = (
-                        use_legacy_exporter
-                        if use_legacy_exporter is not None
-                        else False
-                    )
-                    exp_program = export(
-                        module,
-                        arg_inputs=arg_tensors,
-                        kwarg_inputs=kwarg_tensors,
-                        dynamic_shapes=dynamic_shapes,
-                        use_legacy_exporter=_use_legacy,
-                        share_tensors=share_tensors,
-                    )
-                else:
-                    # Regular GraphModule or no dynamic shapes - retrace normally
-                    if has_symbolic_metadata:
-                        logger.warning(
-                            "The provided module has symbolic metadata and retrace is True, however there is no dynamic shapes information available either explicitly or derived from arg/kwarg inputs (torch_tensorrt.Input) "
-                            "This may lead to incorrect tracing and overly restrictive shape guards when the exported program is loaded. Please specify the dynamic shapes either explicitly or derived from arg/kwarg inputs"
-                        )
-
-                    if (arg_inputs is None or arg_inputs == ()) and (
-                        kwarg_tensors is None or kwarg_tensors == {}
-                    ):
-                        raise ValueError(
-                            "Provided model is a torch.fx.GraphModule without existing shape metadata and retrace is True, however no inputs specs were provided. "
-                            "Please provide valid torch.Tensors or torch_tensorrt.Input objects as inputs to retrace and save the model"
-                        )
-                    exp_program = torch.export.export(
-                        module,
-                        args=tuple(arg_tensors),
-                        kwargs=kwarg_tensors,
-                        dynamic_shapes=dynamic_shapes,
-                        strict=False,
-                    )
-
-                from torch_tensorrt.dynamo._exporter import (
-                    _declare_aliased_kv_mutations_on_ep,
-                )
-
-                # create_trt_exp_program already declares the copy-back mutations and
-                # consumes their trailing outputs, so what trails the graph on that path
-                # is a genuine user output. Only the torch.export paths leave the values
-                # to be reclassified.
-                _copyback_bufs = (
-                    []
-                    if _use_legacy
-                    else module.meta.get("_copyback_mutation_buffers", [])
-                )
-
-                if output_format == "aot_inductor" and any(
-                    getattr(sub, "aliased_io", None)
-                    for _sub_name, sub in module.named_modules()
-                ):
+                # Regular GraphModule or no dynamic shapes - retrace normally
+                if has_symbolic_metadata:
                     logger.warning(
-                        "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
-                        "but output_format='aot_inductor' does not declare those aliased "
-                        "outputs as buffer mutations. The saved program's signature will "
-                        "not reflect the in-place update."
+                        "The provided module has symbolic metadata and retrace is True, however there is no dynamic shapes information available either explicitly or derived from arg/kwarg inputs (torch_tensorrt.Input) "
+                        "This may lead to incorrect tracing and overly restrictive shape guards when the exported program is loaded. Please specify the dynamic shapes either explicitly or derived from arg/kwarg inputs"
                     )
 
-                if output_format == "exported_program":
-                    # Must precede normalization, which rewrites the engine constants
-                    # this pass reads aliased_io from.
-                    exp_program = _declare_aliased_kv_mutations_on_ep(
-                        exp_program, copyback_buffers=_copyback_bufs
+                if (arg_inputs is None or arg_inputs == ()) and (
+                    kwarg_tensors is None or kwarg_tensors == {}
+                ):
+                    raise ValueError(
+                        "Provided model is a torch.fx.GraphModule without existing shape metadata and retrace is True, however no inputs specs were provided. "
+                        "Please provide valid torch.Tensors or torch_tensorrt.Input objects as inputs to retrace and save the model"
                     )
-                    _normalize_engine_constants_to_python(exp_program)
-                    function_overload_with_kwargs(
-                        torch.export.save,
-                        exp_program,
-                        file_path,
-                        pickle_protocol=pickle_protocol,
-                        extra_files=extra_files,
-                        **kwargs,
-                    )
-                elif output_format == "aot_inductor":
-                    inductor_configs = {}
-                    if "inductor_configs" in kwargs:
-                        inductor_configs = kwargs["inductor_configs"]
+                exp_program = torch.export.export(
+                    module,
+                    args=tuple(arg_tensors),
+                    kwargs=kwarg_tensors,
+                    dynamic_shapes=dynamic_shapes,
+                    strict=False,
+                )
 
-                    torch._inductor.aoti_compile_and_package(
-                        exp_program,
-                        inductor_configs=inductor_configs,
-                        package_path=file_path,
-                    )
-                elif output_format == "executorch":
-                    exp_program = _declare_aliased_kv_mutations_on_ep(
-                        exp_program, copyback_buffers=_copyback_bufs
-                    )
-                    _save_as_executorch(
-                        exp_program,
-                        file_path,
-                        partitioners=executorch_partitioners,
-                        compile_specs=executorch_compile_specs,
-                        backend_config=executorch_backend_config,
-                        constant_methods=executorch_constant_methods,
-                        transform_passes=executorch_transform_passes,
-                        compile_config=executorch_compile_config,
-                        generate_etrecord=executorch_generate_etrecord,
-                        weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
-                        use_cuda_graphs=use_cuda_graphs,
-                        zero_copy_kv=executorch_zero_copy_kv,
-                        external_engine_data=executorch_external_engine_data,
-                    )
-                else:
-                    raise RuntimeError(
-                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
-                    )
+            from torch_tensorrt.dynamo._exporter import (
+                _declare_aliased_kv_mutations_on_ep,
+            )
+
+            # create_trt_exp_program already declares the copy-back mutations and
+            # consumes their trailing outputs, so what trails the graph on that path
+            # is a genuine user output. Only the torch.export paths leave the values
+            # to be reclassified.
+            _copyback_bufs = (
+                [] if _use_legacy else module.meta.get("_copyback_mutation_buffers", [])
+            )
+
+            if output_format == "aot_inductor" and any(
+                getattr(sub, "aliased_io", None)
+                for _sub_name, sub in module.named_modules()
+            ):
+                logger.warning(
+                    "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
+                    "but output_format='aot_inductor' does not declare those aliased "
+                    "outputs as buffer mutations. The saved program's signature will "
+                    "not reflect the in-place update."
+                )
+
+            if output_format == "exported_program":
+                # Must precede normalization, which rewrites the engine constants
+                # this pass reads aliased_io from.
+                exp_program = _declare_aliased_kv_mutations_on_ep(
+                    exp_program, copyback_buffers=_copyback_bufs
+                )
+                _normalize_engine_constants_to_python(exp_program)
+                function_overload_with_kwargs(
+                    torch.export.save,
+                    exp_program,
+                    file_path,
+                    pickle_protocol=pickle_protocol,
+                    extra_files=extra_files,
+                    **kwargs,
+                )
+            elif output_format == "aot_inductor":
+                inductor_configs = {}
+                if "inductor_configs" in kwargs:
+                    inductor_configs = kwargs["inductor_configs"]
+
+                torch._inductor.aoti_compile_and_package(
+                    exp_program,
+                    inductor_configs=inductor_configs,
+                    package_path=file_path,
+                )
+            elif output_format == "executorch":
+                exp_program = _declare_aliased_kv_mutations_on_ep(
+                    exp_program, copyback_buffers=_copyback_bufs
+                )
+                _save_as_executorch(
+                    exp_program,
+                    file_path,
+                    partitioners=executorch_partitioners,
+                    compile_specs=executorch_compile_specs,
+                    backend_config=executorch_backend_config,
+                    constant_methods=executorch_constant_methods,
+                    transform_passes=executorch_transform_passes,
+                    compile_config=executorch_compile_config,
+                    generate_etrecord=executorch_generate_etrecord,
+                    weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                    use_cuda_graphs=use_cuda_graphs,
+                    zero_copy_kv=executorch_zero_copy_kv,
+                    external_engine_data=executorch_external_engine_data,
+                )
+            else:
+                raise RuntimeError(
+                    "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                )
 
 
 def compile_and_save(

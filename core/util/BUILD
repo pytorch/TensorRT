@@ -93,28 +93,10 @@ cc_library(
     deps = [
         ":build_info",
         ":exception",
-        ":jit_util",
         ":macros",
         ":trt_util",
         "//core/util/logging",
     ],
-)
-
-cc_library(
-    name = "jit_util",
-    hdrs = [
-        "jit_util.h",
-    ],
-    deps = [
-        ":macros",
-    ] + select({
-        ":jetpack": ["@torch_l4t//:libtorch"],
-        ":rtx_win_arm64": ["@libtorch_win_arm64//:libtorch"],
-        ":rtx_win_x86_64": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
-        ":windows": ["@libtorch_win//:libtorch"],
-        "//conditions:default": ["@libtorch"],
-    }),
 )
 
 cc_library(
@@ -190,7 +172,6 @@ filegroup(
     srcs = [
         "Exception.h",
         "build_info.h",
-        "jit_util.h",
         "macros.h",
         "prelude.h",
         "trt_util.h",

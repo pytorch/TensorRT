@@ -89,29 +89,6 @@ config_setting(
 )
 
 cc_library(
-    name = "torch_tensorrt",
-    srcs = [
-        "src/compile_spec.cpp",
-        "src/logging.cpp",
-        "src/torch_tensorrt.cpp",
-        "src/types.cpp",
-    ],
-    hdrs = [
-        "include/torch_tensorrt/logging.h",
-        "include/torch_tensorrt/macros.h",
-        "include/torch_tensorrt/torch_tensorrt.h",
-    ],
-    linkstatic = True,
-    strip_include_prefix = "include/",
-    deps = [
-        "//core",
-        "//core/ir",
-        "//core/util:prelude",
-    ],
-    alwayslink = True,
-)
-
-cc_library(
     name = "tensorrt_executorch_blob_header",
     srcs = [
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
@@ -463,16 +440,6 @@ filegroup(
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
     ],
-)
-
-filegroup(
-    name = "api_headers",
-    srcs = glob(
-        ["include/**/*.h"],
-        exclude = [
-            "include/torch_tensorrt/executorch/**/*.h",
-        ],
-    ),
 )
 
 filegroup(

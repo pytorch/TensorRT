@@ -257,30 +257,6 @@ class dtype(Enum):
         elif isinstance(t, dtype):
             return t
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if isinstance(t, _C.dtype):
-                if t == _C.dtype.long:
-                    return dtype.i64
-                elif t == _C.dtype.int32:
-                    return dtype.i32
-                elif t == _C.dtype.int8:
-                    return dtype.i8
-                elif t == _C.dtype.half:
-                    return dtype.f16
-                elif t == _C.dtype.float:
-                    return dtype.f32
-                elif t == _C.dtype.double:
-                    return dtype.f64
-                elif t == _C.dtype.bool:
-                    return dtype.b
-                elif t == _C.dtype.unknown:
-                    return dtype.unknown
-                else:
-                    raise TypeError(
-                        f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {t}"
-                    )
         # else: # commented out for mypy
         raise TypeError(
             f"Provided unsupported source type for dtype conversion (got: {t})"
@@ -451,30 +427,6 @@ class dtype(Enum):
         elif t == dtype:
             return self
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if t == _C.dtype:
-                if self == dtype.i64:
-                    return _C.dtype.long
-                elif self == dtype.i8:
-                    return _C.dtype.int8
-                elif self == dtype.i32:
-                    return _C.dtype.int32
-                elif self == dtype.f16:
-                    return _C.dtype.half
-                elif self == dtype.f32:
-                    return _C.dtype.float
-                elif self == dtype.f64:
-                    return _C.dtype.double
-                elif self == dtype.b:
-                    return _C.dtype.bool
-                elif self == dtype.unknown:
-                    return _C.dtype.unknown
-                else:
-                    raise TypeError(
-                        f"Provided an unsupported data type as an input data type (support: bool, int32, long, half, float), got: {self}"
-                    )
         # else: # commented out for mypy
         raise TypeError(
             f"Provided unsupported destination type for dtype conversion {t}"
@@ -738,18 +690,6 @@ class memory_format(Enum):
         elif isinstance(f, memory_format):
             return f
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if isinstance(f, _C.TensorFormat):
-                if f == _C.TensorFormat.contiguous:
-                    return memory_format.contiguous
-                elif f == _C.TensorFormat.channels_last:
-                    return memory_format.channels_last
-                else:
-                    raise ValueError(
-                        "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
-                    )
         # else: # commented out for mypy
         raise TypeError("Provided unsupported source type for memory_format conversion")
 
@@ -861,18 +801,6 @@ class memory_format(Enum):
         elif t == memory_format:
             return self
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if t == _C.TensorFormat:
-                if self == memory_format.contiguous:
-                    return _C.TensorFormat.contiguous
-                elif self == memory_format.channels_last:
-                    return _C.TensorFormat.channels_last
-                else:
-                    raise ValueError(
-                        "Provided an unsupported tensor format (support: NCHW/contiguous_format, NHWC/channel_last)"
-                    )
         # else: # commented out for mypy
         raise TypeError(
             "Provided unsupported destination type for memory format conversion"
@@ -986,18 +914,6 @@ class DeviceType(Enum):
         elif isinstance(d, DeviceType):
             return d
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if isinstance(d, _C.DeviceType):
-                if d == _C.DeviceType.GPU:
-                    return DeviceType.GPU
-                elif d == _C.DeviceType.DLA:
-                    return DeviceType.DLA
-                else:
-                    raise ValueError(
-                        "Provided an unsupported device type (support: GPU/DLA)"
-                    )
         # else: # commented out for mypy
         raise TypeError("Provided unsupported source type for DeviceType conversion")
 
@@ -1079,18 +995,6 @@ class DeviceType(Enum):
         elif t == DeviceType:
             return self
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if t == _C.DeviceType:
-                if self == DeviceType.GPU:
-                    return _C.DeviceType.GPU
-                elif self == DeviceType.DLA:
-                    return _C.DeviceType.DLA
-                else:
-                    raise ValueError(
-                        "Provided an unsupported device type (support: GPU/DLA)"
-                    )
         # else: # commented out for mypy
         raise TypeError(
             "Provided unsupported destination type for device type conversion"
@@ -1204,18 +1108,6 @@ class EngineCapability(Enum):
         elif isinstance(c, EngineCapability):
             return c
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if isinstance(c, _C.EngineCapability):
-                if c == _C.EngineCapability.STANDARD:
-                    return EngineCapability.STANDARD
-                elif c == _C.EngineCapability.SAFETY:
-                    return EngineCapability.SAFETY
-                elif c == _C.EngineCapability.DLA_STANDALONE:
-                    return EngineCapability.DLA_STANDALONE
-                else:
-                    raise ValueError("Provided an unsupported engine capability")
         # else: # commented out for mypy
         raise TypeError(
             "Provided unsupported source type for EngineCapability conversion"
@@ -1296,18 +1188,6 @@ class EngineCapability(Enum):
         elif t == EngineCapability:
             return self
 
-        elif ENABLED_FEATURES.torchscript_frontend:
-            from torch_tensorrt import _C
-
-            if t == _C.EngineCapability:
-                if self == EngineCapability.STANDARD:
-                    return _C.EngineCapability.STANDARD
-                elif self == EngineCapability.SAFETY:
-                    return _C.EngineCapability.SAFETY
-                elif self == EngineCapability.DLA_STANDALONE:
-                    return _C.EngineCapability.DLA_STANDALONE
-                else:
-                    raise ValueError("Provided an unsupported engine capability")
         # else: # commented out for mypy
         raise TypeError(
             "Provided unsupported destination type for engine capability type conversion"

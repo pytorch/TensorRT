@@ -179,24 +179,3 @@ regular_model_output = model(*inputs)
 torch.testing.assert_close(
     reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2
 )
-
-print("torch.jit.trace FX split and lowered module")
-# Convert model to torchscript
-ts_trt_mod = torch.jit.trace(reload_trt_mod, inputs)
-ts_model_output = ts_trt_mod(*inputs)
-
-# Make sure the results match
-regular_model_output = model(*inputs)
-torch.testing.assert_close(ts_model_output, regular_model_output, atol=3e-3, rtol=1e-2)
-
-print("Saving torchscript version of module")
-ts_trt_mod.save("trt_ts.ts")
-print("Loading torchscript version of module")
-reload_ts_trt_mod = torch.jit.load("trt_ts.ts")
-reload_ts_model_output = reload_ts_trt_mod(*inputs)
-
-# Make sure the results match
-regular_model_output = model(*inputs)
-torch.testing.assert_close(
-    reload_ts_model_output, regular_model_output, atol=3e-3, rtol=1e-2
-)

@@ -1,2 +1,0 @@
-timm==0.9.12
-transformers>=5.14.1

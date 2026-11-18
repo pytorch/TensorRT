@@ -12,7 +12,6 @@ set(CXX_SRCS
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/Exception.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/build_info.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/jit_util.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/macros.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/prelude.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/trt_util.h"

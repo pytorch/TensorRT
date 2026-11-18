@@ -138,8 +138,6 @@ def build_pytest_args(suite: Suite, variant: Variant) -> list[str]:
 def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     """(argv, cwd) pairs for a named setup step."""
     launcher = _launcher()
-    if step == "hub":
-        return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
         # ExecuTorch publishes CUDA builds only on the nightly channel matching the row's CUDA,
         # so a CUDA 13 row installs from its own channel. Any other row gets no index, which
