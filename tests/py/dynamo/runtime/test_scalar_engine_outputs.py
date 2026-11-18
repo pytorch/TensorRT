@@ -28,6 +28,14 @@ class UnitTensorSecondOutput(torch.nn.Module):
         return y.sum(), y[:1]
 
 
+class RankZeroTensorFromSymIntSecondOutput(torch.nn.Module):
+    """Returns a rank-0 tensor computed from a symbolic int (shape [1] in TensorRT)."""
+
+    def forward(self, x):
+        y = x * 2.0
+        return y, y.sum() + y.shape[0]
+
+
 @unittest.skipIf(
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "Torch-TensorRT runtime is not available",
@@ -102,6 +110,16 @@ class TestScalarEngineOutputs(TestCase):
 
         self.assertEqual(meta, real)
         self.assertEqual(real[1], (1,))
+
+    def test_rank_zero_tensor_from_symint_is_bound_at_rank_zero(self):
+        engine_module = self._compile_to_single_engine(
+            RankZeroTensorFromSymIntSecondOutput()
+        )
+
+        meta, real = self._meta_and_real_output_shapes(engine_module)
+
+        self.assertEqual(meta, real)
+        self.assertEqual(real[1], ())
 
 
 if __name__ == "__main__":
