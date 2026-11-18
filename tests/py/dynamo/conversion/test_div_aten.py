@@ -55,7 +55,7 @@ class TestDivConverter(DispatchTestCase):
             ("3d", (2, 1, 2), 2.0),
         ]
     )
-    def test_div_tensor(self, _, shape, scalar):
+    def test_div_tensor_scalar(self, _, shape, scalar):
         class div(nn.Module):
             def forward(self, lhs_val):
                 return torch.ops.aten.div.Tensor(lhs_val, scalar)
@@ -113,7 +113,7 @@ class TestDivConverter(DispatchTestCase):
             ("3d", (2, 3, 2), -3.0, "floor"),
         ]
     )
-    def test_div_tensor_rounding_mode(self, _, shape, scalar, rounding_mode):
+    def test_div_tensor_scalar_rounding_mode(self, _, shape, scalar, rounding_mode):
         class div(nn.Module):
             def forward(self, lhs_val):
                 return torch.ops.aten.div.Tensor_mode(
