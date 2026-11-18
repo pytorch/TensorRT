@@ -385,3 +385,32 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_dynamic_with_fallback_shape_tensor_pass_through model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+
+@pytest.mark.unit
+def test_dynamic_fallback_derived_dim_min_1():
+    """
+    An engine input sized 2*s (a cat run in PyTorch) accepts s = 1: export
+    traces Dim(min=1) with s >= 2, which must not raise that engine's min to 4
+    """
+
+    class MyModule(torch.nn.Module):
+        def forward(self, x):
+            return torch.cat([x, x]) + 1
+
+    model = MyModule().eval().cuda()
+    ep = torch.export.export(
+        model,
+        (torch.randn(4, 8, device="cuda"),),
+        dynamic_shapes=({0: torch.export.Dim("s", min=1, max=8)},),
+    )
+    trt_model = torchtrt.dynamo.compile(
+        ep,
+        inputs=[torchtrt.Input(min_shape=(1, 8), opt_shape=(4, 8), max_shape=(8, 8))],
+        min_block_size=1,
+        torch_executed_ops={"torch.ops.aten.cat.default"},
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+    x = torch.randn(1, 8, device="cuda")
+    torch.testing.assert_close(trt_model(x), model(x))
