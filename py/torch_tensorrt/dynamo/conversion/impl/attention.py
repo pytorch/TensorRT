@@ -72,6 +72,70 @@ def _normalize_attention_mask_rank(
     return mask
 
 
+def _pad_odd_key_length(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    mask: TRTTensor,
+) -> Tuple[TRTTensor, TRTTensor, TRTTensor]:
+    """Pad an odd key length by one key that the mask blocks.
+
+    TensorRT's fused attention kernel with a mask is 1.5 to 3 times slower when the key length
+    is odd (https://github.com/pytorch/TensorRT/issues/5009). One extra key that the mask blocks
+    selects the fast kernel and keeps the result: its softmax weight is zero. The extra key and
+    value are a copy of the first ones, so they are finite and add nothing to the output.
+
+    Only a static odd key length is padded, with a mask that is not broadcast along the keys.
+    A single query uses a different kernel that has no slowdown, so it is not padded. Neither is
+    float32, which has no slowdown either: there the extra key made attention 1.35 times slower.
+    """
+    kv_len = key.shape[-2]
+    if (
+        key.dtype not in (trt.DataType.HALF, trt.DataType.BF16)
+        or kv_len < 0
+        or kv_len % 2 == 0
+        or value.shape[-2] != kv_len
+        or mask.shape[-1] != kv_len
+        or query.shape[-2] == 1
+    ):
+        return key, value, mask
+
+    def append_first(tensor: TRTTensor, dim: int, suffix: str) -> TRTTensor:
+        first = impl.slice.slice_op(
+            ctx, target, source_ir, f"{name}_{suffix}_first", tensor, dim, 0, 1, 1
+        )
+        return impl.cat.cat(
+            ctx, target, source_ir, f"{name}_{suffix}_pad", [tensor, first], dim
+        )
+
+    key = append_first(key, len(key.shape) - 2, "key")
+    value = append_first(value, len(value.shape) - 2, "value")
+
+    mask_rank = len(mask.shape)
+    mask_col = impl.slice.slice_op(
+        ctx, target, source_ir, f"{name}_mask_first", mask, mask_rank - 1, 0, 1, 1
+    )
+    if mask.dtype == trt.DataType.BOOL:
+        blocked = impl.elementwise.logical_and(
+            ctx, target, source_ir, f"{name}_mask_pad_block", mask_col, False
+        )
+    else:
+        neg_inf = get_trt_tensor(
+            ctx, float("-inf"), f"{name}_mask_pad_neg_inf", mask.dtype
+        )
+        blocked = impl.elementwise.min(
+            ctx, target, source_ir, f"{name}_mask_pad_block", mask_col, neg_inf
+        )
+    mask = impl.cat.cat(
+        ctx, target, source_ir, f"{name}_mask_pad", [mask, blocked], mask_rank - 1
+    )
+    return key, value, mask
+
+
 def _restore_static_query_heads(
     ctx: ConversionContext,
     target: Target,
@@ -348,6 +412,29 @@ def scaled_dot_product_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
 
+    mask = None
+    if not is_causal and attn_mask is not None:
+        attn_mask = get_trt_tensor(ctx, attn_mask, f"{name}_attn_mask")
+        if attn_mask.dtype == trt.DataType.BOOL:
+            mask = attn_mask
+        elif attn_mask.dtype != query.dtype:
+            mask = cast_trt_tensor(
+                ctx,
+                attn_mask,
+                query.dtype,
+                f"{name}_cast_attn_mask",
+                target,
+                source_ir,
+            )
+        else:
+            mask = attn_mask
+        mask = _normalize_attention_mask_rank(
+            ctx, mask, query, f"{name}_normalize_attn_mask"
+        )
+        key, value, mask = _pad_odd_key_length(
+            ctx, target, source_ir, f"{name}_odd_kv", query, key, value, mask
+        )
+
     attention_layer = ctx.net.add_attention_v2(
         scaled_query,
         key,
@@ -359,26 +446,8 @@ def scaled_dot_product_attention(
 
     if is_causal:
         attention_layer.causal_kind = _causal_mask_kind(ctx, target, query, key)
-    else:
-        if attn_mask is not None:
-            attn_mask = get_trt_tensor(ctx, attn_mask, f"{name}_attn_mask")
-            if attn_mask.dtype == trt.DataType.BOOL:
-                mask = attn_mask
-            elif attn_mask.dtype != query.dtype:
-                mask = cast_trt_tensor(
-                    ctx,
-                    attn_mask,
-                    query.dtype,
-                    f"{name}_cast_attn_mask",
-                    target,
-                    source_ir,
-                )
-            else:
-                mask = attn_mask
-            mask = _normalize_attention_mask_rank(
-                ctx, mask, query, f"{name}_normalize_attn_mask"
-            )
-            attention_layer.mask = mask
+    elif mask is not None:
+        attention_layer.mask = mask
 
     fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
     attention_layer.decomposable = not fp8_norm
@@ -478,6 +547,66 @@ def scaled_dot_product_efficient_attention(
             ctx, target, source_ir, f"{name}_scaled_query", query, scale
         )
 
+    mask = None
+    if is_causal and attn_bias is not None:
+        attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+
+        L = impl.shape.shape(ctx, target, source_ir, f"{name}_L", query, -2)
+        S = impl.shape.shape(ctx, target, source_ir, f"{name}_S", key, -2)
+        mask = tril(ctx, target, source_ir, f"{name}_tril", L, S)
+        # TODO: Whether explicitly prepend 1s to the mask shape is more performant or not?
+        # diff = len(query.shape) - len(mask.shape)
+        # if diff > 0:
+        #     mask = prepend_ones(ctx, mask, f"{name}_prepend_ones", diff)
+
+        # Convert causal bool mask to additive bias mask: True -> 0.0 (keep), False -> -inf (block)
+        zero_bias = get_trt_tensor(
+            ctx, 0.0, f"{name}_causal_additive_bias_zero", query.dtype
+        )
+        neg_inf_bias = get_trt_tensor(
+            ctx, float("-inf"), f"{name}_causal_additive_bias_neg_inf", query.dtype
+        )
+        additive_causal_mask = impl.condition.where(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_additive_causal_mask",
+            zero_bias,
+            neg_inf_bias,
+            mask,
+        )
+        mask = impl.elementwise.add(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_attn_bias_add_causal_mask",
+            attn_bias,
+            additive_causal_mask,
+        )
+    elif not is_causal and attn_bias is not None:
+        attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
+        if attn_bias.dtype == trt.DataType.BOOL:
+            mask = attn_bias
+        elif attn_bias.dtype != query.dtype:
+            mask = cast_trt_tensor(
+                ctx,
+                attn_bias,
+                query.dtype,
+                f"{name}_cast_attn_bias",
+                target,
+                source_ir,
+            )
+        else:
+            mask = attn_bias
+        mask = _normalize_attention_mask_rank(
+            ctx, mask, query, f"{name}_normalize_attn_bias"
+        )
+
+    if mask is not None:
+        key, value, mask = _pad_odd_key_length(
+            ctx, target, source_ir, f"{name}_odd_kv", query, key, value, mask
+        )
+
     attention_layer = ctx.net.add_attention_v2(
         scaled_query,
         key,
@@ -487,67 +616,10 @@ def scaled_dot_product_efficient_attention(
     )
     assert attention_layer is not None, "attention layer is None"
 
-    if is_causal:
-        if attn_bias is not None:
-            # TRT's IAttention layer does not support passing in both attn_bias/mask and causal mask at the same time,
-            # so we convert causal mask to an additive causal mask and add it to the attn_bias
-            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
-
-            L = impl.shape.shape(ctx, target, source_ir, f"{name}_L", query, -2)
-            S = impl.shape.shape(ctx, target, source_ir, f"{name}_S", key, -2)
-            mask = tril(ctx, target, source_ir, f"{name}_tril", L, S)
-            # TODO: Whether explicitly prepend 1s to the mask shape is more performant or not?
-            # diff = len(query.shape) - len(mask.shape)
-            # if diff > 0:
-            #     mask = prepend_ones(ctx, mask, f"{name}_prepend_ones", diff)
-
-            # Convert causal bool mask to additive bias mask: True -> 0.0 (keep), False -> -inf (block)
-            zero_bias = get_trt_tensor(
-                ctx, 0.0, f"{name}_causal_additive_bias_zero", query.dtype
-            )
-            neg_inf_bias = get_trt_tensor(
-                ctx, float("-inf"), f"{name}_causal_additive_bias_neg_inf", query.dtype
-            )
-            additive_causal_mask = impl.condition.where(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_additive_causal_mask",
-                zero_bias,
-                neg_inf_bias,
-                mask,
-            )
-            mask = impl.elementwise.add(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_attn_bias_add_causal_mask",
-                attn_bias,
-                additive_causal_mask,
-            )
-            attention_layer.mask = mask
-        else:
-            attention_layer.causal_kind = _causal_mask_kind(ctx, target, query, key)
-    else:
-        if attn_bias is not None:
-            attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
-            if attn_bias.dtype == trt.DataType.BOOL:
-                mask = attn_bias
-            elif attn_bias.dtype != query.dtype:
-                mask = cast_trt_tensor(
-                    ctx,
-                    attn_bias,
-                    query.dtype,
-                    f"{name}_cast_attn_bias",
-                    target,
-                    source_ir,
-                )
-            else:
-                mask = attn_bias
-            mask = _normalize_attention_mask_rank(
-                ctx, mask, query, f"{name}_normalize_attn_bias"
-            )
-            attention_layer.mask = mask
+    if mask is not None:
+        attention_layer.mask = mask
+    elif is_causal:
+        attention_layer.causal_kind = _causal_mask_kind(ctx, target, query, key)
 
     fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
     attention_layer.decomposable = not fp8_norm
