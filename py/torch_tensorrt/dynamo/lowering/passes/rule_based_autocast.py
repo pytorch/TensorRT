@@ -242,7 +242,7 @@ def rule_based_autocast(
                     # copy the meta of the original tensor to the casted tensor
                     cast.meta.update(arg.meta)
                     # update the dtype of the casted tensor
-                    cast.meta["val"] = cast.meta["val"].to(dtype)
+                    cast.meta["val"] = _retype_tensors(cast.meta["val"], dtype)
                     return cast
         elif isinstance(arg, (tuple, list)):
             return type(arg)(

@@ -61,8 +61,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
 from torch_tensorrt.dynamo.lowering import (
-    filter_decomposition_table,
-    get_decompositions,
     post_lowering,
     pre_export_lowering,
     remove_alias_from_exported_program,
@@ -75,6 +73,9 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
+)
+from torch_tensorrt.dynamo.lowering._export_with_decomps import (
+    maybe_run_decompositions,
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     reset_folded_constructors,
@@ -455,16 +456,13 @@ def cross_compile_for_windows(
     logger.info("Compilation Settings: %s\n", settings)
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        filter_decomposition_table(
-            get_decompositions(
-                enable_experimental_decompositions,
-                decompose_attention,
-                use_distributed_mode_trace,
-                use_fp32_acc=use_fp32_acc,
-            ),
-            exported_program.graph_module,
-        )
+    exported_program = maybe_run_decompositions(
+        exported_program,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
+        enable_autocast=settings.enable_autocast,
     )
     exported_program = remove_alias_from_exported_program(exported_program)
 
@@ -955,16 +953,13 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        filter_decomposition_table(
-            get_decompositions(
-                enable_experimental_decompositions,
-                decompose_attention,
-                use_distributed_mode_trace,
-                use_fp32_acc=use_fp32_acc,
-            ),
-            exported_program.graph_module,
-        )
+    exported_program = maybe_run_decompositions(
+        exported_program,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
+        enable_autocast=enable_autocast,
     )
     exported_program = remove_alias_from_exported_program(exported_program)
 
@@ -2561,16 +2556,13 @@ def convert_exported_program_to_serialized_trt_engine(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        filter_decomposition_table(
-            get_decompositions(
-                enable_experimental_decompositions,
-                decompose_attention,
-                use_distributed_mode_trace,
-                use_fp32_acc=use_fp32_acc,
-            ),
-            exported_program.graph_module,
-        )
+    exported_program = maybe_run_decompositions(
+        exported_program,
+        enable_experimental_decompositions=enable_experimental_decompositions,
+        decompose_attention=decompose_attention,
+        use_distributed_mode_trace=use_distributed_mode_trace,
+        use_fp32_acc=use_fp32_acc,
+        enable_autocast=settings.enable_autocast,
     )
     exported_program = remove_alias_from_exported_program(exported_program)
 
