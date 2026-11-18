@@ -78,7 +78,7 @@ def grouped_mm(
     name: str,
     mat1: trt.ITensor,
     mat2: trt.ITensor,
-    offs: trt.ITensor,
+    offs: Union[trt.ITensor, torch.Tensor, np.ndarray],
     out_dtype: Optional[Union[torch.dtype, trt.DataType]] = None,
 ) -> trt.ITensor:
     num_rows = int(mat1.shape[0])
@@ -90,6 +90,8 @@ def grouped_mm(
     rows = get_trt_tensor(
         ctx, np.arange(num_rows, dtype=np.int32).reshape(num_rows, 1), f"{name}_rows"
     )
+    # Fixed group sizes, such as a buffer, reach the converter as a constant tensor.
+    offs = get_trt_tensor(ctx, offs, f"{name}_offs")
     offs_i32 = cast_trt_tensor(
         ctx, offs, torch.int32, f"{name}_offs_i32", target, source_ir
     )
