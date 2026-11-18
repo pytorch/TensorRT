@@ -51,6 +51,12 @@
 // Full TRT NCCL collectives support requires both:
 // 1. PyTorch built with NCCL (USE_C10D_NCCL defined via Bazel)
 // 2. A TensorRT exposing the native collectives API (TRT_HAS_NATIVE_NCCL above)
+//
+// These macros and TORCHTRT_HAS_IRUNTIME_CONFIG() may gate code, but not data
+// members. Code built outside Bazel does not get Bazel's defines, such as
+// USE_C10D_NCCL: torch_tensorrt._C, built by setuptools, allocates TRTEngine
+// objects that libtorchtrt's constructor initializes, so both must see the same
+// layout.
 #if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
 #define ENABLE_TRT_NCCL_COLLECTIVES 1
 #endif
@@ -402,7 +408,6 @@ struct TRTEngine : torch::CustomClassHolder {
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   const bool _native_nccl_support = true; // Support value that is mostly here to back the torchbind hooks
-  bool nccl_initialized = false; // guards lazy one-shot NCCL setup in execute_engine
 
   // Resolve ProcessGroup via group_name, fetch the NCCL comm from PyTorch,
   // and bind it to exec_ctx.  Returns true on success.  Returns false (without
@@ -419,6 +424,10 @@ struct TRTEngine : torch::CustomClassHolder {
 #else
   const bool _native_nccl_support = false;
 #endif
+  // Declared in every build, so that the layout does not depend on
+  // ENABLE_TRT_NCCL_COLLECTIVES (see the note above its definition). Only used
+  // when it is defined.
+  bool nccl_initialized = false; // guards lazy one-shot NCCL setup in execute_engine
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
