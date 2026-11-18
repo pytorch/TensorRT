@@ -49,7 +49,6 @@ def test_windows_export_and_execute(tmp_path):
         ir="dynamo",
         inputs=[example],
         min_block_size=1,
-        enabled_precisions={torch.float32},
     )
     path = tmp_path / "windows.pte"
     torch_tensorrt.save(

@@ -28,7 +28,6 @@ def _compile_conv(strategy):
         model,
         ir="dynamo",
         inputs=inputs,
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
     torch._dynamo.reset()
@@ -56,7 +55,6 @@ def _compile_simple(*, runtime_settings=None):
         model,
         ir="dynamo",
         inputs=inputs,
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
     torch._dynamo.reset()

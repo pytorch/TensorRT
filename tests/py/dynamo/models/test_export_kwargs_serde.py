@@ -36,8 +36,7 @@ def _no_fallback_gemm_dtype() -> torch.dtype:
     These tests are about kwarg plumbing, not about FP32, so follow the capability
     rather than switching them off: the guard keys on operand dtype only and Turing has
     FP16 GEMM hardware. Keyed off the same predicate the validator uses so the two
-    cannot drift, and no ``enabled_precisions`` change is needed because the network is
-    strongly typed.
+    cannot drift; the strongly typed network's dtype controls compilation.
     """
     return torch.float16 if trt_rtx_targets_turing() else torch.float32
 

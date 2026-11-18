@@ -751,7 +751,6 @@ def test_model_with_none_output(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,

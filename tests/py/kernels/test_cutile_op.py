@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import pytest
 import tensorrt as trt
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 
@@ -320,7 +319,6 @@ def test_cutile_selected_compiler_version(monkeypatch):
 
 def test_driver_verification_fails_closed(monkeypatch):
     from cuda.bindings import driver as cuda
-
     from torch_tensorrt.kernels import _common, _cutile
 
     monkeypatch.setattr(
@@ -1023,7 +1021,7 @@ class TestCuTileOpIntegration:
         op = "ttk_test::cutile_fp32_to_fp16"
         _register_cast(op)
         x = torch.randn(4, 256, device="cuda", dtype=torch.float32)
-        trt = compile_op(op, [x], enabled_precisions={torch.float32, torch.float16})
+        trt = compile_op(op, [x])
         assert_ran_in_engine(trt, op)
         with torch.no_grad():
             output = trt(x)
@@ -1066,7 +1064,7 @@ class TestCuTileOpIntegration:
             torch.ops.ttk_test.cutile_add_one_dtype(eager_input), eager_input + 1
         )
         x = torch.randn(4, 256, device="cuda", dtype=torch.float16)
-        trt = compile_op(op, [x], enabled_precisions={torch.float16})
+        trt = compile_op(op, [x])
         # The mirror of assert_ran_in_engine: declined, so still in the graph.
         assert any(
             node.op == "call_function" and "cutile_add_one_dtype" in str(node.target)

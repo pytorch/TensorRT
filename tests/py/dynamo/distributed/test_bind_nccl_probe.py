@@ -147,10 +147,8 @@ def _compile_and_save(model, inp, save_path):
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=[inp],
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
-        enabled_precisions={torch.float32},
     )
     torch_tensorrt.save(trt_model, save_path, retrace=False)
     dist.barrier()
@@ -316,7 +314,6 @@ def _bind_auto_resolved_single_group(rank, world_size, device):
         backend="torch_tensorrt",
         dynamic=False,
         options={
-            "use_python_runtime": False,
             "min_block_size": 1,
             "use_distributed_mode_trace": True,
         },
@@ -351,7 +348,6 @@ def _bind_explicit_pin_world_group(rank, world_size, device):
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "use_python_runtime": False,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
             },
@@ -391,7 +387,6 @@ def _bind_explicit_pin_subgroup(rank, world_size, device):
             backend="torch_tensorrt",
             dynamic=False,
             options={
-                "use_python_runtime": False,
                 "min_block_size": 1,
                 "use_distributed_mode_trace": True,
             },

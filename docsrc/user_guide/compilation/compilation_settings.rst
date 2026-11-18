@@ -305,11 +305,9 @@ Hardware Compatibility
      - ``STANDARD``
      - Restrict kernel selection to safe GPU kernels (``SAFETY``) or safe DLA kernels
        (``DLA_STANDALONE``). Use ``STANDARD`` for normal inference workloads.
-   * - ``enable_cross_compile_for_windows``
-     - ``False``
-     - Build engines on Linux that are deployable on Windows (x86-64). Disables Python
-       runtime, lazy engine init, and engine caching. See
-       :func:`torch_tensorrt.dynamo.cross_compile_for_windows`.
+
+To build Windows-deployable engines on Linux, use the dedicated
+:func:`torch_tensorrt.dynamo.cross_compile_for_windows` API.
 
 ----
 
@@ -467,9 +465,9 @@ Compilation Workflow
      - Defer TRT engine deserialization until all engines have been built.
        Works around resource contraints and builder overhad but engines
        may be less well tuned to their deployment resource availability
-   * - ``debug``
-     - ``False``
-     - Enable verbose TRT builder logs at ``DEBUG`` level.
+
+Use the :class:`~torch_tensorrt.dynamo.Debugger` context manager for verbose
+compilation logs and graph captures.
 
 ----
 
@@ -553,5 +551,5 @@ rebuilt from scratch:
 ``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
-Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
+Settings not in this list (e.g., ``dryrun`` and ``pass_through_build_failures``)
 can be changed without invalidating the cache.

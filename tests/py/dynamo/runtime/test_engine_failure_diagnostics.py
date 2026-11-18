@@ -27,7 +27,6 @@ class TestEngineFailureDiagnostics(TestCase):
             inputs=(torch.randn(INPUT_SHAPE, device="cuda"),),
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=False,
         )
         engines = [
             module

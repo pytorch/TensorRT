@@ -10,7 +10,6 @@ from types import SimpleNamespace
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels import _common, _cutedsl
@@ -395,7 +394,7 @@ def test_dynamic_multi_output_engine_and_standalone_serialization(
         )
         for _ in range(2)
     ]
-    compiled = compile_op(op_name, profiles, enabled_precisions={dtype})
+    compiled = compile_op(op_name, profiles)
     assert_ran_in_engine(compiled, op_name)
     for size in (31, 129, 1025):
         x, y = (torch.randn(size, device="cuda", dtype=dtype) for _ in range(2))
