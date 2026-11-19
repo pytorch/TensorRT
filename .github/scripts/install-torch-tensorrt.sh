@@ -14,12 +14,16 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-# Quantization packages currently lag the Torch nightly API. Keep them opt-in,
-# and propagate the setting to tests even on images with preinstalled packages.
-export INSTALL_QUANTIZATION="${INSTALL_QUANTIZATION:-0}"
+# ModelOpt currently lags the Torch nightly API. Keep it opt-in while preserving
+# TorchAO suite coverage, and propagate both settings to the tests.
+export INSTALL_MODELOPT_QUANTIZATION="${INSTALL_MODELOPT_QUANTIZATION:-0}"
+export INSTALL_TORCHAO_QUANTIZATION="${INSTALL_TORCHAO_QUANTIZATION:-1}"
 QUANTIZATION_ARGS=()
-if [[ "${INSTALL_QUANTIZATION}" == "1" ]]; then
-    QUANTIZATION_ARGS=(--group quantization)
+if [[ "${INSTALL_MODELOPT_QUANTIZATION}" == "1" ]]; then
+    QUANTIZATION_ARGS+=(--group modelopt_quantization)
+fi
+if [[ "${INSTALL_TORCHAO_QUANTIZATION}" == "1" ]]; then
+    QUANTIZATION_ARGS+=(--group torchao_quantization)
 fi
 python -m pip install --upgrade "pip>=25.1"
 python -m pip install \
