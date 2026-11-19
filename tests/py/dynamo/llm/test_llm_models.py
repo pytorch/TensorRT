@@ -10,6 +10,8 @@ import pytest
 import torch
 import torch_tensorrt
 
+from ..quantization_utils import quantization_available
+
 if importlib.util.find_spec("transformers"):
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
@@ -20,8 +22,8 @@ import argparse
 @pytest.mark.unit
 @pytest.mark.parametrize("precision", ["FP16", "BF16", "FP32"])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),

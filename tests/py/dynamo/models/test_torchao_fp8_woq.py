@@ -1,11 +1,13 @@
 # type: ignore
-import importlib
+import importlib.util
 import unittest
 
 import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+
+from ..quantization_utils import quantization_available
 
 assertions = unittest.TestCase()
 
@@ -18,6 +20,8 @@ def _has_fp8_gpu() -> bool:
 
 
 def _has_mslk() -> bool:
+    if not quantization_available("mslk"):
+        return False
     # TorchAO's Int4Tensor.from_hp raises "Requires mslk >= 1.0.0" when this import
     # fails; it does not check the version. A Python-only MSLK install
     # (MSLK_PYTHON_ONLY=1) reports 0.0.0 but provides it, so test the import itself.
@@ -53,7 +57,10 @@ def _promote_float8_woq(model: torch.nn.Module) -> torch.nn.Module:
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(not _has_fp8_gpu(), "FP8 GPU (compute capability >= 9.0) is required")
 def test_linear_fp8_woq():
     from torch._inductor.constant_folding import (
@@ -119,7 +126,10 @@ def test_linear_fp8_woq():
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(not _has_fp8_gpu(), "FP8 GPU (compute capability >= 9.0) is required")
 def test_linear_fp8_static():
     import sys
@@ -182,7 +192,10 @@ def test_linear_fp8_static():
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 @pytest.mark.parametrize(
     "weight_dtype", [torch.int8, torch.float8_e4m3fn], ids=["int8", "float8"]
@@ -265,7 +278,10 @@ def test_dequantize_default_output_dtype(weight_dtype):
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(
     importlib.util.find_spec("triton") is None,
     "TorchAO INT4 dependencies require Triton, which is unavailable",
@@ -340,6 +356,8 @@ def test_linear_int4_woq():
 
 
 def _has_nvfp4_support() -> bool:
+    if not quantization_available("torchao"):
+        return False
     if not torch.cuda.is_available():
         return False
     major, _ = torch.cuda.get_device_capability()
@@ -355,7 +373,10 @@ def _has_nvfp4_support() -> bool:
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 @unittest.skipIf(not _has_nvfp4_support(), "TensorRT FP4 DataType is required")
 def test_linear_nvfp4_woq():
@@ -420,6 +441,8 @@ def test_linear_nvfp4_woq():
 
 
 def _has_mxfp4_support() -> bool:
+    if not quantization_available("torchao"):
+        return False
     if not torch.cuda.is_available():
         return False
     major, _ = torch.cuda.get_device_capability()
@@ -435,7 +458,10 @@ def _has_mxfp4_support() -> bool:
 
 
 @pytest.mark.unit
-@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    not quantization_available("torchao"),
+    "torchao not installed or quantization tests disabled",
+)
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 @unittest.skipIf(
     not _has_mxfp4_support(), "TensorRT FP4 and E8M0 DataTypes are required"
