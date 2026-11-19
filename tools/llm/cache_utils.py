@@ -11,7 +11,6 @@ from torch.fx import Graph, GraphModule, Node
 from torch.fx.passes.shape_prop import _extract_tensor_metadata
 from torch.utils._pytree import _LEAF_SPEC, TreeSpec
 
-
 # Both forms of SDPA: ``register_sdpa`` rewrites the aten op to the ``torch._C._nn`` one; without it
 # the graph keeps the aten op (``enable_gqa`` / ``scale`` as keyword arguments).
 SDPA_OPS = (
@@ -36,11 +35,8 @@ def get_kv_nodes(gm):
     """
     kv_nodes = []
     for node in gm.graph.nodes:
-        if (
-            node.op == "call_function"
-            and node.target in SDPA_OPS
-        ):
-            q_node, k_node, v_node = node.args[:3]
+        if node.op == "call_function" and node.target in SDPA_OPS:
+            _, k_node, v_node = node.args[:3]
             kv_nodes.append((k_node, v_node))
     return kv_nodes
 
