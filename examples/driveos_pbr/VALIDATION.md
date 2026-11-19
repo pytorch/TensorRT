@@ -1,5 +1,31 @@
 # Handoff validation — November 17, 2026
 
+## Rebase verification — November 19, 2026
+
+The handoff was rebased without conflicts onto `origin/main` at
+`13658aa29828e09c514f2855946faa7b719f5a4b`. The rebased implementation commit
+was `0887f819b0`; the benchmark source was unchanged from the original handoff.
+The subsequent documentation update clarifies the relationship to the blog.
+
+- All five host-independent tests and Python syntax/whitespace checks passed.
+- Every file in the supplied artifact bundle passed checksum verification.
+- Both C++ applications were rebuilt in the ARM64 NGC container with the
+  supplied native SDK and target CUDA 13.3.
+- Twelve fresh-process checks passed on 14-SM DRIVE Thor U: both models,
+  both input snapshots, and all three execution paths. Native checks used the
+  newly rebuilt applications; eager checks used the pinned Python environment.
+- Each process completed one first call, 20 warmups and 100 measured calls,
+  with all output comparisons passing at `atol=rtol=3e-4`. Native dependency
+  checks passed without Python, LibTorch or libc10 loaded.
+
+These checks use one launch per snapshot/path, rather than the three-launch
+measurement protocol below. They verify functionality and do not replace the
+reference benchmark cohort. The SDK, engines, programs and geometry plugin
+remain the frozen supplied artifacts: this rebase does not validate a rebuild
+of the latest upstream TensorRT backend or ExecuTorch runtime.
+
+## Original handoff validation
+
 Both native applications were built from this directory against the relocated
 artifact bundle on DRIVE Thor U. The eager baseline used a newly created Python
 environment inside the existing NGC 26.06 container. All **36 measured processes**

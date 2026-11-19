@@ -16,6 +16,26 @@ inputs and expected FP32 outputs. Results may favor either implementation.
 Start with [PBR.md](PBR.md) for the request text and [VALIDATION.md](VALIDATION.md)
 for the handoff's verification results.
 
+## Relationship to the blog figures
+
+This handoff reproduces the measurements behind the native deployment comparison:
+
+| Blog comparison | Handoff output |
+|---|---|
+| Inference latency for both models | `latency_ms` for `eager`, `onnx`, and `executorch` |
+| BEVFormer-Tiny loading peak and retained process memory | `loading_peak_rss_mib` and `retained_rss_mib` |
+| SegFormer-B0 CUDA free-memory decrease | `cuda_free_decrease_mib` |
+
+It also records PSS and lifetime peak RSS for both models. It does not include
+the separate CUDA Graph, green-context, shared-scratch, KV-cache, export-memory,
+or camera-visualization experiments. The runner produces CSV/JSON data, not the
+blog's styled plots.
+
+Use results from one complete cohort when plotting. The handoff's cleaned-up
+TensorRT runner releases engine-file bytes earlier than the older blog runner,
+so its BEVFormer loading peak is different. See [VALIDATION.md](VALIDATION.md);
+the older graph values are not exact reproduction targets for this package.
+
 ## Required environment and artifacts
 
 | Component | Tested configuration |
