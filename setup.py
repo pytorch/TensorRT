@@ -46,7 +46,7 @@ def get_git_revision_short_hash() -> str:
             .decode("ascii")
             .strip()
         )
-    except:
+    except Exception:
         print("WARNING: Could not get git revision short hash, using default one")
         # in release/ngc/25.10 branch this is the commit hash of the pytorch commit that is used for dlfw package
         return "0000000"
@@ -217,6 +217,7 @@ EXECUTORCH_REQUIREMENT = (
 )
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT],
+    "modelopt": ["nvidia-modelopt[hf]>=0.44.0"],
     "all": [EXECUTORCH_REQUIREMENT],
 }
 # A published wheel's extras also require the exact companion its build job produced, but only

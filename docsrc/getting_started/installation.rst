@@ -28,6 +28,26 @@ You can install the python package using
 
 Packages are uploaded for Linux on x86 and Windows
 
+Optional ModelOpt quantization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ModelOpt is optional. The default installation does not install or import it
+for unquantized models. To use ModelOpt quantization on a supported platform,
+select the ``modelopt`` extra:
+
+.. code-block:: sh
+
+    python -m pip install "torch-tensorrt[modelopt]"
+
+For TensorRT-RTX, use ``"torch-tensorrt-rtx[modelopt]"`` instead. When installing
+from source, use ``python -m pip install ".[modelopt]"`` to opt in, or
+``python -m pip install .`` without ModelOpt. Existing build options still apply.
+Development environments can also opt in with ``uv sync --group quantization``.
+
+Windows ARM64 users should use the default installation without this extra,
+because ModelOpt does not support that platform. FP16, BF16, and FP32 models
+do not require ModelOpt. Quantized models that use ModelOpt still require it.
+
 Installing Torch-TensorRT for a specific CUDA version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

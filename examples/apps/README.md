@@ -8,8 +8,13 @@ This demo showcases the Flux image generation model accelerated using Torch-Tens
 1. Install the required dependencies:
 
 ```bash
-pip install gradio==5.29.0 nvidia-modelopt==0.27.1 diffusers==0.40.0 accelerate==1.3.0
+pip install gradio==5.29.0 diffusers==0.40.0 accelerate==1.3.0
 ```
+
+FP16 does not require ModelOpt. For FP4, FP8, or INT8 quantization on a
+supported platform, also install `"torch-tensorrt[modelopt]"` (or
+`"torch-tensorrt-rtx[modelopt]"` for TensorRT-RTX). ModelOpt is not supported
+on Windows ARM64; use FP16 there.
 
 ## Usage
 
