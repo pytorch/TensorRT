@@ -78,7 +78,7 @@ def deconvNd(
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
-            input = impl.unsqueeze.unsqueeze(
+            weight = impl.unsqueeze.unsqueeze(
                 ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
             )
         num_output_maps = weight.shape[1]

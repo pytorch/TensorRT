@@ -322,6 +322,21 @@ class TestDeconvolutionConverter(DispatchTestCase):
             enable_passes=True,
         )
 
+    def test_deconv1d_tensor_weight(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten.convolution.default(
+                    x, weight, None, [2], [0], [1], True, [0], 1
+                )
+
+        inputs = [torch.randn(1, 16, 32), torch.randn(16, 8, 2)]
+        self.run_test(
+            TestModule(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
