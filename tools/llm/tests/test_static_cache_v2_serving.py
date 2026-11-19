@@ -68,9 +68,6 @@ class Decoder(nn.Module):
 
 @pytest.fixture(scope="module")
 def compiled(tmp_path_factory):
-    from torchtrt_ext import register_sdpa
-
-    register_sdpa.enable_sdpa_converter("default", None)
     import static_cache_v2
 
     static_cache_v2.KV_CACHE_LEN = CACHE_LEN
@@ -115,7 +112,7 @@ def compiled(tmp_path_factory):
             )
     finally:
         static_cache_v2.KV_CACHE_LEN = None
-    path = str(tmp_path_factory.mktemp("engine") / "decoder.ep")
+    path = str(tmp_path_factory.mktemp("engine") / "decoder.pt2")
     torch_tensorrt.save(trt_mod, path, retrace=False)
     return model, trt_mod, torch.export.load(path).module()
 

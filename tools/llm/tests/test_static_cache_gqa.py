@@ -5,8 +5,8 @@
 
 HF models call ``scaled_dot_product_attention(..., enable_gqa=True)`` with ``num_key_value_heads``
 K/V heads (or expand K/V with ``repeat_kv``). The static cache must hold the *un-expanded* K/V and the
-SDPA converter must broadcast them, otherwise the cache is ``num_heads / num_kv_heads`` times larger
-than necessary (or the engine fails to build).
+attention (Torch-TensorRT's built-in converter) must broadcast them, otherwise the cache is
+``num_heads / num_kv_heads`` times larger than necessary (or the engine fails to build).
 
 Run with: ``pytest tools/llm/tests/test_static_cache_gqa.py``
 """
@@ -64,11 +64,7 @@ class GQADecoder(nn.Module):
 @pytest.fixture(scope="module", params=KV_HEADS_VARIANTS, ids=lambda h: f"kv{h}")
 def compiled(request):
     kv_heads = request.param
-    # Both passes register themselves globally on import / call.
-    from torchtrt_ext import register_sdpa
-
-    register_sdpa.enable_sdpa_converter("default", None)
-    import static_cache_v2  # noqa: F401
+    import static_cache_v2  # noqa: F401  (registers the lowering pass on import)
 
     torch.manual_seed(0)
     model = GQADecoder(kv_heads).cuda().half().eval()
@@ -83,7 +79,6 @@ def compiled(request):
             use_explicit_typing=False,
             min_block_size=1,
             disable_tf32=True,
-            use_python_runtime=True,  # as in run_llm.py
         )
     return model, trt_mod, kv_heads
 
