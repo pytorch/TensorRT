@@ -16,6 +16,9 @@ fi
 # Install all the dependencies required for Torch-TensorRT
 # ModelOpt currently lags the Torch nightly API. Keep it opt-in while preserving
 # TorchAO suite coverage, and propagate both settings to the tests.
+# TODO: Once ModelOpt supports PyTorch 2.16, change the default below from 0 to 1
+# to re-enable it in CI. To opt in sooner, set INSTALL_MODELOPT_QUANTIZATION=1
+# in the environment before running this script.
 export INSTALL_MODELOPT_QUANTIZATION="${INSTALL_MODELOPT_QUANTIZATION:-0}"
 export INSTALL_TORCHAO_QUANTIZATION="${INSTALL_TORCHAO_QUANTIZATION:-1}"
 QUANTIZATION_ARGS=()
