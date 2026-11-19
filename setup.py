@@ -214,6 +214,7 @@ EXECUTORCH_REQUIREMENT = (
 )
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT],
+    "modelopt": ["nvidia-modelopt[hf]>=0.44.0"],
     "all": [EXECUTORCH_REQUIREMENT],
 }
 # A published wheel's extras also require the exact companion its build job produced, but only
