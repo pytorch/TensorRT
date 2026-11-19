@@ -100,6 +100,13 @@ Native build on Windows ARM64
       python -m pip install C:\path\to\the\generated-win_arm64.whl
       python -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
 
+   For FP16 Flux and SDXL examples, see the repository's
+   `application examples <https://github.com/pytorch/TensorRT/tree/main/examples/apps>`_.
+   Install their pipeline dependencies in this native ARM64 environment without
+   the optional ``modelopt`` extra. The reduced
+   `Flux smoke test <https://github.com/pytorch/TensorRT/tree/main/tools/perf/Flux>`_
+   checks transformer compilation without downloading pretrained weights.
+
 Cross-build on Windows x64
 --------------------------
 
