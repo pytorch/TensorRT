@@ -43,6 +43,12 @@ This also applies to TensorRT-RTX and source installations. ModelOpt remains
 in the quantization dependency group for tests and development environments
 using ``uv sync --group quantization``.
 
+CI skips installing the quantization group by default while these packages
+catch up with the PyTorch nightly API. Set ``INSTALL_QUANTIZATION=1`` before
+running ``.github/scripts/install-torch-tensorrt.sh`` to enable it.
+``INSTALL_QUANTIZATION=0`` also skips tests requiring ModelOpt, MSLK, or TorchAO,
+including when those packages are already present in the runner image.
+
 Windows ARM64 users should use the default installation without ModelOpt,
 because ModelOpt does not support that platform. FP16, BF16, and FP32 models
 do not require ModelOpt. Quantized models that use ModelOpt still require it.

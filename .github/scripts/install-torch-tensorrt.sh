@@ -14,6 +14,13 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
+# Quantization packages currently lag the Torch nightly API. Keep them opt-in,
+# and propagate the setting to tests even on images with preinstalled packages.
+export INSTALL_QUANTIZATION="${INSTALL_QUANTIZATION:-0}"
+QUANTIZATION_ARGS=()
+if [[ "${INSTALL_QUANTIZATION}" == "1" ]]; then
+    QUANTIZATION_ARGS=(--group quantization)
+fi
 python -m pip install --upgrade "pip>=25.1"
 python -m pip install \
     --pre \
@@ -21,7 +28,7 @@ python -m pip install \
     --extra-index-url https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION} \
     --group test \
     --group test-ext \
-    --group quantization
+    "${QUANTIZATION_ARGS[@]}"
 TORCHVISION=$(python - <<'PY'
 import tomllib
 
@@ -42,8 +49,6 @@ PY
 python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
-# dynamo-torchao full/nightly suite
-python -m pip install torchao
 
 # Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
 SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"

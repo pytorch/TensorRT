@@ -17,6 +17,8 @@ from torch_tensorrt.dynamo.lowering.passes import (
 )
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
+from ..quantization_utils import quantization_available
+
 # PyTorch before 2.9, as on JetPack, has only the older allow_tf32 flags.
 _HAS_FP32_PRECISION = hasattr(torch.backends.cuda.matmul, "fp32_precision")
 
@@ -292,6 +294,10 @@ class TestConstantFolding(TestCase):
                     op,
                 )
 
+    @unittest.skipIf(
+        not quantization_available("torchao"),
+        "torchao not installed or quantization tests disabled",
+    )
     def test_aliased_permute_into_dequantize_is_installed(self):
         try:
             import torchao  # noqa: F401
