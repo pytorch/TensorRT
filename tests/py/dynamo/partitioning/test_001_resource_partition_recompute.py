@@ -167,7 +167,7 @@ class _UnbindInput(torch.nn.Module):
         return (x + first) * second  # the multiply is in subgraph 1
 
 
-def test_a_getitem_crosses_with_its_producer():
+def test_a_getitem_is_passed_with_its_producer():
     module = _UnbindInput()
     x, pair = torch.randn(256, 256), torch.randn(2, 256, 256)
     gm, nodes, subgraphs = _recompute(module, (x, pair), cuts=[-1])

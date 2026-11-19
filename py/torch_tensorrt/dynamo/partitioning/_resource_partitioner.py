@@ -551,9 +551,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if node.op == "placeholder":
                 input_only[node] = True
             elif node.op == "get_attr":
-                # ponytail: a constant that isn't a weight is copied whatever its size, so a large
-                # buffer (an old GPT-2-style max_positions^2 causal mask) lands in every engine that
-                # reads it; bound the bytes each engine copies if a model ever does that.
+                # A constant that isn't a weight is copied whatever its size, so a large buffer (an old
+                # GPT-2-style max_positions^2 causal mask) would land in every engine that reads it.
                 constant = operator.attrgetter(str(node.target))(self.module)
                 input_only[node] = isinstance(constant, torch.Tensor) and (
                     not isinstance(constant, torch.nn.Parameter)
@@ -567,8 +566,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                     and all(input_only[i] for i in node._input_nodes)
                 )
 
-        def crosses(node: torch.fx.Node) -> bool:
-            """Whether the node's value goes to later subgraphs as it is rather than being recomputed."""
+        def reads_graph_input(node: torch.fx.Node) -> bool:
+            """Whether the node reads a graph input, so later subgraphs are passed its value rather than
+            recomputing it: each input keeps a single reader."""
             # A getitem goes with its producer: copied alone, it would make the producer's engine
             # output a tuple.
             producer = node.args[0] if node.target is operator.getitem else None
@@ -591,12 +591,12 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             subgraph = subgraphs[j]
             copies: Dict[torch.fx.Node, torch.fx.Node] = {}
 
-            def kept(node: torch.fx.Node) -> bool:
-                """Whether subgraph j reads the node itself rather than a copy."""
-                return (
+            def needs_copy(node: torch.fx.Node) -> bool:
+                """Whether subgraph j needs its own copy of the node rather than reading the node itself."""
+                return not (
                     node.op in ("placeholder", "get_attr")
                     or where.get(node) == j
-                    or crosses(node)
+                    or reads_graph_input(node)
                 )
 
             def copy_chain(node: torch.fx.Node, before: torch.fx.Node) -> torch.fx.Node:
@@ -604,7 +604,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 chain, stack = set(), [node]
                 while stack:  # not recursive, for the same reason as `input_only`
                     n = stack.pop()
-                    if n not in chain and n not in copies and not kept(n):
+                    if n not in chain and n not in copies and needs_copy(n):
                         chain.add(n)
                         stack.extend(n._input_nodes)
                 chain_in_order = sorted(chain, key=order.__getitem__)
@@ -623,7 +623,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                     if (
                         where.get(node, j) < j
                         and input_only[node]
-                        and not crosses(node)
+                        and not reads_graph_input(node)
                     ):
                         user.replace_input_with(node, copy_chain(node, user))
                         values.append(node)
