@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 from torch_tensorrt.dynamo.tools.weight_mapping import raise_if_mapped_files_changed
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .annotate_sort_num_keys import annotate_sort_num_keys
 from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
 from .collapse_high_rank_permutes import collapse_high_rank_permutes
 from .complex_decomposition_adapter import (
@@ -206,6 +207,9 @@ def post_lowering(
         set_defer_graph_cleanup(False)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
+    # After every pass, including registered ones, and after the fake tensor refresh when there
+    # is a fake mode: the sort converter trusts this range for correctness.
+    gm = annotate_sort_num_keys(gm, settings)
 
     # A branch shared by several cond nodes is lowered once.
     for branch in dict.fromkeys(iter_cond_subgraphs(gm)):
