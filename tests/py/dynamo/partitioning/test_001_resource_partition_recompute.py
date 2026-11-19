@@ -210,41 +210,70 @@ class _TwoReadersOfTheMask(torch.nn.Module):
         return torch.relu(x + mask) * mask  # the multiply is in subgraph 1
 
 
-@pytest.mark.parametrize("length,recomputed", [(64, False), (256, True)])
-def test_only_a_large_value_is_recomputed(length, recomputed):
-    """A 64x64 float mask (16 KiB) crosses as it is; a 256x256 one (256 KiB) is recomputed."""
+@pytest.mark.parametrize("length", [8, 256])
+def test_a_value_is_recomputed_whatever_its_size(length):
+    """An 8x8 float mask (256 bytes) is recomputed like a 256x256 one (256 KiB)."""
     x, pad = torch.randn(1, length, length), torch.rand(1, length) > 0.2
     _, nodes, subgraphs = _recompute(_TwoReadersOfTheMask(), (x, pad), cuts=[-1])
     mask = next(n for n in nodes if n.target is torch.where)
-    assert (mask not in _inputs_of(subgraphs[1])) == recomputed
+    assert mask not in _inputs_of(subgraphs[1])
 
 
 class _MaskPlusFolded(torch.nn.Module):
-    """A mask plus a fixed part that constant folding turns into a 1 MiB float constant, built from
+    """A mask plus a fixed part that constant folding turns into a 4.6 MiB float constant, built from
     constructors (a causal triangle) or from a parameter (a weight transform)."""
 
     def __init__(self, from_parameter):
         super().__init__()
         self.from_parameter = from_parameter
-        self.weight = torch.nn.Parameter(torch.full((512, 512), -1e4))
+        self.weight = torch.nn.Parameter(torch.full((1100, 1100), -1e4))
 
     def forward(self, x, pad):
-        fixed = self.weight if self.from_parameter else torch.full((512, 512), -1e4)
+        fixed = self.weight if self.from_parameter else torch.full((1100, 1100), -1e4)
         y = _mask(pad) + fixed.triu(1)
         return torch.relu(x + y) * y  # the multiply is in subgraph 1
 
 
 @pytest.mark.parametrize("from_parameter,recomputed", [(False, True), (True, False)])
 def test_a_constant_folded_from_a_parameter_is_a_weight(from_parameter, recomputed):
-    """A constant folded without reading a parameter, such as a mask's fixed part, may be recomputed
-    with the chain up to 4 MiB, whatever its dtype; one folded from a parameter is a weight
-    transform, so the value it feeds is passed."""
-    x, pad = torch.randn(1, 512, 512), torch.rand(1, 512) > 0.2
+    """A constant folded without reading a parameter, such as a mask's fixed part, is recomputed
+    from, whatever its size or dtype; one folded from a parameter is a weight transform, so the
+    value it feeds is passed."""
+    x, pad = torch.randn(1, 1100, 1100), torch.rand(1, 1100) > 0.2
     _, nodes, subgraphs = _recompute(
         _MaskPlusFolded(from_parameter), (x, pad), cuts=[-1], fold=True
     )
     y = next(n for n in nodes if n.target is torch.ops.aten.add.Tensor)
     assert (y not in _inputs_of(subgraphs[1])) == recomputed
+
+
+class _Rotary(torch.nn.Module):
+    """Rotary cos built from the position input and frequencies held in a non-persistent buffer, as
+    Hugging Face models do, or in a parameter."""
+
+    def __init__(self, in_parameter):
+        super().__init__()
+        inv_freq = 1 / 10000 ** (torch.arange(0, 64, 2) / 64)
+        if in_parameter:
+            self.inv_freq = torch.nn.Parameter(inv_freq, requires_grad=False)
+        else:
+            self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+    def forward(self, x, position):
+        freqs = position[..., None].float() * self.inv_freq
+        cos = torch.cat((freqs, freqs), -1).cos()
+        return torch.relu(x + cos) * cos  # the multiply is in subgraph 1
+
+
+@pytest.mark.parametrize("in_parameter,recomputed", [(False, True), (True, False)])
+def test_a_buffer_is_copied_and_a_parameter_is_a_weight(in_parameter, recomputed):
+    x, position = torch.randn(1, 256, 64), torch.arange(256)[None]
+    gm, nodes, subgraphs = _recompute(
+        _Rotary(in_parameter), (x, position), cuts=[-1], fold=True
+    )
+    cos = next(n for n in nodes if n.target is torch.ops.aten.cos.default)
+    assert (cos not in _inputs_of(subgraphs[1])) == recomputed
+    torch.testing.assert_close(gm(x, position), _Rotary(in_parameter)(x, position))
 
 
 def test_an_input_only_chain_deeper_than_the_recursion_limit():

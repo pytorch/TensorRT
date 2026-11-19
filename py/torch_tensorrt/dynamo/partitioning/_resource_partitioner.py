@@ -63,7 +63,6 @@ from typing import Dict, List, Optional, Set, Tuple
 import psutil
 import torch
 from torch.fx.experimental.const_fold import _inline_module
-from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.passes.splitter_base import Subgraph, _SplitterBase
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
@@ -74,16 +73,6 @@ logger = logging.getLogger(__name__)
 
 MAX_NUM_OF_ENGINES = 50
 ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER = 4
-# A value up to this size crosses between engines as it is; only larger ones are recomputed. Values that grow
-# with the sequence length stay below it (pi0.5's padding mask: about 1 KiB), and those that grow with its
-# square exceed it (pi0.5's attention mask: 3.6 MiB; its rotary cos/sin: about 0.5 MiB).
-RECOMPUTE_MIN_OUTPUT_BYTES = 64 << 10
-# Constants a recomputed chain may read: mask fill values and rotary frequencies, not weights.
-RECOMPUTE_MAX_CONSTANT_BYTES = 64 << 10
-# A constant folded without reading a parameter may be larger: constant folding turns the fixed part of an
-# attention mask into one (968x968 bools for pi0.5, or a float causal triangle). One folded from a parameter
-# is a weight transform (w.T, w.to(dtype)).
-RECOMPUTE_MAX_FOLDED_BYTES = 4 << 20
 # Ops that communicate with the other ranks are never recomputed: a copy in each engine that reads one would
 # make a rank's number of collectives depend on how its own memory reading split the graph.
 COLLECTIVE_OP_PREFIXES = (
@@ -530,7 +519,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         return sizes
 
     def recompute_input_only_nodes(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
-        """Recompute, in each subgraph, the large weightless values it reads that depend only on graph inputs.
+        """Recompute, in each subgraph, the weightless values it reads that depend only on graph inputs.
 
         Splitting keeps graph order, and a model computes the values that depend only on its inputs (an
         attention mask, rotary cos/sin) before its first layer, so they land in the first engine and reach
@@ -539,20 +528,21 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         attention on sm_110 (11.0 to 11.4) building: a layer fed such a value as an input needs 0x39174
         bytes of shared memory, 0x38c00 max.
 
-        Only large values are recomputed, from the small ones they are built from: a value of at most
-        `RECOMPUTE_MIN_OUTPUT_BYTES` (a padding mask, position ids, prompt tokens) crosses engines as it
-        is, and so does any node that reads a graph input directly, which keeps each input a single
-        reader, as GPU-resident ExecuTorch programs (`skip_h2d_for_method_inputs`) require. A whole
-        chain recomputed into an attention engine lets TensorRT fuse it into the attention kernel,
-        which fails the same way. Values that reach an engine across a split this pass doesn't make (an
-        operator that runs in PyTorch), and a mask passed in as a graph input, still arrive as inputs.
+        Chains start at the nodes that read a graph input, which cross engines as they are: that keeps
+        each input a single reader, as GPU-resident ExecuTorch programs (`skip_h2d_for_method_inputs`)
+        require. Which constants a chain may read is decided by where they come from, not their size:
+        a buffer (rotary's `inv_freq`), a tensor constant, or a value constant folding built without
+        reading a parameter (an attention mask's causal part) is copied into each engine that
+        recomputes from it; a parameter, or a constant folded from one (`w.T`, `w.to(dtype)`), is a
+        weight, and the values it feeds are passed. Values that reach an engine across a split this
+        pass doesn't make (an operator that runs in PyTorch), and a mask passed in as a graph input,
+        still arrive as inputs.
         """
         from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
             FOLDED_WITHOUT_PARAMETERS_META,
         )
 
         graph = self.module.graph
-        params = self.module.state_dict(keep_vars=True)
         # Whether each node is weightless and computed from the graph inputs alone. One pass in
         # graph order, which puts a node's inputs before it: chains can be thousands of nodes
         # deep, too deep to walk recursively.
@@ -561,15 +551,13 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if node.op == "placeholder":
                 input_only[node] = True
             elif node.op == "get_attr":
-                constant = params.get(str(node.target))
-                limit = (
-                    RECOMPUTE_MAX_FOLDED_BYTES
-                    if node.meta.get(FOLDED_WITHOUT_PARAMETERS_META)
-                    else RECOMPUTE_MAX_CONSTANT_BYTES
-                )
-                input_only[node] = (
-                    constant is not None
-                    and constant.numel() * constant.element_size() <= limit
+                # ponytail: a constant that isn't a weight is copied whatever its size, so a large
+                # buffer (an old GPT-2-style max_positions^2 causal mask) lands in every engine that
+                # reads it; bound the bytes each engine copies if a model ever does that.
+                constant = operator.attrgetter(str(node.target))(self.module)
+                input_only[node] = isinstance(constant, torch.Tensor) and (
+                    not isinstance(constant, torch.nn.Parameter)
+                    or bool(node.meta.get(FOLDED_WITHOUT_PARAMETERS_META))
                 )
             else:
                 input_only[node] = (
@@ -589,12 +577,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 if isinstance(producer, torch.fx.Node)
                 else node._input_nodes
             )
-            if any(i.op == "placeholder" for i in reads):
-                return True
-            value = node.meta.get("val")
-            return isinstance(value, torch.Tensor) and statically_known_true(
-                value.numel() * value.element_size() <= RECOMPUTE_MIN_OUTPUT_BYTES
-            )
+            return any(i.op == "placeholder" for i in reads)
 
         where = {n: i for i, s in enumerate(subgraphs) for n in s.nodes}
         order = {
