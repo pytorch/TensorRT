@@ -57,9 +57,9 @@ inference with an unquantized checkpoint skips these imports and the quantizatio
 configuration download. Transformers still uses Hugging Face Hub for model and
 tokenizer loading.
 
-Install `"torch-tensorrt[modelopt]"` (or `"torch-tensorrt-rtx[modelopt]"`)
+Install `"nvidia-modelopt[hf]>=0.44.0"` separately
 before using ModelOpt quantization on a supported platform. Unquantized
-inference does not require this extra.
+inference does not require ModelOpt.
 
 - `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
