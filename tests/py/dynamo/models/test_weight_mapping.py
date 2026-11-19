@@ -425,8 +425,10 @@ def _mapped_two_buffers(tmp_path):
 
 
 def _has_pageout():
+    if sys.platform != "linux":
+        return False
     release = tuple(int(p) for p in platform.release().split("-")[0].split(".")[:2])
-    return sys.platform == "linux" and release >= (5, 4)
+    return release >= (5, 4)
 
 
 def _present(tensor):
