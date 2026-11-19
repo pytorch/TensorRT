@@ -3691,9 +3691,6 @@ all = [
 executorch = [
     { name = "executorch" },
 ]
-modelopt = [
-    { name = "nvidia-modelopt", extra = ["hf"] },
-]
 
 [package.dev-dependencies]
 debug = [
@@ -3792,7 +3789,6 @@ requires-dist = [
     { name = "executorch", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'executorch') or (sys_platform == 'linux' and extra == 'executorch')", specifier = ">=1.6.0.dev20261105,<1.7" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "numpy" },
-    { name = "nvidia-modelopt", extras = ["hf"], marker = "extra == 'modelopt'", specifier = ">=0.44.0" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
     { name = "tensorrt", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", specifier = ">=11.4.0,<11.5.0" },
@@ -3802,7 +3798,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.16.0.dev0,<2.17.0", index = "https://download.pytorch.org/whl/nightly/cu132" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
-provides-extras = ["executorch", "modelopt", "all"]
+provides-extras = ["executorch", "all"]
 
 [package.metadata.requires-dev]
 debug = [
