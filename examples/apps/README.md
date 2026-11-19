@@ -12,8 +12,7 @@ pip install gradio==5.29.0 diffusers==0.40.0 accelerate==1.3.0
 ```
 
 FP16 does not require ModelOpt. For FP4, FP8, or INT8 quantization on a
-supported platform, also install `"torch-tensorrt[modelopt]"` (or
-`"torch-tensorrt-rtx[modelopt]"` for TensorRT-RTX). ModelOpt is not supported
+supported platform, also install `"nvidia-modelopt[hf]>=0.44.0"`. ModelOpt is not supported
 on Windows ARM64; use FP16 there.
 
 ## Usage

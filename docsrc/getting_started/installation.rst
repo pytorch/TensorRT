@@ -31,20 +31,19 @@ Packages are uploaded for Linux on x86 and Windows
 Optional ModelOpt quantization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-ModelOpt is optional. The default installation does not install or import it
-for unquantized models. To use ModelOpt quantization on a supported platform,
-select the ``modelopt`` extra:
+ModelOpt is not a package dependency. The default installation does not install
+or import it for unquantized models. To use ModelOpt quantization on a supported
+platform, install ModelOpt separately:
 
 .. code-block:: sh
 
-    python -m pip install "torch-tensorrt[modelopt]"
+    python -m pip install "nvidia-modelopt[hf]>=0.44.0"
 
-For TensorRT-RTX, use ``"torch-tensorrt-rtx[modelopt]"`` instead. When installing
-from source, use ``python -m pip install ".[modelopt]"`` to opt in, or
-``python -m pip install .`` without ModelOpt. Existing build options still apply.
-Development environments can also opt in with ``uv sync --group quantization``.
+This also applies to TensorRT-RTX and source installations. ModelOpt remains
+in the quantization dependency group for tests and development environments
+using ``uv sync --group quantization``.
 
-Windows ARM64 users should use the default installation without this extra,
+Windows ARM64 users should use the default installation without ModelOpt,
 because ModelOpt does not support that platform. FP16, BF16, and FP32 models
 do not require ModelOpt. Quantized models that use ModelOpt still require it.
 

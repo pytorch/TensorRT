@@ -13,7 +13,7 @@ from packaging.requirements import Requirement
 
 
 class TestModelOptOptional(unittest.TestCase):
-    def test_modelopt_installation_is_opt_in(self):
+    def test_modelopt_is_not_a_package_dependency(self):
         root = Path(__file__).resolve().parents[4]
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
@@ -34,15 +34,12 @@ class TestModelOptOptional(unittest.TestCase):
             metadata = Parser().parsestr(
                 next(Path(directory).glob("*.egg-info/PKG-INFO")).read_text()
             )
-            self.assertIn("modelopt", metadata.get_all("Provides-Extra", []))
+            self.assertNotIn("modelopt", metadata.get_all("Provides-Extra", []))
             requirements = [
                 Requirement(value) for value in metadata.get_all("Requires-Dist", [])
             ]
             modelopt = [r for r in requirements if r.name == "nvidia-modelopt"]
-            self.assertTrue(modelopt)
-            for requirement in modelopt:
-                self.assertFalse(requirement.marker.evaluate({"extra": ""}))
-                self.assertTrue(requirement.marker.evaluate({"extra": "modelopt"}))
+            self.assertFalse(modelopt)
 
     def test_unquantized_model_does_not_import_modelopt(self):
         # Use a fresh interpreter to cover converter registration during import,
