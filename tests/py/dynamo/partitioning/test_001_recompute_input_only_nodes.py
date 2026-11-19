@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER,
     ResourcePartitioner,
 )
+from torch_tensorrt.dynamo.partitioning.common import recompute_input_only_nodes
 
 LAYER_BYTES = 1 << 20
 
@@ -34,11 +35,12 @@ def _mask(pad):
 
 class _MaskedLayers(torch.nn.Module):
     """Attention-like layers that all read one 512x512 mask built from the padding input, with a fixed
-    causal part if `causal`."""
+    causal part if `causal`, and a ReLU after each layer if `relu`."""
 
-    def __init__(self, causal=False):
+    def __init__(self, causal=False, relu=False):
         super().__init__()
         self.causal = causal
+        self.relu = relu
         self.layers = torch.nn.ModuleList(
             torch.nn.Linear(256, LAYER_BYTES // (256 * 4), bias=False) for _ in range(8)
         )
@@ -57,6 +59,8 @@ class _MaskedLayers(torch.nn.Module):
                 torch.softmax(x @ x.transpose(1, 2) / 16 + mask, -1)
                 @ layer(x)[..., :256]
             )
+            if self.relu:
+                x = torch.relu(x)
         return x
 
 
@@ -111,10 +115,49 @@ def test_subgraphs_recompute_the_input_only_mask(dynamic, causal):
     assert len(pad_readers) <= 1
 
 
-def _recompute(module, inputs, cuts, fold=False):
+@pytest.mark.parametrize("causal", [False, True])
+@pytest.mark.parametrize(
+    "partition",
+    [partitioning.fast_partition, partitioning.global_partition],
+    ids=["adjacency", "global"],
+)
+def test_engines_after_a_pytorch_op_recompute_the_mask(partition, causal):
+    """Without resource partitioning, an operator that runs in PyTorch splits the layers into engines too.
+    Each engine after one builds the mask itself instead of receiving it, and holds its own copy of the
+    folded causal part rather than receiving that."""
+    torch.manual_seed(0)
+    model = _MaskedLayers(causal, relu=True).cuda().eval()
+    x = torch.randn(1, 512, 256, device="cuda") / 8
+    pad = torch.ones(1, 512, dtype=torch.bool, device="cuda")
+    pad[:, 400:] = False
+    settings = CompilationSettings(min_block_size=1)
+    exported = pre_export_lowering(torch.export.export(model, (x, pad)), settings)
+    gm = post_lowering(
+        exported.run_decompositions(get_decompositions(False)).module(), settings
+    )
+    partitioned, _ = partition(
+        gm, min_block_size=1, torch_executed_ops={"torch.ops.aten.relu.default"}
+    )
+
+    engines = [m for n, m in partitioned.named_children() if "_run_on_acc" in n]
+    received = []  # the 512x512 values an engine receives: the mask or its causal part
+    for engine in engines:
+        engine.register_forward_pre_hook(
+            lambda _, args: received.extend(
+                a for a in args if tuple(a.shape[-2:]) == (512, 512)
+            )
+        )
+    with torch.no_grad():
+        torch.testing.assert_close(partitioned(x, pad), model(x, pad))
+    assert len(engines) == 8
+    assert received == []
+
+
+def _recompute(module, inputs, cuts, fold=False, in_pytorch=()):
     """Trace `module`, give its nodes fake values, and recompute across subgraphs that start at the call
-    nodes with the indices in `cuts`. With `fold`, the module is exported and constant-folded first, as
-    compilation does, so that its constructors become constants."""
+    nodes with the indices in `cuts`; those at the positions in `in_pytorch` run in PyTorch. With `fold`,
+    the module is exported and constant-folded first, as compilation does, so that its constructors
+    become constants."""
     if fold:
         gm = constant_fold(
             torch.export.export(module, inputs).module(), CompilationSettings()
@@ -125,10 +168,10 @@ def _recompute(module, inputs, cuts, fold=False):
     nodes = [n for n in gm.graph.nodes if n.op == "call_function"]
     bounds = [0, *cuts, len(nodes)]
     subgraphs = [
-        Subgraph(is_acc=True, nodes=nodes[a:b]) for a, b in zip(bounds, bounds[1:])
+        Subgraph(is_acc=k not in in_pytorch, nodes=nodes[a:b])
+        for k, (a, b) in enumerate(zip(bounds, bounds[1:]))
     ]
-    partitioner = ResourcePartitioner(gm, cpu_memory_budget=None, submodule_name="m")
-    subgraphs = partitioner.recompute_input_only_nodes(subgraphs)
+    subgraphs = recompute_input_only_nodes(gm, subgraphs)
     gm.graph.lint()
     gm.recompile()
     return gm, nodes, subgraphs
@@ -167,7 +210,7 @@ class _UnbindInput(torch.nn.Module):
         return (x + first) * second  # the multiply is in subgraph 1
 
 
-def test_a_getitem_crosses_with_its_producer():
+def test_a_getitem_is_passed_with_its_producer():
     module = _UnbindInput()
     x, pair = torch.randn(256, 256), torch.randn(2, 256, 256)
     gm, nodes, subgraphs = _recompute(module, (x, pair), cuts=[-1])
@@ -210,41 +253,82 @@ class _TwoReadersOfTheMask(torch.nn.Module):
         return torch.relu(x + mask) * mask  # the multiply is in subgraph 1
 
 
-@pytest.mark.parametrize("length,recomputed", [(64, False), (256, True)])
-def test_only_a_large_value_is_recomputed(length, recomputed):
-    """A 64x64 float mask (16 KiB) crosses as it is; a 256x256 one (256 KiB) is recomputed."""
+def test_a_value_computed_in_pytorch_is_passed():
+    """TensorRT couldn't build a copy of an operator that runs in PyTorch, so a mask computed there
+    reaches the TensorRT subgraphs that read it as an input."""
+    x, pad = torch.randn(1, 256, 256), torch.rand(1, 256) > 0.2
+    gm, nodes, subgraphs = _recompute(
+        _TwoReadersOfTheMask(), (x, pad), cuts=[-3, -1], in_pytorch=[0]
+    )
+    mask = next(n for n in nodes if n.target is torch.where)
+    assert mask in _inputs_of(subgraphs[2])
+    torch.testing.assert_close(gm(x, pad), _TwoReadersOfTheMask()(x, pad))
+
+
+@pytest.mark.parametrize("length", [8, 256])
+def test_a_value_is_recomputed_whatever_its_size(length):
+    """An 8x8 float mask (256 bytes) is recomputed like a 256x256 one (256 KiB)."""
     x, pad = torch.randn(1, length, length), torch.rand(1, length) > 0.2
     _, nodes, subgraphs = _recompute(_TwoReadersOfTheMask(), (x, pad), cuts=[-1])
     mask = next(n for n in nodes if n.target is torch.where)
-    assert (mask not in _inputs_of(subgraphs[1])) == recomputed
+    assert mask not in _inputs_of(subgraphs[1])
 
 
 class _MaskPlusFolded(torch.nn.Module):
-    """A mask plus a fixed part that constant folding turns into a 1 MiB float constant, built from
+    """A mask plus a fixed part that constant folding turns into a 4.6 MiB float constant, built from
     constructors (a causal triangle) or from a parameter (a weight transform)."""
 
     def __init__(self, from_parameter):
         super().__init__()
         self.from_parameter = from_parameter
-        self.weight = torch.nn.Parameter(torch.full((512, 512), -1e4))
+        self.weight = torch.nn.Parameter(torch.full((1100, 1100), -1e4))
 
     def forward(self, x, pad):
-        fixed = self.weight if self.from_parameter else torch.full((512, 512), -1e4)
+        fixed = self.weight if self.from_parameter else torch.full((1100, 1100), -1e4)
         y = _mask(pad) + fixed.triu(1)
         return torch.relu(x + y) * y  # the multiply is in subgraph 1
 
 
 @pytest.mark.parametrize("from_parameter,recomputed", [(False, True), (True, False)])
 def test_a_constant_folded_from_a_parameter_is_a_weight(from_parameter, recomputed):
-    """A constant folded without reading a parameter, such as a mask's fixed part, may be recomputed
-    with the chain up to 4 MiB, whatever its dtype; one folded from a parameter is a weight
-    transform, so the value it feeds is passed."""
-    x, pad = torch.randn(1, 512, 512), torch.rand(1, 512) > 0.2
+    """A constant folded without reading a parameter, such as a mask's fixed part, is recomputed
+    from, whatever its size or dtype; one folded from a parameter is a weight transform, so the
+    value it feeds is passed."""
+    x, pad = torch.randn(1, 1100, 1100), torch.rand(1, 1100) > 0.2
     _, nodes, subgraphs = _recompute(
         _MaskPlusFolded(from_parameter), (x, pad), cuts=[-1], fold=True
     )
     y = next(n for n in nodes if n.target is torch.ops.aten.add.Tensor)
     assert (y not in _inputs_of(subgraphs[1])) == recomputed
+
+
+class _Rotary(torch.nn.Module):
+    """Rotary cos built from the position input and frequencies held in a non-persistent buffer, as
+    Hugging Face models do, or in a parameter."""
+
+    def __init__(self, in_parameter):
+        super().__init__()
+        inv_freq = 1 / 10000 ** (torch.arange(0, 64, 2) / 64)
+        if in_parameter:
+            self.inv_freq = torch.nn.Parameter(inv_freq, requires_grad=False)
+        else:
+            self.register_buffer("inv_freq", inv_freq, persistent=False)
+
+    def forward(self, x, position):
+        freqs = position[..., None].float() * self.inv_freq
+        cos = torch.cat((freqs, freqs), -1).cos()
+        return torch.relu(x + cos) * cos  # the multiply is in subgraph 1
+
+
+@pytest.mark.parametrize("in_parameter,recomputed", [(False, True), (True, False)])
+def test_a_buffer_is_copied_and_a_parameter_is_a_weight(in_parameter, recomputed):
+    x, position = torch.randn(1, 256, 64), torch.arange(256)[None]
+    gm, nodes, subgraphs = _recompute(
+        _Rotary(in_parameter), (x, position), cuts=[-1], fold=True
+    )
+    cos = next(n for n in nodes if n.target is torch.ops.aten.cos.default)
+    assert (cos not in _inputs_of(subgraphs[1])) == recomputed
+    torch.testing.assert_close(gm(x, position), _Rotary(in_parameter)(x, position))
 
 
 def test_an_input_only_chain_deeper_than_the_recursion_limit():
@@ -266,9 +350,8 @@ def test_an_input_only_chain_deeper_than_the_recursion_limit():
     nodes = [n for n in gm.graph.nodes if n.op == "call_function"]
     # The whole chain and the first reader in one subgraph, the second reader in the next.
     first, second = nodes[:-1], nodes[-1:]
-    partitioner = ResourcePartitioner(gm, cpu_memory_budget=None, submodule_name="m")
-    subgraphs = partitioner.recompute_input_only_nodes(
-        [Subgraph(is_acc=True, nodes=first), Subgraph(is_acc=True, nodes=second)]
+    subgraphs = recompute_input_only_nodes(
+        gm, [Subgraph(is_acc=True, nodes=first), Subgraph(is_acc=True, nodes=second)]
     )
 
     assert {i for n in subgraphs[1].nodes for i in n._input_nodes} & set(first) <= {
