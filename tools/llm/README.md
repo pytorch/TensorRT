@@ -59,7 +59,7 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 
 `run_vla.py` runs [Alpamayo 1.5](https://huggingface.co/nvidia/Alpamayo-1.5-10B) (Qwen3-VL backbone + flow-matching
 action expert) as separate Torch-TensorRT engines for the vision tower, the text decoder (`static_cache_v2` on
-the unmodified Hugging Face layers, split into segments, chunked prefill) and the expert. It needs the
+the unmodified Hugging Face layers as a single engine, with chunked prefill) and the expert. It needs the
 `alpamayo1_5` package for the model and data.
 
 ```bash
@@ -82,8 +82,7 @@ Key arguments of `run_vla.py`:
 - `--component`: Engine(s) to build (`vision`, `llm`, `expert`, `all`); `all` builds each in its own process.
 - `--model`: Alpamayo checkpoint, `nvidia/Alpamayo-1.5-10B` by default, or a ModelOpt FP8 checkpoint directory.
 - `--clip_id`: Dataset clip to run on (or `--parquet` with `--clip_index`).
-- `--engine_dir`: Where the engines are saved and loaded (`vla_engines` by default).
-- `--llm_segments`: Number of engines the text decoder is split into (2 by default) to keep build memory down.
+- `--engine_dir`: Where the engines (`vision.pt2`, `llm.pt2`, `expert.pt2`) are saved and loaded (`vla_engines` by default).
 - `--resident`: Keep all engines loaded and time a second, steady-state call (needs more GPU memory).
 - `--save` / `--ref`: Write the reference results / compare the TensorRT rollout against them.
 
@@ -644,8 +643,21 @@ Alpamayo PTQ and TensorRT compilation need different PyTorch versions, so the st
 one venv in a specific order: the PTQ step runs first with the recipe's PyTorch, then PyTorch is upgraded for
 Torch-TensorRT.
 
-Measured with the FP8 checkpoint on an RTX 5090 (one clip, 6 trajectory samples, 17 generated tokens): eager PyTorch
-takes about 5.3 s and TensorRT about 1.2 s (`--resident`, steady state), roughly 4.5x faster.
+Measured on an RTX 5090 (one clip, 6 trajectory samples, 17 generated tokens). The TensorRT runs use `--resident` and
+report the second, steady-state call; the first call also includes engine loading and context setup. All four runs
+generate the same reasoning text:
+
+| | minADE (m) | Latency | vision+prefill / decode / expert (ms) | Engines (load time) |
+|---|---|---|---|---|
+| Eager PyTorch, FP16 | 1.451 | 3.8 s | | |
+| Eager PyTorch, FP8 | 1.463 | 5.0 s | | |
+| TensorRT, FP16 | 1.448 | 1.38 s | 824 / 384 / 173 | 28 GB (65 s) |
+| TensorRT, FP8 | 1.480 | 1.13 s | 683 / 317 / 134 | 14 GB (31 s) |
+
+Eager FP8 is slower than eager FP16 because ModelOpt emulates FP8 with fake-quantization (quantize and dequantize
+operations around FP16 matrix multiplies); only TensorRT runs real FP8 kernels. TensorRT is about 2.8x faster than
+eager FP16 and 4.4x faster than eager FP8 for the same checkpoint. FP8 is about 18% faster than FP16 in TensorRT and
+halves the engine memory.
 
 The Alpamayo 1.5 model and the PhysicalAI-AV dataset are gated on Hugging Face: request access to both and run
 `hf auth login` first (see the [Alpamayo Recipes README](https://github.com/NVlabs/alpamayo-recipes)).

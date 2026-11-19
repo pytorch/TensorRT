@@ -42,7 +42,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable
 
 import numpy as np
 import torch
@@ -89,13 +89,6 @@ def get_args():
         type=int,
         default=3456,
         help="KV-cache length: prompt (~3.1k tokens) + generated tokens + margin",
-    )
-    ap.add_argument(
-        "--llm_segments",
-        type=int,
-        default=2,
-        help="split the text decoder into this many engines; building one ~15 GB fp16 engine "
-        "needs more host RAM than a 64 GB machine has",
     )
     ap.add_argument(
         "--chunk_len",
@@ -391,55 +384,32 @@ class StaticVisionEncoder(torch.nn.Module):
         return v.merger(x), deepstack
 
 
-class TextSegment(torch.nn.Module):
-    """A contiguous range of Qwen3-VL text decoder layers (unmodified HF layers).
+class TextDecoder(torch.nn.Module):
+    """The Qwen3-VL text decoder (unmodified HF layers) with the final norm and ``lm_head``.
 
     The KV cache is added to the graph by ``static_cache_v2`` at compile time; the causal mask is
-    that pass's causal SDPA, so the layers are called with ``attention_mask=None``. mRoPE is computed
-    in the graph from ``position_ids`` [3, B, L]. The last segment applies the final norm and
-    ``lm_head`` to all L positions (the host reads the last).
-
-    The decoder is split into several engines because the host RAM needed to build and serialize one
-    ~15 GB fp16 engine exceeds a 64 GB machine.
+    built by that pass too, so the layers are called with ``attention_mask=None``. mRoPE is computed
+    in the graph from ``position_ids`` [3, B, L]. DeepStack adds the dense vision features
+    [num_deepstack, 1, L, H] after the first layers. ``lm_head`` is applied to all L positions (the
+    host reads the last).
     """
 
-    def __init__(
-        self, text_model, lm_head, layer_range: Tuple[int, int], num_deepstack: int
-    ):
+    def __init__(self, text_model, lm_head, num_layers: int, num_deepstack: int):
         super().__init__()
-        lo, hi = layer_range
-        self.layers = text_model.layers[lo:hi]
+        self.layers = text_model.layers[:num_layers]
         self.rotary_emb = text_model.rotary_emb
-        self.first_layer, self.num_deepstack = lo, num_deepstack
-        self.is_last = hi == len(text_model.layers)
-        if self.is_last:
-            self.norm, self.lm_head = text_model.norm, lm_head
+        self.norm, self.lm_head = text_model.norm, lm_head
+        self.num_deepstack = num_deepstack
 
-    def _run(self, hidden, position_ids, deepstack):
+    def forward(self, hidden, position_ids, deepstack):
         position_embeddings = self.rotary_emb(hidden, position_ids)
         for i, layer in enumerate(self.layers):
             hidden = layer(
                 hidden, position_embeddings=position_embeddings, attention_mask=None
             )
-            if deepstack is not None and self.first_layer + i < self.num_deepstack:
-                hidden = (
-                    hidden + deepstack[self.first_layer + i]
-                )  # DeepStack: [1, L, H]
-        return self.lm_head(self.norm(hidden)) if self.is_last else hidden
-
-    def forward(self, hidden, position_ids):
-        return self._run(hidden, position_ids, None)
-
-
-class TextFirstSegment(TextSegment):
-    """First segment: adds the dense DeepStack features [num_deepstack, 1, L, H] after layer i.
-
-    (A separate class rather than an optional argument: ``torch_tensorrt.save`` cannot serialize a
-    signature with a defaulted ``None`` argument that is absent from the graph.)
-    """
-
-    def forward(self, hidden, position_ids, deepstack):
-        return self._run(hidden, position_ids, deepstack)
+            if i < self.num_deepstack:
+                hidden = hidden + deepstack[i]  # DeepStack: [1, L, H]
+        return self.lm_head(self.norm(hidden))
 
 
 def _folded_gqa_sdpa(q, k, v, mask, scale):
@@ -549,11 +519,6 @@ def compile_and_save(build: Callable, out_path: Path, quantized: bool = False):
     print("saved", out_path)
 
 
-def segment_ranges(num_layers: int, num_segments: int) -> List[Tuple[int, int]]:
-    bounds = [round(i * num_layers / num_segments) for i in range(num_segments + 1)]
-    return list(zip(bounds[:-1], bounds[1:]))
-
-
 def build_vision(args):
     model = load_model(args.model).to(DEVICE)
     _, tokenized = load_inputs(model, args)
@@ -562,87 +527,80 @@ def build_vision(args):
     quantized = is_quantized(args.model)
     visual = model.vlm.model.visual.eval()
     prepare_weights(visual, quantized)
+    with torch.no_grad():
+        ref, _ = visual(pixel_values, grid_thw)
     encoder = StaticVisionEncoder(visual, grid_thw).eval()
-    del model, visual
+    with torch.no_grad():
+        out, _ = encoder(pixel_values)
+    cos = F.cosine_similarity(
+        out.float().flatten(), ref.float().flatten(), dim=0
+    ).item()
+    print(f"[vision] wrapper vs original cosine {cos:.6f}")
+    # FP8 (W8A8) rounds differently in the wrapper (it applies the attention q/k/v quantizers
+    # explicitly), so a looser bound than FP16's applies there.
+    min_cos = 0.97 if quantized else 0.999
+    assert (
+        cos > min_cos
+    ), f"the static vision wrapper does not reproduce the HF vision tower (cosine {cos:.6f})"
+    del model, visual, ref, out
     gc.collect()
     compile_and_save(
         lambda: (encoder, (pixel_values,), None, [pixel_values]),
-        Path(args.engine_dir) / "vision.ep",
+        Path(args.engine_dir) / "vision.pt2",
         quantized,
     )
 
 
-def build_llm_segment(args, layer_range):
-    model = load_model(args.model)
-    text_model = model.vlm.model.language_model
-    num_deepstack = len(model.vlm.config.vision_config.deepstack_visual_indexes)
-    lo, hi = layer_range
-    first = lo == 0
-    assert (
-        not first or hi >= num_deepstack
-    ), "the first segment must hold all DeepStack layers"
-    cls = TextFirstSegment if first else TextSegment
-    seg = (
-        cls(text_model, model.vlm.lm_head, layer_range, num_deepstack).to(DEVICE).eval()
-    )
-    prepare_weights(seg, is_quantized(args.model), args.fp8_attention_output_quant)
-    H = text_model.config.hidden_size
-    del model, text_model
-    gc.collect()
+def build_llm(args):
+    # The KV cache is added to every SDPA of the graph being compiled, so this is only enabled for
+    # the decoder (the vision and expert engines are built in other processes).
+    import static_cache_v2
 
-    dt = torch.float16
-    B_ex, L_ex = 2, 8  # example > 1 so export does not specialize the dynamic dims
-    example = (
-        torch.randn(B_ex, L_ex, H, device=DEVICE, dtype=dt),
-        torch.arange(L_ex, device=DEVICE, dtype=torch.int32)
-        .expand(3, B_ex, L_ex)
-        .contiguous(),
-    ) + (
-        (torch.zeros(num_deepstack, 1, L_ex, H, device=DEVICE, dtype=dt),)
-        if first
-        else ()
-    )
-    batch = torch.export.Dim("batch", min=1, max=args.num_traj_samples)
-    seq = torch.export.Dim("seq", min=1, max=args.chunk_len)
-    dyn = ({0: batch, 1: seq}, {1: batch, 2: seq}) + (({2: seq},) if first else ())
-    Bmax, C, Lopt = args.num_traj_samples, args.chunk_len, 1  # tuned for decoding
-    inputs = [
-        trt_input((Bmax, Lopt, H), dt, (1, 1, H), (Bmax, C, H)),
-        trt_input((3, Bmax, Lopt), torch.int32, (3, 1, 1), (3, Bmax, C)),
-    ]
-    if first:
-        inputs.append(
+    static_cache_v2.KV_CACHE_LEN = args.max_seq_len
+
+    def build():
+        model = load_model(args.model)
+        text_model = model.vlm.model.language_model
+        num_deepstack = len(model.vlm.config.vision_config.deepstack_visual_indexes)
+        num_layers = len(text_model.layers)
+        decoder = (
+            TextDecoder(text_model, model.vlm.lm_head, num_layers, num_deepstack)
+            .to(DEVICE)
+            .eval()
+        )
+        prepare_weights(
+            decoder, is_quantized(args.model), args.fp8_attention_output_quant
+        )
+        H = text_model.config.hidden_size
+        del model, text_model
+        gc.collect()
+
+        dt = torch.float16
+        B_ex, L_ex = 2, 8  # example > 1 so export does not specialize the dynamic dims
+        example = (
+            torch.randn(B_ex, L_ex, H, device=DEVICE, dtype=dt),
+            torch.arange(L_ex, device=DEVICE, dtype=torch.int32)
+            .expand(3, B_ex, L_ex)
+            .contiguous(),
+            torch.zeros(num_deepstack, 1, L_ex, H, device=DEVICE, dtype=dt),
+        )
+        batch = torch.export.Dim("batch", min=1, max=args.num_traj_samples)
+        seq = torch.export.Dim("seq", min=1, max=args.chunk_len)
+        dyn = ({0: batch, 1: seq}, {1: batch, 2: seq}, {2: seq})
+        Bmax, C, Lopt = args.num_traj_samples, args.chunk_len, 1  # tuned for decoding
+        inputs = [
+            trt_input((Bmax, Lopt, H), dt, (1, 1, H), (Bmax, C, H)),
+            trt_input((3, Bmax, Lopt), torch.int32, (3, 1, 1), (3, Bmax, C)),
             trt_input(
                 (num_deepstack, 1, Lopt, H),
                 dt,
                 (num_deepstack, 1, 1, H),
                 (num_deepstack, 1, C, H),
-            )
-        )
-    return seg, example, dyn, inputs
+            ),
+        ]
+        return decoder, example, dyn, inputs
 
-
-def build_llm(args):
-    # The KV cache is added to every SDPA of the graph being compiled, so these are only enabled
-    # for the decoder (the vision and expert engines are built in other processes).
-    import static_cache_v2
-    from torchtrt_ext import register_sdpa
-
-    register_sdpa.enable_sdpa_converter("default", None)
-    static_cache_v2.KV_CACHE_LEN = args.max_seq_len
-
-    model = load_model(args.model)
-    num_layers = len(model.vlm.model.language_model.layers)
-    del model
-    gc.collect()
-    for idx, layer_range in enumerate(segment_ranges(num_layers, args.llm_segments)):
-        print(f"[llm] segment {idx}: layers {layer_range}")
-        compile_and_save(
-            lambda r=layer_range: build_llm_segment(args, r),
-            Path(args.engine_dir) / f"llm_{idx}.ep",
-            is_quantized(args.model),
-        )
-        gc.collect()
+    compile_and_save(build, Path(args.engine_dir) / "llm.pt2", is_quantized(args.model))
 
 
 def build_expert(args):
@@ -681,7 +639,9 @@ def build_expert(args):
         return step, example, None, inputs
 
     compile_and_save(
-        build, Path(args.engine_dir) / "expert.ep", is_quantized(args.model)
+        build,
+        Path(args.engine_dir) / "expert.pt2",
+        is_quantized(args.model),
     )
 
 
@@ -769,13 +729,6 @@ class TrtAlpamayo:
             {},
         )
         self.load_ms = 0.0  # engine deserialization time, reported apart from compute
-        self.llm_names = [
-            p.stem
-            for p in sorted(
-                self.engine_dir.glob("llm_*.ep"),
-                key=lambda p: int(p.stem.split("_")[1]),
-            )
-        ]
         # Host-side pieces: the embedding table and the expert's rotary tables (small).
         lm = model.vlm.model.language_model
         self.embed, self.expert_rotary = lm.embed_tokens, model.expert.rotary_emb
@@ -790,7 +743,6 @@ class TrtAlpamayo:
         gc.collect()
         cfg = model.vlm.config.text_config
         self.layers, self.H = cfg.num_hidden_layers, cfg.hidden_size
-        self.segment_ranges = segment_ranges(self.layers, len(self.llm_names))
         self.kv_shape = (cfg.num_key_value_heads, self.S, cfg.head_dim)
         self.image_token_id = model.vlm.config.image_token_id
         self.eos_id = model.tokenizer.convert_tokens_to_ids(
@@ -807,7 +759,7 @@ class TrtAlpamayo:
         if name not in self._engines:
             t = time.perf_counter()
             self._engines[name] = torch.export.load(
-                str(self.engine_dir / f"{name}.ep")
+                str(self.engine_dir / f"{name}.pt2")
             ).module()
             dt = time.perf_counter() - t
             self.load_ms += dt * 1e3
@@ -823,18 +775,11 @@ class TrtAlpamayo:
         torch.cuda.empty_cache()
 
     def run_llm(self, hidden, position_ids, caches, deepstack, start, end):
-        """Chain the decoder segment engines; returns (logits [B, L, V], all updated caches)."""
-        new_caches = []
-        position_ids = position_ids.to(torch.int32)
-        for i, (name, (lo, hi)) in enumerate(zip(self.llm_names, self.segment_ranges)):
-            extra = (
-                (deepstack,) if i == 0 else ()
-            )  # only the first segment takes DeepStack
-            out = self.engine(name)(
-                hidden, position_ids, *extra, *caches[2 * lo : 2 * hi], start, end
-            )
-            hidden, new_caches = out[0], new_caches + list(out[1:])
-        return hidden, new_caches
+        """The decoder engine; returns (logits [B, L, V], all updated caches)."""
+        out = self.engine("llm")(
+            hidden, position_ids.to(torch.int32), deepstack, *caches, start, end
+        )
+        return out[0], list(out[1:])
 
     def _sample(self, logits):
         """ExpertLogitsProcessor -> temperature -> top-p -> multinomial (HF's processor order)."""
@@ -990,7 +935,7 @@ class TrtAlpamayo:
         self.first_logits = logits[0].float().cpu()
         t = tick("vision+prefill", t)
         seqs, caches = self.generate(input_ids, logits, caches, rope_deltas)
-        self.release(*self.llm_names)
+        self.release("llm")
         t = tick("decode", t)
         seqs = replace_padding_after_eos(seqs, self.eos_id, self.pad_id)
         pred_xyz = self.expert_rollout(seqs, caches, rope_deltas, data)

@@ -12,6 +12,14 @@ from torch.fx.passes.shape_prop import _extract_tensor_metadata
 from torch.utils._pytree import _LEAF_SPEC, TreeSpec
 
 
+# Both forms of SDPA: ``register_sdpa`` rewrites the aten op to the ``torch._C._nn`` one; without it
+# the graph keeps the aten op (``enable_gqa`` / ``scale`` as keyword arguments).
+SDPA_OPS = (
+    torch._C._nn.scaled_dot_product_attention,
+    torch.ops.aten.scaled_dot_product_attention.default,
+)
+
+
 def get_kv_nodes(gm):
     """
     Extract key and value nodes from scaled dot-product attention operations in the graph.
@@ -30,7 +38,7 @@ def get_kv_nodes(gm):
     for node in gm.graph.nodes:
         if (
             node.op == "call_function"
-            and node.target == torch._C._nn.scaled_dot_product_attention
+            and node.target in SDPA_OPS
         ):
             q_node, k_node, v_node = node.args[:3]
             kv_nodes.append((k_node, v_node))

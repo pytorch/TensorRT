@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 import torch
 import torch.utils._pytree as pytree
 from cache_utils import (
+    SDPA_OPS,
     add_graph_input,
     create_random_output_tensors,
     get_kv_nodes,
@@ -23,8 +24,6 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 from torch_tensorrt.dynamo.utils import extract_var_range_info
 
 logger = logging.getLogger(__name__)
-
-SDPA_OP = torch._C._nn.scaled_dot_product_attention
 
 # Length of the static KV cache; None ties it to the largest per-call sequence length. Set before
 # compiling (the lowering pass has no way to receive arguments).
@@ -250,6 +249,25 @@ def create_kv_cache_update_nodes(
     return concat_keys_or_values, new_incoming_keys_or_values
 
 
+def build_cache_causal_mask(gm, sdpa_node, q_node, k_node, start_idx_input) -> Node:
+    """Boolean mask [q_len, k_len]: query row ``i`` (the ``i``-th of the *last* ``q_len`` positions)
+    attends key ``j`` iff ``j <= start_idx + i`` (``start_idx`` = ``k_len - q_len``, the cached prefix)."""
+    g = gm.graph
+    device = q_node.meta["val"].device
+    with g.inserting_before(sdpa_node):
+        q_len = g.call_function(torch.ops.aten.sym_size.int, (q_node, 2))
+        k_len = g.call_function(torch.ops.aten.sym_size.int, (k_node, 2))
+        rows = g.call_function(
+            torch.ops.aten.arange.start_step, (0, q_len, 1), {"dtype": torch.int32, "device": device}
+        )
+        rows = g.call_function(torch.ops.aten.add.Tensor, (rows, start_idx_input))
+        cols = g.call_function(
+            torch.ops.aten.arange.start_step, (0, k_len, 1), {"dtype": torch.int32, "device": device}
+        )
+        rows = g.call_function(torch.ops.aten.unsqueeze.default, (rows, 1))
+        return g.call_function(torch.ops.aten.le.Tensor, (cols, rows))
+
+
 def insert_kv_slicing_before_sdpa(
     gm,
     incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]],
@@ -267,14 +285,16 @@ def insert_kv_slicing_before_sdpa(
     # Find all nodes with scaled_dot_product_attention
     sdpa_nodes = []
     for node in gm.graph.nodes:
-        if node.op == "call_function" and node.target == SDPA_OP:
+        if node.op == "call_function" and node.target in SDPA_OPS:
             sdpa_nodes.append(node)
     kv_cache_for_graph = []
+    causal_mask = None  # identical for every layer: built once, before the first SDPA
     for idx, sdpa_node in enumerate(sdpa_nodes):
-        assert (
-            len(sdpa_node.args) == 6
-        ), f"SDPA node should have 6 arguments but got {len(sdpa_node.args)} arguments"
-        q_node, k_node, v_node, attn_mask, dropout_p, is_causal = sdpa_node.args
+        q_node, k_node, v_node = sdpa_node.args[:3]
+        # (attn_mask, dropout_p, is_causal) are positional or keyword depending on the op form
+        attn_mask, dropout_p, _ = (
+            list(sdpa_node.args[3:6]) + [None, 0.0, False][len(sdpa_node.args[3:6]) :]
+        )
         incoming_key, incoming_value = incoming_keys_values[idx]
         # For keys
         new_current_key_node, new_incoming_key_cache_node = (
@@ -294,11 +314,24 @@ def insert_kv_slicing_before_sdpa(
             [new_incoming_key_cache_node, new_incoming_value_cache_node]
         )
 
+        # K/V now come from the cache (a slice + cat), which TensorRT's fused FP8 attention kernel
+        # cannot take: drop the FP8 softmax annotation (``annotate_fp8_sdpa``, set while K/V were
+        # still the quantizers' outputs) so the attention stays decomposable.
+        sdpa_node.meta.pop("_fp8_softmax_scale", None)
+
         # Update the SDPA node arguments with current key and value nodes
+        # The keys are the cache's prefix plus the new ones, so the query rows are the *last* rows of
+        # the causal mask. ``is_causal=True`` would align it to the top-left for a shorter query, so
+        # the mask is explicit.
+        if causal_mask is None:
+            causal_mask = build_cache_causal_mask(
+                gm, sdpa_node, q_node, new_current_key_node, start_idx_input
+            )
+        attn_mask = causal_mask
         sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + (
             attn_mask,
             dropout_p,
-            True,
+            False,
         )
 
     # kv_cache_for_graph.extend([k_node, v_node])
