@@ -7,7 +7,11 @@ import os
 
 def quantization_available(package: str) -> bool:
     """Check optional test dependencies without importing their Torch extensions."""
+    setting = (
+        "INSTALL_MODELOPT_QUANTIZATION"
+        if package == "modelopt"
+        else "INSTALL_TORCHAO_QUANTIZATION"
+    )
     return (
-        os.environ.get("INSTALL_QUANTIZATION") != "0"
-        and importlib.util.find_spec(package) is not None
+        os.environ.get(setting) != "0" and importlib.util.find_spec(package) is not None
     )
