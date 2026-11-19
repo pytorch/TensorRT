@@ -1419,8 +1419,9 @@ def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
     return True
 
 
-@fn_supports_debugger  # type: ignore[misc]
 @with_compiler_lock
+# Register the original function so Debugger can update its keyword defaults.
+@fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
