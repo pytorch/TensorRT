@@ -240,6 +240,30 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
        regions.
+   * - ``autocast_model_casts``
+     - ``"keep"``
+     - What autocast does with the casts to FP32 that the model itself writes, such as
+       ``x.float()`` or ``x.to(torch.float32)``. ``"keep"`` keeps them. An op that
+       autocast runs in the low precision type still casts its inputs to that type, so
+       such a cast between two of those ops becomes a round trip, for example float16 to
+       FP32 and back. ``"reclassify"`` removes these round trips: a cast that autocast
+       runs in the low precision type, and whose users all run in it too, keeps the
+       dtype of its input, as if the model had not written it. Other casts, such as an
+       excluded cast, one with a user in FP32 or one that makes an output of the model,
+       still cast to FP32. The values do not change, since a cast from float16 or
+       bfloat16 to FP32 is exact. To keep an op in FP32, exclude the op, not the cast.
+       With ``autocast_model_regions="reclassify"`` this also covers the casts that
+       inlining adds at the boundary of a region.
+   * - ``autocast_vector_norm_in_low_precision``
+     - ``False``
+     - Whether autocast writes a 2-norm that it runs in the low precision type, such as
+       the ``torch.linalg.vector_norm(x)`` in ``F.normalize``, as ``sqrt(sum(x * x))`` in
+       that type. By default PyTorch computes it in FP32 for a float16 or bfloat16 ``x``,
+       as eager does, which adds casts around it. In float16 a sum of squares overflows
+       for a norm above about 256, and a value below about 2e-4 squares to 0. With
+       ``autocast_calibration_dataloader``, a norm whose sum of squares would overflow
+       stays in FP32. Otherwise check the accuracy, or keep such norms in FP32 with the
+       exclusions.
 
 ----
 
@@ -546,6 +570,8 @@ rebuilt from scratch:
 ``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
+``autocast_model_casts``,
+``autocast_vector_norm_in_low_precision``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,

@@ -140,6 +140,16 @@ def get_tensor_placeholders(
     return placeholders
 
 
+def set_schema_argument(node: torch.fx.Node, name: str, value: Any) -> None:
+    """Set the argument of node that its schema calls name, in args when the call
+    gives it there and as a keyword otherwise."""
+    i = [a.name for a in node.target._schema.arguments].index(name)
+    if i < len(node.args):
+        node.update_arg(i, value)
+    else:
+        node.update_kwarg(name, value)
+
+
 def tensors_written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     """The tensors an op writes into, such as self of add_, out of add.out and each
     tensor of the list self of _foreach_add_."""

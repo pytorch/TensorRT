@@ -95,6 +95,9 @@ might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autoc
 allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast
 respects the precision of the nodes within PyTorch Autocast context. To let Torch-TensorRT Autocast choose the
 precision inside those contexts too, set ``autocast_model_regions="reclassify"``.
+Casts to FP32 that the model writes itself, such as ``x.float()``, stay in the graph too. Between two ops that run in
+the low precision type, such a cast only adds a round trip through FP32, and ``autocast_model_casts="reclassify"``
+removes it.
 
 To enable Torch-TensorRT Autocast, we need to set ``enable_autocast=True``.
 On top of that, we can also specify the precision of the nodes to reduce to by ``autocast_low_precision_type``,

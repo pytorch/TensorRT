@@ -573,6 +573,8 @@ def compile(
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     autocast_model_regions: str = _defaults.AUTOCAST_MODEL_REGIONS,
+    autocast_model_casts: str = _defaults.AUTOCAST_MODEL_CASTS,
+    autocast_vector_norm_in_low_precision: bool = _defaults.AUTOCAST_VECTOR_NORM_IN_LOW_PRECISION,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     max_partition_size: Optional[int] = _defaults.MAX_PARTITION_SIZE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
@@ -691,6 +693,8 @@ def compile(
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
+        autocast_model_casts (str): What autocast does with the casts to FP32 that the model itself writes, such as x.float() or x.to(torch.float32). "keep" keeps them. An op that autocast runs in the low precision type still casts its inputs to that type, so such a cast between two of those ops becomes a round trip, for example float16 to FP32 and back. "reclassify" removes these round trips: a cast that autocast runs in the low precision type, and whose users all run in it too, keeps the dtype of its input, as if the model had not written it. Other casts, such as an excluded cast, one with a user in FP32 or one that makes an output of the model, still cast to FP32. The values do not change, since a cast from float16 or bfloat16 to FP32 is exact. To keep an op in FP32, exclude the op, not the cast. With autocast_model_regions="reclassify" this also covers the casts that inlining adds at the boundary of a region. Default is "keep".
+        autocast_vector_norm_in_low_precision (bool): Whether autocast writes a 2-norm that it runs in the low precision type, such as the torch.linalg.vector_norm(x) in F.normalize, as sqrt(sum(x * x)) in that type. By default PyTorch computes it in FP32 for a float16 or bfloat16 x, as eager does, which adds casts around it. In float16 a sum of squares overflows for a norm above about 256, and a value below about 2e-4 squares to 0. With autocast_calibration_dataloader, a norm whose sum of squares would overflow stays in FP32. Otherwise check the accuracy, or keep such norms in FP32 with the exclusions. Default is False.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
@@ -921,6 +925,8 @@ def compile(
         "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
         "autocast_model_regions": autocast_model_regions,
+        "autocast_model_casts": autocast_model_casts,
+        "autocast_vector_norm_in_low_precision": autocast_vector_norm_in_low_precision,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "max_partition_size": max_partition_size,

@@ -13,6 +13,7 @@ from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 
 from .pass_utils import (
     clean_up_graph_after_modifications,
+    set_schema_argument,
     tensors_maybe_written_by,
     tensors_written_by,
 )
@@ -256,11 +257,7 @@ def _inline_region(
                 if _copies(node):
                     # to() returns its input when that already has the dtype, as it
                     # now can. Keep the copy, which a view of the result can need.
-                    names = [a.name for a in node.target._schema.arguments]
-                    if names.index("copy") < len(node.args):
-                        env[node].update_arg(names.index("copy"), True)
-                    else:
-                        env[node].update_kwarg("copy", True)
+                    set_schema_argument(env[node], "copy", True)
                 # Ops such as matmul and lerp need their floating point inputs in one
                 # dtype. Autocast gave them one when it has a kernel for the op, which
                 # casts them, or when they all had one dtype in the region.

@@ -23,7 +23,9 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_LOW_PRECISION_TYPE,
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    AUTOCAST_MODEL_CASTS,
     AUTOCAST_MODEL_REGIONS,
+    AUTOCAST_VECTOR_NORM_IN_LOW_PRECISION,
     BUILD_ROUTE,
     CACHE_BUILT_ENGINES,
     COLLAPSE_HIGH_RANK_PERMUTES,
@@ -175,6 +177,8 @@ class CompilationSettings:
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
+        autocast_model_casts (str): What autocast does with the casts to FP32 that the model itself writes, such as x.float() or x.to(torch.float32). "keep" keeps them. An op that autocast runs in the low precision type still casts its inputs to that type, so such a cast between two of those ops becomes a round trip, for example float16 to FP32 and back. "reclassify" removes these round trips: a cast that autocast runs in the low precision type, and whose users all run in it too, keeps the dtype of its input, as if the model had not written it. Other casts, such as an excluded cast, one with a user in FP32 or one that makes an output of the model, still cast to FP32. The values do not change, since a cast from float16 or bfloat16 to FP32 is exact. To keep an op in FP32, exclude the op, not the cast. With autocast_model_regions="reclassify" this also covers the casts that inlining adds at the boundary of a region. Default is "keep".
+        autocast_vector_norm_in_low_precision (bool): Whether autocast writes a 2-norm that it runs in the low precision type, such as the torch.linalg.vector_norm(x) in F.normalize, as sqrt(sum(x * x)) in that type. By default PyTorch computes it in FP32 for a float16 or bfloat16 x, as eager does, which adds casts around it. In float16 a sum of squares overflows for a norm above about 256, and a value below about 2e-4 squares to 0. With autocast_calibration_dataloader, a norm whose sum of squares would overflow stays in FP32. Otherwise check the accuracy, or keep such norms in FP32 with the exclusions. Default is False.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner
             splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The
             size is then not derived from the budget and the process's resident memory, so the same model and size always
@@ -285,6 +289,8 @@ class CompilationSettings:
         AUTOCAST_CALIBRATION_DATALOADER
     )
     autocast_model_regions: str = AUTOCAST_MODEL_REGIONS
+    autocast_model_casts: str = AUTOCAST_MODEL_CASTS
+    autocast_vector_norm_in_low_precision: bool = AUTOCAST_VECTOR_NORM_IN_LOW_PRECISION
     # Set by autocast, not by users: the nodes it kept in high precision using the
     # calibration data. Saved in place of the data so refit can reuse the choice.
     _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
@@ -354,6 +360,11 @@ class CompilationSettings:
                 'autocast_model_regions must be "keep" or "reclassify", got '
                 f"{self.autocast_model_regions!r}"
             )
+        if self.autocast_model_casts not in ("keep", "reclassify"):
+            raise ValueError(
+                'autocast_model_casts must be "keep" or "reclassify", got '
+                f"{self.autocast_model_casts!r}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -415,6 +426,11 @@ class CompilationSettings:
         state.setdefault("max_partition_size", MAX_PARTITION_SIZE)
         state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
         state.setdefault("autocast_model_regions", AUTOCAST_MODEL_REGIONS)
+        state.setdefault("autocast_model_casts", AUTOCAST_MODEL_CASTS)
+        state.setdefault(
+            "autocast_vector_norm_in_low_precision",
+            AUTOCAST_VECTOR_NORM_IN_LOW_PRECISION,
+        )
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
         self.__dict__.update(state)
 
@@ -442,6 +458,8 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
     "autocast_model_regions",
+    "autocast_model_casts",
+    "autocast_vector_norm_in_low_precision",
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",

@@ -15,6 +15,7 @@ from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
     _wait_tensor_op,
     clean_up_graph_after_modifications,
+    set_schema_argument,
     tensors_maybe_written_by,
     tensors_written_by,
 )
@@ -57,6 +58,83 @@ def _is_given_a_dtype(n: torch.fx.Node) -> bool:
             given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
             return given is not None
     return False
+
+
+def _is_cast_to_float32(n: torch.fx.Node) -> bool:
+    """Whether n is a cast to float32, such as x.float(), of a float16, bfloat16 or
+    float32 tensor that stays on its device."""
+    if not (
+        _is_given_a_dtype(n)
+        and n.target.overloadpacket in (torch.ops.aten.to, torch.ops.aten._to_copy)
+        and n.args
+        and isinstance(n.args[0], torch.fx.Node)
+    ):
+        return False
+    src, out = n.args[0].meta.get("val"), n.meta.get("val")
+    return (
+        isinstance(src, torch.Tensor)
+        and isinstance(out, torch.Tensor)
+        and src.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        and out.dtype == torch.float32
+        and src.device == out.device
+    )
+
+
+def _keep_copy(n: torch.fx.Node) -> None:
+    """Make n, a cast that made a copy when traced, still make one. to() returns its
+    input when that already has the dtype, as it can after autocast, while an op may
+    write into the copy."""
+    if (
+        isinstance(n.target, torch._ops.OpOverload)
+        and n.target.overloadpacket is torch.ops.aten.to
+    ):
+        set_schema_argument(n, "copy", True)
+
+
+def _keep_input_dtype(n: torch.fx.Node, copies: bool) -> None:
+    """Make n, a cast, keep the dtype of its input. A cast that made a copy, such as
+    x.float() of a float16 x, still does."""
+    dtype = n.args[0].meta["val"].dtype
+    set_schema_argument(n, "dtype", dtype)
+    if copies:
+        _keep_copy(n)
+    n.meta["val"] = n.meta["val"].to(dtype)
+
+
+def _is_2_norm(n: torch.fx.Node) -> bool:
+    """Whether n is a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), as F.normalize
+    uses it."""
+    if n.target != torch.ops.aten.linalg_vector_norm.default:
+        return False
+    order = n.args[1] if len(n.args) > 1 else n.kwargs.get("ord", 2)
+    return bool(order == 2)
+
+
+def _write_out_vector_norm(
+    gm: torch.fx.GraphModule, node: torch.fx.Node
+) -> torch.fx.Node:
+    """Replace a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), with
+    sqrt(sum(x * x, dim, keepdim)) in the dtype of x, and return the sqrt. PyTorch's
+    decomposition squares and sums a float16 or bfloat16 x in float32, with casts
+    around it."""
+    names = [a.name for a in node.target._schema.arguments]
+    args = {**dict(zip(names, node.args)), **node.kwargs}
+    x = args["self"]
+    with gm.graph.inserting_before(node):
+        square = gm.graph.call_function(torch.ops.aten.mul.Tensor, (x, x))
+        total = gm.graph.call_function(
+            torch.ops.aten.sum.dim_IntList,
+            (square, args.get("dim"), args.get("keepdim", False)),
+        )
+        root = gm.graph.call_function(torch.ops.aten.sqrt.default, (total,))
+    for new in (square, total, root):
+        # Keep nn_module_stack, which torch_executed_modules and engine layer names read.
+        new.meta.update({k: v for k, v in node.meta.items() if k != "tensor_meta"})
+    square.meta["val"] = x.meta["val"]
+    total.meta["val"] = root.meta["val"] = node.meta["val"]
+    node.replace_all_uses_with(root)
+    gm.graph.erase_node(node)
+    return root
 
 
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
@@ -209,6 +287,18 @@ def rule_based_autocast(
     low_precision_nodes, high_precision_nodes = node_classifier.run(
         reference_data, reference_shapes
     )
+    if settings.autocast_vector_norm_in_low_precision and reference_data:
+        # The written-out 2-norm sums the squares in the low precision type, so a norm
+        # whose square calibration finds too large for that type stays in FP32.
+        largest = math.sqrt(torch.finfo(autocast_low_precision_type).max)
+        for n in gm.graph.nodes:
+            if (
+                _is_2_norm(n)
+                and n.name in low_precision_nodes
+                and reference_data.get(n.name, 0) > largest
+            ):
+                low_precision_nodes.remove(n.name)
+                high_precision_nodes.append(n.name)
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(
@@ -365,9 +455,37 @@ def rule_based_autocast(
                 # A factory op such as torch.zeros has no inputs to cast, so its
                 # output keeps the dtype it was created with.
                 continue
+            if (
+                settings.autocast_model_casts == "reclassify"
+                and _is_cast_to_float32(node)
+                and node.name in low_precision_nodes
+                # A user in FP32, or one given its traced dtype such as view(dtype),
+                # would need a cast back, and an output of the model keeps the dtype
+                # the model gives it.
+                and all(
+                    user.name in low_precision_nodes
+                    and user.target != torch.ops.aten.view.dtype
+                    and user not in kept
+                    for user in node.users
+                )
+            ):
+                _keep_input_dtype(
+                    node, copies=traced_dtypes[node.args[0]] != torch.float32
+                )
+                continue
             if _is_given_a_dtype(node):
                 # An op such as x.float() or cumsum(dtype=torch.float32) makes the
                 # dtype it is given, whatever its inputs are.
+                src = node.args[0] if node.args else None
+                if (
+                    settings.autocast_model_casts == "reclassify"
+                    and isinstance(src, torch.fx.Node)
+                    and src in traced_dtypes
+                    and traced_dtypes[src] != traced_dtypes.get(node)
+                ):
+                    # A cast such as y.half() can now get y in float16, as from a
+                    # reclassified y = h.float() or through y.add_(1).
+                    _keep_copy(node)
                 continue
             if _has_only_integer_outputs(node):
                 # An integer op such as ids % k must still make integers, for
@@ -395,6 +513,15 @@ def rule_based_autocast(
             ):
                 # With only bool inputs, mask * 0.5 still makes float32.
                 node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
+            if (
+                settings.autocast_vector_norm_in_low_precision
+                and target_dtype == autocast_low_precision_type
+                and _is_2_norm(node)
+            ):
+                root = _write_out_vector_norm(gm, node)
+                # A later cast of the norm, such as one autocast_model_casts
+                # reclassifies, reads the dtype its input was traced with.
+                traced_dtypes[root] = traced_dtypes[node]
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)
