@@ -661,7 +661,7 @@ def verify_driver_accepts_ptx(op_name: str, kernel_name: str, ptx: str) -> None:
         from cuda import cuda
 
     try:
-        err = _common.load_ptx(ptx, kernel_name)
+        err, _ = _common.load_ptx(ptx, kernel_name)
     except Exception as exc:  # pragma: no cover - environment dependent
         raise RuntimeError(
             f"cutile_op '{op_name}' could not verify the PTX for kernel "

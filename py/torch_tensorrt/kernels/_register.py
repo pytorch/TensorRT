@@ -25,6 +25,7 @@ import torch
 
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins import custom_op
+from torch_tensorrt.kernels import _common
 from torch_tensorrt.kernels._qdp import (
     _patch_trt_shape_expr_reflected_ops,
     _QDPRegistrationState,
@@ -49,6 +50,7 @@ _GENERATED_PARAMETER_NAMES = frozenset(
         "_generic_plugin_desc",
         "_generic_plugin_impl",
         "_user_aot_fn",
+        "_check_shared_mem",
         "_kernel_name",
         "_ptx_str",
         "_trtp",
@@ -386,6 +388,18 @@ def _register_pytorch_op(
     return lib
 
 
+def _check_aot_shared_mem(kernel_name: str, launch_params: Any) -> None:
+    """Fail the engine build for a launch that would fail on every run."""
+    shared_mem = _common.constant_int(getattr(launch_params, "shared_mem", None))
+    if shared_mem is not None and shared_mem > _common.AOT_MAX_DYNAMIC_SHARED_MEM:
+        raise ValueError(
+            f"kernel '{kernel_name}' asks for {shared_mem} bytes of dynamic shared "
+            "memory, but TensorRT launches plugin kernels with at most "
+            f"{_common.AOT_MAX_DYNAMIC_SHARED_MEM} bytes "
+            f"({_common.AOT_SHARED_MEM_ISSUE})."
+        )
+
+
 def _make_aot_impl(
     schema_info: OpSchemaInfo,
     ptx: str,
@@ -407,6 +421,7 @@ def _aot_impl({sig}):
         launch_params, extra_args = result
     else:
         launch_params, extra_args = result, None
+    _check_shared_mem(_kernel_name, launch_params)
     if extra_args is None:
         extra_args = _trtp.SymIntExprs(0)
     return (_kernel_name, _ptx_str, launch_params, extra_args)
@@ -414,6 +429,7 @@ def _aot_impl({sig}):
 
     fn_globals = {
         "_user_aot_fn": user_aot_fn,
+        "_check_shared_mem": _check_aot_shared_mem,
         "_kernel_name": kernel_name,
         "_ptx_str": ptx,
         "_trtp": trtp,
