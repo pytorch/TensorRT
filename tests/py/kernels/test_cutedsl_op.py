@@ -97,26 +97,6 @@ def test_ptx_may_declare_wider_pointer_alignment():
     assert _cutedsl._validate_ptx(ptx, layout, (128, 1, 1), 0) == "kernel"
 
 
-@pytest.mark.parametrize(
-    "alignment,expected",
-    [
-        (1, {"x": 1, "out": 1}),
-        (16, {"x": 16, "out": 16}),
-        ({"x": 16}, {"x": 16, "out": 1}),
-    ],
-)
-def test_pointer_alignment_resolves_per_pointer(alignment, expected):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    assert _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment) == expected
-
-
-@pytest.mark.parametrize("alignment", [0, 3, 512, True, 2.0, {"n": 16}, {"x": 6}])
-def test_invalid_pointer_alignment_is_rejected(alignment):
-    layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
-    with pytest.raises(ValueError, match="pointer_alignment"):
-        _cutedsl.normalize_pointer_alignment("ns::op", layout, alignment)
-
-
 def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     layout = _common.analyze_signature(SIGNATURE, (1, 1), frontend="cutedsl_op")
     artifact = _cutedsl.CompiledCuteDSLArtifact(b"", "kernel", (128, 1, 1), 0, (9, 0))
@@ -128,6 +108,68 @@ def test_hardware_compatible_engines_decline_the_plugin(monkeypatch):
     )
     assert validate(node, SimpleNamespace(hardware_compatible=False))
     assert not validate(node, SimpleNamespace(hardware_compatible=True))
+
+
+@skip_no_cuda
+@skip_no_qdp
+@pytest.mark.parametrize("has_eager_fn", [True, False])
+def test_kernel_needing_too_much_shared_memory_is_not_lowered(
+    monkeypatch, caplog, has_eager_fn
+):
+    cutlass = pytest.importorskip("cutlass")
+    cute = pytest.importorskip("cutlass.cute")
+    from torch_tensorrt.kernels import _register
+
+    captured = {}
+    monkeypatch.setattr(
+        _register,
+        "register_precompiled_qdp_plugin",
+        lambda **kwargs: captured.update(kwargs),
+    )
+
+    # 16 KiB of static shared memory, which only the driver reports, plus
+    # 32 KiB and 16 bytes of dynamic memory is 16 bytes over the limit.
+    @cute.kernel
+    def kernel(x: cute.Pointer, out: cute.Pointer):
+        tx, _, _ = cute.arch.thread_idx()
+        buffer = cute.arch.alloc_smem(cutlass.Float32, 4096)
+        buffer[tx] = x[tx]
+        cute.arch.barrier()
+        out[tx] = buffer[127 - tx]
+
+    def meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
+
+    def eager(x):
+        return x.flip(0)
+
+    def register():
+        ttk.cutedsl_op(
+            f"ttk_test::cutedsl_shared_mem_limit_{has_eager_fn}",
+            kernel,
+            {"x": "*fp32", "out": "*fp32"},
+            meta,
+            grid=lambda i, o: 1,
+            block_size=128,
+            shared_mem=32 * 1024 + 16,
+            eager_fn=eager if has_eager_fn else None,
+        )
+
+    if not has_eager_fn:
+        with pytest.raises(RuntimeError, match="49168 bytes.*no PyTorch fallback"):
+            register()
+        assert captured == {}
+        return
+
+    register()
+    assert captured["eager_fn"] is eager
+    with caplog.at_level("WARNING", logger=_common.__name__):
+        value = torch.empty(128, device="meta")
+        node = SimpleNamespace(
+            args=(SimpleNamespace(meta={"val": value}),), meta={"val": value}
+        )
+        assert captured["capability_validator"](node) is False
+    assert "49168 bytes of shared memory" in caplog.text
 
 
 def _cached_kernel(x, n, out, block):

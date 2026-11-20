@@ -120,7 +120,14 @@ bypass the corresponding auto-derivation:
 * ``aot_fn`` — TensorRT AOT impl with signature
   ``(inputs, outputs, tactic) -> (KernelLaunchParams, SymExprs | None)``.
   When both ``eager_fn`` and ``aot_fn`` are supplied, ``spec.geometry``
-  may be omitted.
+  may be omitted. TensorRT launches the kernel without CUDA's opt-in, so a
+  block gets at most 48 KiB of shared memory in total, and ``shared_mem`` at
+  most 48 KiB minus the kernel's static shared size
+  (`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+  A constant ``shared_mem`` above 48 KiB fails the engine build, and the
+  build log names the reason. The static size is not known there, so a launch
+  that is over the limit only because of static arrays builds and then fails
+  on every run.
 * ``schema`` — explicit Torch schema (for example
   ``"(Tensor x, float alpha) -> Tensor"``). Falls back to deriving from
   ``spec.inputs`` / ``spec.outputs`` if both are present, else to
@@ -145,7 +152,15 @@ Pre-compiled PTX entry point
 requested ``.entry`` symbol before it mutates the PyTorch or TensorRT global
 registries. Its AOT path requires a Tensor-only Torch schema. Treat PTX and its
 entry name as trusted build artifacts: this API validates the registration ABI,
-not the behavior or memory safety of arbitrary device code.
+not the behavior or memory safety of arbitrary device code. TensorRT launches
+the kernel without CUDA's opt-in, so a block gets at most 48 KiB of shared
+memory in total, and ``aot_fn`` must keep ``shared_mem`` at or below 48 KiB
+minus the kernel's static shared size
+(`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+A constant ``shared_mem`` above 48 KiB fails the engine build, and the build
+log names the reason. The static size is not known there, so a launch that is
+over the limit only because of static arrays builds and then fails on every
+run.
 
 Triton entry point
 ------------------
@@ -216,6 +231,23 @@ positive integer. Invalid callbacks, names, and options are rejected before
 compilation. Duplicate operator names are also checked before compilation and
 rechecked under the registration lock.
 
+``pointer_alignment`` declares the byte alignment the kernel may assume for
+every tensor pointer, or for named pointers through a mapping (unlisted
+pointers use 1). Values must be powers of two from 1 to 256, and only pointer
+parameters may be named. The default of 1 adds nothing. Any larger value
+becomes Triton's divisibility hint for that pointer, capped at 16 as Triton's
+own launcher does, so 16 allows 16-byte loads and pipelining and 8 allows
+8-byte loads. The declared alignment must hold for every pointer the kernel
+gets. A misaligned pointer raises ``cudaErrorMisalignedAddress``, which is
+sticky and leaves the process's CUDA context unusable. TensorRT does not
+document an alignment for the buffers it allocates inside the engine. An
+engine input is bound as given, so an offset view such as ``x[1:]`` is
+misaligned when its byte offset is not a multiple of the declared alignment.
+It can come from the caller, or from a PyTorch op that runs before the engine.
+Scalar arguments never get a hint, so accesses masked by a runtime size
+(``off < n``) or offset by a runtime stride can stay scalar; the hint helps
+when offsets and strides come from constexprs.
+
 Registration compiles for the current CUDA device. For a different device,
 register inside ``with torch.cuda.device(device):``. The compiled artifact
 records its target, and conversion and AOT construction reject a different GPU
@@ -230,8 +262,10 @@ to place in those argument slots.  :func:`triton_op` raises
 interleaves scalars between pointers, disagrees with ``meta_fn``'s arity,
 differs from the kernel declaration, contains an unknown pointer dtype or a
 non-``i32`` scalar, or declares scalars without an ``extra_args_fn`` to supply
-them. The launch is also rejected if ``extra_args_fn`` returns the wrong number
-or type of values. Constant scalar values must fit in signed 32-bit integers,
+them, or if ``pointer_alignment`` is not a power of two from 1 to 256 or names
+a parameter that is not a pointer. The launch is also rejected if
+``extra_args_fn`` returns the wrong number or type of values. Constant scalar
+values must fit in signed 32-bit integers,
 including constants wrapped in ``SymInt32``. ``grid`` must return one to three
 dimensions: X must be between 1 and 2**31 - 1, and Y and Z between 1 and 65535.
 These limits are checked for ordinary integers and symbolic constants.
@@ -255,6 +289,12 @@ a positive launch grid and a kernel that masks every load and store.
    unchecked pointer binding. Register a second op for a second dtype —
    multi-config autotuning and dtype specialization are not yet supported.
 
+   A kernel that needs more than 48 KiB of dynamic shared memory is declined
+   the same way, because TensorRT launches plugin kernels with at most 48 KiB
+   (`pytorch/TensorRT#5010 <https://github.com/pytorch/TensorRT/issues/5010>`_).
+   Without an ``eager_fn`` such a kernel could not run at all, so registration
+   fails instead. Fewer ``num_stages`` or smaller tiles reduce the requirement.
+
    Triton emits PTX at the ISA version of its own bundled ``ptxas``, which
    can be newer than the installed CUDA driver accepts.  ``triton_op``
    attempts to detect the driver's maximum ISA and recompiles at that version
@@ -265,12 +305,17 @@ a positive launch grid and a kernel that masks every load and store.
    The AOT launcher currently supports ordinary, non-clustered CUDA launches.
    Registration fails closed if Triton's compiler metadata layout is incomplete
    or reports non-zero global/profile scratch, multiple CTAs per cluster, a
-   non-32 warp size, cooperative launch, programmatic dependent launch, tensor
-   memory, or tensor-descriptor metadata. Zero-sized scratch parameters are
-   retained in Triton's PTX and rely on TensorRT padding unused arguments with
-   null. This launch behavior has been validated with TensorRT 11.2 and Triton
-   3.5.0 and 3.8.0. The general QDP API version requirement above does not imply
-   that this Triton launch behavior has been validated on every earlier release.
+   non-32 warp size, cooperative launch, programmatic dependent launch, more
+   tensor memory columns than an SM has (512, or 576 on sm_107, as in Triton's
+   own loader), or tensor-descriptor metadata. A kernel that uses tensor memory
+   (``tcgen05`` code) allocates it itself, so an ordinary launch serves it.
+   Zero-sized scratch parameters are retained in Triton's PTX and rely on
+   TensorRT padding unused arguments with null. This launch behavior has been
+   validated with TensorRT 11.2 and Triton 3.5.0 and 3.8.0. Kernels that use
+   tensor memory have been run only on Jetson Thor (sm_110), with TensorRT 11.4
+   and Triton 3.9.0. The general QDP API version requirement above does not
+   imply that this Triton launch behavior has been validated on every earlier
+   release.
 
 Measuring and tuning configurations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -318,7 +363,10 @@ driver; serialized engines retain these compatibility requirements.
 Kernels index contiguous TensorRT buffers and must guard their loads and
 stores. ``meta_fn`` must describe contiguous outputs with the compiled dtypes.
 The caller must provide enough ``shared_mem`` for the kernel; launch limits
-and scalar ranges must hold throughout the input profile. Empty tensors
+and scalar ranges must hold throughout the input profile. TensorRT launches
+plugin kernels with at most 48 KiB of shared memory, so an op whose
+``shared_mem`` plus static ``.shared`` arrays need more is left to PyTorch with
+a warning, and registration fails if it has no ``eager_fn``. Empty tensors
 require a positive grid. Native tensor arguments, TMA descriptors, clusters,
 and compiler-added workspaces are unsupported; kernels may construct CuTe
 tensors internally from pointers.
