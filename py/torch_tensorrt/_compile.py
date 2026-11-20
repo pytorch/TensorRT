@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import collections.abc
+import contextlib
 import gc
 import importlib
 import inspect
 import logging
 import os
 import platform
+import shutil
 import warnings
 from enum import Enum
 from typing import (
@@ -77,6 +79,8 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
     from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        defer_engine_setup_to_load,
+        moving_engines_into,
         offload_engines_to_disk,
     )
     from torch_tensorrt.dynamo.utils import get_torch_inputs
@@ -871,8 +875,12 @@ def save(
                 TRT engines.
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
-                ExecuTorch Inspector. It does not work for a program with
-                TensorRT engines: writing the record raises a ``SerializeError``.
+                ExecuTorch Inspector. With this save it does not work for a program
+                with TensorRT engines: writing the record raises a ``SerializeError``.
+                :func:`torch_tensorrt.compile_and_save` can write one, because it
+                keeps each engine as a byte buffer read from its file. The record
+                then holds copies of every engine, and writing it reads them into
+                memory.
                 ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
                 number of bytes of engine weights that may stay resident in GPU
                 memory, with the rest streamed from host memory. It applies to
@@ -1550,6 +1558,17 @@ def compile_and_save(
     but each engine is written to a file as soon as it is built, so no built engine is held on the GPU
     or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever
     loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).
+    When the outputs would not fit in the free space of ``file_path``'s file system, with a tenth to
+    spare (an output already there counts as free), the save moves each engine file into them instead of
+    copying it, so the engines are on disk once (plus one chunk) instead of twice, on a file system with
+    sparse files. ExecuTorch moves other data that owns its file the same way, such as the CUDA
+    backend's weights. The move syncs each chunk to disk before the engine file gives it up, so it takes
+    2.5 to 5.5 times as long as a copy (measured on btrfs), which is why it is used only then. It needs
+    an ExecuTorch whose save takes ``consume``, and for the ``.pte`` a ``file_path`` that ends with
+    ``.pte``. If a move fails, the call also deletes the partial output and any data file it moved only
+    in part, since neither can be finished; export again. With ``generate_etrecord``, the save copies
+    the engines, because the ETRecord, written after the program, reads them. The ETRecord holds copies
+    of every engine, and writing it reads them into memory.
     The other formats save each engine from a loaded one, so their engines are loaded once all of them
     are built, and their save needs as much memory as after ``compile``.
 
@@ -1600,7 +1619,46 @@ def compile_and_save(
         save(trt_gm, os.fspath(file_path), output_format=output_format, **save_kwargs)
 
 
-def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None:
+def _takes_consume(method: Callable[..., Any]) -> bool:
+    # ExecuTorch releases before pytorch/executorch#25099 have no consume argument; they copy.
+    return "consume" in inspect.signature(method).parameters
+
+
+def _external_tensor_data_paths(executorch_program: Any, file_path: str) -> List[str]:
+    """The ``.ptd`` files ``_write_external_tensor_data`` writes, next to ``file_path``."""
+    out_dir = os.path.dirname(os.path.abspath(file_path))
+    # Direct attribute access (no getattr default) so a future rename fails loud.
+    # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+    return [
+        os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+        for name in executorch_program._tensor_data or ()
+    ]
+
+
+def _cords(executorch_program: Any) -> List[Any]:
+    """The serialized program and its ``.ptd`` data, as ExecuTorch writes them."""
+    # Direct attribute access (no getattr default) so a future rename fails loud.
+    return [
+        executorch_program._pte_data,
+        *(executorch_program._tensor_data or {}).values(),
+    ]
+
+
+def _copy_fits(executorch_program: Any, outputs: Sequence[str]) -> bool:
+    """Whether a copy of the outputs fits in their file system's free space, with a tenth to spare.
+
+    An output already there counts as free, since both a copy and a move replace it.
+    """
+    size = sum(len(cord) for cord in _cords(executorch_program))
+    free = shutil.disk_usage(os.path.dirname(outputs[0])).free + sum(
+        os.path.getsize(path) for path in outputs if os.path.isfile(path)
+    )
+    return size + size // 10 <= free
+
+
+def _write_external_tensor_data(
+    executorch_program: Any, file_path: str, consume: bool = False
+) -> None:
     """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
@@ -1613,15 +1671,14 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     the program has any; the runtime must then be given those data file(s) (e.g.
     via the ExecuTorch ``Module`` data-files argument) to load the program.
     """
-    # Direct attribute access (no getattr default) so a future rename fails loud.
-    if executorch_program._tensor_data:
-        out_dir = os.path.dirname(os.path.abspath(file_path))
-        executorch_program.write_tensor_data_to_file(out_dir)
-        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
-        paths = [
-            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
-            for name in executorch_program._tensor_data
-        ]
+    paths = _external_tensor_data_paths(executorch_program, file_path)
+    if paths:
+        out_dir = os.path.dirname(paths[0])
+        write = executorch_program.write_tensor_data_to_file
+        if consume and _takes_consume(write):
+            write(out_dir, consume=True)
+        else:
+            write(out_dir)
         logger.info(
             "Wrote external delegate data to %s. Pass %s, not the directory, "
             "when loading the program.",
@@ -1752,9 +1809,40 @@ def _lower_and_write_executorch(
         # the same call is the caller's to make, because finalization happens on
         # ExecuTorch's own manager and out of this library's sight.
         check_zero_copy_kv(executorch_program)
-    with open(file_path, "wb") as f:
-        executorch_program.write_to_file(f)
-    _write_external_tensor_data(executorch_program, file_path)
+    file_path = os.fspath(file_path)
+    # Inside compile_and_save the engine files are deleted after this save, so when a copy would not
+    # fit it moves them into the program instead. The move is slower, so it is used only then. The
+    # ETRecord reads the engines after the program is written, so with one the save copies them.
+    outputs = [
+        os.path.abspath(file_path),
+        *_external_tensor_data_paths(executorch_program, file_path),
+    ]
+    consume = (
+        defer_engine_setup_to_load()
+        and not generate_etrecord
+        and _takes_consume(executorch_program.save)
+        and not _copy_fits(executorch_program, outputs)
+    )
+    moving = (
+        moving_engines_into(
+            outputs,
+            [
+                (data.path, len(data))
+                for cord in _cords(executorch_program)
+                for data in cord.file_backed_buffers()
+            ],
+        )
+        if consume
+        else contextlib.nullcontext()
+    )
+    with moving:
+        if consume and file_path.endswith(".pte"):
+            # ExecuTorch's save takes only a .pte path; its .ptd write moves data for any name.
+            executorch_program.save(file_path, consume=True)
+        else:
+            with open(file_path, "wb") as f:
+                executorch_program.write_to_file(f)
+        _write_external_tensor_data(executorch_program, file_path, consume)
     if generate_etrecord:
         # Follows ExecuTorch's example convention (e.g. examples/cuda/scripts/export.py):
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
