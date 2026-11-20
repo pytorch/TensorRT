@@ -46,7 +46,7 @@ def get_git_revision_short_hash() -> str:
             .decode("ascii")
             .strip()
         )
-    except:
+    except Exception:
         print("WARNING: Could not get git revision short hash, using default one")
         # in release/ngc/25.10 branch this is the commit hash of the pytorch commit that is used for dlfw package
         return "0000000"
@@ -127,9 +127,6 @@ if "--fx-only" in sys.argv:
 if "--py-only" in sys.argv:
     PY_ONLY = True
     sys.argv.remove("--py-only")
-
-if "--no-ts" in sys.argv:
-    sys.argv.remove("--no-ts")
 
 if "--legacy" in sys.argv:
     LEGACY = True
@@ -276,30 +273,20 @@ if not PY_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_cxx11_abi(
-    develop=True,
-    use_dist_dir=True,
-    rt_only=False,
-    target_python=True,
-):
-    cmd = [BAZEL_EXE, "build"]
-    if rt_only:
-        cmd.append("//:libtorchtrt_runtime")
-    else:
-        cmd.append("//:libtorchtrt")
+def build_libtorchtrt_cxx11_abi(develop=True):
+    cmd = [BAZEL_EXE, "build", "//:libtorchtrt"]
 
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
         cmd.append("--compilation_mode=opt")
-    if use_dist_dir and not IS_WINDOWS:
+    if not IS_WINDOWS:
         if IS_AARCH64:
             cmd.append("--distdir=third_party/dist_dir/aarch64-linux-gnu")
         else:
             cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
 
-    if target_python:
-        cmd.append("--config=python")
+    cmd.append("--config=python")
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
@@ -413,94 +400,71 @@ def gen_version_file():
         f.write('__executorch_channel__ = "' + EXECUTORCH_CHANNEL + '"\n')
 
 
-def copy_libtorchtrt(multilinux=False, rt_only=False):
-    if not os.path.exists(dir_path + "/torch_tensorrt/lib"):
-        os.makedirs(dir_path + "/torch_tensorrt/lib")
+def copy_libtorchtrt():
+    package_path = Path(dir_path) / "torch_tensorrt"
+    (package_path / "lib").mkdir(parents=True, exist_ok=True)
+    bazel_bin = get_root_dir() / "bazel-bin"
 
     print("copying library into module")
     if IS_WINDOWS:
+        copyfile(bazel_bin / "cpp/lib/torchtrt.dll", package_path / "lib/torchtrt.dll")
         copyfile(
-            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
-            dir_path + "/torch_tensorrt/lib/torchtrt.dll",
-        )
-        copyfile(
-            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
-            dir_path + "/torch_tensorrt/lib/torchtrt.lib",
-        )
-    elif multilinux:
-        copyfile(
-            dir_path + "/build/libtrtorch_build/libtrtorch.so",
-            dir_path + "/trtorch/lib/libtrtorch.so",
-        )
-    elif rt_only:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt_runtime.tar.gz --strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+            bazel_bin / "cpp/lib/torchtrt.dll.if.lib", package_path / "lib/torchtrt.lib"
         )
     else:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz "
-            + "--exclude='torch_tensorrt/src' "
-            + "--exclude='torch_tensorrt/src/*' "
-            + "--exclude='torch_tensorrt/examples' "
-            + "--exclude='torch_tensorrt/examples/*' "
-            + "--strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+        subprocess.run(
+            [
+                "tar",
+                "-xzf",
+                str(bazel_bin / "libtorchtrt.tar.gz"),
+                "--exclude=torch_tensorrt/src",
+                "--exclude=torch_tensorrt/src/*",
+                "--exclude=torch_tensorrt/examples",
+                "--exclude=torch_tensorrt/examples/*",
+                "--strip-components=1",
+                "-C",
+                str(package_path),
+            ],
+            check=True,
         )
+
+
+def prepare_build(develop=False):
+    if not PY_ONLY:
+        build_libtorchtrt_cxx11_abi(develop=develop)
+        copy_libtorchtrt()
+    gen_version_file()
 
 
 class DevelopCommand(develop):
     description = "Builds the package and symlinks it into the PYTHONPATH"
 
-    def initialize_options(self):
-        develop.initialize_options(self)
-
     def finalize_options(self):
-        develop.finalize_options(self)
+        super().finalize_options()
         self.root_is_pure = False
 
     def run(self):
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=True, rt_only=False)
-            copy_libtorchtrt(rt_only=False)
-
-        gen_version_file()
-        develop.run(self)
+        prepare_build(develop=True)
+        super().run()
 
 
 class InstallCommand(install):
     description = "Builds the package"
 
-    def initialize_options(self):
-        install.initialize_options(self)
-
     def finalize_options(self):
-        install.finalize_options(self)
+        super().finalize_options()
         self.root_is_pure = False
 
     def run(self):
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=False, rt_only=False)
-            copy_libtorchtrt(rt_only=False)
-
-        gen_version_file()
-        install.run(self)
+        prepare_build(develop=False)
+        super().run()
 
 
 class BdistCommand(bdist_wheel):
     description = "Builds the package"
 
-    def initialize_options(self):
-        bdist_wheel.initialize_options(self)
-
     def finalize_options(self):
-        bdist_wheel.finalize_options(self)
+        super().finalize_options()
         if TARGET_WINDOWS_ARM64:
             # Cross-builds run under x64 Python, so the target platform cannot be
             # inferred from the build interpreter.
@@ -508,7 +472,7 @@ class BdistCommand(bdist_wheel):
         self.root_is_pure = False
 
     def get_tag(self):
-        python_tag, abi_tag, platform_tag = bdist_wheel.get_tag(self)
+        python_tag, abi_tag, platform_tag = super().get_tag()
         if TARGET_WINDOWS_ARM64:
             platform_tag = "win_arm64"
         return python_tag, abi_tag, platform_tag
@@ -520,33 +484,20 @@ class BdistCommand(bdist_wheel):
             self.distribution.metadata.name = PROJECT_NAME
         except Exception:
             pass
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=False, rt_only=False)
-            copy_libtorchtrt(rt_only=False)
-
-        gen_version_file()
-        bdist_wheel.run(self)
+        prepare_build(develop=False)
+        super().run()
 
 
 class EditableWheelCommand(editable_wheel):
     description = "Builds the package in development mode"
 
-    def initialize_options(self):
-        editable_wheel.initialize_options(self)
-
     def finalize_options(self):
-        editable_wheel.finalize_options(self)
+        super().finalize_options()
         self.root_is_pure = False
 
     def run(self):
-        if PY_ONLY:
-            gen_version_file()
-            editable_wheel.run(self)
-        else:
-            build_libtorchtrt_cxx11_abi(develop=True, rt_only=False)
-            copy_libtorchtrt(rt_only=False)
-            gen_version_file()
-            editable_wheel.run(self)
+        prepare_build(develop=True)
+        super().run()
 
 
 class CleanCommand(Command):
@@ -602,7 +553,6 @@ class CleanCommand(Command):
 
 
 _FX_FE_AVAIL = False if USE_TRT_RTX else True
-ext_modules = []
 
 fx_packages = [
     "torch_tensorrt.fx",
@@ -833,7 +783,6 @@ def get_requirements():
 
 setup(
     name=PROJECT_NAME,
-    ext_modules=ext_modules,
     version=__version__,
     cmdclass={
         "install": InstallCommand,
