@@ -391,7 +391,9 @@ def broadcast_to_same_shape(
         expanded_dims = [-1] * len(lhs_val_shape)
 
         for dim in range(rank):
-            expanded_dims[dim] = max(lhs_val_shape[dim], rhs_val_shape[dim])
+            # A size 1 dim broadcasts to a size 0 one, which max() would turn into 1.
+            sizes = (lhs_val_shape[dim], rhs_val_shape[dim])
+            expanded_dims[dim] = 0 if 0 in sizes else max(sizes)
 
         expanded_shape = tuple(expanded_dims)
 
@@ -1323,6 +1325,8 @@ def prepend_ones(
         more 1s prepended to the beginning of `tensor` shape.
     """
     layer = ctx.net.add_shuffle(tensor)
+    # The new shape copies every size, so a 0 in it is an empty dim, not a placeholder.
+    layer.zero_is_placeholder = False
 
     # If there're dynamic dim in tensor's shape, we need to use shape layer to
     # compute the final shape.

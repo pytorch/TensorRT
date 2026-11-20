@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
+import sys
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
@@ -66,6 +68,19 @@ def select(
             indices_tensor = impl.shuffle.reshape(
                 ctx, target, source_ir, f"{name}_index_rank0", indices_tensor, ()
             )
+    elif _rebuilds_its_input(ctx.current_node):
+        # TensorRT 10.16 to 11.4 can return wrong values for a concatenation that rebuilds
+        # a tensor from parts of it and a gather of it with a scalar index, so gather with
+        # a one element index there and drop the dim afterwards. Elsewhere the scalar index
+        # stays, as TensorRT fails to build some engines with the other form.
+        indices_tensor = get_trt_tensor(
+            ctx, np.array([index], dtype=np.int32), f"{name}_indices_tensor"
+        )
+        layer = ctx.net.add_gather(input, indices_tensor, dim)
+        set_layer_name(layer, target, f"{name}_gather", source_ir)
+        return impl.squeeze.squeeze(
+            ctx, target, source_ir, f"{name}_squeeze", layer.get_output(0), dim
+        )
     else:
         indices_tensor = get_trt_tensor(
             ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
@@ -74,6 +89,129 @@ def select(
     set_layer_name(layer, target, f"{name}_gather", source_ir)
 
     return layer.get_output(0)
+
+
+# Ops that only change the shape or layout of a tensor, or copy or cast it.
+_FOLDED_OPS = {
+    torch.ops.aten.view.default,
+    torch.ops.aten._unsafe_view.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.transpose.int,
+    torch.ops.aten.permute.default,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.clone.default,
+    torch.ops.aten._to_copy.default,
+}
+_SPLIT_OPS = {torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes.default}
+
+
+def _is_full_slice(node: torch.fx.Node) -> bool:
+    """Whether node is an aten.slice that keeps all of its dim."""
+    if node.target != torch.ops.aten.slice.Tensor:
+        return False
+    defaults = [0, None, None, 1][len(node.args) - 1 :]
+    source, dim, start, end, step = list(node.args) + defaults
+    if step != 1 or start not in (None, 0):
+        return False
+    if end is None:
+        return True
+    if not isinstance(end, int):
+        return False
+    val = source.meta.get("val") if isinstance(source, torch.fx.Node) else None
+    shape = getattr(val, "shape", None)
+    return end >= sys.maxsize or (
+        shape is not None and statically_known_true(end >= shape[dim])
+    )
+
+
+def _data_source(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The input whose data node passes on unchanged, or None."""
+    if node.target in _FOLDED_OPS or _is_full_slice(node):
+        source = node.args[0]
+    elif node.target == torch.ops.aten.copy.default:
+        source = node.args[1]
+    else:
+        return None
+    return source if isinstance(source, torch.fx.Node) else None
+
+
+def _root(node: torch.fx.Node) -> torch.fx.Node:
+    """The tensor node is, once TensorRT folds away the ops in between."""
+    while (source := _data_source(node)) is not None:
+        node = source
+    return node
+
+
+def _part_of(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The tensor node is a slice, a select or a split piece of, or None."""
+    if node.target in (torch.ops.aten.slice.Tensor, torch.ops.aten.select.int):
+        whole = node.args[0]
+    elif (
+        node.target == operator.getitem
+        and getattr(node.args[0], "target", None) in _SPLIT_OPS
+    ):
+        whole = node.args[0].args[0]
+    else:
+        return None
+    return whole if isinstance(whole, torch.fx.Node) else None
+
+
+def _passes_on(user: torch.fx.Node, node: torch.fx.Node) -> bool:
+    """Whether the search from a select goes on from node to user."""
+    if _data_source(user) is node:
+        return True
+    if user.target == torch.ops.aten.slice.Tensor:
+        return user.args[0] is node
+    if user.target == torch.ops.aten.slice_scatter.default:
+        return node in user.args[:2]
+    # Any op of node whose other positional arguments are not nodes counts, not only the
+    # ops TensorRT folds away such as a multiply by one. An extra match still ends in a
+    # cat or scatter that takes the select's source data, where the one element form
+    # works too.
+    return user.args[:1] == (node,) and not any(
+        isinstance(arg, torch.fx.Node) for arg in user.args[1:]
+    )
+
+
+def _rebuilds_its_input(node: Optional[torch.fx.Node]) -> bool:
+    """Whether node is aten.select whose result goes into a concatenation with a slice,
+    a select or a split piece of the same data, or into a slice_scatter into that data,
+    maybe through the ops that _passes_on lets through."""
+    if node is None or node.target != torch.ops.aten.select.int:
+        return False
+    sources, data = set(), node.args[0]
+    while isinstance(data, torch.fx.Node):
+        data = _root(data)
+        sources.add(data)
+        data = _part_of(data)
+
+    pending, seen = [node], set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for user in current.users:
+            if user.target == torch.ops.aten.cat.default and any(
+                isinstance(other, torch.fx.Node)
+                and (whole := _part_of(_root(other))) is not None
+                and _root(whole) in sources
+                for other in user.args[0]
+                if other is not current
+            ):
+                return True
+            if (
+                user.target == torch.ops.aten.slice_scatter.default
+                and _root(user.args[0]) in sources
+            ):
+                return True
+            if _passes_on(user, current):
+                pending.append(user)
+    return False
 
 
 def is_boolean_tensor(

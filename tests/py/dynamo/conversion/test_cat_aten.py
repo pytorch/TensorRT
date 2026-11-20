@@ -75,6 +75,27 @@ class TestCatConverter(DispatchTestCase):
             input_specs,
         )
 
+    @parameterized.expand([("empty_first", True), ("empty_last", False)])
+    def test_cat_with_zero_size_operand(self, _, empty_first):
+        class Cat(nn.Module):
+            def forward(self, x):
+                empty = lambda: x[..., 4:].reshape(1, 2, 2, 3, 0)
+                full = lambda: x.reshape(1, 2, 2, 3, 4)
+                parts = (empty, full) if empty_first else (full, empty)
+                return torch.ops.aten.cat.default([part() for part in parts], -1) + 1
+
+        self.run_test(Cat(), [torch.randn(1, 4, 3, 4)], use_dynamo_tracer=True)
+
+    def test_cat_where_every_operand_is_empty(self):
+        class Cat(nn.Module):
+            def forward(self, x):
+                empty = torch.tensor([], device=x.device)
+                return torch.ops.aten.cat.default([empty, x[4:]]) + 1
+
+        self.run_test(
+            Cat(), [torch.randn(4, 3)], use_dynamo_tracer=True, enable_passes=True
+        )
+
     def test_cat_no_dim(self):
         class Cat(nn.Module):
             def forward(self, x, y, z):
