@@ -630,11 +630,11 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         engine_info = list(engine_info)
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
-        # ExecuTorch writes named data only from `bytes`, and an engine can be several
-        # gigabytes, so reuse the `bytes` the export staged the engine from
-        # (engine_bytes_tensor) and copy only a tensor that did not come from one.
-        # An engine still in its file (compile_and_save) is streamed from the file into
-        # the .pte, never read into memory.
+        # ExecuTorch writes named data from `bytes` or from a file. An engine in its file
+        # (save() with engine_offload_dir, or compile_and_save) is streamed from the file
+        # into the .pte, never read into memory. Otherwise reuse the `bytes` the export
+        # staged the engine from (engine_bytes_tensor), since an engine can be several
+        # gigabytes, and copy only a tensor that did not come from one.
         engine_file = get_offloaded_engine_path(serialized_engine)
         engine_bytes = getattr(serialized_engine, ENGINE_BYTES_ATTR, None)
         if engine_file is None and not isinstance(engine_bytes, bytes):
