@@ -17,6 +17,10 @@ from torch.fx.experimental.symbolic_shapes import (
     has_guarding_hint,
 )
 from torch_tensorrt.dynamo._exporter import deepcopy_memo_sharing_tensors
+from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+    engines_go_to_files,
+    offload_engine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +122,19 @@ def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
     return all(
         -1 not in tuple(getattr(shape, "shape", shape)) for shape in output_shapes
     )
+
+
+def _placeholder_output_shapes_are_known(exported_program: Any, node: Any) -> bool:
+    """:func:`_output_shapes_are_known` for a placeholder, whose engine is in its file.
+
+    The shapes export traced can be static where TensorRT still computes an output
+    size at run time, so the engine is loaded to ask TensorRT, and dropped again.
+    """
+    from torch_tensorrt.dynamo.runtime._TRTEngine import _reconstruct_trt_engine
+    from torch_tensorrt.executorch.backend import _get_engine_info_for_node
+
+    engine = _reconstruct_trt_engine(_get_engine_info_for_node(exported_program, node))
+    return _output_shapes_are_known(engine, node)
 
 
 def validate_engine_info(
@@ -257,7 +274,11 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         if raw is not None:
             # raw() views TensorRT's own buffer, and the returned tensor stays registered on
             # the program until the save ends. ExecuTorch writes named data only from
-            # bytes, so copy now, while TensorRT's buffer is the only other copy.
+            # bytes or a file, so in a save given an engine_offload_dir write the buffer
+            # to a file, which the save streams into the program; elsewhere copy it,
+            # while TensorRT's buffer is the only other copy.
+            if engines_go_to_files():
+                return offload_engine(raw().numpy(), node.name)
             return engine_bytes_tensor(raw().numpy().tobytes())
         _warn_missing_accessor("serialized_engine_tensor")
 
@@ -268,6 +289,8 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         engine_bytes = base64.b64decode(engine_bytes)
     elif not isinstance(engine_bytes, bytes):
         engine_bytes = bytes(engine_bytes)
+    if engines_go_to_files():
+        return offload_engine(engine_bytes, node.name)
     return engine_bytes_tensor(engine_bytes)
 
 
@@ -296,12 +319,16 @@ def validate_engine_program(
 
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
+    The rewrite also takes each output allocator flag cleared here from it; without it
+    such a flag stays set and the backend refuses the engine.
 
     Validation reads each engine's metadata. For an engine marked as needing an
     output allocator it also asks the live engine for its output shapes, which sets
     the node's input shapes on the engine's execution context and creates the context
-    if no run has yet. The records kept in ``resolved`` are metadata-only: their
-    ENGINE_IDX slot is empty. The rewrite reuses them for the
+    if no run has yet. A placeholder's engine is in its file, so for one of those
+    it loads the engine for that question alone. The records kept in ``resolved``
+    are metadata-only: an execute_engine record's ENGINE_IDX slot is empty, and a
+    placeholder's holds the node of its engine buffer. The rewrite reuses them for the
     plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
@@ -338,13 +365,16 @@ def validate_engine_program(
                 by_engine_node[engine_node] = engine_info
         inference_error = None
         if (
-            node.target is torch.ops.tensorrt.execute_engine.default
-            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
             and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
         ):
             try:
-                shapes_known = _output_shapes_are_known(
-                    _resolve_engine_object(exported_program, node), node
+                shapes_known = (
+                    _output_shapes_are_known(
+                        _resolve_engine_object(exported_program, node), node
+                    )
+                    if engine_node is not None
+                    else _placeholder_output_shapes_are_known(exported_program, node)
                 )
             except RuntimeError as error:
                 # The C++ engine raises when it cannot create an output for an
@@ -549,22 +579,44 @@ def replace_execute_engine(
     2 GB, so an inline base64 string breaks recompilation for any engine past that size.
 
     ``resolved`` carries what validate_engine_program already resolved, so the engine is
-    not serialized again here.
+    not serialized again here. A placeholder already in the program takes the output
+    allocator flag from it, so without ``resolved`` a flag validation cleared stays set
+    and the backend refuses that engine.
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         ENGINE_IDX,
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
         SERIALIZATION_LEN,
     )
 
     graph_module = exported_program.graph_module
     execute_engine_op = torch.ops.tensorrt.execute_engine.default
     no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+    records = resolved or {}
+    # A placeholder's own arguments are its record, and the backend refuses one still
+    # marked as needing the output allocator that validation found it does not need.
+    placeholders = [
+        node
+        for node in graph_module.graph.nodes
+        if node.op == "call_function"
+        and _schema_name(node) == "tensorrt::no_op_placeholder_for_execute_engine"
+        and node.name in records
+    ]
+    for node in placeholders:
+        node.update_arg(
+            1 + REQUIRES_OUTPUT_ALLOCATOR_IDX,
+            records[node.name][REQUIRES_OUTPUT_ALLOCATOR_IDX],
+        )
     nodes_to_replace = [
         node
         for node in graph_module.graph.nodes
         if node.op == "call_function" and node.target is execute_engine_op
     ]
     if not nodes_to_replace:
+        if placeholders:
+            # update_arg edits only the graph, so the generated code keeps the old
+            # flag until it is recompiled.
+            graph_module.recompile()
         return exported_program
 
     materialized_engines: dict[torch.fx.Node, tuple[torch.fx.Node, list[str]]] = {}
@@ -577,7 +629,7 @@ def replace_execute_engine(
             # metadata-only record, empty ENGINE_IDX); the engine bytes come from
             # _resolve_engine_tensor, which re-resolves the engine itself rather than
             # reading this record's ENGINE_IDX, so the empty slot is never consumed.
-            engine_info = (resolved or {}).get(node.name)
+            engine_info = records.get(node.name)
             if engine_info is None:
                 engine_info = _resolve_engine_info(
                     exported_program, node, metadata_only=True
