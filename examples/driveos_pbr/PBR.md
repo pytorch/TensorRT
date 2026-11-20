@@ -14,13 +14,12 @@ the tradeoffs, not to establish that one implementation always wins.
 **Source:** `pytorch/TensorRT`, branch `abose/PBR-file-driveOS`, directory
 `examples/driveos_pbr`. Record the exact source commit in the filed request.
 
-**Attachments:** `driveos-pbr-thoru-20261117.tar.gz`, its SHA-256 file, and the
-handoff validation results archive. These must accompany the request; the Git
-branch intentionally does not contain engines, weights, or compiled libraries.
+**Attachments:** `driveos-pbr-thoru-20261120.tar.gz` and its SHA-256 file.
+This single artifact archive accompanies the request; the Git branch intentionally does not contain engines, weights, or compiled libraries.
 Insert the team's artifact links when filing.
 
 **Target:** 14-SM Thor U, DRIVE OS 7.2.5.0 Linux, CUDA 13.3, native TensorRT
-11.0.1.7. Use the frozen runtime SDK and artifact hashes in the bundle. This is
+11.0.1.7. Use the pinned source builds and supplied checkpoint/fixture bundle. This is
 not a QNX request or a Thor X measurement.
 
 | Model | Input workload | Native ONNX path | Native ExecuTorch path |
@@ -30,9 +29,10 @@ not a QNX request or a Thor X measurement.
 
 **Build:** Run `build_native.sh` to compile the native ExecuTorch runtime, CUDA
 backend, TensorRT delegate and benchmark applications from the pinned source
-dependencies. Select the resulting installation with `--native-dir`. Reuse the
-prepared models and Python wheels. No separate Bazel step is required for this
-CMake source-build path.
+dependencies. Run `build_authoring.sh` to build the Torch-TensorRT Python compiler,
+then `export_pte.py` for each model. Select the rebuilt runtime with `--native-dir`
+and fresh programs with `--program-dir`. The ONNX engines and pinned Python
+dependencies are supplied. No separate Bazel step is required for this path.
 
 **Protocol:** Two fixed snapshots per model, three fresh launches per snapshot
 and mode; one first call, 20 warmup calls, and 100 measured calls per process.

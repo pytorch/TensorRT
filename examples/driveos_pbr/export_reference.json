@@ -1,0 +1,165 @@
+{
+  "segformer": {
+    "model": "segformer",
+    "precision": "FP32",
+    "tf32": false,
+    "atol": 0.0003,
+    "rtol": 0.0003,
+    "caller_owned_cpu_io": true,
+    "cases": [
+      {
+        "case": "case0",
+        "eager": [
+          {
+            "elements": 1245184,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          }
+        ],
+        "compiled": [
+          {
+            "elements": 1245184,
+            "max_abs_error": 3.0517578125e-05,
+            "mismatches": 0
+          }
+        ]
+      },
+      {
+        "case": "case1",
+        "eager": [
+          {
+            "elements": 1245184,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          }
+        ],
+        "compiled": [
+          {
+            "elements": 1245184,
+            "max_abs_error": 3.0517578125e-05,
+            "mismatches": 0
+          }
+        ]
+      }
+    ],
+    "versions": {
+      "torch": "2.16.0.dev20261009+cu132",
+      "torch-tensorrt": "2.16.0.dev0+202fba4",
+      "executorch": "1.6.0.dev20261009+cu132",
+      "tensorrt": "11.0.0.114"
+    },
+    "delegates": [
+      "TensorRTBackend"
+    ],
+    "artifacts": {
+      "model.pte": {
+        "bytes": 18772732,
+        "sha256": "435609f151755e81660161dab3749ec963166d36a33d53265f7e385a4bd47a67"
+      }
+    }
+  },
+  "bevformer": {
+    "model": "bevformer",
+    "precision": "FP32",
+    "tf32": false,
+    "atol": 0.0003,
+    "rtol": 0.0003,
+    "caller_owned_cpu_io": true,
+    "cases": [
+      {
+        "case": "case0",
+        "eager": [
+          {
+            "elements": 9000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          },
+          {
+            "elements": 9000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          },
+          {
+            "elements": 640000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          }
+        ],
+        "compiled": [
+          {
+            "elements": 9000,
+            "max_abs_error": 5.245208740234375e-06,
+            "mismatches": 0
+          },
+          {
+            "elements": 9000,
+            "max_abs_error": 3.814697265625e-05,
+            "mismatches": 0
+          },
+          {
+            "elements": 640000,
+            "max_abs_error": 2.86102294921875e-06,
+            "mismatches": 0
+          }
+        ]
+      },
+      {
+        "case": "case1",
+        "eager": [
+          {
+            "elements": 9000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          },
+          {
+            "elements": 9000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          },
+          {
+            "elements": 640000,
+            "max_abs_error": 0.0,
+            "mismatches": 0
+          }
+        ],
+        "compiled": [
+          {
+            "elements": 9000,
+            "max_abs_error": 4.291534423828125e-06,
+            "mismatches": 0
+          },
+          {
+            "elements": 9000,
+            "max_abs_error": 3.814697265625e-05,
+            "mismatches": 0
+          },
+          {
+            "elements": 640000,
+            "max_abs_error": 3.5762786865234375e-06,
+            "mismatches": 0
+          }
+        ]
+      }
+    ],
+    "versions": {
+      "torch": "2.16.0.dev20261009+cu132",
+      "torch-tensorrt": "2.16.0.dev0+202fba4",
+      "executorch": "1.6.0.dev20261009+cu132",
+      "tensorrt": "11.0.0.114"
+    },
+    "delegates": [
+      "CudaBackend",
+      "TensorRTBackend"
+    ],
+    "artifacts": {
+      "model.pte": {
+        "bytes": 165210020,
+        "sha256": "3bc8993714b6aab9066b17d4defb683c73bd6ae913dbdc1ad361447109f76d44"
+      },
+      "aoti_cuda_blob.ptd": {
+        "bytes": 990384,
+        "sha256": "788838af20236577ef0b74a96e15c306c138a83a05de3ac183a722e459624d21"
+      }
+    }
+  }
+}

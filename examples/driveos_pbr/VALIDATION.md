@@ -1,5 +1,43 @@
 # Handoff validation — November 17, 2026
 
+## Checkpoint-to-program export verification — November 20, 2026
+
+A fresh ARM64 NGC 26.06 container built the Torch-TensorRT Python compiler
+from `202fba495341f83c4d25b6b2dece95e0242c5369` using `PYTHON_ONLY=1`.
+`build_authoring.sh` completed, and both models exported from the supplied
+checkpoints using `export_pte.py`. PyTorch and ExecuTorch Python packages used
+the pinned wheels; this was not a PyTorch source build.
+
+- Both eager and compiled models matched both supplied reference snapshots at
+  `atol=rtol=3e-4` before saving.
+- SegFormer produced a `.pte` with `TensorRTBackend`. BEVFormer produced a
+  `.pte` plus `aoti_cuda_blob.ptd`, with `TensorRTBackend` and `CudaBackend`.
+- Exported-plan checks confirmed caller-owned CPU input/output buffers. The
+  exporter refreshes output tensor metadata before memory planning to account
+  for the pinned ExecuTorch device-to-host-copy insertion behavior. It does not
+  patch an installed dependency or edit the serialized program afterward.
+- All 12 fresh native processes passed: two models × two snapshots × three
+  launches, using the rebuilt runtime and `--program-dir` to select fresh exports.
+  Each ran one first call, 20 warmups and 100 measured calls; every output
+  matched at all three checkpoints. Loaded-library audits passed without
+  Python, LibTorch or libc10. No export process ran during this final cohort.
+- [export_reference.json](export_reference.json) records package versions,
+  output errors, delegate IDs, and hashes of the newly generated programs.
+
+These checks validate the new exports in the native runtime. They are not a new
+three-mode comparison: eager and ONNX paths were tested in the separate
+36-process source-build cohort below. Do not combine those timings with this
+export-validation cohort to form comparative bars.
+
+The fresh-container recipe includes the two DRIVE device mappings, unlimited
+memlock and `SYS_NICE`. GPU identification alone succeeded without the complete
+setup, but allocating a CUDA tensor failed. The complete documented configuration
+passed allocation and export checks.
+
+The November 20 artifact archive adds the ExecuTorch, ruamel.yaml, and
+flatbuffers export wheels. Every original bundle file was checked against its
+manifest and retained unchanged. Fresh programs remain outside the bundle.
+
 ## Full native source-build verification — November 20, 2026
 
 `build_native.sh` completed from fresh dependency checkouts in the ARM64 NGC

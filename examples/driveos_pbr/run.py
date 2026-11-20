@@ -131,6 +131,11 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument(
+        "--program-dir",
+        type=Path,
+        help="Fresh export root containing MODEL/model.pte; overrides ExecuTorch programs only",
+    )
+    parser.add_argument(
         "--native-dir",
         type=Path,
         help="Installed source build with bin/ and lib/; overrides bundled native runtime",
@@ -171,6 +176,19 @@ def main():
     root = bundle.parent
     native = args.native_dir.resolve() if args.native_dir else bundle
     rebuilt = native_files(native) if args.native_dir else None
+    programs = args.program_dir.resolve() if args.program_dir else bundle
+    program_hashes = {}
+    if args.program_dir and "executorch" in args.modes:
+        for model in args.models:
+            names = ["model.pte"] + (
+                ["aoti_cuda_blob.ptd"] if model == "bevformer" else []
+            )
+            for name in names:
+                path = programs / model / name
+                with path.open("rb") as f:
+                    program_hashes[f"{model}/{name}"] = hashlib.file_digest(
+                        f, "sha256"
+                    ).hexdigest()
     output = args.output.resolve()
     source = Path(__file__).resolve().parent
     if "eager" in args.modes and (not args.container or not args.container_root):
@@ -203,6 +221,8 @@ def main():
                 "warmup": 20,
                 "measured": 100,
                 "native_directory": str(native),
+                "program_directory": str(programs),
+                "exported_program_sha256": program_hashes,
                 "rebuilt_native_sha256": rebuilt,
                 "native_source_revisions": (
                     (native / "source-revisions.txt").read_text()
@@ -249,6 +269,8 @@ def main():
                         model,
                     ]
                 else:
+                    if mode == "executorch":
+                        arguments[0] = programs / model
                     command = [
                         str(
                             native

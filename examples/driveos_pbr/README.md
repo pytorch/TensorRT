@@ -47,24 +47,25 @@ the older graph values are not exact reproduction targets for this package.
 | Authoring container | `nvcr.io/nvidia/pytorch:26.06-py3` |
 | Python / PyTorch | 3.12 / `2.16.0.dev20261009+cu132` |
 | TorchVision / Transformers | `0.30.0.dev20261007+cu132` / 4.55.4 |
-| Exported ExecuTorch revision | Development 1.6; use the pinned runtime sources below with the supplied programs |
+| ExecuTorch Python export package | `1.6.0.dev20261009+cu132` |
 | Authoring TensorRT Python metadata | 11.0.0.114; this differs from the loaded native library |
 
 This handoff does not target QNX, Orin, or a different TensorRT major version.
 TensorRT plans and AOTInductor binaries are prepared artifacts for the tested
 stack. The source-build path below rebuilds the native ExecuTorch runtime, TensorRT
-delegate and both benchmark applications at pinned revisions. It reuses the
-prepared engines/programs; it does not rebuild the Python compiler packages or
-re-export models.
+delegate and both benchmark applications at pinned revisions. The authoring step
+also builds the Torch-TensorRT Python compiler from source
+and exports fresh ExecuTorch programs from the supplied checkpoints. The ONNX
+TensorRT engines remain supplied artifacts.
 
-Obtain `driveos-pbr-thoru-20261117.tar.gz` and its SHA-256 file from the PBR
+Obtain `driveos-pbr-thoru-20261120.tar.gz` and its SHA-256 file from the PBR
 attachments. They contain third-party license notices and `bundle/`, including:
 
 - `bevformer/`, `segformer/`: engines, programs, checkpoints, and two fixtures each.
 - `bin/`: native benchmark applications; `lib/`: native CUDA backend shims.
 - `sdk/`: frozen native headers and static libraries for rebuilding the applications.
 - `authoring/`: pinned Torch wheel, Python dependency wheels, CUDA Python libraries,
-  and supplemental NGC libraries needed by the eager baseline.
+  the pinned ExecuTorch export wheel, and supplemental NGC libraries.
 - `provenance/` and `manifest.json`: artifact origins, CPU-IO metadata changes,
   exact file sizes, and SHA-256 checksums.
 
@@ -79,10 +80,10 @@ source dependencies and build outputs. Run the following in the directory contai
 archive and checksum:
 
 ```bash
-sha256sum -c driveos-pbr-thoru-20261117.tar.gz.sha256
+sha256sum -c driveos-pbr-thoru-20261120.tar.gz.sha256
 export PBR_ROOT="$HOME/driveos-pbr"
 mkdir -p "$PBR_ROOT"
-tar -xzf driveos-pbr-thoru-20261117.tar.gz -C "$PBR_ROOT"
+tar -xzf driveos-pbr-thoru-20261120.tar.gz -C "$PBR_ROOT"
 
 ```
 
@@ -97,6 +98,8 @@ Use a configured DRIVE authoring container with NVIDIA device access and mount
 
 ```bash
 sudo docker run -d --name drive-pbr --runtime=nvidia \
+  --device=/dev/host1x-fence --device=/dev/dri/renderD128 \
+  --cap-add=SYS_NICE --ulimit memlock=-1 --ulimit stack=67108864 \
   --ipc=host --network=host -v "$PBR_ROOT:/pbr" \
   nvcr.io/nvidia/pytorch:26.06-py3 sleep infinity
 sudo docker exec drive-pbr git clone --single-branch \
@@ -165,7 +168,48 @@ compiler, the DRIVE CUDA/TensorRT development files, and the prepared Python
 build environment. `CUDAToolkit_ROOT` overrides the script's CUDA 13.3 default.
 The script uses two build jobs to limit build-time memory pressure.
 
-## 4. Run the benchmark on the target host
+## 4. Build the Python compiler and export the programs
+
+Run inside the same container, after the native source build:
+
+```bash
+bash /pbr/source/build_authoring.sh /pbr
+export LD_LIBRARY_PATH=/pbr/bundle/authoring/lib
+mkdir -p /pbr/cache/tmp
+export TMPDIR=/pbr/cache/tmp
+export TRITON_CACHE_DIR=/pbr/cache/triton
+export TORCHINDUCTOR_CACHE_DIR=/pbr/cache/inductor
+export XDG_CACHE_HOME=/pbr/cache
+/opt/pbr-venv/bin/python /pbr/source/export_pte.py \
+  --bundle /pbr/bundle --model segformer --output /pbr/exported/segformer
+/opt/pbr-venv/bin/python /pbr/source/export_pte.py \
+  --bundle /pbr/bundle --model bevformer --output /pbr/exported/bevformer
+```
+
+`build_authoring.sh` builds and installs Torch-TensorRT's Python compiler from
+`deps/TensorRT-runtime`, the same pinned source used for the native delegate.
+`PYTHON_ONLY=1` selects the Python authoring package; CMake already built the
+native delegate. The matching Torch and ExecuTorch Python wheels are supplied
+in the single artifact archive. This does not build PyTorch itself from source.
+
+The exporter loads the checkpoint, captures the PyTorch graph, compiles supported
+regions with TensorRT, and saves the ExecuTorch program. BEVFormer geometry is
+compiled through ExecuTorch's CUDA/AOTInductor backend. Outputs are:
+
+- `exported/segformer/model.pte`: TensorRT-backed SegFormer.
+- `exported/bevformer/model.pte` and `aoti_cuda_blob.ptd`: mixed BEVFormer program.
+- Per-model graph listings and `export-report.json`: versions, artifact hashes,
+  and eager/compiled comparisons against both saved input snapshots.
+
+The export uses FP32 with TF32 disabled and configures caller-owned CPU inputs
+and outputs through `MemoryPlanningPass`, before serialization. It does not
+modify the serialized program afterward. Each output directory must be new.
+An `EXPORT_PASS` confirms export checks; the next step checks the saved program
+in the native runtime. Fresh engine builds can choose different tactics, so
+report their new measurements as a new cohort rather than expecting identical
+historical graph values.
+
+## 5. Run the benchmark on the target host
 
 Keep other GPU workloads stopped for the comparison. Record the board's power
 mode and clock policy; the runner does not change clocks, drop caches, or reboot.
@@ -175,12 +219,16 @@ Run the native applications outside the authoring container:
 export LD_LIBRARY_PATH="/usr/local/cuda-13.3/targets/aarch64-linux/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 "$PBR_ROOT/source/run.py" \
   --bundle "$PBR_ROOT/bundle" --output "$PBR_ROOT/results" \
-  --native-dir "$PBR_ROOT/native" \
+  --native-dir "$PBR_ROOT/native" --program-dir "$PBR_ROOT/exported" \
   --container drive-pbr --container-root /pbr
 ```
 
 `sudo` allows this command to invoke Docker. It is unnecessary when the current
 user already has Docker access. All native processes use the same user.
+The `--program-dir` option selects the freshly exported programs; the input
+fixtures, checkpoints, and ONNX engines still come from `bundle`. The runner
+records the fresh program hashes without changing the original bundle. Omit
+`--program-dir` only to measure the original supplied programs.
 The `--native-dir` option selects the rebuilt executables and shared libraries.
 Without it, the runner uses the original bundled binaries. The configuration
 record includes hashes of the selected rebuilt files.
@@ -199,11 +247,12 @@ model/mode still runs six fresh processes. A single diagnostic invocation is:
 ```bash
 LD_LIBRARY_PATH="$PBR_ROOT/native/lib:$LD_LIBRARY_PATH" \
   "$PBR_ROOT/native/bin/benchmark_et" \
-  "$PBR_ROOT/bundle/bevformer" "$PBR_ROOT/bundle/bevformer/case0" \
+  "$PBR_ROOT/exported/bevformer" "$PBR_ROOT/bundle/bevformer/case0" \
   "$PBR_ROOT/single-bevformer" bevformer
 ```
 
-Replace `benchmark_et` with `benchmark_trt` to run the ONNX engine. The applications
+To run the ONNX engine, replace `benchmark_et` with `benchmark_trt` and use
+`"$PBR_ROOT/bundle/bevformer"` as its first argument. The applications
 set the same timing and correctness protocol; there are no hidden tuning flags.
 
 ## What is measured
@@ -219,7 +268,7 @@ set the same timing and correctness protocol; there are no hidden tuning flags.
   outside timing. The first call is recorded separately, not included in the median.
 - Both native applications register and reuse CPU input/output buffers. The
   ExecuTorch programs expose caller-owned CPU IO; their internal GPU allocations
-  and delegate blobs are retained. This is an optimized prepared export, not the
+  and delegate blobs are retained. The exporter selects this IO planning explicitly; it is not the
   default export configuration. The eager control uses ordinary CPU tensors and
   reused GPU inputs. It is a development baseline, not an allocator ablation.
 - CUDA Graph replay and shared activation scratch are not enabled by these runners.
@@ -227,7 +276,10 @@ set the same timing and correctness protocol; there are no hidden tuning flags.
 
 `summary.csv` reports the mean, minimum, and maximum of six process values. For
 latency, each process value is the median of its 100 measured calls. Ranges are
-process variation, not confidence intervals.
+process variation, not confidence intervals. For the relative blog plots, use
+`mean eager latency / mean path latency` for speedup (eager = 1×), and
+`100 * mean path memory / mean eager memory` for memory (eager = 100%). Compare
+the same model and memory metric within the same cohort; keep raw ms/MiB data.
 
 | Metric | Meaning |
 |---|---|
@@ -281,8 +333,8 @@ rotation implementation used by the ONNX engine. It can be rebuilt separately:
 The native SDK is a frozen binary dependency, identified by the artifact manifest.
 This optional command rebuilds only the applications. The primary
 `build_native.sh` path above also builds the native runtime and delegate.
-Use the supplied bundle for the requested benchmark; changing SDK versions,
-precision, engine tactics, or geometry changes the comparison.
+The bundle supplies the ONNX engines and fixed fixtures. The fresh `.pte` export
+is a new build; retain its reports and benchmark results together.
 
 ## Files and provenance
 
@@ -291,6 +343,7 @@ precision, engine tactics, or geometry changes the comparison.
 | `benchmark.h` | Shared fixture reader, pinned buffers, timing, correctness, and memory collection |
 | `tensorrt.cpp` | Loads ONNX-built engines and runs `enqueueV3`; loads the BEV geometry plugin first |
 | `executorch.cpp` | Loads the program, binds caller buffers and stream, and calls `Module::forward` |
+| `build_authoring.sh`, `export_pte.py` | Build the Python compiler from source and export both models with caller-owned IO |
 | `eager.py`, `models/` | Original FP32 inference baseline and model adapters |
 | `run.py` | Verifies artifacts, runs fresh processes, and aggregates valid results |
 | `test_run.py` | Tests artifact verification and rejection of incomplete measurements |
@@ -302,3 +355,10 @@ Run the host-independent checks with:
 ```bash
 python3 -m unittest discover -s "$PBR_ROOT/source" -p test_run.py -v
 ```
+
+The pinned ExecuTorch exporter can leave the output node's tensor metadata
+pointing to GPU intermediates after inserting device-to-host copies.
+`CallerIOMemoryPlanning` refreshes that metadata before the normal planner runs.
+The serialized-plan checks then require all public CPU IO to be caller-owned;
+native output comparisons verify the resulting program. No installed ExecuTorch
+source files or serialized `.pte` files are patched.
