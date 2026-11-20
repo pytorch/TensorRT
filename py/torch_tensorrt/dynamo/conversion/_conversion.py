@@ -237,6 +237,7 @@ def interpret_module_to_result(
     *,
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
+    skip_conversion_validation: bool = False,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -244,6 +245,8 @@ def interpret_module_to_result(
         inputs: It requires a sequence of FLATTENED Inputs representing inputs to the module. It should include both arg_inputs and kwarg_inputs, if applicable.
         settings: Compilation settings
         engine_cache: Engine cache instance
+        skip_conversion_validation: If True, skip TRTInterpreter.validate_conversion.
+            Set by compile_module when require_full_compilation already proved full converter coverage.
     Returns:
         SerializedInterpreterResult
     """
@@ -277,6 +280,7 @@ def interpret_module_to_result(
         engine_cache,
         input_binding_names=input_binding_names,
         output_binding_names=output_binding_names,
+        skip_conversion_validation=skip_conversion_validation,
     )
 
 
@@ -288,6 +292,7 @@ def _interpret_module_to_result_impl(
     *,
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
+    skip_conversion_validation: bool = False,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult (single build, no GPT sweep)."""
 
@@ -359,6 +364,7 @@ def _interpret_module_to_result_impl(
         engine_cache=engine_cache,
         input_binding_names=input_binding_names,
         output_binding_names=output_binding_names,
+        skip_conversion_validation=skip_conversion_validation,
     )
 
     interpreter_result = interpreter.run()
@@ -416,6 +422,7 @@ def convert_module(
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
     engine_cache: Optional[BaseEngineCache] = None,
+    skip_conversion_validation: bool = False,
 ) -> TorchTensorRTModule:
     """Convert an FX module to a TRT module
     Args:
@@ -424,11 +431,16 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
         engine_cache: Engine cache instance
+        skip_conversion_validation: If True, skip TRTInterpreter.validate_conversion.
     Returns:
         TorchTensorRTModule
     """
     serialized_interpreter_result = interpret_module_to_result(
-        module, inputs, settings, engine_cache=engine_cache
+        module,
+        inputs,
+        settings,
+        engine_cache=engine_cache,
+        skip_conversion_validation=skip_conversion_validation,
     )
     from torch_tensorrt.dynamo._reporting import record_engine_metadata
 

@@ -1483,6 +1483,9 @@ def compile_module(
             gm, settings.torch_executed_ops, settings.torch_executed_modules
         )
     )
+    skip_conversion_validation = (
+        settings.require_full_compilation and num_supported_ops == total_ops
+    )
 
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
@@ -1644,6 +1647,7 @@ def compile_module(
                 settings=settings,
                 name="_run_on_acc_0",
                 engine_cache=engine_cache,
+                skip_conversion_validation=skip_conversion_validation,
             )
         if (
             weight_releaser is not None
@@ -1919,6 +1923,7 @@ def compile_module(
                     settings=settings,
                     name=name,
                     engine_cache=engine_cache,
+                    skip_conversion_validation=skip_conversion_validation,
                 )
 
             if (
