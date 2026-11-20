@@ -259,7 +259,7 @@ print("eager:", tokenizer.decode(eager_ids[0], skip_special_tokens=True))
 # Export and compile
 # ------------------
 # strict=False matches other Torch-TensorRT LLM examples (aotautograd).
-# immutable_weights=True is required for INT4 packed constants.
+# immutable_weights=True lets TensorRT fuse the INT4 dequantize into the matmul.
 
 processed = pre_process_model_for_export(wrapper)
 with exclude_dq_from_constant_folding():

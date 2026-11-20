@@ -218,9 +218,9 @@ int8 qdata into ``trt.DataType.INT4``. With BF16 scales, as in the example,
 the weights are dequantized straight to BF16, so TensorRT can fuse the
 dequantize into the matmul.
 
-Compile with ``immutable_weights=True``. The converter packs INT4 at build
-time; engine refit would push the graph's int8 qdata at an INT4 prototype
-(``refit weights data type Int8 must equal to weights prototype Int4``).
+Compile with ``immutable_weights=True``. A refittable engine can be refit, but
+it dequantizes INT4 weights in FP32, and TensorRT does not fuse that into the
+matmul.
 
 .. code-block:: python
 
