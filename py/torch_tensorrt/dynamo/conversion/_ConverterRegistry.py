@@ -358,6 +358,9 @@ class ConverterRegistry:
     def set_compilation_settings(
         self, compilation_settings: CompilationSettings
     ) -> None:
+        from .aten_ops_converters import register_modelopt_converters
+
+        register_modelopt_converters()
         self.compilation_settings = compilation_settings
         # set torch executed ops as disallowed targets
         self.set_disallowed_targets(compilation_settings.torch_executed_ops)

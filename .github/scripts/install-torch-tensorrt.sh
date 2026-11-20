@@ -14,6 +14,20 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
+# ModelOpt currently lags the Torch nightly API. Keep it opt-in while preserving
+# TorchAO suite coverage, and propagate both settings to the tests.
+# TODO: Once ModelOpt supports PyTorch 2.16, change the default below from 0 to 1
+# to re-enable it in CI. To opt in sooner, set INSTALL_MODELOPT_QUANTIZATION=1
+# in the environment before running this script.
+export INSTALL_MODELOPT_QUANTIZATION="${INSTALL_MODELOPT_QUANTIZATION:-0}"
+export INSTALL_TORCHAO_QUANTIZATION="${INSTALL_TORCHAO_QUANTIZATION:-1}"
+QUANTIZATION_ARGS=()
+if [[ "${INSTALL_MODELOPT_QUANTIZATION}" == "1" ]]; then
+    QUANTIZATION_ARGS+=(--group modelopt_quantization)
+fi
+if [[ "${INSTALL_TORCHAO_QUANTIZATION}" == "1" ]]; then
+    QUANTIZATION_ARGS+=(--group torchao_quantization)
+fi
 python -m pip install --upgrade "pip>=25.1"
 python -m pip install \
     --pre \
@@ -21,7 +35,7 @@ python -m pip install \
     --extra-index-url https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION} \
     --group test \
     --group test-ext \
-    --group quantization
+    "${QUANTIZATION_ARGS[@]}"
 TORCHVISION=$(python - <<'PY'
 import tomllib
 
@@ -42,8 +56,6 @@ PY
 python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
-# dynamo-torchao full/nightly suite
-python -m pip install torchao
 
 # Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
 SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
