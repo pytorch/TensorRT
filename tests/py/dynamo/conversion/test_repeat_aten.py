@@ -34,6 +34,13 @@ class TestRepeatConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_repeat_zero_size_dim_adds_dims(self):
+        class Repeat(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.repeat.default(x[..., 4:], (2, 1, 1))
+
+        self.run_test(Repeat(), [torch.randn(3, 4)], use_dynamo_tracer=True)
+
     @parameterized.expand(
         [
             # Unlike aten.tile, aten.repeat requires len(repeats) >= input.dim() —
@@ -143,6 +150,21 @@ class TestRepeatConverterDynamicShape(DispatchTestCase):
             Repeat(),
             input_specs,
         )
+
+    def test_repeat_zero_size_dim_adds_dims(self):
+        class Repeat(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.repeat.default(x[..., 4:], (2, 1, 1))
+
+        input_specs = [
+            Input(
+                min_shape=(1, 4),
+                opt_shape=(3, 4),
+                max_shape=(6, 4),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(Repeat(), input_specs, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [

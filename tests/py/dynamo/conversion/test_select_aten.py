@@ -360,6 +360,29 @@ class WriteBack(nn.Module):
         return v
 
 
+class CostVolume(nn.Module):
+    """Group-wise correlation cost volume, as stereo depth models build it."""
+
+    def __init__(self, disparities, groups=4):
+        super().__init__()
+        self.disparities, self.groups = disparities, groups
+
+    def forward(self, left, right):
+        b, c, h, w = left.shape
+        volume = left.new_zeros([b, self.groups, self.disparities, h, w])
+        for i in range(self.disparities):
+            a, r = (left[..., i:], right[..., :-i]) if i > 0 else (left, right)
+            shape = (b, self.groups, c // self.groups, h, a.shape[-1])
+            corr = (a * r).view(shape).mean(dim=2)
+            # Once i reaches the width, this writes an empty slice.
+            volume[:, :, i, :, i:] = corr
+        return volume
+
+
+def _empty_correlation(y):
+    return y[..., 4:].view(1, 2, 4, 3, 0).mean(2).mean(1)
+
+
 @unittest.skipIf(not torch.cuda.is_available(), "needs a CUDA device")
 class TestSelectWrittenBack(TestCase):
     def _check(self, module, inputs):
@@ -382,9 +405,10 @@ class TestSelectWrittenBack(TestCase):
         ]
         self.assertFalse(left_to_pytorch)
         with torch.no_grad():
-            torch.testing.assert_close(
-                trt_module(*[i.clone() for i in inputs]), expected
-            )
+            actual = trt_module(*[i.clone() for i in inputs])
+        # A compiled module that holds a buffer returns its outputs as a tuple.
+        actual = actual[0] if isinstance(actual, tuple) else actual
+        torch.testing.assert_close(actual, expected)
 
     @parameterized.expand(
         [
@@ -435,6 +459,31 @@ class TestSelectWrittenBack(TestCase):
                 return x
 
         self._check(WriteInput(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
+
+    @parameterized.expand([(5,), (6,), (8,)])
+    def test_cost_volume_with_empty_disparities_matches_pytorch(self, disparities):
+        left, right = torch.randn(1, 8, 3, 4), torch.randn(1, 8, 3, 4)
+        self._check(CostVolume(disparities), [left, right])
+
+    def test_empty_correlation_into_input_plane_matches_pytorch(self):
+        class WriteInput(nn.Module):
+            def forward(self, x, y):
+                x[:, 0, :, 4:] = _empty_correlation(y)
+                return x
+
+        self._check(WriteInput(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
+
+    def test_empty_correlation_into_buffer_plane_matches_pytorch(self):
+        class WriteBuffer(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("volume", torch.randn(1, 3, 3, 4))
+
+            def forward(self, y):
+                self.volume[:, 0, :, 4:] = _empty_correlation(y)
+                return self.volume * 1
+
+        self._check(WriteBuffer(), [torch.randn(1, 8, 3, 4)])
 
 
 if __name__ == "__main__":

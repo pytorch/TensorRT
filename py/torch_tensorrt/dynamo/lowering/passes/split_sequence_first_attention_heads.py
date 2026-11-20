@@ -123,9 +123,9 @@ def _head_split(node: Any) -> Optional[_Split]:
         return None
     if x.dim() != 3 or y.dim() != 3:
         return None
-    # The reshape converter reads a 0 in a shape as the size of the input's dim there,
-    # which would give the reshapes of the rewrite wrong shapes for an empty sequence.
-    # A sequence that a mask selects can be empty at run time.
+    # This keeps the rewrite to sequences known not to be empty, the cases it is tested
+    # on. A sequence that a mask selects can be empty at run time. The reshapes of the
+    # rewrite would still be correct for an empty sequence.
     if statically_known_true(x.numel() == 0) or not statically_known_true(
         x.shape[0] >= 1
     ):

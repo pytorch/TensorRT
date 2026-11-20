@@ -7,13 +7,13 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import cat_validator
 
 
-def _make_cat_node(shapes, dim=0):
+def _make_cat_node(shapes, dim=0, dtypes=None):
     """A cat node whose operands carry only the metadata the validator reads."""
     operands = []
-    for shape in shapes:
+    for shape, dtype in zip(shapes, dtypes or [torch.float32] * len(shapes)):
         operand = MagicMock()
         operand.meta = {
-            "tensor_meta": SimpleNamespace(shape=torch.Size(shape), dtype=torch.float32)
+            "tensor_meta": SimpleNamespace(shape=torch.Size(shape), dtype=dtype)
         }
         operands.append(operand)
     node = MagicMock()
@@ -39,6 +39,12 @@ class TestCatValidator(unittest.TestCase):
         """Nothing is dropped here, so the answer must not depend on this change."""
         self.assertTrue(cat_validator(_make_cat_node([(2, 3), (5, 3)])))
         self.assertTrue(cat_validator(_make_cat_node([(0,), (3,)])))
+
+    def test_dropped_operand_promoting_to_float64_is_refused(self):
+        """An operand of size 0 on the cat dim is dropped too, so the promoted float64
+        would need truncate_double, which is not set here."""
+        node = _make_cat_node([(2, 0), (2, 3)], 1, [torch.float64, torch.float32])
+        self.assertFalse(cat_validator(node))
 
     def test_single_operand_is_accepted(self):
         self.assertTrue(cat_validator(_make_cat_node([(0,)])))
