@@ -3,12 +3,16 @@
 
 import unittest
 
+import numpy as np
 import tensorrt as trt
 import torch
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+
+from .harness import skip_if_trt_rtx_turing
 
 
 @unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
@@ -218,6 +222,160 @@ class TestQuantizeScale(TestCase):
             with self.assertRaisesRegex(RuntimeError, "outside -8..7"):
                 dequantize(*values)
         dequantize(-8, 7)
+
+    def _int4_matmul(
+        self, qdata, scale, x, dtype, runtime_scale=False, refittable=False
+    ):
+        """Build and run x @ dequantize_affine(qdata, scale).T, the scale optionally an input."""
+        skip_if_trt_rtx_turing(self, "INT4 dequantize into a matmul")
+        builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
+        network = builder.create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(
+            network, CompilationSettings(immutable_weights=not refittable)
+        )
+        trt_dtype = _enums.dtype._from(dtype).to(trt.DataType)
+        x_trt = network.add_input("x", trt_dtype, tuple(x.shape))
+        scale_arg = scale
+        if runtime_scale:
+            scale_arg = network.add_input(
+                "scale", _enums.dtype._from(scale.dtype).to(trt.DataType), scale.shape
+            )
+        w = impl.quantize.dequantize_affine(
+            ctx,
+            torch.ops.aten.mul.Tensor,
+            None,
+            "dq",
+            qdata,
+            [1, 128],
+            scale_arg,
+            dtype,
+        )
+        self.assertEqual(w.dtype, trt_dtype)
+        matmul = network.add_matrix_multiply(
+            x_trt, trt.MatrixOperation.NONE, w, trt.MatrixOperation.TRANSPOSE
+        )
+        network.mark_output(matmul.get_output(0))
+        config = builder.create_builder_config()
+        if refittable:
+            config.set_flag(trt.BuilderFlag.REFIT)
+        plan = builder.build_serialized_network(network, config)
+        self.assertIsNotNone(plan)
+        engine = trt.Runtime(trt.Logger(trt.Logger.ERROR)).deserialize_cuda_engine(plan)
+        context = engine.create_execution_context()
+        buffers = {"x": x.to("cuda", dtype), "scale": scale.cuda()}
+        out = torch.empty(x.shape[0], qdata.shape[0], device="cuda", dtype=dtype)
+        for i in range(engine.num_io_tensors):
+            name = engine.get_tensor_name(i)
+            context.set_tensor_address(name, buffers.get(name, out).data_ptr())
+        context.execute_async_v3(torch.cuda.current_stream().cuda_stream)
+        torch.cuda.synchronize()
+        # torchao multiplies in the promoted type of the two dtypes, then casts.
+        weight = (qdata.to(dtype) * scale.repeat_interleave(128, dim=1)).to(dtype)
+        return out.float().cpu(), x.to(dtype).float() @ weight.float().t()
+
+    def test_int4_dequantize_returns_the_requested_dtype(self):
+        # A matmul with a bfloat16 input cannot take a float32 weight.
+        qdata = torch.randint(-8, 8, (64, 256), dtype=torch.int8)
+        scale = torch.rand(64, 2, dtype=torch.bfloat16) + 0.5
+        x = torch.randn(8, 256)
+        for dtype in (torch.bfloat16, torch.float16, torch.float32):
+            for runtime_scale in (False, True):
+                with self.subTest(dtype=dtype, runtime_scale=runtime_scale):
+                    out, expected = self._int4_matmul(
+                        qdata, scale, x, dtype, runtime_scale
+                    )
+                    torch.testing.assert_close(out, expected, rtol=2e-2, atol=1.0)
+
+    def test_int4_dequantize_in_a_refittable_engine(self):
+        # TensorRT fails to build a refittable engine with a 16-bit INT4 DQ output.
+        qdata = torch.randint(-8, 8, (64, 256), dtype=torch.int8)
+        scale = torch.rand(64, 2, dtype=torch.bfloat16) + 0.5
+        x = torch.randn(8, 256)
+        for dtype in (torch.bfloat16, torch.float16):
+            for runtime_scale in (False, True):
+                with self.subTest(dtype=dtype, runtime_scale=runtime_scale):
+                    out, expected = self._int4_matmul(
+                        qdata, scale, x, dtype, runtime_scale, refittable=True
+                    )
+                    torch.testing.assert_close(out, expected, rtol=2e-2, atol=1.0)
+
+    def test_int4_dequantize_in_the_scale_dtype_adds_no_cast(self):
+        # A cast between the DQ and its matmul stops TensorRT from fusing them.
+        skip_if_trt_rtx_turing(self, "INT4 dequantize into a matmul")
+        qdata = torch.randint(-8, 8, (64, 256), dtype=torch.int8)
+        scale = torch.rand(64, 2, dtype=torch.bfloat16) + 0.5
+        for runtime_scale in (False, True):
+            with self.subTest(runtime_scale=runtime_scale):
+                network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+                    1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+                )
+                ctx = ConversionContext(network, CompilationSettings())
+                scale_arg = (
+                    network.add_input("scale", trt.bfloat16, tuple(scale.shape))
+                    if runtime_scale
+                    else scale
+                )
+                impl.quantize.dequantize_affine(
+                    ctx,
+                    torch.ops.aten.mul.Tensor,
+                    None,
+                    "dq",
+                    qdata,
+                    [1, 128],
+                    scale_arg,
+                    torch.bfloat16,
+                )
+                types = [network.get_layer(i).type for i in range(network.num_layers)]
+                self.assertIn(trt.LayerType.DEQUANTIZE, types)
+                self.assertNotIn(trt.LayerType.CAST, types)
+
+    def test_int4_dequantize_with_scale_dtypes_tensorrt_lacks(self):
+        # A float64 scale is used in float32, and an int16 one promotes to the output dtype.
+        qdata = torch.randint(-8, 8, (64, 256), dtype=torch.int8)
+        x = torch.randn(8, 256)
+        for scale in (
+            torch.rand(64, 2, dtype=torch.float64) + 0.5,
+            torch.randint(1, 4, (64, 2), dtype=torch.int16),
+        ):
+            for dtype in (torch.bfloat16, torch.float32):
+                with self.subTest(scale_dtype=scale.dtype, dtype=dtype):
+                    out, expected = self._int4_matmul(qdata, scale, x, dtype)
+                    torch.testing.assert_close(out, expected, rtol=2e-2, atol=1.0)
+
+    def test_int4_dequantize_with_numpy_scale(self):
+        qdata = torch.randint(-8, 8, (64, 256), dtype=torch.int8)
+        for dtype in (np.float32, np.float16, np.int16):
+            with self.subTest(dtype=dtype):
+                network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+                    1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+                )
+                ctx = ConversionContext(network, CompilationSettings())
+                out = impl.quantize.dequantize_affine(
+                    ctx,
+                    torch.ops.aten.mul.Tensor,
+                    None,
+                    "dq",
+                    qdata,
+                    [1, 128],
+                    np.random.randint(1, 4, (64, 2)).astype(dtype),
+                    torch.float32,
+                )
+                self.assertEqual(out.dtype, trt.float32)
+
+    def test_int4_dequantize_keeps_float32_scale_precision(self):
+        # In bfloat16 both scales round to 1, and the two groups cancel to 0.
+        qdata = torch.full((8, 256), 7, dtype=torch.int8)
+        scale = torch.tensor([[1.003, 1.0]]).repeat(8, 1)
+        x = torch.cat([torch.ones(1, 128), -torch.ones(1, 128)], dim=1)
+        for runtime_scale in (False, True):
+            with self.subTest(runtime_scale=runtime_scale):
+                out, expected = self._int4_matmul(
+                    qdata, scale, x, torch.bfloat16, runtime_scale
+                )
+                self.assertGreater(expected.min().item(), 2.0)
+                torch.testing.assert_close(out, expected, rtol=1e-2, atol=1e-2)
 
     def test_fp8_dequantize_keeps_its_default_output_dtype(self):
         network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(

@@ -214,8 +214,9 @@ branch, then restore BF16 as the activation dtype). Default
 Parent ``Int4Tensor`` Linear dispatches to fused mslk kernels and never calls
 ``dequantize()``. Promote weights to ``Int4TensorNonDecomposed`` so export emits
 ``torch.ops.torchao.dequantize_affine``. The converter re-packs the unpacked
-int8 qdata into ``trt.DataType.INT4``. Blocked INT4 DQ currently uses an FP32
-DQ output, then a cast back to BF16.
+int8 qdata into ``trt.DataType.INT4``. With BF16 scales, as in the example,
+the weights are dequantized straight to BF16, so TensorRT can fuse the
+dequantize into the matmul.
 
 Compile with ``immutable_weights=True``. The converter packs INT4 at build
 time; engine refit would push the graph's int8 qdata at an INT4 prototype
