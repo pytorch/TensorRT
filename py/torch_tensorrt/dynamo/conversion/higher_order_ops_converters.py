@@ -50,6 +50,8 @@ def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
 
     A node needs a converter, and must not make a uint8 tensor, which the partitioners
     keep in PyTorch for nodes outside a branch. A branch input must not be uint8 either.
+    A branch must not return the result of a quantize, nor dequantize int8 values that
+    did not come from a quantize in the branch.
     """
     for node in gm.graph.nodes:
         if node.op == "placeholder":
@@ -85,6 +87,34 @@ def _subgraph_is_supported(gm: torch.fx.GraphModule) -> bool:
                     node.target,
                 )
                 return False
+            # The quantize converters keep integer results in float32, which only an engine
+            # output casts back to the op's dtype. A branch output is not an engine output.
+            if node.target in impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS and any(
+                user.op == "output" for user in node.users
+            ):
+                _LOGGER.debug(
+                    "torch.cond subgraph %s returns the result of %s",
+                    gm._get_name(),
+                    node.target,
+                )
+                return False
+            # A dequantize reads an int8 tensor through TensorRT's dequantize layer, and
+            # TensorRT rejects one whose int8 values enter the conditional.
+            if node.target in impl.quantize.QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS:
+                source = node.args[0]
+                if (
+                    isinstance(source, Node)
+                    and source.op != "get_attr"
+                    and source.target
+                    not in impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS
+                    and getattr(source.meta.get("val"), "dtype", None) == torch.int8
+                ):
+                    _LOGGER.debug(
+                        "torch.cond subgraph %s dequantizes an int8 input in %s",
+                        gm._get_name(),
+                        node.target,
+                    )
+                    return False
             continue
         _LOGGER.debug(
             "torch.cond subgraph %s has unsupported node.op %s",
