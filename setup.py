@@ -10,24 +10,18 @@ import platform
 import re
 import subprocess
 import sys
-import warnings
-from dataclasses import dataclass
-from datetime import datetime
 from distutils.cmd import Command
 from pathlib import Path
 from shutil import copyfile, rmtree, which
-from typing import List
 
-import setuptools
 import torch
 import yaml
-from setuptools import Extension, find_namespace_packages, setup
+from setuptools import setup
 from setuptools.command.bdist_wheel import bdist_wheel
-from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
-from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
+from torch.utils.cpp_extension import IS_WINDOWS
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
@@ -52,7 +46,7 @@ def get_git_revision_short_hash() -> str:
             .decode("ascii")
             .strip()
         )
-    except:
+    except Exception:
         print("WARNING: Could not get git revision short hash, using default one")
         # in release/ngc/25.10 branch this is the commit hash of the pytorch commit that is used for dlfw package
         return "0000000"
@@ -116,7 +110,6 @@ WINDOWS_CROSS_COMPILE = TARGET_WINDOWS_ARM64 and not NATIVE_WINDOWS_ARM64
 IS_JETPACK = False
 
 PY_ONLY = False
-NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
@@ -135,10 +128,6 @@ if "--py-only" in sys.argv:
     PY_ONLY = True
     sys.argv.remove("--py-only")
 
-if "--no-ts" in sys.argv:
-    NO_TS = True
-    sys.argv.remove("--no-ts")
-
 if "--legacy" in sys.argv:
     LEGACY = True
     sys.argv.remove("--legacy")
@@ -150,10 +139,6 @@ if "--release" in sys.argv:
 if "--dlfw" in sys.argv:
     IS_DLFW_CI = True
     sys.argv.remove("--dlfw")
-
-if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
-    if no_ts_env_var == "1":
-        NO_TS = True
 
 if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
     if py_only_env_var == "1":
@@ -288,30 +273,20 @@ if not PY_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_cxx11_abi(
-    develop=True,
-    use_dist_dir=True,
-    rt_only=False,
-    target_python=True,
-):
-    cmd = [BAZEL_EXE, "build"]
-    if rt_only:
-        cmd.append("//:libtorchtrt_runtime")
-    else:
-        cmd.append("//:libtorchtrt")
+def build_libtorchtrt_cxx11_abi(develop=True):
+    cmd = [BAZEL_EXE, "build", "//:libtorchtrt"]
 
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
         cmd.append("--compilation_mode=opt")
-    if use_dist_dir and not IS_WINDOWS:
+    if not IS_WINDOWS:
         if IS_AARCH64:
             cmd.append("--distdir=third_party/dist_dir/aarch64-linux-gnu")
         else:
             cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
 
-    if target_python:
-        cmd.append("--config=python")
+    cmd.append("--config=python")
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
@@ -425,113 +400,79 @@ def gen_version_file():
         f.write('__executorch_channel__ = "' + EXECUTORCH_CHANNEL + '"\n')
 
 
-def copy_libtorchtrt(multilinux=False, rt_only=False):
-    if not os.path.exists(dir_path + "/torch_tensorrt/lib"):
-        os.makedirs(dir_path + "/torch_tensorrt/lib")
+def copy_libtorchtrt():
+    package_path = Path(dir_path) / "torch_tensorrt"
+    (package_path / "lib").mkdir(parents=True, exist_ok=True)
+    bazel_bin = get_root_dir() / "bazel-bin"
 
     print("copying library into module")
     if IS_WINDOWS:
+        copyfile(bazel_bin / "cpp/lib/torchtrt.dll", package_path / "lib/torchtrt.dll")
         copyfile(
-            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll",
-            dir_path + "/torch_tensorrt/lib/torchtrt.dll",
-        )
-        copyfile(
-            dir_path + "/../bazel-bin/cpp/lib/torchtrt.dll.if.lib",
-            dir_path + "/torch_tensorrt/lib/torchtrt.lib",
-        )
-    elif multilinux:
-        copyfile(
-            dir_path + "/build/libtrtorch_build/libtrtorch.so",
-            dir_path + "/trtorch/lib/libtrtorch.so",
-        )
-    elif rt_only:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt_runtime.tar.gz --strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+            bazel_bin / "cpp/lib/torchtrt.dll.if.lib", package_path / "lib/torchtrt.lib"
         )
     else:
-        os.system(
-            "tar -xzf "
-            + dir_path
-            + "/../bazel-bin/libtorchtrt.tar.gz "
-            + "--exclude='torch_tensorrt/src' "
-            + "--exclude='torch_tensorrt/src/*' "
-            + "--exclude='torch_tensorrt/examples' "
-            + "--exclude='torch_tensorrt/examples/*' "
-            + "--strip-components=1 -C "
-            + dir_path
-            + "/torch_tensorrt"
+        subprocess.run(
+            [
+                "tar",
+                "-xzf",
+                str(bazel_bin / "libtorchtrt.tar.gz"),
+                "--exclude=torch_tensorrt/src",
+                "--exclude=torch_tensorrt/src/*",
+                "--exclude=torch_tensorrt/examples",
+                "--exclude=torch_tensorrt/examples/*",
+                "--strip-components=1",
+                "-C",
+                str(package_path),
+            ],
+            check=True,
         )
+
+
+def prepare_build(develop=False):
+    if not PY_ONLY:
+        build_libtorchtrt_cxx11_abi(develop=develop)
+        copy_libtorchtrt()
+    gen_version_file()
 
 
 class DevelopCommand(develop):
     description = "Builds the package and symlinks it into the PYTHONPATH"
 
-    def initialize_options(self):
-        develop.initialize_options(self)
-
     def finalize_options(self):
-        develop.finalize_options(self)
-        if NO_TS or PY_ONLY:
-            self.root_is_pure = False
+        super().finalize_options()
+        self.root_is_pure = False
 
     def run(self):
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
-            copy_libtorchtrt(rt_only=NO_TS)
-
-        gen_version_file()
-        develop.run(self)
+        prepare_build(develop=True)
+        super().run()
 
 
 class InstallCommand(install):
     description = "Builds the package"
 
-    def initialize_options(self):
-        install.initialize_options(self)
-
     def finalize_options(self):
-        install.finalize_options(self)
-        if NO_TS or PY_ONLY:
-            self.root_is_pure = False
+        super().finalize_options()
+        self.root_is_pure = False
 
     def run(self):
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
-            copy_libtorchtrt(rt_only=NO_TS)
-
-        gen_version_file()
-        install.run(self)
-
-
-class TorchTRTBuildExtension(BuildExtension):
-    def get_ext_filename(self, ext_name):
-        filename = super().get_ext_filename(ext_name)
-        if TARGET_WINDOWS_ARM64:
-            filename = filename.replace("win_amd64", "win_arm64")
-        return filename
+        prepare_build(develop=False)
+        super().run()
 
 
 class BdistCommand(bdist_wheel):
     description = "Builds the package"
 
-    def initialize_options(self):
-        bdist_wheel.initialize_options(self)
-
     def finalize_options(self):
-        bdist_wheel.finalize_options(self)
+        super().finalize_options()
         if TARGET_WINDOWS_ARM64:
             # Cross-builds run under x64 Python, so the target platform cannot be
             # inferred from the build interpreter.
             self.plat_name = "win_arm64"
-        if NO_TS or PY_ONLY:
-            self.root_is_pure = False
+        self.root_is_pure = False
 
     def get_tag(self):
-        python_tag, abi_tag, platform_tag = bdist_wheel.get_tag(self)
+        python_tag, abi_tag, platform_tag = super().get_tag()
         if TARGET_WINDOWS_ARM64:
             platform_tag = "win_arm64"
         return python_tag, abi_tag, platform_tag
@@ -543,34 +484,20 @@ class BdistCommand(bdist_wheel):
             self.distribution.metadata.name = PROJECT_NAME
         except Exception:
             pass
-        if not PY_ONLY:
-            build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
-            copy_libtorchtrt(rt_only=NO_TS)
-
-        gen_version_file()
-        bdist_wheel.run(self)
+        prepare_build(develop=False)
+        super().run()
 
 
 class EditableWheelCommand(editable_wheel):
     description = "Builds the package in development mode"
 
-    def initialize_options(self):
-        editable_wheel.initialize_options(self)
-
     def finalize_options(self):
-        editable_wheel.finalize_options(self)
-        if NO_TS or PY_ONLY:
-            self.root_is_pure = False
+        super().finalize_options()
+        self.root_is_pure = False
 
     def run(self):
-        if PY_ONLY:
-            gen_version_file()
-            editable_wheel.run(self)
-        else:
-            build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
-            copy_libtorchtrt(rt_only=NO_TS)
-            gen_version_file()
-            editable_wheel.run(self)
+        prepare_build(develop=True)
+        super().run()
 
 
 class CleanCommand(Command):
@@ -626,7 +553,6 @@ class CleanCommand(Command):
 
 
 _FX_FE_AVAIL = False if USE_TRT_RTX else True
-ext_modules = []
 
 fx_packages = [
     "torch_tensorrt.fx",
@@ -743,279 +669,15 @@ if _FX_FE_AVAIL:
 
 package_data = {}
 
-if not (PY_ONLY or NO_TS):
-    tensorrt_x86_64_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
-
-    tensorrt_rtx_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_rtx//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
-
-    tensorrt_sbsa_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_sbsa//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
-
-    tensorrt_rtx_sbsa_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_rtx_sbsa//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
-
-    tensorrt_jetpack_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_l4t//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
-
-    if IS_SBSA:
-        if USE_TRT_RTX:
-            tensorrt_linux_external_dir = tensorrt_rtx_sbsa_external_dir
-        else:
-            tensorrt_linux_external_dir = tensorrt_sbsa_external_dir
-    elif IS_JETPACK:
-        tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
-    else:
-        if USE_TRT_RTX:
-            tensorrt_linux_external_dir = tensorrt_rtx_external_dir
-        else:
-            tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
-
-    if USE_TRT_RTX:
-        tensorrt_windows_repo = (
-            "@tensorrt_rtx_win_arm64" if TARGET_WINDOWS_ARM64 else "@tensorrt_rtx_win"
-        )
-        tensorrt_windows_external_dir = lambda: (
-            subprocess.check_output(
-                [
-                    BAZEL_EXE,
-                    "query",
-                    f"{tensorrt_windows_repo}//:nvinfer",
-                    "--output",
-                    "location",
-                ]
-            )
-            .decode("ascii")
-            .strip()
-            .split("/BUILD.bazel")[0]
-        )
-    else:
-        tensorrt_windows_external_dir = (
-            lambda: subprocess.check_output(
-                [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
-            )
-            .decode("ascii")
-            .strip()
-            .split("/BUILD.bazel")[0]
-        )
-
-    extension_type = setuptools.Extension if TARGET_WINDOWS_ARM64 else CUDAExtension
-    target_torch_root = os.environ.get("TORCHTRT_TARGET_TORCH_ROOT")
-    target_cuda_root = os.environ.get("TORCHTRT_TARGET_CUDA_ROOT")
-    target_python_root = os.environ.get("TORCHTRT_TARGET_PYTHON_ROOT")
-    if NATIVE_WINDOWS_ARM64:
-        target_torch_root = target_torch_root or os.path.dirname(torch.__file__)
-        target_cuda_root = (
-            target_cuda_root
-            or os.environ.get("CUDA_PATH")
-            or os.environ.get("CUDA_HOME")
-        )
-        target_python_root = target_python_root or sys.base_prefix
-    if TARGET_WINDOWS_ARM64 and not (
-        target_torch_root and target_cuda_root and target_python_root
-    ):
-        raise RuntimeError(
-            "Windows ARM64 builds require Torch, CUDA, and Python roots; set "
-            "TORCHTRT_TARGET_TORCH_ROOT, TORCHTRT_TARGET_CUDA_ROOT, and "
-            "TORCHTRT_TARGET_PYTHON_ROOT"
-        )
-
-    extension_kwargs = {}
-    if TARGET_WINDOWS_ARM64:
-        extension_kwargs = {
-            "library_dirs": [
-                os.path.join(target_python_root, "libs"),
-                dir_path + "/torch_tensorrt/lib/",
-                os.path.join(target_torch_root, "lib"),
-                os.path.join(target_cuda_root, "lib", "arm64"),
-            ],
-            "libraries": [
-                f"python{sys.version_info.major}{sys.version_info.minor}",
-                "torchtrt",
-                "c10",
-                "torch",
-                "torch_cpu",
-                "torch_python",
-                "c10_cuda",
-                "torch_cuda",
-                "cudart",
-            ],
-        }
-
-    ext_modules += [
-        extension_type(
-            "torch_tensorrt._C",
-            [
-                "py/" + f
-                for f in [
-                    "torch_tensorrt/csrc/torch_tensorrt_py.cpp",
-                    "torch_tensorrt/csrc/tensorrt_backend.cpp",
-                    "torch_tensorrt/csrc/tensorrt_classes.cpp",
-                    "torch_tensorrt/csrc/register_tensorrt_classes.cpp",
-                ]
-            ],
-            library_dirs=extension_kwargs.get(
-                "library_dirs",
-                [
-                    (dir_path + "/torch_tensorrt/lib/"),
-                    "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu",
-                ],
-            ),
-            libraries=extension_kwargs.get("libraries", ["torchtrt"]),
-            include_dirs=(
-                [
-                    dir_path + "torch_tensorrt/csrc",
-                    dir_path + "torch_tensorrt/include",
-                    dir_path + "/../",
-                    dir_path + "/../cpp/include",
-                    "/usr/local/cuda",
-                ]
-                + (
-                    [
-                        os.path.join(target_python_root, "include"),
-                        os.path.join(target_torch_root, "include"),
-                        os.path.join(
-                            target_torch_root,
-                            "include",
-                            "torch",
-                            "csrc",
-                            "api",
-                            "include",
-                        ),
-                        os.path.join(target_cuda_root, "include"),
-                    ]
-                    if TARGET_WINDOWS_ARM64
-                    else []
-                )
-                + (
-                    [
-                        dir_path + "/../bazel-TRTorch/external/tensorrt_win/include",
-                        dir_path
-                        + "/../bazel-Torch-TensorRT/external/tensorrt_win/include",
-                        dir_path + "/../bazel-TensorRT/external/tensorrt_win/include",
-                        dir_path + "/../bazel-tensorrt/external/tensorrt_win/include",
-                        f"{tensorrt_windows_external_dir()}/include",
-                    ]
-                    if IS_WINDOWS
-                    else [
-                        dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                        dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-                        dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-                        dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-                        f"{tensorrt_linux_external_dir()}/include",
-                    ]
-                )
-            ),
-            extra_compile_args=(
-                [
-                    "/GS-",
-                    "/permissive-",
-                    "/utf-8",
-                ]
-                if IS_WINDOWS
-                else [
-                    "-Wno-deprecated",
-                    "-Wno-deprecated-declarations",
-                ]
-                + ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-            ),
-            extra_link_args=(
-                []
-                if IS_WINDOWS
-                else [
-                    "-Wno-deprecated",
-                    "-Wno-deprecated-declarations",
-                    "-Wl,--no-as-needed",
-                    "-ltorchtrt",
-                    "-Wl,-rpath,$ORIGIN/lib",
-                    "-lpthread",
-                    "-ldl",
-                    "-lutil",
-                    "-lrt",
-                    "-lm",
-                    "-Xlinker",
-                    "-export-dynamic",
-                ]
-                + ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-            ),
-            undef_macros=["NDEBUG"],
-        )
-    ]
-
-    packages += ["torch_tensorrt.ts"]
-
-    package_dir.update(
-        {
-            "torch_tensorrt.ts": "py/torch_tensorrt/ts",
-        }
-    )
-
+if not PY_ONLY:
     package_data.update(
         {
             "torch_tensorrt": [
                 "include/torch_tensorrt/*.h",
                 "include/torch_tensorrt/core/*.h",
-                "include/torch_tensorrt/core/conversion/*.h",
-                "include/torch_tensorrt/core/conversion/conversionctx/*.h",
-                "include/torch_tensorrt/core/conversion/converters/*.h",
-                "include/torch_tensorrt/core/conversion/evaluators/*.h",
-                "include/torch_tensorrt/core/conversion/tensorcontainer/*.h",
-                "include/torch_tensorrt/core/conversion/var/*.h",
-                "include/torch_tensorrt/core/ir/*.h",
-                "include/torch_tensorrt/core/lowering/*.h",
-                "include/torch_tensorrt/core/lowering/passes/*.h",
-                "include/torch_tensorrt/core/partitioning/*.h",
-                "include/torch_tensorrt/core/partitioning/segmentedblock/*.h",
-                "include/torch_tensorrt/core/partitioning/partitioninginfo/*.h",
-                "include/torch_tensorrt/core/partitioning/partitioningctx/*.h",
-                "include/torch_tensorrt/core/plugins/*.h",
-                "include/torch_tensorrt/core/plugins/impl/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
                 "include/torch_tensorrt/core/util/*.h",
                 "include/torch_tensorrt/core/util/logging/*.h",
-                "bin/*",
-                "lib/*",
-            ]
-        }
-    )
-elif NO_TS:
-    package_data.update(
-        {
-            "torch_tensorrt": [
-                "include/torch_tensorrt/*.h",
-                "include/torch_tensorrt/core/*.h",
-                "include/torch_tensorrt/core/runtime/*.h",
                 "lib/*",
             ]
         }
@@ -1121,13 +783,11 @@ def get_requirements():
 
 setup(
     name=PROJECT_NAME,
-    ext_modules=ext_modules,
     version=__version__,
     cmdclass={
         "install": InstallCommand,
         "clean": CleanCommand,
         "develop": DevelopCommand,
-        "build_ext": TorchTRTBuildExtension,
         "bdist_wheel": BdistCommand,
         "editable_wheel": EditableWheelCommand,
     },

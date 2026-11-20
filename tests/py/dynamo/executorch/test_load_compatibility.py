@@ -23,6 +23,21 @@ DELEGATE = "torch_tensorrt_executorch_runtime"
 @pytest.fixture
 def compiler(monkeypatch):
     # Isolate the full loader module from compiler frontends that require a GPU.
+    # PyTorch nightly no longer exposes the retired TorchScript frontend APIs.
+    for name in (
+        "script",
+        "script_method",
+        "interface",
+        "trace",
+        "trace_module",
+        "load",
+        "save",
+        "freeze",
+        "optimize_for_inference",
+        "fork",
+        "wait",
+    ):
+        monkeypatch.delattr(torch.jit, name, raising=False)
     for name in list(sys.modules):
         if name == "torch_tensorrt" or name.startswith("torch_tensorrt."):
             monkeypatch.delitem(sys.modules, name)
@@ -32,7 +47,6 @@ def compiler(monkeypatch):
         "torch_tensorrt._features": {
             "ENABLED_FEATURES": types.SimpleNamespace(
                 fx_frontend=False,
-                torchscript_frontend=False,
                 dynamo_frontend=False,
                 torch_tensorrt_runtime=True,
             ),
@@ -264,7 +278,6 @@ def test_native_failures_propagate_without_fallback(
         pytest.fail("ExecuTorch errors must not reach another format's loader")
 
     monkeypatch.setattr(torch.export, "load", unexpected)
-    monkeypatch.setattr(torch.jit, "load", unexpected)
     target, attribute = {
         "register": (boundary.delegate, "register"),
         "load": (boundary.portable, "_load_for_executorch_from_buffer"),
@@ -373,28 +386,17 @@ def test_unsupported_format_preserves_value_error(compiler, boundary, format):
 
 
 @pytest.mark.parametrize("options", [{}, {"format": None}])
-@pytest.mark.parametrize("fallback", [False, True])
-def test_standard_dispatch_and_kwargs(
-    compiler, boundary, monkeypatch, caplog, options, fallback
-):
+def test_standard_dispatch_and_kwargs(compiler, boundary, monkeypatch, caplog, options):
     extra_files = {"metadata": ""}
     calls = []
     expected = object()
 
     def export_load(path, extra_files):
         calls.append(("export", path, extra_files))
-        if fallback:
-            raise RuntimeError("not an exported program")
         extra_files["metadata"] = "export data"
         return expected
 
-    def jit_load(path, map_location=None, _extra_files=None):
-        calls.append(("jit", path, map_location, _extra_files))
-        _extra_files["metadata"] = "jit data"
-        return expected
-
     monkeypatch.setattr(torch.export, "load", export_load)
-    monkeypatch.setattr(torch.jit, "load", jit_load)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = compiler.load(
@@ -406,41 +408,31 @@ def test_standard_dispatch_and_kwargs(
         )
     assert result is expected
     assert calls[0] == ("export", boundary.path, extra_files)
-    assert len(calls) == (2 if fallback else 1)
-    if fallback:
-        assert calls[1] == ("jit", boundary.path, "cpu", extra_files)
-    assert extra_files["metadata"] == ("jit data" if fallback else "export data")
+    assert len(calls) == 1
+    assert extra_files["metadata"] == "export data"
     assert "Keyword argument unknown_option" in caplog.text
     assert not caught
     assert boundary.events == []
 
 
 @pytest.mark.parametrize("options", [{}, {"format": None}])
-@pytest.mark.parametrize("format", ["export", "jit"])
-def test_standard_formats_round_trip_real_cpu_torch(
-    compiler, boundary, options, format
-):
+def test_standard_formats_round_trip_real_cpu_torch(compiler, boundary, options):
     model = torch.nn.Linear(2, 2).eval()
     x = torch.tensor([[1.0, 2.0]])
     path = str(boundary.path.parent / "standard.pt2")
     extra_files = {"metadata": ""}
-    if format == "export":
-        torch.export.save(
-            torch.export.export(model, (x,)), path, extra_files={"metadata": "kept"}
-        )
-    else:
-        torch.jit.save(
-            torch.jit.trace(model, (x,)), path, _extra_files={"metadata": "kept"}
-        )
+    torch.export.save(
+        torch.export.export(model, (x,)), path, extra_files={"metadata": "kept"}
+    )
     loaded = compiler.load(path, extra_files=extra_files, **options)
-    actual = loaded.module()(x) if format == "export" else loaded(x)
+    actual = loaded.module()(x)
     torch.testing.assert_close(actual, model(x))
-    assert extra_files["metadata"] == ("kept" if format == "export" else b"kept")
+    assert extra_files["metadata"] == "kept"
     assert boundary.events == []
 
 
 def test_standard_failure_preserves_value_error(compiler, boundary):
-    with pytest.raises(ValueError, match="valid Torchscript module or ExportedProgram"):
+    with pytest.raises(ValueError, match="valid ExportedProgram"):
         compiler.load(str(boundary.path), format=None)
     assert boundary.events == []
 

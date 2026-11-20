@@ -19,7 +19,7 @@ def runtime_test(name, visibility = None):
         srcs = [name + ".cpp"],
         visibility = visibility,
         deps = [
-            "//tests/util",
+            "//core/runtime",
             "@googletest//:gtest_main",
         ] + select({
             ":jetpack": ["@torch_l4t//:libtorch"],

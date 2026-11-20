@@ -17,7 +17,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "torch_tensorrt"
 authors = [{ name = "NVIDIA Corporation", email = "narens@nvidia.com" }]
-description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch"
+description = "Torch-TensorRT is a package which allows users to automatically compile PyTorch modules to TensorRT while remaining in PyTorch"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 classifiers = [
@@ -52,7 +52,6 @@ keywords = [
     "deep learning",
     "compiler",
     "dynamo",
-    "torchscript",
     "inference",
 ]
 

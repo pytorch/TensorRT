@@ -4,7 +4,7 @@
  */
 
 #include "torch_tensorrt/logging.h"
-#include "core/util/prelude.h"
+#include "core/util/logging/TorchTRTLogger.h"
 
 namespace torch_tensorrt {
 namespace logging {

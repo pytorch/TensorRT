@@ -76,7 +76,7 @@ class LowerSetting(LowerSettingBasic):
     meaning all possible tactic sources.
     correctness_atol: absolute tolerance for correctness check
     correctness_rtol: relative tolerance for correctness check
-    use_experimental_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).
+    use_experimental_rt: Uses the C++ TensorRT runtime module.
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)

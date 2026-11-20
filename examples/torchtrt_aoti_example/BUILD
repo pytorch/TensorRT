@@ -38,7 +38,7 @@ cc_binary(
         "-ldl",
     ],
     deps = [
-        "//cpp:torch_tensorrt",
+        "//core/runtime",
     ] + select({
         ":jetpack": [
             "@torch_l4t//:caffe2",

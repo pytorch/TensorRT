@@ -57,32 +57,32 @@ class ModelStorage:
         if name == "vgg16":
             return {
                 "model": models.vgg16(weights=models.VGG16_Weights.DEFAULT),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "alexnet":
             return {
                 "model": models.alexnet(weights=models.AlexNet_Weights.DEFAULT),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "resnet50":
             return {
                 "model": models.resnet50(weights=None),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "efficientnet_b0":
             return {
                 "model": timm.create_model("efficientnet_b0", pretrained=True),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "vit":
             return {
                 "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "vit_large":
             return {
                 "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
-                "path": ["script", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "google_vit":
             return {
@@ -93,7 +93,7 @@ class ModelStorage:
             return {
                 "model": cm.BertModule(),
                 "inputs": cm.BertInputs(),
-                "path": ["trace", "pytorch"],
+                "path": ["export", "pytorch"],
             }
         elif name == "sd1.4_unet":
             return {

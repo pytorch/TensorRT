@@ -16,4 +16,4 @@ add_custom_command(
 )
 
 target_link_libraries(torchtrt_aoti_example "${TORCH_LIBRARIES}" "-Wl,--no-as-needed" torchtrt_runtime "-Wl,--as-needed")
-set_property(TARGET torchtrt_aoti_example PROPERTY CXX_STANDARD 17)
+set_property(TARGET torchtrt_aoti_example PROPERTY CXX_STANDARD 20)

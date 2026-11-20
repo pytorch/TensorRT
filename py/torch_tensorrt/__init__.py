@@ -64,7 +64,6 @@ def _register_with_torch() -> None:
     linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
 
     if os.path.isfile(linked_file_full_path):
-        assert ENABLED_FEATURES.torchscript_frontend
         assert ENABLED_FEATURES.torch_tensorrt_runtime
         torch.ops.load_library(linked_file_full_path)
 
@@ -92,21 +91,18 @@ from torch_tensorrt._enums import (  # noqa: F401
 from torch_tensorrt._Input import Input  # noqa: F401
 from torch_tensorrt.runtime import *  # noqa: F403
 
-if ENABLED_FEATURES.torchscript_frontend:
-    from torch_tensorrt import ts
-
 if ENABLED_FEATURES.fx_frontend:
     from torch_tensorrt import fx
 
 if ENABLED_FEATURES.dynamo_frontend:
-    from torch_tensorrt.dynamo import backend  # noqa: F401
     from torch_tensorrt import dynamo  # noqa: F401
+    from torch_tensorrt.dynamo import backend  # noqa: F401
 
 if ENABLED_FEATURES.qdp_plugin:
     from torch_tensorrt import kernels  # noqa: F401
 
-from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt import distributed  # noqa: F401
+from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import (
     MutableTorchTensorRTModule,
 )

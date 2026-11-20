@@ -30,7 +30,10 @@ cc_library(
     hdrs = glob([
         "include/**/*.h",
     ]),
-    includes = ["include/"],
+    includes = [
+        "include/",
+        "include/torch_tensorrt/",
+    ],
     strip_include_prefix = "include",
 )
 
@@ -44,6 +47,14 @@ cc_library(
             "lib/libtorchtrt_runtime.so",
         ],
     }),
+    hdrs = glob([
+        "include/**/*.h",
+    ]),
+    includes = [
+        "include/",
+        "include/torch_tensorrt/",
+    ],
+    strip_include_prefix = "include",
 )
 
 cc_library(
