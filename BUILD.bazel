@@ -96,6 +96,7 @@ pkg_tar(
         "//core/runtime:include",
         "//core/util:include",
         "//core/util/logging:include",
+        "//cpp:include",
     ],
 )
 
@@ -104,6 +105,9 @@ pkg_tar(
     package_dir = "include/torch_tensorrt",
     deps = [
         "//core/runtime:include",
+        "//core/util:include",
+        "//core/util/logging:include",
+        "//cpp:include",
     ],
 )
 
@@ -252,6 +256,7 @@ pkg_zip(
         "//core/runtime:include_pkg_files",
         "//core/util:include_pkg_files",
         "//core/util/logging:include_pkg_files",
+        "//cpp:include_pkg_files",
         "//cpp/lib:lib_pkg_files",
         "//third_party/torch_tensorrt:BUILD",
     ],

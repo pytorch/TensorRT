@@ -21,7 +21,7 @@ target_sources(${lib_name}
     PRIVATE
         ${CXX_SRCS}
     PUBLIC
-        "$<TARGET_OBJECTS:core_util_logging>"
+        "$<BUILD_INTERFACE:$<TARGET_OBJECTS:core_util_logging>>"
 )
 
 target_include_directories(${lib_name}

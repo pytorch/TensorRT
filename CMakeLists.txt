@@ -27,6 +27,9 @@ endif()
 # -----------------------------------------
 #  compilation
 # -----------------------------------------
+if(WITH_TESTS)
+  enable_testing()
+endif()
 add_subdirectory(core)
 add_subdirectory(cpp)
 
