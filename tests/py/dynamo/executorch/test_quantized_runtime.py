@@ -7,6 +7,8 @@ import importlib.util
 
 import pytest
 
+from ..quantization_utils import quantization_available
+
 pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
@@ -18,13 +20,14 @@ _PRECISIONS = {"int8": ("INT8_DEFAULT_CFG", (0, 0)), "fp8": ("FP8_DEFAULT_CFG", 
 
 @pytest.fixture(autouse=True)
 def requires_runtime():
+    if not quantization_available("modelopt"):
+        pytest.skip("ModelOpt not installed or quantization tests disabled")
     # Decided at run time, not collection time, for the reason test_cuda_partitioner_composition.py
     # gives: remote GPU runners collect off the GPU host.
     if not torch.cuda.is_available():
         pytest.skip("needs a CUDA device to build and run a TensorRT engine")
-    for package in ("torch_tensorrt_executorch_runtime", "modelopt"):
-        if importlib.util.find_spec(package) is None:
-            pytest.skip(f"needs the {package} package")
+    if importlib.util.find_spec("torch_tensorrt_executorch_runtime") is None:
+        pytest.skip("needs the torch_tensorrt_executorch_runtime package")
 
 
 class _Model(torch.nn.Module):

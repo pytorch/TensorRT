@@ -28,6 +28,34 @@ You can install the python package using
 
 Packages are uploaded for Linux on x86 and Windows
 
+Optional ModelOpt quantization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ModelOpt is not a package dependency. The default installation does not install
+or import it for unquantized models. To use ModelOpt quantization on a supported
+platform, install ModelOpt separately:
+
+.. code-block:: sh
+
+    python -m pip install "nvidia-modelopt[hf]>=0.44.0"
+
+This also applies to TensorRT-RTX and source installations. ModelOpt remains
+in the ``modelopt_quantization`` dependency group for tests and development
+environments using ``uv sync --group modelopt_quantization``. TorchAO and MSLK
+are in the separate ``torchao_quantization`` group.
+
+CI skips installing ModelOpt by default while it catches up with the PyTorch
+nightly API. Set ``INSTALL_MODELOPT_QUANTIZATION=1`` before running
+``.github/scripts/install-torch-tensorrt.sh`` to enable it. TorchAO and MSLK
+remain enabled by default to preserve TorchAO suite coverage; set
+``INSTALL_TORCHAO_QUANTIZATION=0`` to disable them. Setting either flag to ``0``
+also skips tests requiring its packages, including when those packages are
+already present in the runner image.
+
+Windows ARM64 users should use the default installation without ModelOpt,
+because ModelOpt does not support that platform. FP16, BF16, and FP32 models
+do not require ModelOpt. Quantized models that use ModelOpt still require it.
+
 Installing Torch-TensorRT for a specific CUDA version
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
