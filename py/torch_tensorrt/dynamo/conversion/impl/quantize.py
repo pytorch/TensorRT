@@ -423,6 +423,11 @@ def dequantize_affine(
                 f"(got nonzero zero_point for '{name}')"
             )
         assert isinstance(qdata, torch.Tensor)
+        if qdata.numel() and (int(qdata.min()) < -8 or int(qdata.max()) > 7):
+            raise RuntimeError(
+                "Group-wise int8 weights are dequantized as INT4, but the int8 "
+                f"weights of '{name}' hold values outside -8..7"
+            )
         qdata_trt = _add_int4_constant(ctx, qdata, f"{name}_qdata_int4")
         # Blocked along the group dimension (last dim of block_size > 1).
         axis: Optional[int] = len(_block_size_as_ints(block_size)) - 1

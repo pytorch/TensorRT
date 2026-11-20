@@ -192,6 +192,33 @@ class TestQuantizeScale(TestCase):
         finally:
             torch.set_default_dtype(default_dtype)
 
+    def test_groupwise_int8_outside_int4_range_is_rejected(self):
+        # Packing these values into 4 bits would silently change the weights.
+        network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(network, CompilationSettings())
+        scale = torch.rand(64, 16, dtype=torch.float32)
+
+        def dequantize(*values):
+            qdata = torch.zeros(64, 256, dtype=torch.int8)
+            qdata.view(-1)[: len(values)] = torch.tensor(values, dtype=torch.int8)
+            return impl.quantize.dequantize_affine(
+                ctx,
+                torch.ops.aten.mul.Tensor,
+                None,
+                "dq",
+                qdata,
+                [1, 16],
+                scale,
+                torch.float32,
+            )
+
+        for values in (range(-32, 32), [8], [-9]):
+            with self.assertRaisesRegex(RuntimeError, "outside -8..7"):
+                dequantize(*values)
+        dequantize(-8, 7)
+
     def test_fp8_dequantize_keeps_its_default_output_dtype(self):
         network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
             1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
