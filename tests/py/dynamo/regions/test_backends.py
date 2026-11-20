@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
     configure_region_backends,
     get_region_records,
+    has_region_markers,
     is_region_hop,
     materialize_regions,
     normalize_region_scopes,
@@ -66,15 +67,13 @@ def test_capture_checks_precede_kernel_factory(strict):
                 return x.sin()
 
     with RegionCompilationSession(strict=strict) as session:
-        if strict:
-            session.capture_error = "Missing marker capabilities"
-        message = "Missing marker capabilities" if strict else "strict=True"
-        with pytest.raises(Exception, match=message):
+        session.capture_error = "Missing marker capabilities"
+        with pytest.raises(Exception, match="Missing marker capabilities"):
             torch.export.export(Model(), (torch.ones(2),), strict=strict)
     assert not calls
 
 
-def test_default_and_unowned_annotations_do_not_compile(monkeypatch):
+def test_default_annotations_do_not_compile(monkeypatch):
     def unexpected_compile(*args, **kwargs):
         raise AssertionError("Annotation unexpectedly invoked torch.compile")
 
@@ -94,33 +93,58 @@ def test_default_and_unowned_annotations_do_not_compile(monkeypatch):
     assert eager_graph.get_submodule(record.child_target)._compiled_call_impl is None
 
 
-@pytest.mark.parametrize("trace", ["strict_export", "nonstrict_export", "compile"])
-def test_unowned_trace_warns_once(trace, monkeypatch, caplog):
-    monkeypatch.setattr(region._context, "_warned_unowned_trace", False)
+def _ignored_warnings(caplog):
     logger = region._context.logger.name
+    return [r.getMessage() for r in caplog.records if r.name == logger]
 
-    def messages():
-        return [r.getMessage() for r in caplog.records if r.name == logger]
 
+@pytest.mark.parametrize("strict", [False, True])
+def test_export_records_regions_without_a_session(strict, caplog):
     model = RegionModel(backend="eager").eval()
     x = torch.randn(2, 8)
-    with caplog.at_level(logging.WARNING, logger=logger):
+    with caplog.at_level(logging.WARNING, logger=region._context.logger.name):
+        exported = torch.export.export(model, (x,), strict=strict)
+    assert has_region_markers(exported.graph_module)
+    assert not _ignored_warnings(caplog)
+    torch.testing.assert_close(exported.module()(x), model(x))
+    records = region_hop_records(normalize_region_scopes(exported).graph_module)
+    assert [record.backend for record in records] == ["eager"]
+
+
+@pytest.mark.parametrize("strict", [False, True])
+def test_ignore_regions_exports_ordinary_operations(strict, caplog):
+    model = RegionModel(backend="eager").eval()
+    x = torch.randn(2, 8)
+    with caplog.at_level(logging.WARNING, logger=region._context.logger.name):
+        with region.ignore_regions():
+            exported = torch.export.export(model, (x,), strict=strict)
+        after = torch.export.export(model, (x,), strict=strict)
+    assert not has_region_markers(exported.graph_module)
+    assert has_region_markers(after.graph_module)
+    assert not _ignored_warnings(caplog)
+    torch.testing.assert_close(exported.module()(x), model(x))
+
+
+@pytest.mark.parametrize("trace", ["compile", "torchscript"])
+def test_trace_that_ignores_regions_warns_once(trace, monkeypatch, caplog):
+    monkeypatch.setattr(region._context, "_warned_ignored", set())
+    model = RegionModel(backend="eager").eval()
+    x = torch.randn(2, 8)
+    with caplog.at_level(logging.WARNING, logger=region._context.logger.name):
         model(x)
-        assert get_region_records(capture(model, x))
-        assert not messages()
+        assert not _ignored_warnings(caplog)
         for _ in range(2):
             torch._dynamo.reset()
             if trace == "compile":
                 # fullgraph: the warning must not add a graph break.
                 traced = torch.compile(model, backend="eager", fullgraph=True)
             else:
-                strict = trace == "strict_export"
-                traced = torch.export.export(model, (x,), strict=strict).module()
-                assert not get_region_records(traced)
+                traced = torch.jit.trace(model, (x,))
             torch.testing.assert_close(traced(x), model(x))
     torch._dynamo.reset()
-    assert len(messages()) == 1
-    assert "torch_tensorrt.compile(..., ir='dynamo', strict=True)" in messages()[0]
+    (message,) = _ignored_warnings(caplog)
+    assert "annotations are ignored" in message
+    assert "backend='torch_tensorrt'" in message
 
 
 def test_backend_metadata_survives_capture_with_repeated_names():

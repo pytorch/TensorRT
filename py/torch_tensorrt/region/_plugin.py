@@ -5,12 +5,49 @@
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import replace
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from torch_tensorrt.kernels import KernelSpec
+
+# Kernels are Python objects, so a traced program holds only a key into this
+# table. The key is random: a program loaded in another process cannot find a
+# kernel, or pick up a different one, by accident.
+_KERNELS: dict[str, KernelSpec | partial[None]] = {}
+
+
+# The key of each kernel request already seen. A model is traced again for
+# every new input shape, and a rule is applied to every graph of a model.
+_KERNEL_KEYS: dict[tuple[Any, ...], str] = {}
+
+
+def remember_kernel(
+    prepared: KernelSpec | partial[None], request: tuple[Any, ...] = ()
+) -> str:
+    """Keep a prepared kernel for this process and return the key a trace records.
+
+    ``request`` identifies what was asked for, so that asking again for the
+    same kernel and options returns the same key instead of a new entry.
+    """
+    try:
+        known = _KERNEL_KEYS.get(request) if request else None
+    except TypeError:
+        # An option that cannot be hashed, such as a dict of lists.
+        request, known = (), None
+    if known is not None:
+        return known
+    key = uuid.uuid4().hex
+    _KERNELS[key] = prepared
+    if request:
+        _KERNEL_KEYS[request] = key
+    return key
+
+
+def find_kernel(key: str) -> Optional[KernelSpec | partial[None]]:
+    return _KERNELS.get(key)
 
 
 def prepare_plugin(kernel: Any, **options: Any) -> KernelSpec | partial[None]:

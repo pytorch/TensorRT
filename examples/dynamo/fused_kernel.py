@@ -26,7 +26,9 @@ prints that engine's layer information, which lists the generated plugin layer.
 The supplied kernel must implement the entire annotated computation. This
 example uses equal-shaped contiguous CUDA float32 inputs and checks numerical
 agreement, including NaN and infinity; automatic registration does not prove
-kernel correctness or speed.
+kernel correctness or speed. To replace a submodule without editing its
+source, pass a ``FusedKernel`` rule with the same kernel options; see
+:ref:`execute_in_torch`.
 """
 
 import json
@@ -91,8 +93,6 @@ def main():
         model,
         inputs=list(inputs),
         ir="dynamo",
-        strict=True,
-        offload_module_to_cpu=False,
         min_block_size=1,
         require_full_compilation=True,
     )

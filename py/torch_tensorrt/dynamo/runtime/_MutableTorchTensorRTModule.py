@@ -458,13 +458,24 @@ class MutableTorchTensorRTModule(object):
         # Export the module
         self.original_model.to(to_torch_device(self.trt_device))
         self.exp_program = self.get_exported_program()
-        self.gm = dynamo_compile(
-            self.exp_program,
-            arg_inputs=self.arg_inputs,
-            kwarg_inputs=self.kwarg_inputs,
-            immutable_weights=False,
-            **self.additional_settings,
-        )
+        from torch_tensorrt.region import RegionError
+
+        try:
+            self.gm = dynamo_compile(
+                self.exp_program,
+                arg_inputs=self.arg_inputs,
+                kwarg_inputs=self.kwarg_inputs,
+                immutable_weights=False,
+                **self.additional_settings,
+            )
+        except RegionError as error:
+            raise RegionError(
+                "MutableTorchTensorRTModule rebuilds weights in place, which "
+                "regions do not support. Compile with torch_tensorrt.compile "
+                "instead, or, for scopes written in forward, make the first "
+                "call inside torch_tensorrt.region.ignore_regions(); regions= "
+                "rules cannot be used here"
+            ) from error
         if self.additional_settings.get("offload_module_to_cpu", False):
             _offload_original_model(self)
         if self.enable_weight_streaming:

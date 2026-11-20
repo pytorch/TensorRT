@@ -44,3 +44,46 @@ def validate_region_mutations(exported_program: torch.export.ExportedProgram) ->
             + " is unsupported anywhere in a model containing live regions, "
             "including outside the annotated scope."
         )
+
+
+def validate_model_mode(model: torch.nn.Module) -> None:
+    """Reject a model with regions that has a module in training mode."""
+    training = [
+        name or "<the model>" for name, child in model.named_modules() if child.training
+    ]
+    if training:
+        shown = ", ".join(training[:5]) + (", ..." if len(training) > 5 else "")
+        raise RegionCaptureError(
+            f"Regions currently require model.eval(); still in training mode: {shown}"
+        )
+
+
+def validate_eval_mode(gm: torch.fx.GraphModule) -> None:
+    """Reject training-mode sampling outside the regions of a traced program.
+
+    A traced program does not say whether its model was in training mode; the
+    dropout it recorded does. Batch-norm updates show up as buffer mutations,
+    which ``validate_region_mutations`` rejects. A caller that checked the
+    model itself says so on the compilation session, and this check is skipped:
+    an eval-mode model may keep dropout active on purpose.
+    """
+    from torch_tensorrt.region._session import current_session
+
+    from ._capture import _SAMPLING_SWITCHES, _draws_random_numbers, region_hop_records
+
+    session = current_session()
+    if getattr(session, "model_in_eval_mode", False) or not region_hop_records(gm):
+        return
+    for node in gm.graph.nodes:
+        if not isinstance(node.target, torch._ops.OpOverload):
+            continue
+        # An in-place variant shares its switches with the plain operator.
+        name = node.target._schema.name.partition("::")[2].rstrip("_")
+        packet = getattr(torch.ops.aten, name, None)
+        if packet in _SAMPLING_SWITCHES and _draws_random_numbers(node):
+            raise RegionCaptureError(
+                "Regions currently require a model in eval mode: "
+                f"{node.target} at {node.name!r} samples at random, as a "
+                "model traced in training mode does. Call model.eval() before "
+                "tracing it"
+            )

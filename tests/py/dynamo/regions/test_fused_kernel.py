@@ -188,9 +188,9 @@ def _assert_plugin_ownership(compiled, count):
     return records
 
 
-def test_unowned_context_does_not_resolve_or_register_a_kernel(monkeypatch):
+def test_trace_that_ignores_regions_does_not_resolve_or_register_a_kernel(monkeypatch):
     def unexpected(*args, **kwargs):
-        raise AssertionError("An unowned region attempted kernel registration")
+        raise AssertionError("An ignored region attempted kernel registration")
 
     monkeypatch.setattr(kernels, "triton_op", unexpected)
     monkeypatch.setattr(kernels, "cuda_kernel_op", unexpected)
@@ -204,9 +204,14 @@ def test_unowned_context_does_not_resolve_or_register_a_kernel(monkeypatch):
     x = torch.randn(2, 8)
     expected = x.sin() + 1
     torch.testing.assert_close(Eager()(x), expected)
-    exported = torch.export.export(Eager(), (x,), strict=True)
+    with region.ignore_regions():
+        exported = torch.export.export(Eager(), (x,), strict=True)
     torch.testing.assert_close(exported.module()(x), expected)
     assert not get_region_records(exported.module())
+    torch._dynamo.reset()
+    compiled = torch.compile(Eager(), backend="eager", fullgraph=True)
+    torch.testing.assert_close(compiled(x), expected)
+    torch._dynamo.reset()
 
 
 @pytest.mark.parametrize(

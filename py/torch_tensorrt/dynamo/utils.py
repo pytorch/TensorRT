@@ -755,6 +755,20 @@ def to_torch_tensorrt_device(
     return Device._from(device)
 
 
+# torch.compile options that are not compilation settings. ``regions`` holds
+# rules with classes and kernels, which the settings, saved with every engine,
+# cannot carry.
+_BACKEND_OPTIONS = frozenset(
+    {
+        "regions",
+        "debug",
+        "custom_engine_cache",
+        "engine_cache_dir",
+        "engine_cache_size",
+    }
+)
+
+
 def parse_dynamo_kwargs(
     kwargs: Any,
 ) -> Tuple[CompilationSettings, Optional[BaseEngineCache]]:
@@ -809,6 +823,14 @@ def parse_dynamo_kwargs(
         valid_attrs = {attr.name for attr in fields(settings)}
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
+        # Options the backend reads itself rather than through the settings.
+        unknown = sorted(set(kwargs) - valid_attrs - _BACKEND_OPTIONS)
+        if unknown:
+            logger.warning(
+                "Ignoring unknown torch.compile options for the Torch-TensorRT "
+                "backend: %s",
+                ", ".join(unknown),
+            )
 
     # Ensure device is a torch_tensorrt Device
     settings.device = to_torch_tensorrt_device(settings.device)

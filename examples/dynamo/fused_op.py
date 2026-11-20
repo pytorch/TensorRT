@@ -20,7 +20,9 @@ Register the operator and its fake implementation before compiling. ``inputs``
 lists the tensors the region reads in the operator's argument order, and the
 operator's outputs must match the entire region. The counter below verifies
 that compiled inference actually calls the supplied operator. Register the
-operator again before loading a saved model in a new process.
+operator again before loading a saved model in a new process. To replace a
+submodule without editing its source, pass a ``FusedOp`` rule instead; see
+:ref:`region_rules_example`.
 """
 
 import torch
@@ -67,8 +69,6 @@ def main():
         model,
         inputs=list(inputs),
         ir="dynamo",
-        strict=True,
-        offload_module_to_cpu=False,
         min_block_size=1,
     )
 

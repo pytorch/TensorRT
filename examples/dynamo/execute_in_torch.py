@@ -19,9 +19,12 @@ addition and subtraction execute in TensorRT.
 
 ``backend="eager"`` is the default; ``"inductor"`` is the only other accepted
 value. This selects the compiler, not a ``torch.compile`` tuning mode. The
-annotation is a no-op when the original model executes eagerly or is exported
-outside Torch-TensorRT. Models with Inductor regions cannot currently be saved
-through ``torch_tensorrt.save``.
+annotation does nothing when the original model executes eagerly.
+``torch.export`` records it, so a program you export yourself keeps the
+region; :ref:`execute_in_torch` lists the compile paths that honor it. Models
+with Inductor regions cannot currently be saved through ``torch_tensorrt.save``.
+To keep a submodule in PyTorch without editing its source, pass an
+``ExecuteInTorch`` rule instead; see :ref:`region_rules_example`.
 
 Inductor may fuse compatible operations, but this example does not promise a
 particular kernel count or speed improvement. Use static shapes and the same
@@ -60,8 +63,6 @@ def main():
             model,
             inputs=list(inputs),
             ir="dynamo",
-            strict=True,
-            offload_module_to_cpu=False,
             min_block_size=1,
         )
 

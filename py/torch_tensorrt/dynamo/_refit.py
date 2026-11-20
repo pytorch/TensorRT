@@ -147,6 +147,14 @@ def refit_module_weights(
         A new compiled TensorRT module that has the updated weights.
     """
     inline_module = False
+    # A saved program lists the regions its module was compiled with.
+    had_regions = any(
+        getattr(saved, "meta", {}).get("custom", {}).get("torch_tensorrt_regions")
+        for saved in (
+            compiled_module,
+            getattr(compiled_module, "graph_module", None),
+        )
+    )
     if isinstance(compiled_module, ExportedProgram):
         compiled_module = compiled_module.module()
 
@@ -245,6 +253,14 @@ def refit_module_weights(
         clean_up_graph_after_modifications(compiled_module)
 
     assert settings is not None
+
+    from torch_tensorrt.dynamo.region_compilation import RegionError, get_region_records
+
+    if had_regions or get_region_records(compiled_module):
+        raise RegionError(
+            "A model compiled with regions cannot be refitted; compile it again "
+            "with the new weights"
+        )
 
     assert (
         not settings.immutable_weights

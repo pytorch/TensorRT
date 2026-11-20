@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Temporary scope markers, registered by the compilation session before tracing."""
+"""Scope markers that a trace records and compilation consumes.
+
+They are registered when ``torch_tensorrt`` is imported, so that a saved program
+holding them can be loaded.
+"""
 
 from typing import Optional, Sequence
 
@@ -9,8 +13,8 @@ import torch
 
 _LIBRARY = torch.library.Library("torch_tensorrt_region", "DEF")
 _LIBRARY.define(
-    'begin(str name, str backend="eager", str route="torch", int plugin=-1, '
-    "int operator=-1, Tensor[]? inputs=None) -> Tensor"
+    'begin(str name, str backend="eager", str route="torch", str plugin="", '
+    'str operator="", Tensor[]? inputs=None) -> Tensor'
 )
 _LIBRARY.define("end(Tensor sentinel) -> ()")
 
@@ -19,8 +23,8 @@ def _begin(
     name: str,
     backend: str = "eager",
     route: str = "torch",
-    plugin: int = -1,
-    operator: int = -1,
+    plugin: str = "",
+    operator: str = "",
     inputs: Optional[Sequence[torch.Tensor]] = None,
 ) -> torch.Tensor:
     # ``inputs`` only records the replacement's argument order for capture;
@@ -51,6 +55,9 @@ try:
     register_effect(END, EffectType.ORDERED, lib=_LIBRARY)
 except (ImportError, AttributeError, TypeError) as error:
     CAPTURE_ERROR = (
-        "execute_in_torch requires PyTorch ordered-effect markers, tracing "
-        f"annotations, and graph-break guards; this PyTorch version lacks them: {error}"
+        "Regions (execute_in_torch, fused_op, fused_kernel and regions= rules) "
+        "require PyTorch ordered-effect markers, tracing annotations, and "
+        f"graph-break guards; this PyTorch version lacks them: {error}. To trace "
+        "an annotated model without its regions, use "
+        "torch_tensorrt.region.ignore_regions()"
     )

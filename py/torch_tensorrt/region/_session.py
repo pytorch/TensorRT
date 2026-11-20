@@ -4,15 +4,10 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
-from functools import partial
 from types import TracebackType
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from ._errors import RegionCaptureError
-
-if TYPE_CHECKING:
-    from torch._ops import OpOverload
-    from torch_tensorrt.kernels import KernelSpec
 
 _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
     "torch_tensorrt_region_session", default=None
@@ -20,16 +15,25 @@ _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
 
 
 class RegionCompilationSession:
-    """Own marker registration and kernel definitions from export to compilation."""
+    """Explain region capture failures while Torch-TensorRT traces one model.
 
-    def __init__(self, *, strict: bool) -> None:
+    Regions are recorded by any ``torch.export`` trace and by the Torch-TensorRT
+    ``torch.compile`` backend, with or without a session. The session only adds
+    diagnostics that need the surrounding compile call. ``strict`` is kept for
+    callers; strict and non-strict export both record regions.
+    """
+
+    def __init__(self, *, strict: bool = True) -> None:
         self.strict = strict
         self.capture_error: Optional[str] = None
         # Name of the fused_kernel scope whose options Dynamo is converting
         # ('' if unnamed), else None.
         self.pending_plugin: Optional[str] = None
-        self.plugins: dict[int, KernelSpec | partial[None]] = {}
-        self.operators: dict[int, OpOverload] = {}
+        # Set by a compile call that checked the model it traced was in eval mode.
+        self.model_in_eval_mode = False
+        # Why tracing could not record how the modules that rules replace are
+        # called, when it could not.
+        self.call_record_failure: Optional[str] = None
         self._context_token: Optional[Token[Optional[RegionCompilationSession]]] = None
 
     def __enter__(self) -> RegionCompilationSession:
@@ -37,10 +41,9 @@ class RegionCompilationSession:
             raise RegionCaptureError(
                 "A region compilation session cannot re-enter itself"
             )
-        if self.strict:
-            from . import _marker_ops
+        from . import _marker_ops
 
-            self.capture_error = _marker_ops.CAPTURE_ERROR
+        self.capture_error = _marker_ops.CAPTURE_ERROR
         self._context_token = _CURRENT_SESSION.set(self)
         return self
 

@@ -31,8 +31,9 @@ class RegionRecord:
     owner: Optional[str] = None
     reference_graph: Optional[str] = field(default=None, repr=False)
     backend: str = "eager"
-    plugin_key: int = -1
-    operator_key: int = -1
+    # The kernel's key in this process and the custom operator's name; "" if unused.
+    plugin_key: str = ""
+    operator_key: str = ""
     plugin_op: Any = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
@@ -42,7 +43,7 @@ class RegionRecord:
             raise RegionError(f"Unsupported region backend {self.backend!r}")
 
     @property
-    def capture_signature(self) -> tuple[str, str, str, int, int]:
+    def capture_signature(self) -> tuple[str, str, str, str, str]:
         """Identity and execution policy that lowering must preserve."""
         return self.id, self.backend, self.route, self.plugin_key, self.operator_key
 

@@ -40,9 +40,10 @@ Some of the frequently used options are as follows:
 * ``min_block_size`` - Minimum number of consecutive operators required to be executed as a TensorRT segment.
 
 To keep a particular invocation or group of operations in PyTorch, see
-:ref:`execute_in_torch`. Region annotations require direct
-``torch_tensorrt.compile(model, ir="dynamo", strict=True, ...)`` capture;
-standalone export does not preserve them.
+:ref:`execute_in_torch`. ``torch.export`` records region annotations, with
+``strict=True`` and with the default ``strict=False``, so a program you export
+yourself keeps them. The tutorial lists the compile paths that honor them and
+describes ``regions=`` rules, which select submodules when you compile.
 
 The complete list of options can be found `here <https://github.com/pytorch/TensorRT/blob/123a486d6644a5bbeeec33e2f32257349acc0b8f/py/torch_tensorrt/dynamo/compile.py#L51-L77>`_
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import copy
 import logging
 import operator
 import os
@@ -413,6 +414,9 @@ def cross_compile_for_windows(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    from torch_tensorrt.dynamo.region_compilation._capture import reject_region_capture
+
+    reject_region_capture(exported_program, "cross-compilation", kwargs.get("regions"))
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
@@ -549,6 +553,7 @@ def compile(
     accuracy_algorithm: str = _defaults.ACCURACY_ALGORITHM,
     accuracy_atol: float = _defaults.ACCURACY_ATOL,
     accuracy_rtol: float = _defaults.ACCURACY_RTOL,
+    regions: Optional[collections.abc.Mapping[Any, Any]] = None,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -666,6 +671,7 @@ def compile(
         accuracy_algorithm (str): Loss metric: "l0", "l1", "l2", "lInf", or "cos" (lower is better).
         accuracy_atol (float): Absolute tolerance for "accuracy_algorithm="l0"".
         accuracy_rtol (float): Relative tolerance for "accuracy_algorithm="l0"".
+        regions (Optional[Mapping]): Rules that place whole submodules in regions without editing their source, keyed by module path (``"encoder.layers.*.mlp"``; ``*`` matches one name and ``**`` any number) or by module class. Each value is a ``torch_tensorrt.region.ExecuteInTorch``, ``FusedOp`` or ``FusedKernel`` rule. The program's own ``torch_tensorrt.region`` scopes are honored with or without rules. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -878,14 +884,29 @@ def compile(
     settings = CompilationSettings(**compilation_options)
 
     logger.info("Compilation Settings: %s\n", settings)
-    exported_program = pre_export_lowering(exported_program, settings)
     from torch_tensorrt.dynamo.region_compilation import (
         check_decomposed_regions,
         configure_region_backends,
+        has_region_markers,
         materialize_regions,
         region_hop_records,
+        select_exported_regions,
+        validate_eval_mode,
         validate_region_settings,
     )
+
+    if regions or has_region_markers(exported_program.graph_module):
+        # Capture rewrites the graph: keep the caller's program as it was traced,
+        # so that it can be saved or compiled again, with other rules.
+        exported_program = _copy_program_graph(exported_program)
+        if regions:
+            select_exported_regions(exported_program, regions)
+        # Capture renames the values that recorded submodule calls refer to.
+        for entry in exported_program.module_call_graph:
+            if entry.fqn:
+                entry.signature = None
+    exported_program = pre_export_lowering(exported_program, settings)
+    validate_eval_mode(exported_program.graph_module)
 
     captured = exported_program.graph_module
     exported_program = exported_program.run_decompositions(
@@ -1339,6 +1360,25 @@ def _build_user_symbol_bounds(
             )
 
     return user_symbol_bounds
+
+
+def _copy_program_graph(exported_program: ExportedProgram) -> ExportedProgram:
+    """Copy a program's graph and signature; the copy shares the weights."""
+    graph_module = copy.deepcopy(exported_program.graph_module)
+    # Copying renames a node called like a builtin, such as the ``input`` of
+    # nn.Sequential, and the signature refers to nodes by name.
+    renamed = False
+    for original, copied in zip(exported_program.graph.nodes, graph_module.graph.nodes):
+        if copied.name != original.name:
+            copied.name = original.name
+            if copied.op == "placeholder":
+                copied.target = original.target
+            renamed = True
+    if renamed:
+        graph_module.recompile()
+    return exported_program._update(
+        graph_module, copy.deepcopy(exported_program.graph_signature)
+    )
 
 
 def _report_stopped_dryrun(
@@ -2408,6 +2448,11 @@ def convert_exported_program_to_serialized_trt_engine(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    from torch_tensorrt.dynamo.region_compilation._capture import reject_region_capture
+
+    reject_region_capture(
+        exported_program, "serialized-engine-only output", kwargs.get("regions")
+    )
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(

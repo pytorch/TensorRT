@@ -602,11 +602,15 @@ class TestExecuteInTorchCapture(TestCase):
         torch.testing.assert_close(gm(x), model(x))
 
     def test_failed_capture_does_not_leak_session(self):
+        from torch_tensorrt.region._session import current_session
+
         with self.assertRaisesRegex(RuntimeError, "deliberate failure"):
             with RegionCompilationSession(strict=True):
                 raise RuntimeError("deliberate failure")
+        self.assertIsNone(current_session())
         model, x = SharedBlock().eval(), torch.randn(2, 8)
-        ep = torch.export.export(model, (x,), strict=True)
+        with region.ignore_regions():
+            ep = torch.export.export(model, (x,), strict=True)
         self.assertNotIn(BEGIN, operator_targets(ep.graph_module))
         gm = capture_regions(model, x)
         self.assertEqual(len(get_region_records(gm)), 1)
@@ -942,10 +946,12 @@ class TestExecuteInTorchIntegration(TestCase):
         self.assertIn(f"Dry run stopped before partitioning: {conflict}", report)
         torch.testing.assert_close(compiled(x), model(x))
 
-    def test_public_non_strict_capture_fails_explicitly(self):
+    def test_public_non_strict_capture_keeps_region(self):
         model, x = SharedBlock().eval().cuda(), torch.randn(2, 8, device="cuda")
-        with self.assertRaisesRegex(RuntimeError, "strict=True"):
-            self._compile(model, (x,), strict=False)
+        compiled = self._compile(model, (x,), strict=False)
+        self.assertEqual(len(get_region_records(compiled)), 1)
+        audit_region_placement(compiled, get_region_records(compiled))
+        torch.testing.assert_close(compiled(x), model(x), atol=5e-3, rtol=5e-3)
 
     def test_training_model_is_rejected(self):
         model, x = SharedBlock().train().cuda(), torch.randn(2, 8, device="cuda")
@@ -1029,7 +1035,6 @@ import torch_tensorrt
 from torch_tensorrt.region._session import current_session
 
 assert current_session() is None
-assert not hasattr(torch.ops.torch_tensorrt_region, "begin")
 loaded = torch_tensorrt.load(sys.argv[1])
 data = torch.load(sys.argv[2], weights_only=True)
 actual = loaded.module()(data["input"].cuda())
@@ -1037,7 +1042,8 @@ assert actual.device.type == "cuda"
 torch.testing.assert_close(actual.cpu(), data["expected"], atol=5e-3, rtol=5e-3)
 engine_calls = [node for node in loaded.graph.nodes if "execute_engine" in str(node.target)]
 assert len(engine_calls) == int(sys.argv[3]), (len(engine_calls), sys.argv[3])
-assert not hasattr(torch.ops.torch_tensorrt_region, "begin")
+# No capture marker executes at runtime.
+assert not any("torch_tensorrt_region" in str(node.target) for node in loaded.graph.nodes)
 assert loaded.graph_module.meta["custom"]["torch_tensorrt_regions"]
 """
             run_python("-c", script, artifact, data_file, expected_engines, timeout=90)
