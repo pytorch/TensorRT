@@ -4,7 +4,9 @@
 import tensorrt as trt
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
+from torch.testing._internal.common_cuda import PLATFORM_SUPPORTS_CUDNN_ATTENTION
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -509,7 +511,109 @@ class TestScaledDotProductAttention(DispatchTestCase):
                     not constant,
                 )
 
-    @parameterized.expand([("sdpa", 1, 8), ("efficient", 6, 4)])
+    @parameterized.expand(
+        [
+            ("grouped_query", "sdpa", 1, 32, 2, "shared"),
+            ("grouped_query_mask_per_head", "sdpa", 1, 32, 2, "per_head"),
+            ("grouped_query_mask_without_batch", "sdpa", 2, 32, 2, "rank_3"),
+            ("multi_head_batch_2", "sdpa", 2, 4, 4, "per_head"),
+            ("efficient", "efficient", 2, 4, 4, "per_head"),
+            ("cudnn", "cudnn", 2, 4, 4, "per_head"),
+        ]
+    )
+    def test_single_query_mask(self, _, op, batch, q_heads, kv_heads, mask_kind):
+        if op == "cudnn" and not PLATFORM_SUPPORTS_CUDNN_ATTENTION:
+            self.skipTest("Platform doesn't support cuDNN attention")
+
+        # A decode step over a long cache, where the mask hides the slots not written yet.
+        class Attention(nn.Module):
+            def forward(self, query, key, value, mask):
+                if op == "sdpa":
+                    return torch.ops.aten.scaled_dot_product_attention.default(
+                        query, key, value, mask, enable_gqa=q_heads != kv_heads
+                    )
+                attention = (
+                    torch.ops.aten._scaled_dot_product_efficient_attention.default
+                    if op == "efficient"
+                    else torch.ops.aten._scaled_dot_product_cudnn_attention.default
+                )
+                return attention(query, key, value, mask, False)[0]
+
+        key_len = 2048
+        query = torch.randn(batch, q_heads, 1, 64, dtype=torch.float16)
+        key, value = (
+            torch.randn(batch, kv_heads, key_len, 64, dtype=torch.float16)
+            for _ in range(2)
+        )
+        value[:, :, 1700:] = 4
+        # A different number of visible keys per head shows a mixed-up head order.
+        visible = torch.arange(q_heads).view(-1, 1, 1) * 50 + 100
+        mask = torch.arange(key_len) < (100 if mask_kind == "shared" else visible)
+        if mask_kind != "rank_3":
+            mask = mask.expand(
+                batch, 1 if mask_kind == "shared" else q_heads, 1, key_len
+            )
+        if op != "sdpa":
+            mask = torch.zeros(mask.shape, dtype=torch.float16).masked_fill(
+                ~mask, float("-inf")
+            )
+        inputs = [query, key, value, mask.contiguous()]
+        # run_test compares TensorRT with the rewritten graph, so compare that graph with the op first.
+        rewritten = self.generate_graph(
+            Attention(), inputs, use_dynamo_tracer=True, enable_passes=True
+        )
+        cuda_inputs = [tensor.cuda() for tensor in inputs]
+        torch.testing.assert_close(
+            rewritten(*cuda_inputs), Attention()(*cuda_inputs), rtol=1e-2, atol=1e-2
+        )
+        self.run_test(Attention(), inputs, rtol=1e-2, atol=1e-2, enable_passes=True)
+
+    @parameterized.expand(
+        [
+            ("bfloat16", torch.bfloat16, 60000, False, False),
+            ("float32_cast_from_float16", torch.float16, 1024, True, False),
+            ("dynamic_key", torch.float16, 2048, False, True),
+        ]
+    )
+    def test_single_query_mask_compiled(self, _, dtype, key_len, cast, dynamic):
+        # Compiled the way a user compiles, so a dynamic key goes through every lowering pass.
+        class Attention(nn.Module):
+            def forward(self, query, key, value, mask):
+                if cast:
+                    # TensorRT folds these casts and runs the attention layer in FP16.
+                    query, key, value = (t.float() for t in (query, key, value))
+                    return torch.ops.aten.scaled_dot_product_attention.default(
+                        query, key, value, mask, scale=0.125
+                    ).half()
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query, key, value, mask, enable_gqa=True
+                )
+
+        kv_heads = 8 if cast else 2
+        query = torch.randn(1, 8, 1, 64, dtype=dtype, device="cuda")
+        key, value = (
+            torch.randn(1, kv_heads, key_len, 64, dtype=dtype, device="cuda")
+            for _ in range(2)
+        )
+        value[:, :, 100:] = 4
+        mask = (torch.arange(key_len, device="cuda") < 100).expand(1, 1, 1, key_len)
+        inputs = (query, key, value, mask.contiguous())
+        dynamic_shapes = None
+        if dynamic:
+            length = torch.export.Dim("length", min=2, max=4096)
+            dynamic_shapes = (None, {2: length}, {2: length}, {3: length})
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(Attention(), inputs, dynamic_shapes=dynamic_shapes),
+            arg_inputs=inputs,
+            min_block_size=1,
+        )
+        torch.testing.assert_close(
+            compiled(*inputs), Attention()(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    @parameterized.expand(
+        [("sdpa", 1, 8), ("sdpa", 1, 2048), ("efficient", 6, 4), ("efficient", 1, 2048)]
+    )
     def test_causal_with_unequal_lengths(self, op, query_len, key_len):
         # PyTorch aligns the causal mask to the top left, so a decode step attends to the first key only.
         class Causal(nn.Module):
@@ -526,9 +630,16 @@ class TestScaledDotProductAttention(DispatchTestCase):
         key, value = (
             torch.randn(2, 4, key_len, 32, dtype=torch.float16) for _ in range(2)
         )
-        self.run_test(
-            Causal(), [query, key, value], rtol=1e-2, atol=1e-2, enable_passes=True
+        inputs = [query, key, value]
+        # run_test compares TensorRT with the rewritten graph, so compare that graph with the op first.
+        rewritten = self.generate_graph(
+            Causal(), inputs, use_dynamo_tracer=True, enable_passes=True
         )
+        cuda_inputs = [tensor.cuda() for tensor in inputs]
+        torch.testing.assert_close(
+            rewritten(*cuda_inputs), Causal()(*cuda_inputs), rtol=1e-2, atol=1e-2
+        )
+        self.run_test(Causal(), inputs, rtol=1e-2, atol=1e-2, enable_passes=True)
 
     def test_causal_mask_kind(self):
         # TensorRT's LOWER_RIGHT is PyTorch's mask for equal lengths and for its flash kernel.
