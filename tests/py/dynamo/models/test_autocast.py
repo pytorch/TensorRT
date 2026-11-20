@@ -2234,6 +2234,96 @@ def test_autocast_model_regions_rejects_unknown_values():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("in_low_precision", [False, True])
+def test_autocast_vector_norm_in_low_precision(in_low_precision):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            # The 1-norm and the excluded 2-norm keep linalg_vector_norm.
+            scale = torch.linalg.vector_norm(h, 1, dim=1, keepdim=True)
+            kept = torch.linalg.vector_norm(h, dim=(2, 3), keepdim=True)
+            return self.conv2(nn.functional.normalize(h, dim=1)) * scale + kept
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    l1, excluded, normalize = [
+        n.name
+        for n in ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+        )
+    ]
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_node_names={f"{excluded}$"},
+        autocast_vector_norm_in_low_precision=in_low_precision,
+    )
+    graph = pre_export_lowering(ep, CompilationSettings(**kwargs)).graph
+    norms = {
+        n.name: n.meta["val"].dtype
+        for n in graph.find_nodes(
+            op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+        )
+    }
+    sums = graph.find_nodes(op="call_function", target=torch.ops.aten.sum.dim_IntList)
+    if in_low_precision:
+        assert norms == {l1: torch.float16, excluded: torch.float32}
+        (total,) = sums
+        assert total.meta["val"].dtype == torch.float16
+        # torch_executed_modules reads the module of each op.
+        assert total.meta["nn_module_stack"]
+    else:
+        assert norms == {
+            l1: torch.float16,
+            normalize: torch.float16,
+            excluded: torch.float32,
+        }
+        assert not sums
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    ref = model(x)
+    torch.testing.assert_close(
+        trt_model(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value, written_out", [(50.0, True), (100.0, False)])
+def test_autocast_vector_norm_in_low_precision_with_calibration(value, written_out):
+    class Model(nn.Module):
+        def forward(self, x):
+            return nn.functional.normalize(x, dim=1)
+
+    # The norm is sqrt(8) * value: about 141, or 283, whose square overflows float16.
+    x = torch.full((2, 8), value, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_vector_norm_in_low_precision=True,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    graph = pre_export_lowering(torch.export.export(Model(), (x,)), settings).graph
+    norms = graph.find_nodes(
+        op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+    )
+    assert (not norms) == written_out
+    # Refit, which has no calibration data, keeps the norm in FP32 too.
+    assert (
+        "linalg_vector_norm" in settings._autocast_calibrated_high_precision_nodes
+    ) != written_out
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 @pytest.mark.parametrize("model_casts", ["keep", "reclassify"])
 def test_autocast_model_casts(model_casts):

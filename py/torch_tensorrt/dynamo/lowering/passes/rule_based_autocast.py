@@ -101,6 +101,38 @@ def _keep_input_dtype(n: torch.fx.Node, copies: bool) -> None:
     n.meta["val"] = n.meta["val"].to(dtype)
 
 
+def _is_2_norm(n: torch.fx.Node) -> bool:
+    """Whether n is a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), as F.normalize
+    uses it."""
+    if n.target != torch.ops.aten.linalg_vector_norm.default:
+        return False
+    order = n.args[1] if len(n.args) > 1 else n.kwargs.get("ord", 2)
+    return bool(order == 2)
+
+
+def _write_out_vector_norm(gm: torch.fx.GraphModule, node: torch.fx.Node) -> None:
+    """Replace a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), with
+    sqrt(sum(x * x, dim, keepdim)) in the dtype of x. PyTorch's decomposition squares
+    and sums a float16 or bfloat16 x in float32, with casts around it."""
+    names = [a.name for a in node.target._schema.arguments]
+    args = {**dict(zip(names, node.args)), **node.kwargs}
+    x = args["self"]
+    with gm.graph.inserting_before(node):
+        square = gm.graph.call_function(torch.ops.aten.mul.Tensor, (x, x))
+        total = gm.graph.call_function(
+            torch.ops.aten.sum.dim_IntList,
+            (square, args.get("dim"), args.get("keepdim", False)),
+        )
+        root = gm.graph.call_function(torch.ops.aten.sqrt.default, (total,))
+    for new in (square, total, root):
+        # Keep nn_module_stack, which torch_executed_modules and engine layer names read.
+        new.meta.update({k: v for k, v in node.meta.items() if k != "tensor_meta"})
+    square.meta["val"] = x.meta["val"]
+    total.meta["val"] = root.meta["val"] = node.meta["val"]
+    node.replace_all_uses_with(root)
+    gm.graph.erase_node(node)
+
+
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
     tensors = [
         v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
@@ -251,6 +283,18 @@ def rule_based_autocast(
     low_precision_nodes, high_precision_nodes = node_classifier.run(
         reference_data, reference_shapes
     )
+    if settings.autocast_vector_norm_in_low_precision and reference_data:
+        # The written-out 2-norm sums the squares in the low precision type, so a norm
+        # whose square calibration finds too large for that type stays in FP32.
+        largest = math.sqrt(torch.finfo(autocast_low_precision_type).max)
+        for n in gm.graph.nodes:
+            if (
+                _is_2_norm(n)
+                and n.name in low_precision_nodes
+                and reference_data.get(n.name, 0) > largest
+            ):
+                low_precision_nodes.remove(n.name)
+                high_precision_nodes.append(n.name)
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(
@@ -465,6 +509,12 @@ def rule_based_autocast(
             ):
                 # With only bool inputs, mask * 0.5 still makes float32.
                 node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
+            if (
+                settings.autocast_vector_norm_in_low_precision
+                and target_dtype == autocast_low_precision_type
+                and _is_2_norm(node)
+            ):
+                _write_out_vector_norm(gm, node)
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

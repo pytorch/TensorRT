@@ -254,6 +254,16 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        bfloat16 to FP32 is exact. To keep an op in FP32, exclude the op, not the cast.
        With ``autocast_model_regions="reclassify"`` this also covers the casts that
        inlining adds at the boundary of a region.
+   * - ``autocast_vector_norm_in_low_precision``
+     - ``False``
+     - Whether autocast writes a 2-norm that it runs in the low precision type, such as
+       the ``torch.linalg.vector_norm(x)`` in ``F.normalize``, as ``sqrt(sum(x * x))`` in
+       that type. By default PyTorch computes it in FP32 for a float16 or bfloat16 ``x``,
+       as eager does, which adds casts around it. In float16 a sum of squares overflows
+       for a norm above about 256, and a value below about 2e-4 squares to 0. With
+       ``autocast_calibration_dataloader``, a norm whose sum of squares would overflow
+       stays in FP32. Otherwise check the accuracy, or keep such norms in FP32 with the
+       exclusions.
 
 ----
 
@@ -561,6 +571,7 @@ rebuilt from scratch:
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
 ``autocast_model_casts``,
+``autocast_vector_norm_in_low_precision``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
