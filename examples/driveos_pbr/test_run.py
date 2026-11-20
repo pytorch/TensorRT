@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from run import result, verify
+from run import native_files, result, verify
 
 
 class HandoffChecks(unittest.TestCase):
@@ -104,6 +104,27 @@ class HandoffChecks(unittest.TestCase):
         manifest.write_text(json.dumps(dict(format=1, files={"../outside": entry})))
         with self.assertRaisesRegex(ValueError, "Invalid artifact path"):
             verify(self.root)
+
+    def test_rebuilt_runtime_requires_libraries_and_records_exact_bytes(self):
+        with self.assertRaisesRegex(ValueError, "Missing rebuilt"):
+            native_files(self.root)
+        names = (
+            "bin/benchmark_et",
+            "bin/benchmark_trt",
+            "lib/libaoti_cuda_shims.so",
+            "lib/libextension_cuda.so",
+        )
+        for name in names:
+            path = self.root / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(name.encode())
+        measured = native_files(self.root)
+        self.assertEqual(
+            measured[names[0]], hashlib.sha256(names[0].encode()).hexdigest()
+        )
+        (self.root / names[-1]).unlink()
+        with self.assertRaisesRegex(ValueError, "Missing rebuilt"):
+            native_files(self.root)
 
 
 if __name__ == "__main__":

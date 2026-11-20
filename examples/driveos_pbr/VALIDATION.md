@@ -1,5 +1,31 @@
 # Handoff validation — November 17, 2026
 
+## Full native source-build verification — November 20, 2026
+
+`build_native.sh` completed from fresh dependency checkouts in the ARM64 NGC
+26.06 container on the same 14-SM DRIVE Thor U. It compiled the ExecuTorch
+runtime, CUDA backend, TensorRT delegate and both benchmark applications;
+it did not link the bundle's frozen SDK archives.
+
+- Torch-TensorRT runtime source: `202fba495341f83c4d25b6b2dece95e0242c5369`.
+- ExecuTorch source: `a9665e25097b324a7116efa2bd6602287c9c064f`.
+- The complete 36-process matrix passed with `--native-dir` selecting the new
+  installation. Both models, both snapshots and all three execution paths
+  passed the first-call, post-warmup and post-measurement output checks.
+- Each process ran 20 warmups and 100 measured calls. Native library-map checks
+  passed. All 12 ExecuTorch processes loaded the rebuilt `libaoti_cuda_shims.so`
+  and `libextension_cuda.so`, without Python, LibTorch or libc10.
+- Six host-independent tests, shell syntax and source whitespace checks passed.
+
+Mean process-median latency in this separate source-build cohort was
+267.76 / 138.59 / 139.04 ms for BEVFormer-Tiny and
+89.27 / 48.67 / 48.70 ms for SegFormer-B0, in eager / TensorRT / ExecuTorch order.
+The original reference table below remains the prepared-binary cohort.
+
+This validates the pinned native runtime sources with the supplied models and
+Python environment. It does not validate the latest upstream backend ABI,
+rebuild Python packages, or regenerate engines/programs.
+
 ## Rebase verification — November 19, 2026
 
 The handoff was rebased without conflicts onto `origin/main` at
@@ -103,7 +129,9 @@ Final `bundle/manifest.json` SHA-256:
 58a9068731d06cfa931f43740d04a7fbe2478ccba90be6e5bf00e2bba5fae727
 ```
 
-The handoff rebuilds benchmark applications against the frozen native SDK. It
-does not establish a from-scratch compiler/runtime build, re-export on another
-TensorRT release, or a newly flashed/containerized target setup. The PBR has been
-prepared for filing; submission and attachment hosting are separate steps.
+The original handoff rebuilt benchmark applications against the frozen native
+SDK. The source-build procedure added on November 20 also rebuilds the pinned
+native runtime and delegate. Neither procedure rebuilds the Python compiler
+packages, re-exports the models on another TensorRT release, or validates a newly
+flashed target setup. The PBR has been prepared for filing; submission and
+attachment hosting are separate steps.

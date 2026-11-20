@@ -34,6 +34,23 @@ def rows(path):
         return list(csv.DictReader(f, delimiter="\t"))
 
 
+def native_files(directory):
+    """Identify the rebuilt executables and libraries without changing the bundle."""
+    files = {}
+    for name in (
+        "bin/benchmark_et",
+        "bin/benchmark_trt",
+        "lib/libaoti_cuda_shims.so",
+        "lib/libextension_cuda.so",
+    ):
+        path = directory / name
+        if not path.is_file():
+            raise ValueError(f"Missing rebuilt native file: {path}")
+        with path.open("rb") as f:
+            files[name] = hashlib.file_digest(f, "sha256").hexdigest()
+    return files
+
+
 def result(directory, model):
     if not (directory / "PASS").is_file():
         raise ValueError(f"No correctness PASS in {directory}")
@@ -114,6 +131,11 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument(
+        "--native-dir",
+        type=Path,
+        help="Installed source build with bin/ and lib/; overrides bundled native runtime",
+    )
+    parser.add_argument(
         "--models",
         nargs="+",
         choices=("bevformer", "segformer"),
@@ -147,6 +169,8 @@ def main():
     if not args.output:
         parser.error("--output is required for a benchmark")
     root = bundle.parent
+    native = args.native_dir.resolve() if args.native_dir else bundle
+    rebuilt = native_files(native) if args.native_dir else None
     output = args.output.resolve()
     source = Path(__file__).resolve().parent
     if "eager" in args.modes and (not args.container or not args.container_root):
@@ -160,7 +184,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     environment = dict(os.environ)
     environment["LD_LIBRARY_PATH"] = (
-        str(bundle / "lib") + ":" + environment.get("LD_LIBRARY_PATH", "")
+        str(native / "lib") + ":" + environment.get("LD_LIBRARY_PATH", "")
     )
     environment["OMP_NUM_THREADS"] = "2"
     environment["MKL_NUM_THREADS"] = "2"
@@ -178,6 +202,13 @@ def main():
                 "modes": args.modes,
                 "warmup": 20,
                 "measured": 100,
+                "native_directory": str(native),
+                "rebuilt_native_sha256": rebuilt,
+                "native_source_revisions": (
+                    (native / "source-revisions.txt").read_text()
+                    if args.native_dir and (native / "source-revisions.txt").is_file()
+                    else None
+                ),
                 "artifact_manifest_sha256": hashlib.sha256(
                     (bundle / "manifest.json").read_bytes()
                 ).hexdigest(),
@@ -220,7 +251,7 @@ def main():
                 else:
                     command = [
                         str(
-                            bundle
+                            native
                             / "bin"
                             / ("benchmark_trt" if mode == "onnx" else "benchmark_et")
                         ),

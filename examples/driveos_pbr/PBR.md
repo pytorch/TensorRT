@@ -28,6 +28,12 @@ not a QNX request or a Thor X measurement.
 | BEVFormer-Tiny | Six 480×800 views plus calibration, motion, previous BEV, and history flag | TensorRT engine with a fixed-shape CUDA geometry plugin | TensorRT engine regions plus AOTInductor geometry |
 | SegFormer-B0 | One 1024×1024 RGB tensor | TensorRT engine | TensorRT-backed program |
 
+**Build:** Run `build_native.sh` to compile the native ExecuTorch runtime, CUDA
+backend, TensorRT delegate and benchmark applications from the pinned source
+dependencies. Select the resulting installation with `--native-dir`. Reuse the
+prepared models and Python wheels. No separate Bazel step is required for this
+CMake source-build path.
+
 **Protocol:** Two fixed snapshots per model, three fresh launches per snapshot
 and mode; one first call, 20 warmup calls, and 100 measured calls per process.
 Each path uses FP32 artifacts and the same input/reference tensors. The timing
