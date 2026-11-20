@@ -13,6 +13,7 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 import argparse
 import timeit
 from contextlib import nullcontext
+from pathlib import Path
 
 # %%
 # Imports and Model Definition
@@ -273,6 +274,12 @@ if __name__ == "__main__":
         action="store_true",
     )
     args = arg_parser.parse_args()
+
+    if not args.pre_quantized and (Path(args.model) / "hf_quant_config.json").is_file():
+        arg_parser.error(
+            f"Found hf_quant_config.json in {args.model!r}. "
+            "Use --pre_quantized to load this pre-quantized checkpoint."
+        )
 
     with torch.inference_mode():
         hf_quant_config = None
