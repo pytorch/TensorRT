@@ -2235,6 +2235,180 @@ def test_autocast_model_regions_rejects_unknown_values():
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize("model_casts", ["keep", "reclassify"])
+def test_autocast_model_casts(model_casts):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x).float()
+            g = self.conv2(h).float()
+            return (h + g).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    first, second, last = [
+        n.name
+        for n in ep.graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    ]
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_node_names={f"{second}$"},
+        autocast_model_casts=model_casts,
+    )
+    nodes = {
+        n.name: n
+        for n in pre_export_lowering(ep, CompilationSettings(**kwargs)).graph.nodes
+    }
+    expected = torch.float16 if model_casts == "reclassify" else torch.float32
+    assert nodes[first].args[1] == expected
+    assert nodes[first].meta["val"].dtype == expected
+    # An excluded cast, and the cast that makes the output of the model, keep their
+    # dtype.
+    assert nodes[second].meta["val"].dtype == torch.float32
+    assert nodes[last].meta["val"].dtype == torch.float32
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    out = trt_model(x)
+    assert out.dtype == torch.float32
+    torch.testing.assert_close(out, model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("user", ["linear", "view", "owner"])
+def test_autocast_model_casts_keep_a_cast_whose_users_need_fp32(user):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 16, 3, padding=1)
+            self.a = nn.Linear(16, 16)
+            self.b = nn.Linear(16, 16)
+
+        def forward(self, x):
+            h = self.conv(x).float()
+            if user == "view":
+                # view(dtype) reads the bytes of the FP32 tensor.
+                return h.view(torch.int32) + 1
+            if user == "owner":
+                # A view(dtype) writes into g, so g is made in its traced FP32.
+                g = h * 2
+                g.view(torch.int32).add_(1)
+                return g
+            return self.a(h) + self.b(h)
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+
+    def casts(model_casts):
+        settings = CompilationSettings(
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+            autocast_excluded_ops={torch.ops.aten.linear.default},
+            autocast_model_casts=model_casts,
+        )
+        graph = pre_export_lowering(torch.export.export(model, (x,)), settings).graph
+        return len(graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype))
+
+    # A float16 h would need a cast back to FP32 for each such user.
+    assert casts("reclassify") == casts("keep")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("case", ["float16_model", "_to_copy", "region"])
+def test_autocast_model_casts_removes_a_round_trip(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.a = nn.Linear(16, 16)
+            self.b = nn.Linear(16, 16)
+
+        def forward(self, x):
+            if case == "float16_model":
+                # In a float16 model, x.float() already casts when traced.
+                return self.b(self.a(x).float())
+            if case == "_to_copy":
+                # _to_copy takes dtype as a keyword argument.
+                y = torch.ops.aten._to_copy.default(self.a(x), dtype=torch.float32)
+                return self.b(y)
+            # Softmax runs in FP32 in a float16 region, so inlining casts its output
+            # to FP32 for b.
+            with torch.autocast("cuda", dtype=torch.float16):
+                y = torch.softmax(self.a(x), -1)
+            return self.b(y)
+
+    dtype = torch.float16 if case == "float16_model" else torch.float32
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(4, 16, device="cuda", dtype=dtype)
+
+    def round_trips(model_casts):
+        settings = CompilationSettings(
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+            autocast_model_regions="reclassify",
+            autocast_model_casts=model_casts,
+        )
+        graph = pre_export_lowering(torch.export.export(model, (x,)), settings).graph
+        return sum(
+            n.target in (torch.ops.aten.to.dtype, torch.ops.aten._to_copy.default)
+            and n.args[0].meta["val"].dtype == torch.float16
+            and (n.kwargs.get("dtype") or n.args[1]) == torch.float32
+            for n in graph.nodes
+        )
+
+    assert round_trips("keep") == 1
+    assert round_trips("reclassify") == 0
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_model_casts_keep_the_copy_an_in_place_op_writes():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            # h.float() of a float16 h is a copy, so the write must not reach h.
+            y = h.float()
+            y.add_(10.0)
+            # So is y.half(), so this write must not reach y.
+            z = y.half()
+            z.mul_(2.0)
+            return self.conv2(h).float() + y + z
+
+    model = Model().cuda().half().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=torch.float16)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+    )
+    torch.testing.assert_close(
+        trt_model(x).float(), model(x).float(), rtol=1e-2, atol=5e-2
+    )
+
+
+@pytest.mark.unit
+def test_autocast_model_casts_rejects_unknown_values():
+    assert CompilationSettings().autocast_model_casts == "keep"
+    with pytest.raises(ValueError, match="autocast_model_casts"):
+        CompilationSettings(autocast_model_casts="drop")
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 @pytest.mark.parametrize(
     "given",
     [
