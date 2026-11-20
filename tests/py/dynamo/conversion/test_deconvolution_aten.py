@@ -9,7 +9,7 @@ from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 def _any_gt_1(v):
@@ -318,6 +318,120 @@ class TestDeconvolutionConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(),
             input_specs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    @parameterized.expand(
+        [
+            ("1d", torch.nn.ConvTranspose1d, (1, 16, 32)),
+            ("2d", torch.nn.ConvTranspose2d, (1, 16, 16, 16)),
+            ("3d", torch.nn.ConvTranspose3d, (1, 16, 8, 8, 8)),
+        ]
+    )
+    def test_deconv_bf16(self, _, deconv_cls, shape):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.deconv = deconv_cls(16, 16, kernel_size=2, stride=2)
+
+            def forward(self, x):
+                return self.deconv(x)
+
+        inputs = [torch.randn(shape, dtype=torch.bfloat16)]
+        # bfloat16 keeps about 2 digits.
+        self.run_test(
+            TestModule().to(torch.bfloat16),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+            rtol=1.6e-2,
+            atol=1.6e-2,
+        )
+
+    @parameterized.expand(
+        [
+            ("1d", (1, 16, 32), (16, 8, 2), [2], [0], [1], [0]),
+            ("2d", (1, 16, 16, 16), (16, 8, 2, 2), [2, 2], [0, 0], [1, 1], [0, 0]),
+            (
+                "3d",
+                (1, 16, 8, 8, 8),
+                (16, 8, 2, 2, 2),
+                [2, 2, 2],
+                [0, 0, 0],
+                [1, 1, 1],
+                [0, 0, 0],
+            ),
+        ]
+    )
+    def test_deconv_bf16_tensor_weight_and_bias(
+        self, _, shape, weight_shape, stride, padding, dilation, output_padding
+    ):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class TestModule(torch.nn.Module):
+            def forward(self, x, weight, bias):
+                return torch.ops.aten.convolution.default(
+                    x, weight, bias, stride, padding, dilation, True, output_padding, 1
+                )
+
+        inputs = [
+            torch.randn(shape, dtype=torch.bfloat16),
+            torch.randn(weight_shape, dtype=torch.bfloat16),
+            torch.randn(weight_shape[1], dtype=torch.bfloat16),
+        ]
+        self.run_test(
+            TestModule(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+            rtol=1.6e-2,
+            atol=1.6e-2,
+        )
+
+    def test_deconv_bf16_feeds_another_deconv_with_values_past_float16(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class TestModule(torch.nn.Module):
+            def forward(self, x, first, second):
+                y = torch.ops.aten.convolution.default(
+                    x, first, None, [2, 2], [0, 0], [1, 1], True, [0, 0], 1
+                )
+                return torch.ops.aten.convolution.default(
+                    y, second, None, [2, 2], [0, 0], [1, 1], True, [0, 0], 1
+                )
+
+        # The second layer fails to build unless the first casts its result back to
+        # bfloat16. The values go above float16's largest value 65504, which bfloat16
+        # holds. Non-negative values do not cancel, so the bfloat16 relative tolerance
+        # holds for every element.
+        inputs = [
+            torch.rand(1, 16, 8, 8, dtype=torch.bfloat16) * 1e5,
+            torch.rand(16, 16, 2, 2, dtype=torch.bfloat16),
+            torch.rand(16, 16, 2, 2, dtype=torch.bfloat16),
+        ]
+        self.run_test(
+            TestModule(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+            rtol=1.6e-2,
+            atol=1.6e-2,
+        )
+
+    def test_deconv1d_tensor_weight(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten.convolution.default(
+                    x, weight, None, [2], [0], [1], True, [0], 1
+                )
+
+        inputs = [torch.randn(1, 16, 32), torch.randn(16, 8, 2)]
+        self.run_test(
+            TestModule(),
+            inputs,
             use_dynamo_tracer=True,
             enable_passes=True,
         )

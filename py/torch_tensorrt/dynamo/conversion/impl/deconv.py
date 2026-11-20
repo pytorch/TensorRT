@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import logging
 from typing import Optional, Sequence, Union
 
 import numpy as np
@@ -14,12 +15,27 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
+    cast_trt_tensor,
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
     to_torch,
     to_trt_weights,
 )
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_warned_bf16_deconv = False
+
+
+def _warn_bf16_deconv_runs_in_fp32() -> None:
+    global _warned_bf16_deconv
+    if not _warned_bf16_deconv:
+        _warned_bf16_deconv = True
+        _LOGGER.warning(
+            "TensorRT has no bfloat16 deconvolution kernel, so transposed convolutions "
+            "with bfloat16 inputs run in float32 and cast the result back to bfloat16."
+        )
 
 
 def deconvNd(
@@ -43,6 +59,15 @@ def deconvNd(
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for deconvolution."
 
+    # TensorRT cannot build a bfloat16 deconvolution (NVIDIA/TensorRT#4829), so compute
+    # in float32, which holds every bfloat16 value exactly, and cast the result back.
+    compute_in_fp32 = input.dtype == trt.bfloat16
+    if compute_in_fp32:
+        _warn_bf16_deconv_runs_in_fp32()
+        input = cast_trt_tensor(
+            ctx, input, trt.float32, f"{name}_input_cast", target, source_ir
+        )
+
     if is_deconv1d:
         # Apply an unsqueeze operation to transform the deconv1d problem into deconv2d
         input = impl.unsqueeze.unsqueeze(
@@ -65,6 +90,10 @@ def deconvNd(
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        if compute_in_fp32:
+            bias = cast_trt_tensor(
+                ctx, bias, trt.float32, f"{name}_bias_cast", target, source_ir
+            )
 
     elif bias is not None:
         raise RuntimeError(
@@ -76,9 +105,13 @@ def deconvNd(
     kernel_shape = ()
     if isinstance(weight, TRTTensor):
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+        if compute_in_fp32:
+            weight = cast_trt_tensor(
+                ctx, weight, trt.float32, f"{name}_weight_cast", target, source_ir
+            )
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
-            input = impl.unsqueeze.unsqueeze(
+            weight = impl.unsqueeze.unsqueeze(
                 ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
             )
         num_output_maps = weight.shape[1]
@@ -182,6 +215,11 @@ def deconvNd(
         # Apply a squeeze operation to transform the deconv2d problem back into deconv1d
         result = impl.squeeze.squeeze(
             ctx, target, source_ir, name + "_squeeze_deconv1d", result, -1
+        )
+
+    if compute_in_fp32:
+        result = cast_trt_tensor(
+            ctx, result, trt.bfloat16, f"{name}_output_cast", target, source_ir
         )
 
     return result
