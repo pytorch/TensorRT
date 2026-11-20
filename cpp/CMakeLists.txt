@@ -7,6 +7,7 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN")
 
 add_library(torchtrt SHARED)
 target_sources(torchtrt PRIVATE
+    src/logging.cpp
     $<TARGET_OBJECTS:core_runtime>
     $<TARGET_OBJECTS:core_plugins>
 )
@@ -16,13 +17,10 @@ target_link_libraries(torchtrt PUBLIC
     core_runtime
     core_plugins
 )
-target_include_directories(torchtrt PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
-    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-)
 
 add_library(torchtrt_runtime SHARED)
 target_sources(torchtrt_runtime PRIVATE
+    src/logging.cpp
     $<TARGET_OBJECTS:core_runtime>
     $<TARGET_OBJECTS:core_plugins>
 )
@@ -31,6 +29,23 @@ target_link_libraries(torchtrt_runtime PUBLIC
     "${TORCH_LIBRARIES}"
     core_runtime
     core_plugins
+)
+
+foreach(target torchtrt torchtrt_runtime)
+    target_include_directories(${target} PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt>"
+    )
+    set_target_properties(${target} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endforeach()
+
+install(FILES
+    include/torch_tensorrt/logging.h
+    include/torch_tensorrt/macros.h
+    include/torch_tensorrt/torch_tensorrt.h
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/torch_tensorrt"
 )
 
 add_library(torchtrt_plugins SHARED)
@@ -58,3 +73,11 @@ install(EXPORT torchtrtTargets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/torchtrt
     COMPONENT torchtrtTargets
 )
+
+if(WITH_TESTS)
+    foreach(target torchtrt torchtrt_runtime)
+        add_executable(${target}_api_test ../tests/cpp/test_runtime_api.cpp)
+        target_link_libraries(${target}_api_test PRIVATE ${target} gtest_main)
+        add_test(NAME ${target}_api_test COMMAND ${target}_api_test)
+    endforeach()
+endif()
