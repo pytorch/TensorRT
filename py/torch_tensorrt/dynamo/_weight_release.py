@@ -16,7 +16,7 @@ import contextlib
 import logging
 import weakref
 from collections import Counter
-from typing import Dict, Iterable, Iterator, List, Optional
+from typing import Callable, Dict, Iterable, Iterator, List, Optional
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -190,6 +190,24 @@ class WeightReleaser:
             )
         self.released += released
         return released
+
+    def release_once_built(self, read: Iterable[int], name: str) -> Callable[[], int]:
+        """Return a callback that runs ``release_storages_after_build(read, name)`` on its first call only,
+        and returns the bytes that call released on every call. Conversion calls it once the engine has
+        its weights, before serializing it. The caller calls it again afterwards: that releases for a build
+        that never called it (a tuning sweep, or a cached engine that is not refit), and tells whether this
+        build released anything.
+        """
+        done, released = False, 0
+
+        def release() -> int:
+            nonlocal done, released
+            if not done:
+                done = True
+                released = self.release_storages_after_build(read, name)
+            return released
+
+        return release
 
 
 @contextlib.contextmanager

@@ -225,6 +225,157 @@ def test_weights_are_released_before_the_next_build(monkeypatch):
     assert released_at_build == [{"unused_head"}, {"unused_head", "w_a"}]
 
 
+@pytest.mark.parametrize("single_engine", [True, False])
+def test_weights_are_released_before_the_engine_is_serialized(
+    single_engine, monkeypatch
+):
+    if single_engine:
+        model, names = torch.nn.Linear(16, 16), ("weight", "bias")
+        options = {"require_full_compilation": True}
+    else:
+        model, names = _TwoEngines(), ("w_a", "w_b", "w_shared")
+        options = {"torch_executed_ops": _TORCH_EXECUTED_OPS}
+    model = model.eval().cuda()
+    x = torch.randn(4, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    state = ep.state_dict
+    released_at_serialize = []
+
+    class _RecordingEngine:
+        def __init__(self, engine):
+            self._engine = engine
+
+        def __getattr__(self, attr):
+            return getattr(self._engine, attr)
+
+        def serialize(self):
+            released_at_serialize.append(
+                {n for n in names if not state[n].untyped_storage().nbytes()}
+            )
+            return self._engine.serialize()
+
+    run = _conversion.TRTInterpreter.run
+
+    def run_and_record(self, *args, **kwargs):
+        result = run(self, *args, **kwargs)
+        return result._replace(engine=_RecordingEngine(result.engine))
+
+    monkeypatch.setattr(_conversion.TRTInterpreter, "run", run_and_record)
+    torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        release_weights_after_build=True,
+        **options,
+    )
+    if single_engine:
+        expected_released = [{"weight", "bias"}]
+    else:
+        # w_shared is read by both engines, so it goes only before the second is serialized.
+        expected_released = [{"w_a"}, {"w_a", "w_b", "w_shared"}]
+    assert released_at_serialize == expected_released
+
+
+@pytest.mark.skipif(
+    not torch_tensorrt.ENABLED_FEATURES.refit, reason="refit is not available"
+)
+@pytest.mark.parametrize("strip_engine_weights", [False, True])
+@pytest.mark.parametrize("require_full_compilation", [False, True])
+def test_engine_cache_hit_releases_weights(
+    require_full_compilation, strip_engine_weights, tmp_path, monkeypatch
+):
+    hits, released_at_serialize, weights, reclaims = [], [], [], []
+    pull_cached_engine = _conversion.pull_cached_engine
+    release_host_and_device_memory = _conversion.release_host_and_device_memory
+
+    def record_hit(*args, **kwargs):
+        result = pull_cached_engine(*args, **kwargs)
+        hits.append(result is not None)
+        return result
+
+    def record_reclaim():
+        reclaims.append(True)
+        release_host_and_device_memory()
+
+    serialize_with_config = _conversion.trt.ICudaEngine.serialize_with_config
+
+    def record_serialize(engine, config):
+        released_at_serialize.append(
+            (all(w.numel() == 0 for w in weights), len(reclaims))
+        )
+        return serialize_with_config(engine, config)
+
+    monkeypatch.setattr(_conversion, "pull_cached_engine", record_hit)
+    monkeypatch.setattr(_conversion, "release_host_and_device_memory", record_reclaim)
+    monkeypatch.setattr(
+        _conversion.trt.ICudaEngine, "serialize_with_config", record_serialize
+    )
+    x = torch.randn(4, 16, device="cuda")
+    for _ in range(2):
+        # A fresh instance each time: the cached engine is refit with its weights.
+        model = torch.nn.Linear(16, 16).eval().cuda()
+        with torch.no_grad():
+            expected = model(x)
+        ep = torch.export.export(model, (x,))
+        weights[:] = ep.state_dict.values()
+        released_at_serialize.clear()
+        reclaims.clear()
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            arg_inputs=[x],
+            min_block_size=1,
+            require_full_compilation=require_full_compilation,
+            strip_engine_weights=strip_engine_weights,
+            immutable_weights=False,
+            cache_built_engines=True,
+            reuse_cached_engines=True,
+            engine_cache_dir=str(tmp_path),
+            release_weights_after_build=True,
+        )
+        if not strip_engine_weights:
+            with torch.no_grad():
+                torch.testing.assert_close(trt_gm(x), expected, rtol=1e-2, atol=1e-2)
+        for name, tensor in ep.state_dict.items():
+            assert tensor.numel() == 0, name
+    assert hits == [False, True]
+    # The hit refits the cached engine and serializes it after the weights are released and their
+    # memory is reclaimed. A stripped engine is not refit, so only compile_module's call after the
+    # build releases them.
+    assert released_at_serialize == ([] if strip_engine_weights else [(True, 1)])
+
+
+@pytest.mark.parametrize("require_full_compilation", [False, True])
+def test_memory_is_freed_after_a_build_that_released_weights(
+    require_full_compilation, monkeypatch
+):
+    events = []
+    convert_module = _compiler.convert_module
+    release_host_and_device_memory = _compiler.release_host_and_device_memory
+
+    def record_build(*args, **kwargs):
+        result = convert_module(*args, **kwargs)
+        events.append("built")
+        return result
+
+    def record_free():
+        events.append("freed")
+        release_host_and_device_memory()
+
+    monkeypatch.setattr(_compiler, "convert_module", record_build)
+    monkeypatch.setattr(_compiler, "release_host_and_device_memory", record_free)
+    model = torch.nn.Linear(16, 16).eval().cuda()
+    x = torch.randn(4, 16, device="cuda")
+    torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        require_full_compilation=require_full_compilation,
+        release_weights_after_build=True,
+    )
+    # Conversion released the weights; what the build left behind is freed once it returns.
+    assert events[-2:] == ["built", "freed"]
+
+
 @pytest.mark.parametrize("release", [True, None])
 def test_build_frees_its_folded_constants(release, monkeypatch):
     class _Folded(torch.nn.Module):

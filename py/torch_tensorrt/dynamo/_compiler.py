@@ -10,7 +10,7 @@ import operator
 import os
 import platform
 import warnings
-from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple, Union
 
 import sympy
 import torch
@@ -1629,12 +1629,14 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        read: Set[int] = set()
+        release = None
         if weight_releaser is not None:
             weight_releaser.count_readers([gm])
             if weight_releaser.release_unread_storages():
                 release_host_and_device_memory()
-            read = set(weight_storages(gm))
+            release = weight_releaser.release_once_built(
+                set(weight_storages(gm)), "_run_on_acc_0"
+            )
         record_partition_inputs("_run_on_acc_0", convert_inputs)
         with report_released_weights_on_failure(weight_releaser, "_run_on_acc_0"):
             trt_module = build_engine_with_reporting(
@@ -1644,11 +1646,9 @@ def compile_module(
                 settings=settings,
                 name="_run_on_acc_0",
                 engine_cache=engine_cache,
+                release_weights=release,
             )
-        if (
-            weight_releaser is not None
-            and weight_releaser.release_storages_after_build(read, "_run_on_acc_0")
-        ):
+        if release is not None and release():
             release_host_and_device_memory()
         if set_up_deferred_engines:
             trt_module.setup_engine()
@@ -1906,10 +1906,12 @@ def compile_module(
         if not settings.dryrun:
             # Collected before conversion, which deletes the submodule's frozen parameters. Only the keys:
             # holding the storages would keep those frozen parameters alive after conversion frees them.
-            read = (
-                set(weight_storages(submodule))
+            release = (
+                weight_releaser.release_once_built(
+                    set(weight_storages(submodule)), name
+                )
                 if weight_releaser is not None
-                else set()
+                else None
             )
             with report_released_weights_on_failure(weight_releaser, name):
                 trt_module = build_engine_with_reporting(
@@ -1919,6 +1921,7 @@ def compile_module(
                     settings=settings,
                     name=name,
                     engine_cache=engine_cache,
+                    release_weights=release,
                 )
 
             if (
@@ -1932,10 +1935,7 @@ def compile_module(
                 # Profiling and layer info need the engine.
                 trt_module.setup_engine()
             trt_modules[name] = trt_module
-            if (
-                weight_releaser is not None
-                and weight_releaser.release_storages_after_build(read, name)
-            ):
+            if release is not None and release():
                 release_host_and_device_memory()
 
             if _debugger_config:

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
@@ -126,6 +126,8 @@ def pull_cached_engine(
     settings: CompilationSettings,
     inputs: Sequence[Input],
     symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]],
+    *,
+    release_weights: Optional[Callable[[], Any]] = None,
 ) -> Optional[SerializedInterpreterResult]:
     if hash_val is None:
         logger.warning(
@@ -190,6 +192,8 @@ def pull_cached_engine(
                 input_list=inputs,
                 settings=settings,
             )
+            if release_weights is not None and release_weights():
+                release_host_and_device_memory()
 
             serialization_config = engine.create_serialization_config()
             serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
@@ -237,6 +241,7 @@ def interpret_module_to_result(
     *,
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
+    release_weights: Optional[Callable[[], Any]] = None,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -244,6 +249,9 @@ def interpret_module_to_result(
         inputs: It requires a sequence of FLATTENED Inputs representing inputs to the module. It should include both arg_inputs and kwarg_inputs, if applicable.
         settings: Compilation settings
         engine_cache: Engine cache instance
+        release_weights: Called once the engine holds its weights (built, or refit from the engine cache),
+            before it is serialized. With ``version_compatible`` or TensorRT-RTX, the build already returned
+            a serialized plan before this call. Not called by a tuning sweep.
     Returns:
         SerializedInterpreterResult
     """
@@ -277,6 +285,7 @@ def interpret_module_to_result(
         engine_cache,
         input_binding_names=input_binding_names,
         output_binding_names=output_binding_names,
+        release_weights=release_weights,
     )
 
 
@@ -288,6 +297,7 @@ def _interpret_module_to_result_impl(
     *,
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
+    release_weights: Optional[Callable[[], Any]] = None,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult (single build, no GPT sweep)."""
 
@@ -339,6 +349,7 @@ def _interpret_module_to_result_impl(
                 settings,
                 inputs,
                 symbolic_shape_expressions,
+                release_weights=release_weights,
             )
             if serialized_interpreter_result is not None:  # hit the cache
                 return serialized_interpreter_result
@@ -367,6 +378,9 @@ def _interpret_module_to_result_impl(
     for attr in dir(module):
         if attr.startswith("_frozen_param"):
             delattr(module, attr)
+    # The built engine has its own copy of the weights, so the source copy can go before serializing.
+    if release_weights is not None:
+        release_weights()
     release_host_and_device_memory()
     logger.debug(
         f"CPU memory usage after clearing frozen parameters and building memory in conversion: {get_cpu_memory_usage()} MB"
@@ -416,6 +430,8 @@ def convert_module(
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
     engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    release_weights: Optional[Callable[[], Any]] = None,
 ) -> TorchTensorRTModule:
     """Convert an FX module to a TRT module
     Args:
@@ -424,11 +440,16 @@ def convert_module(
         settings: Compilation settings
         name: TRT engine name
         engine_cache: Engine cache instance
+        release_weights: See ``interpret_module_to_result``
     Returns:
         TorchTensorRTModule
     """
     serialized_interpreter_result = interpret_module_to_result(
-        module, inputs, settings, engine_cache=engine_cache
+        module,
+        inputs,
+        settings,
+        engine_cache=engine_cache,
+        release_weights=release_weights,
     )
     from torch_tensorrt.dynamo._reporting import record_engine_metadata
 
