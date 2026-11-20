@@ -82,9 +82,7 @@ TIER_MAP = {
         ],
     ),
     "l0 core python tests": dict(fn="trt_tier_l0_py_core", paths=["tests/py/core/"]),
-    "l0 torchscript tests": dict(
-        fn="trt_tier_l0_torchscript", paths=["tests/py/ts/api/", "tests/modules/hub.py"]
-    ),
+    "l0 torchscript tests": dict(fn="retired TorchScript suite", paths=[]),
     "l1 dynamo core tests": dict(
         fn="trt_tier_l1_dynamo_core",
         paths=[
@@ -104,9 +102,7 @@ TIER_MAP = {
             "tests/py/dynamo/models/test_dyn_models.py",
         ],
     ),
-    "l1 torch script tests": dict(
-        fn="trt_tier_l1_torchscript", paths=["tests/py/ts/models/"]
-    ),
+    "l1 torch script tests": dict(fn="retired TorchScript suite", paths=[]),
     "l2 torch compile tests": dict(
         fn="trt_tier_l2_torch_compile",
         paths=[
@@ -130,9 +126,7 @@ TIER_MAP = {
             "tests/py/kernels/",
         ],
     ),
-    "l2 torch script tests": dict(
-        fn="trt_tier_l2_torchscript", paths=["tests/py/ts/integrations/"]
-    ),
+    "l2 torch script tests": dict(fn="retired TorchScript suite", paths=[]),
     "l2 dynamo distributed tests": dict(
         fn="trt_tier_l2_distributed", paths=["tests/py/dynamo/distributed/"]
     ),

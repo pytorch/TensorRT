@@ -107,13 +107,6 @@ trt_tier_l0_py_core() {
       trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_py_core_tests_results)" . "$@" )
 }
 
-# Standard-TRT only (gated off for RTX in the workflow).
-trt_tier_l0_torchscript() {
-    ( cd "${TRT_REPO_ROOT}/tests/modules" && _trt_py hub.py )
-    ( cd "${TRT_REPO_ROOT}/tests/py/ts"
-      trt_pytest -ra --junitxml="$(_trt_xml l0_ts_api_tests_results)" api/ "$@" )
-}
-
 # ── L1: critical-path tier ────────────────────────────────────────────────────
 
 trt_tier_l1_dynamo_core() {
@@ -133,13 +126,6 @@ trt_tier_l1_torch_compile() {
       trt_pytest -ra --junitxml="$(_trt_xml l1_torch_compile_be_tests_results)" backend/ "$@"
       trt_pytest -m critical -ra --junitxml="$(_trt_xml l1_torch_compile_models_tests_results)" --ir torch_compile models/test_models.py "$@"
       trt_pytest -m critical -ra --junitxml="$(_trt_xml l1_torch_compile_dyn_models_tests_results)" --ir torch_compile models/test_dyn_models.py "$@" )
-}
-
-# Standard-TRT only.
-trt_tier_l1_torchscript() {
-    ( cd "${TRT_REPO_ROOT}/tests/modules" && _trt_py hub.py )
-    ( cd "${TRT_REPO_ROOT}/tests/py/ts"
-      trt_pytest -ra --junitxml="$(_trt_xml l1_ts_models_tests_results)" models/ "$@" )
 }
 
 # ── L2: full tier (no reruns; matches historical behavior) ────────────────────
@@ -189,13 +175,6 @@ trt_tier_l2_plugin() {
           cd "${TRT_REPO_ROOT}/tests/py/kernels"
           _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_kernels_test_results)" . "$@" )
     fi
-}
-
-# Standard-TRT only.
-trt_tier_l2_torchscript() {
-    ( cd "${TRT_REPO_ROOT}/tests/modules" && _trt_py hub.py )
-    ( cd "${TRT_REPO_ROOT}/tests/py/ts"
-      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml l2_ts_integrations_tests_results)" integrations/ "$@" )
 }
 
 # Standard-TRT only; needs a multi-GPU runner + system MPI (CI-only).

@@ -12,15 +12,15 @@ ecosystem or learn a separate optimization stack.
 
 The primary frontend is the **Dynamo** path, which integrates with
 `torch.compile <https://pytorch.org/docs/stable/generated/torch.compile.html>`_ and
-`torch.export <https://pytorch.org/docs/stable/export.html>`_. A legacy **TorchScript**
-(``ts``) path is also supported for backwards compatibility.
+`torch.export <https://pytorch.org/docs/stable/export.html>`_. The legacy TorchScript
+frontend has been removed.
 
 Repository Structure
 ---------------------
 
 * ``py/``: Python API and the Dynamo compiler pipeline (lowering, partitioning, conversion, runtime)
 * ``core/``: C++ runtime library — TensorRT engine management, the ``execute_engine`` custom op, serialization
-* ``cpp/``: C++ API surface
+* ``cpp/``: Native runtime packaging and the ExecuTorch TensorRT backend
 * ``tests/``: Test suite. Python tests under ``tests/py/``, C++ tests under ``tests/core/``
 * ``tools/``: Developer utilities (opset coverage, perf benchmarking, LLM tools)
 * ``examples/``: Standalone example programs

@@ -25,7 +25,6 @@ from typing import (
 )
 
 import torch
-import torch.jit as jit
 import torch.nn as nn
 from torch._sources import normalize_source_lines
 from torch.fx import Graph, Tracer
@@ -288,8 +287,6 @@ class AccRewritingTracer(Tracer):
         torch.nn.quantized.Linear,
         torch.nn.quantized.Conv2d,
         torch.nn.intrinsic.quantized.ConvReLU2d,
-        jit.ScriptModule,
-        jit.RecursiveScriptModule,
         torch.nn.modules.activation.MultiheadAttention,
     }
 
@@ -372,13 +369,6 @@ def _rewrite(
     # functions that are attrs of this moodule. Return the new, rewritten module
     # hierarchy.
     def rewrite_module(m: nn.Module):
-        if isinstance(m, jit.ScriptModule):
-            # ScriptModule cannot be rewritten, so bypass it. The issue is it
-            # requires explicitly calling its `__init__()`, calling
-            # `nn.Module.__init__()` in the derived `RewrittenModule` is not
-            # enough. And even if we init it we can't do much with it.
-            return m
-
         # If m is an already-rewritten RewrittenModule, then use the original base class.
         base_class: Type[nn.Module] = getattr(m, "_base_class_origin", type(m))
 

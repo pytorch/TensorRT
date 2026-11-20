@@ -36,7 +36,6 @@ results = []
 SUPPORTED_BACKENDS = [
     "all",
     "torch",
-    "ts_trt",
     "dynamo",
     "torch_compile",
     "inductor",
@@ -151,7 +150,7 @@ def record_perf(
 
 # Runs inference using Torch backend
 @run_with_try_except
-def run_torch(model, input_tensors, params, precision, batch_size):
+def run_torch(model_torch, input_tensors, params, precision, batch_size):
     print("Running Torch for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
 
@@ -170,47 +169,6 @@ def run_torch(model, input_tensors, params, precision, batch_size):
 
     record_perf(
         model, "Torch", input_tensors, precision, iters, batch_size, compile_time_s=None
-    )
-
-
-# Runs inference using Torch-TensorRT backend
-@run_with_try_except
-def run_ts_trt(model, input_tensors, params, precision, batch_size):
-    print(
-        "Running Torch-TensorRT for precision: ",
-        precision,
-        " batch_size : ",
-        batch_size,
-    )
-    # Compiling Torch-TensorRT model
-    compile_settings = {
-        "inputs": input_tensors,
-        "enabled_precisions": {precision_to_dtype(precision)},
-    }
-
-    if precision == "int8":
-        compile_settings.update({"calib": params.get("calibration_cache")})
-
-    if params.get("enable_cuda_graph", False):
-        logging.warning(
-            f"Torchscript backend doesn't support CUDA Graphs. `--enable_cuda_graph` will be ignored."
-        )
-
-    start_compile = timeit.default_timer()
-    model = torchtrt.compile(model, ir="ts", **compile_settings)
-    end_compile = timeit.default_timer()
-    compile_time_s = end_compile - start_compile
-
-    iters = params.get("iterations", 20)
-
-    record_perf(
-        model,
-        "Torchscript",
-        input_tensors,
-        precision,
-        iters,
-        batch_size,
-        compile_time_s,
     )
 
 
@@ -606,20 +564,9 @@ def run(
                 )
                 return False
 
-            if (
-                backend == "all"
-                or backend == "ts_trt"
-                or params.get("calibration_cache", None) == None
-            ):
+            if backend == "all" or params.get("calibration_cache", None) == None:
                 print("int8 precision expects calibration cache file for inference")
                 return False
-
-        if (model is None) and (backend in ("ts_trt", "all")):
-            warnings.warn(
-                f"Requested backend {backend} without specifying a TorchScript Model, "
-                + "skipping this backend"
-            )
-            continue
 
         if (model_torch is None) and (backend in ("all", "fx2trt")):
             warnings.warn(
@@ -629,14 +576,7 @@ def run(
             continue
 
         if backend == "all":
-            run_torch(model, input_tensors, params, precision, batch_size)
-            run_ts_trt(
-                model,
-                input_tensors,
-                params,
-                precision,
-                batch_size,
-            )
+            run_torch(model_torch, input_tensors, params, precision, batch_size)
             run_onnx_trt(
                 model_torch,
                 input_tensors,
@@ -649,14 +589,6 @@ def run(
         elif backend == "torch":
             run_torch(model_torch, input_tensors, params, precision, batch_size)
 
-        elif backend == "ts_trt":
-            run_ts_trt(
-                model,
-                input_tensors,
-                params,
-                precision,
-                batch_size,
-            )
         elif backend == "onnx_trt":
             run_onnx_trt(
                 model_torch,
@@ -683,10 +615,13 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--backends",
         type=str,
-        help="Comma separated string of backends. Eg: torch, ts_trt, dynamo, torch_compile, inductor, onnx_trt",
+        help="Comma separated string of backends. Eg: torch, dynamo, torch_compile, inductor, onnx_trt",
     )
     arg_parser.add_argument(
-        "--model", type=str, default="", help="Name of torchscript model file"
+        "--model",
+        type=str,
+        default="",
+        help="Path to an ExportedProgram or serialized TensorRT engine",
     )
     arg_parser.add_argument(
         "--model_torch",
@@ -698,7 +633,7 @@ if __name__ == "__main__":
         "--onnx",
         type=str,
         default="",
-        help="ONNX model file which helps bypass the step of exporting ONNX from torchscript model. If this argument is provided, the ONNX will be directly converted to TRT engine",
+        help="ONNX model file which helps bypass the step of exporting ONNX from the PyTorch model. If this argument is provided, the ONNX will be directly converted to TRT engine",
     )
     arg_parser.add_argument(
         "--inputs",
@@ -812,15 +747,15 @@ if __name__ == "__main__":
     model_name_torch = params["model_torch"]
     model_torch = None
 
-    # Load TorchScript model, if provided
+    # Load an ExportedProgram or serialized TensorRT engine, if provided
     if os.path.exists(model_name):
         if params["is_trt_engine"]:
             with open(model_name, "rb") as f:
                 model = f.read()
                 print("Loading user provided trt engine: ", model_name)
         else:
-            print("Loading user provided torchscript model: ", model_name)
-            model = torch.jit.load(model_name).cuda().eval()
+            print("Loading user provided ExportedProgram: ", model_name)
+            model_torch = torchtrt.load(model_name).module().cuda().eval()
 
     # Load PyTorch Model, if provided
     if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
@@ -832,7 +767,7 @@ if __name__ == "__main__":
     # If neither model type was provided
     if (model is None) and (model_torch is None):
         raise ValueError(
-            "No valid models specified. Please provide a torchscript model file or model name (defined in hub.py) or model_hf name in huggingface models "
+            "No valid models specified. Please provide an ExportedProgram, serialized TensorRT engine, or --model_torch model "
         )
 
     backends = parse_backends(params["backends"])

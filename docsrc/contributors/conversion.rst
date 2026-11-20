@@ -3,8 +3,8 @@
 Conversion Phase
 ==================
 
-The conversion phase translates each TensorRT-targeted subgraph (an ``torch.fx.Graph``
-or, in the legacy path, a TorchScript block) into a TensorRT ``INetworkDefinition``
+The conversion phase translates each TensorRT-targeted subgraph (a ``torch.fx.Graph``)
+into a TensorRT ``INetworkDefinition``
 which is then compiled into a serializable ``ICudaEngine``.
 
 Dynamo Conversion (Primary Path)
@@ -115,40 +115,3 @@ Example
         return mul(x7, x14)
 
 ----
-
-TorchScript Conversion (Legacy ``ts`` Path)
----------------------------------------------
-
-.. note::
-
-   The following describes the legacy TorchScript conversion path. For new
-   development use the Dynamo path above.
-
-Once the TorchScript graph has been simplified by the lowering phase, a conversion
-context is created to manage construction of a TensorRT ``INetworkDefinition`` from the
-graph blocks. The conversion context records converted nodes, block inputs/outputs, and
-build-time weights.
-
-The block converter iterates over nodes and assembles inputs in one of four states:
-
-* **Block parameter** — stored as an ``IValue`` in ``evaluated_value_map``; passed
-  directly to the converter.
-* **Output of a previously converted node** — ``ITensor`` retrieved from
-  ``value_tensor_map``.
-* **Static value node** (e.g. ``prim::Constant``, ``prim::ListConstruct``) — evaluated
-  at conversion time via the evaluator registry; result stored in ``evaluated_value_map``.
-* **Unconverted node** — Torch-TensorRT errors out.
-
-Node Evaluators
-^^^^^^^^^^^^^^^^
-
-Some nodes produce static data (parameters for operators) that can be resolved at
-compile time. Any node kind can have a compile-time evaluator as long as it produces a
-static ``IValue``. Common types are ``prim::Constant`` and ``prim::ListConstruct``.
-
-Node Converters
-^^^^^^^^^^^^^^^^
-
-Node converters map TorchScript nodes to TensorRT layers, associating TRT outputs back
-to TorchScript graph values in the conversion context so downstream nodes can consume
-them. For more information see :ref:`writing_converters`.

@@ -495,8 +495,7 @@ def _iter_trt_engines(
     ``GraphModule``).
 
     Accepts an ``nn.Module``, a ``torch.export.ExportedProgram``, or a
-    sequence of those.  Results are deduped by ``id(engine)``.  A
-    ``torch.jit.ScriptModule`` target raises :exc:`TypeError`.
+    sequence of those. Results are deduped by ``id(engine)``.
     """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
@@ -531,13 +530,6 @@ def _iter_trt_engines(
     def _visit_one(t: Any) -> Any:
         if isinstance(t, torch.export.ExportedProgram):
             yield from _visit_ep(t)
-        elif isinstance(t, torch.jit.ScriptModule):
-            raise TypeError(
-                f"_iter_trt_engines(): TorchScript modules are not supported; "
-                f"got {type(t).__name__}. Save the compiled model with "
-                'output_format="exported_program" and pass the '
-                "torch_tensorrt.load() result or its .module()."
-            )
         elif isinstance(t, torch.nn.Module):
             yield from _visit_module(t)
         else:
@@ -580,9 +572,6 @@ def apply_runtime_settings(
     * :class:`torch.export.ExportedProgram` -- loaded result of
       :func:`torch_tensorrt.load`.
     * A sequence (list / tuple) of the above.
-
-    A :class:`torch.jit.ScriptModule` (a TorchScript artifact loaded by
-    :func:`torch_tensorrt.load`) is not supported and raises :exc:`TypeError`.
 
     **Ownership rule for module-less engines** (e.g. an AOT-loaded artifact):
     ``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you

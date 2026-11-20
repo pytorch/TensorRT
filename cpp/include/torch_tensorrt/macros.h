@@ -36,8 +36,5 @@
   "." STR(TORCH_TENSORRT_MINOR_VERSION) "." STR(TORCH_TENSORRT_PATCH_VERSION)
 
 // Setup namespace aliases for ease of use
-namespace torch_tensorrt {
-namespace torchscript {}
-namespace ts = torchscript;
-} // namespace torch_tensorrt
+namespace torch_tensorrt {} // namespace torch_tensorrt
 namespace torchtrt = torch_tensorrt;

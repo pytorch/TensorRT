@@ -20,7 +20,7 @@ if not torch.cuda.is_available():
 MANIFEST_FILE = "model_manifest.json"
 
 # Valid paths for model-saving specification
-VALID_PATHS = ("script", "trace", "torchscript", "pytorch", "all")
+VALID_PATHS = ("export", "pytorch", "all")
 
 # Key models selected for benchmarking with their respective paths
 from utils import BENCHMARK_MODELS
@@ -28,102 +28,41 @@ from utils import BENCHMARK_MODELS
 
 def get(n, m, manifest):
     print("Downloading {}".format(n))
-    traced_filename = "models/" + n + "_traced.jit.pt"
-    script_filename = "models/" + n + "_scripted.jit.pt"
+    exported_filename = "models/" + n + "_exported.pt2"
     pytorch_filename = "models/" + n + "_pytorch.pt"
-
-    m["model"] = m["model"].eval().cuda()
-
-    # Get all desired model save specifications as list
+    model = m["model"].eval().cuda()
     paths = [m["path"]] if isinstance(m["path"], str) else m["path"]
-
-    # Depending on specified model save specifications, save desired model formats
-    if any(path in ("all", "torchscript", "trace") for path in paths):
-        # (TorchScript) Traced model
-        trace_model = torch.jit.trace(m["model"], [inp.cuda() for inp in m["inputs"]])
-        torch.jit.save(trace_model, traced_filename)
-        manifest.update({n: [traced_filename]})
-    if any(path in ("all", "torchscript", "script") for path in paths):
-        # (TorchScript) Scripted model
-        script_model = torch.jit.script(m["model"])
-        torch.jit.save(script_model, script_filename)
-        if n in manifest.keys():
-            files = list(manifest[n]) if type(manifest[n]) != list else manifest[n]
-            files.append(script_filename)
-            manifest.update({n: files})
-        else:
-            manifest.update({n: [script_filename]})
+    files = []
+    if any(path in ("all", "export") for path in paths):
+        inputs = tuple(inp.cuda() for inp in m["inputs"])
+        torch.export.save(torch.export.export(model, inputs), exported_filename)
+        files.append(exported_filename)
     if any(path in ("all", "pytorch") for path in paths):
-        # (PyTorch Module) model
-        torch.save(m["model"], pytorch_filename)
-        if n in manifest.keys():
-            files = list(manifest[n]) if type(manifest[n]) != list else manifest[n]
-            files.append(script_filename)
-            manifest.update({n: files})
-        else:
-            manifest.update({n: [script_filename]})
+        torch.save(model, pytorch_filename)
+        files.append(pytorch_filename)
+    manifest[n] = files
 
     return manifest
 
 
 def download_models(version_matches, manifest):
-    # Download all models if torch version is different than model version
-    if not version_matches:
-        for n, m in BENCHMARK_MODELS.items():
-            # Ensure all specified desired model formats exist and are valid
-            assert all(
-                (path in VALID_PATHS)
-                for path in (
-                    m["path"] if isinstance(m["path"], (list, tuple)) else [m["path"]]
-                )
-            ), "Not all 'path' attributes in BENCHMARK_MODELS are valid"
-
-            manifest = get(n, m, manifest)
-    else:
-        for n, m in BENCHMARK_MODELS.items():
-            # Ensure all specified desired model formats exist and are valid
-            assert all(
-                (path in VALID_PATHS)
-                for path in (
-                    m["path"] if isinstance(m["path"], (list, tuple)) else [m["path"]]
-                )
-            ), "Not all 'path' attributes in BENCHMARK_MODELS are valid"
-
-            scripted_filename = "models/" + n + "_scripted.jit.pt"
-            traced_filename = "models/" + n + "_traced.jit.pt"
-            pytorch_filename = "models/" + n + "_pytorch.pt"
-            # Check if model file exists on disk
-
-            # Extract model specifications as list and ensure all desired formats exist
-            paths = [m["path"]] if isinstance(m["path"], str) else m["path"]
-            if (
-                (
-                    any(path == "all" for path in paths)
-                    and os.path.exists(scripted_filename)
-                    and os.path.exists(traced_filename)
-                    and os.path.exists(pytorch_filename)
-                )
-                or (
-                    any(path == "torchscript" for path in paths)
-                    and os.path.exists(scripted_filename)
-                    and os.path.exists(traced_filename)
-                )
-                or (
-                    any(path == "script" for path in paths)
-                    and os.path.exists(scripted_filename)
-                )
-                or (
-                    any(path == "trace" for path in paths)
-                    and os.path.exists(traced_filename)
-                )
-                or (
-                    any(path == "pytorch" for path in paths)
-                    and os.path.exists(pytorch_filename)
-                )
-            ):
-                print("Skipping {} ".format(n))
-                continue
-            manifest = get(n, m, manifest)
+    for n, m in BENCHMARK_MODELS.items():
+        paths = [m["path"]] if isinstance(m["path"], str) else m["path"]
+        if not all(path in VALID_PATHS for path in paths):
+            raise ValueError("Unsupported benchmark model format")
+        files = []
+        if any(path in ("all", "export") for path in paths):
+            files.append("models/" + n + "_exported.pt2")
+        if any(path in ("all", "pytorch") for path in paths):
+            files.append("models/" + n + "_pytorch.pt")
+        if (
+            version_matches
+            and manifest.get(n) == files
+            and all(os.path.exists(path) for path in files)
+        ):
+            print("Skipping {} ".format(n))
+            continue
+        get(n, m, manifest)
 
 
 def main():
