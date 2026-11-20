@@ -783,9 +783,55 @@ def test_int4_blockwise_weight_only(ir, dtype, in_features):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+@_skip_int4_on_trt_rtx_turing
+def test_int4_blockwise_weight_only_refittable(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    # TensorRT fails to build this shape in a refittable engine with a bf16 INT4
+    # dequantize.
+    model = torch.nn.Linear(2048, 2048).eval().cuda().to(torch.bfloat16)
+    input_tensor = torch.randn(8, 2048, dtype=torch.bfloat16).cuda()
+    mtq.quantize(
+        model,
+        mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG,
+        forward_loop=lambda model: model(input_tensor),
+    )
+    output_pyt = model(input_tensor)
+
+    with torch.no_grad(), export_torch_mode():
+        exp_program = torch.export.export(model, (input_tensor,), strict=False)
+        trt_model = torchtrt.dynamo.compile(
+            exp_program,
+            inputs=[input_tensor],
+            min_block_size=1,
+            immutable_weights=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        outputs_trt = trt_model(input_tensor)
+    assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=5e-2)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "layer, weight_cfg, error",
-    [(lambda: torch.nn.Conv2d(16, 32, 3), {}, "supports matmul weights only")],
+    [
+        (lambda: torch.nn.Conv2d(16, 32, 3), {}, "supports matmul weights only"),
+        (
+            lambda: torch.nn.Linear(1024, 512),
+            {"unsigned": True},
+            "TensorRT INT4 is signed",
+        ),
+    ],
 )
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
@@ -804,6 +850,8 @@ def test_int4_blockwise_weight_only_unsupported(ir, layer, weight_cfg, error):
         if entry.get("quantizer_name") == "*weight_quantizer":
             entry["cfg"] = {**entry["cfg"], **weight_cfg}
     model = layer().eval().cuda().to(torch.bfloat16)
+    # ModelOpt's unsigned quantization asserts on negative values.
+    model.weight.data.abs_()
     if isinstance(model, torch.nn.Conv2d):
         input_tensor = torch.randn(1, 16, 8, 8, dtype=torch.bfloat16).cuda()
     else:

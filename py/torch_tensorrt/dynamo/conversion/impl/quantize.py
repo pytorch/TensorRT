@@ -49,6 +49,7 @@ def quantize(
     amax: Union[np.ndarray, torch.Tensor, TRTTensor],
     num_bits: int,
     exponent_bits: int,
+    unsigned: bool = False,
     narrow_range: bool = True,
 ) -> TRTTensor:
     """
@@ -75,7 +76,14 @@ def quantize(
                 and isinstance(input_tensor, torch.Tensor)
             ):
                 return _int4_weight(
-                    ctx, target, source_ir, name, input_tensor, amax, narrow_range
+                    ctx,
+                    target,
+                    source_ir,
+                    name,
+                    input_tensor,
+                    amax,
+                    unsigned,
+                    narrow_range,
                 )
             if num_bits != 8 or exponent_bits not in (0, 4):
                 raise ValueError(
@@ -262,6 +270,7 @@ def _int4_weight(
     name: str,
     weight: torch.Tensor,
     amax: Union[np.ndarray, torch.Tensor],
+    unsigned: bool,
     narrow_range: bool,
 ) -> TRTTensor:
     """Quantize a constant weight to INT4 now and add only a dequantize layer.
@@ -274,6 +283,11 @@ def _int4_weight(
     scale and output have the weight's type, so the constant takes the shape of that
     reshape. Otherwise it dequantizes the whole weight into scratch memory first.
     """
+    if unsigned:
+        raise ValueError(
+            f"INT4 quantize of {name} is unsigned, but TensorRT INT4 is signed. "
+            "Use signed INT4 quantization."
+        )
     amax = to_torch(amax, None)
     assert amax is not None
     if (
@@ -342,22 +356,27 @@ def _int4_weight(
     qdata = qdata.reshape(shape)
     scale = scale.reshape(*shape[:-1], -1)
 
+    # A refittable engine fails to build with a 16-bit INT4 dequantize, so there it
+    # dequantizes in float32 and casts, which TensorRT does not fuse.
+    dq_dtype = (
+        weight.dtype if ctx.compilation_settings.immutable_weights else torch.float32
+    )
     qdata_trt = _add_int4_constant(ctx, qdata, f"{name}_int4_weight")
-    scale_trt = get_trt_tensor(ctx, scale.to(weight.dtype), f"{name}_scale")
+    scale_trt = get_trt_tensor(ctx, scale.to(dq_dtype), f"{name}_scale")
     dequantize_layer = ctx.net.add_dequantize(
         qdata_trt,
         scale_trt,
-        output_type=_enums.dtype._from(weight.dtype).to(trt.DataType),
+        output_type=_enums.dtype._from(dq_dtype).to(trt.DataType),
     )
     dequantize_layer.axis = len(shape) - 1
     set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
+    output = dequantize_layer.get_output(0)
+    if dq_dtype != weight.dtype:
+        output = cast_trt_tensor(
+            ctx, output, weight.dtype, f"{name}_cast_output", target, source_ir
+        )
     return impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_block_rows",
-        dequantize_layer.get_output(0),
-        tuple(weight.shape),
+        ctx, target, source_ir, f"{name}_block_rows", output, tuple(weight.shape)
     )
 
 
@@ -391,9 +410,8 @@ def dequantize_affine(
     matmul's activations are INT8 too.
 
     Group-wise INT4 WOQ unpacks to int8 in the PyTorch graph; this converter
-    re-packs those nibbles into a trt.DataType.INT4 constant. TensorRT
-    blocked INT4 DQ currently wants an FP32 DQ output (cast back to BF16
-    after). Nonzero zero-points are rejected for that path.
+    re-packs those nibbles into a trt.DataType.INT4 constant and dequantizes
+    it to FP32. Nonzero zero-points are rejected for that path.
     """
     use_int4 = _is_groupwise_int4(qdata, block_size)
 
@@ -409,7 +427,7 @@ def dequantize_affine(
         # Blocked along the group dimension (last dim of block_size > 1).
         axis: Optional[int] = len(_block_size_as_ints(block_size)) - 1
         scale_for_trt = scale
-        # Myelin currently matches INT4 blocked DQ -> FP32, not BF16.
+        # A bf16 output fails to build in a refittable engine.
         trt_output_dtype = trt.DataType.FLOAT
     else:
         int8_qdata = torch.int8 in (input_dtype, getattr(qdata, "dtype", None))

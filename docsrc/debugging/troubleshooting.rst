@@ -223,6 +223,11 @@ Accuracy / Performance Issues
         )
         mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
 
+    Refit does not support INT4 weights yet, so keep the default
+    ``immutable_weights=True``. A refittable engine still builds, but TensorRT does
+    not fuse its INT4 dequantize into the matmul, and refitting it fails with an
+    error. Reusing a cached engine fails the same way, because it refits the engine.
+
     With TensorRT 11.4, some deeper networks with INT4 weights fail with an illegal
     memory access when the engine runs in the process that built it. The same engine
     runs correctly in a new process, and ``optimization_level=1`` avoids it.

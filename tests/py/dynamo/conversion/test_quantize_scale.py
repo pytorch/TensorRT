@@ -104,6 +104,17 @@ class TestQuantizeScale(TestCase):
         self.int4_layers = layers
         return qdata, torch.from_numpy(scale.weights.copy())
 
+    def test_int4_weight_tiny_amax_quantizes_to_0(self):
+        # ModelOpt quantizes a block with an amax below 2**-24 to 0. In float32 the
+        # scale of this one does not round to 0.
+        weight = torch.zeros(2, 128)
+        weight[0, 0] = 1e-10
+        weight[1, 0] = 1.0
+        amax = weight.abs().amax(dim=1)
+        qdata, scale = self._int4_weight(weight, amax)
+        torch.testing.assert_close(scale.flatten(), torch.tensor([1.0, 1 / 7]))
+        self.assertEqual(qdata[:, 0].tolist(), [0, 7])
+
     def test_int4_weight_clamps_to_the_signed_range(self):
         # Weights past amax clamp to 7, and to -8 only without narrow_range.
         weight = torch.zeros(1, 128)
