@@ -4,11 +4,12 @@
 import contextlib
 import logging
 import threading
-from typing import Any, Dict, Iterator, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import _PASS_THROUGH_OPS
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
     CONSTANT_FOLD_EXCLUSION_META_KEY,
 )
@@ -38,6 +39,32 @@ logger = logging.getLogger(__name__)
 # Do NOT skip materialized folds (e.g. VLA position embedding outputs) — those
 # can be required for TRT legality (int64 indices never reach the converter).
 _MAX_CONSTANT_FOLD_BYTES = 1 << 20  # 1 MiB
+
+# Install only the source of a folded broadcast when that saves more than this.
+_MIN_BROADCAST_SAVING_BYTES = 1 << 20  # 1 MiB
+_SAME_SIZE_INTEGER = {1: torch.int8, 2: torch.int16, 4: torch.int32, 8: torch.int64}
+_SOURCE_VIEW_OPS = {torch.ops.aten.slice.Tensor, torch.ops.aten.permute.default}
+_MATMUL_OPS = {
+    torch.ops.aten.matmul.default,
+    torch.ops.aten.mm.default,
+    torch.ops.aten.bmm.default,
+    torch.ops.aten.linear.default,
+}
+# Readers after which adding, subtracting, multiplying or dividing a broadcast and a matmul
+# result was measured to run as fast.
+_AFTER_MATMUL_ADD_OPS = {
+    torch.ops.aten.softmax.int,
+    torch.ops.aten._softmax.default,
+    torch.ops.aten.layer_norm.default,
+    torch.ops.aten.native_layer_norm.default,
+    torch.ops.aten._assert_tensor_metadata.default,
+}
+_SCALE_LAYER_OPS = {
+    torch.ops.aten.add.Tensor,
+    torch.ops.aten.sub.Tensor,
+    torch.ops.aten.mul.Tensor,
+    torch.ops.aten.div.Tensor,
+}
 
 # Only skip installing aliased folds whose converters are verified to accept
 # constant inputs. Unknown operations retain the established install behavior.
@@ -119,8 +146,17 @@ def constant_fold(
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
     skipped_alias = 0
-    # Repeats of an op share the tensor folded first, so install it only once.
-    installed: Dict[int, torch.fx.Node] = {}
+    # Slices and permutes rewritten to read an installed source, not installed on their own.
+    rewritten: Set[torch.fx.Node] = set()
+    # Repeats of an op share the tensor folded first, so install each form of it once.
+    installed: Dict[Tuple[int, bool], torch.fx.Node] = {}
+    # Repeats of an op take the source only if all of them can read it.
+    repeats: Dict[int, List[torch.fx.Node]] = {}
+    for node, constant in cf.node_replacements.items():
+        repeats.setdefault(id(constant), []).append(node)
+    sources: Dict[int, Optional[torch.Tensor]] = {}
+    # Folded nodes and permutes that take a slice, so later checks read them at that shape.
+    sliced: Dict[torch.fx.Node, torch.Tensor] = {}
     # Whether each value reads a parameter, in one pass in graph order, which puts a node's inputs
     # before it. The constant installed for a value that reads none inherits the mark from its meta.
     parameters = {name for name, _ in gm.named_parameters(remove_duplicate=False)}
@@ -138,7 +174,9 @@ def constant_fold(
             )
         if node in cf.node_replacements and not reads_parameter[node]:
             node.meta[FOLDED_WITHOUT_PARAMETERS_META] = True
-    for node, constant in cf.node_replacements.items():
+    for node, constant in list(cf.node_replacements.items()):
+        if node in rewritten:
+            continue
         # TensorRT only accepts a quantized constant directly in front of a
         # DQ layer, so a permute feeding a dequantize must still be folded.
         if (
@@ -160,20 +198,46 @@ def constant_fold(
                 )
                 continue
 
-        shared = installed.get(id(constant))
-        if shared is not None:
-            node.replace_all_uses_with(shared)
+        if id(constant) not in sources:
+            # A refit folds the new weights again, and their values or strides can differ, so a
+            # refittable engine keeps every folded value at its full shape.
+            sources[id(constant)] = (
+                _shared_source(
+                    repeats[id(constant)], constant, cf.node_replacements, sliced
+                )
+                if settings.immutable_weights
+                else None
+            )
+        source = sources[id(constant)]
+        readers = list(node.users)
+        key = (id(constant), source is not None)
+        attr = installed.get(key)
+        if attr is not None:
+            node.replace_all_uses_with(attr)
             gm.graph.erase_node(node)
-        elif settings.offload_module_to_cpu:
-            installed[id(constant)] = replace_node_with_constant(
-                gm,
-                node,
-                torch.nn.Parameter(constant.cpu().contiguous(), requires_grad=False),
-            )
         else:
-            installed[id(constant)] = replace_node_with_constant(
-                gm, node, torch.nn.Parameter(constant, requires_grad=False)
+            value = constant if source is None else source
+            if settings.offload_module_to_cpu:
+                value = value.cpu().contiguous()
+            attr = installed[key] = replace_node_with_constant(
+                gm, node, torch.nn.Parameter(value, requires_grad=False)
             )
+            if source is not None:
+                logger.debug(
+                    "Installed %s, a %s slice of the folded %s value of %s",
+                    attr.target,
+                    tuple(source.shape),
+                    tuple(constant.shape),
+                    node.name,
+                )
+                attr.meta.pop("tensor_meta", None)
+                if isinstance(full := attr.meta.get("val"), torch.Tensor):
+                    attr.meta["val"] = full[tuple(slice(0, n) for n in source.shape)]
+        if source is not None:
+            for reader in readers:
+                if reader.target in _SOURCE_VIEW_OPS:
+                    _read_source_view(gm, reader, attr)
+                    rewritten.add(reader)
 
     if skipped_alias:
         logger.info(
@@ -235,6 +299,320 @@ def _ieee_float32() -> Iterator[None]:
             finally:
                 cudnn.allow_tf32 = saved_conv
                 torch.set_float32_matmul_precision(saved_matmul)
+
+
+def _broadcast_source(constant: Any) -> Optional[torch.Tensor]:
+    """One slice along each dimension a folded constant repeats along, or None.
+
+    A broadcast folds to a tensor that repeats its source, as a stride-0 view after an
+    expand or as a full copy after a clone, repeat or cat. Installed as is, the engine
+    stores every copy. The slices keep every value while storing only the source.
+    """
+    if (
+        not isinstance(constant, torch.Tensor)
+        or constant.layout != torch.strided
+        or constant.is_nested
+        or constant.numel() * constant.element_size() <= _MIN_BROADCAST_SAVING_BYTES
+    ):
+        return None
+    source = constant
+    for dim, size in enumerate(constant.shape):
+        if size > 1 and (source.stride(dim) == 0 or _repeats_along(source, dim)):
+            source = source.narrow(dim, 0, 1)
+    saving = (constant.numel() - source.numel()) * constant.element_size()
+    # A copy, so the installed slice does not keep the full storage alive.
+    return source.clone() if saving > _MIN_BROADCAST_SAVING_BYTES else None
+
+
+def _shared_source(
+    nodes: List[torch.fx.Node],
+    constant: Any,
+    replacements: Dict[torch.fx.Node, Any],
+    sliced: Dict[torch.fx.Node, torch.Tensor],
+) -> Optional[torch.Tensor]:
+    """The broadcast source of a folded constant if every node folded to it can read the
+    source, or None. If they can, adds them and their permutes to sliced.
+
+    The attention mask, a slice of one copy and some pointwise ops read the source directly,
+    and a permute read only by those reads a permute of it. Measured, other readers run slower
+    on a broadcast: a matmul, and a pointwise op that TensorRT then no longer fuses with its
+    neighbors.
+    """
+    if not all(
+        not _storage_escapes(node)
+        and all(
+            user.target in _SOURCE_VIEW_OPS
+            or _reads_as_attention_mask(user, node)
+            or _pointwise_reads_broadcast(user, node)
+            for user in node.users
+        )
+        for node in nodes
+    ):
+        return None
+    source = _broadcast_source(constant)
+    if source is None:
+        return None
+    # Checked with every repeat, permute and earlier value that takes a slice read as it, as
+    # one op can read several.
+    substitutes = dict(sliced)
+    for node in nodes:
+        substitutes[node] = source
+        for user in node.users:
+            if user.target == torch.ops.aten.permute.default:
+                substitutes[user] = source.permute(user.args[1])
+    if not all(
+        _reads_source(user, node, substitutes, replacements)
+        for node in nodes
+        for user in node.users
+    ):
+        return None
+    sliced.update(substitutes)
+    return source
+
+
+def _repeats_along(tensor: torch.Tensor, dim: int) -> bool:
+    """Whether every slice of the tensor along dim holds the same bits as the first."""
+    integer = _SAME_SIZE_INTEGER.get(tensor.element_size())
+    if integer is None or tensor.is_quantized:
+        return False
+    # Comparing bits tells -0.0 from 0.0 and matches equal NaNs, so the check is exact.
+    bits = tensor.view(integer)
+    # A corner of the first two slices rules out most tensors before the full pass.
+    corner = bits[
+        tuple(slice(0, 2) if d == dim else slice(0, 8) for d in range(bits.dim()))
+    ]
+    if not torch.equal(corner, corner.narrow(dim, 0, 1).expand_as(corner)):
+        return False
+    return bool(torch.equal(bits, bits.narrow(dim, 0, 1).expand_as(bits)))
+
+
+def _reads_as_attention_mask(user: torch.fx.Node, folded: torch.fx.Node) -> bool:
+    """Whether user is scaled_dot_product_attention reading the folded value only as its mask.
+
+    Its mask only has to broadcast to the scores. The fused efficient and cuDNN attention
+    ops are left out, as their eager kernels are not known to accept a broadcast mask.
+    """
+    if user.target != torch.ops.aten.scaled_dot_product_attention.default:
+        return False
+    mask = user.kwargs.get("attn_mask", user.args[3] if len(user.args) > 3 else None)
+    others = [arg for i, arg in enumerate(user.args) if i != 3]
+    others += [arg for name, arg in user.kwargs.items() if name != "attn_mask"]
+    return mask is folded and folded not in others
+
+
+def _reads_source(
+    user: torch.fx.Node,
+    folded: torch.fx.Node,
+    substitutes: Dict[torch.fx.Node, torch.Tensor],
+    replacements: Dict[torch.fx.Node, Any],
+) -> bool:
+    """Whether a user of a folded broadcast can read its source, or a permute of it, when
+    each node in substitutes reads its value there."""
+    if user.target == torch.ops.aten.permute.default:
+        # Readers that a folded constant replaces never see the permute.
+        return all(
+            _reads_as_attention_mask(reader, user)
+            or _folded_away(reader, replacements)
+            or (
+                _pointwise_reads_broadcast(reader, user)
+                and _same_output_from_source(reader, substitutes)
+                # Two shrunk reads of the folded value could shrink the output.
+                and all(
+                    node is user or (node is not folded and node not in folded.users)
+                    for node in reader.all_input_nodes
+                )
+            )
+            for reader in user.users
+        )
+    if user.target == torch.ops.aten.slice.Tensor:
+        # A slice that takes one copy has the source's shape, so its readers take the source.
+        output = user.meta.get("val")
+        return (
+            isinstance(output, torch.Tensor)
+            and all(isinstance(n, int) for n in output.shape)
+            and output.shape == substitutes[folded].shape
+        )
+    return _reads_as_attention_mask(user, folded) or (
+        _pointwise_reads_broadcast(user, folded)
+        and _same_output_from_source(user, substitutes)
+    )
+
+
+def _read_source_view(
+    gm: torch.fx.GraphModule, view: torch.fx.Node, source: torch.fx.Node
+) -> None:
+    """Point a slice or permute of a folded broadcast at its installed source."""
+    if view.target == torch.ops.aten.slice.Tensor:
+        view.replace_all_uses_with(source)
+        gm.graph.erase_node(view)
+        return
+    view.meta.pop("tensor_meta", None)
+    if isinstance(small := source.meta.get("val"), torch.Tensor):
+        view.meta["val"] = small.permute(view.args[1])
+
+
+def _folded_away(node: torch.fx.Node, replacements: Dict[torch.fx.Node, Any]) -> bool:
+    """Whether a folded constant replaces the node, or every node it feeds."""
+    # Each node is decided once, as paths through shared readers multiply, and without
+    # recursion, as a chain of readers can be longer than the recursion limit.
+    decided: Dict[torch.fx.Node, bool] = {}
+    pending = [node]
+    while pending:
+        current = pending[-1]
+        if current in decided:
+            pending.pop()
+        elif current.target in _SAFE_ALIASED_FOLD_SKIP_OPS:
+            decided[current] = False
+        elif current in replacements:
+            decided[current] = True
+        elif current.op != "call_function" or not current.users:
+            decided[current] = False
+        else:
+            undecided = [user for user in current.users if user not in decided]
+            if undecided:
+                pending.extend(undecided)
+            else:
+                decided[current] = all(decided[user] for user in current.users)
+    return decided[node]
+
+
+def _same_output_from_source(
+    user: torch.fx.Node, substitutes: Dict[torch.fx.Node, torch.Tensor]
+) -> bool:
+    """Whether a pointwise user gives an output of the same shape and strides when each of
+    its inputs in substitutes reads the value there. The strides matter to a later view or
+    as_strided of the output, and running the op on meta tensors also rejects an op that
+    does not broadcast."""
+    output = user.meta.get("val")
+    if not isinstance(output, torch.Tensor):
+        return False
+    inputs = {}
+    for node in user.all_input_nodes:
+        value = substitutes[node] if node in substitutes else node.meta.get("val")
+        if not isinstance(value, torch.Tensor) or not all(
+            isinstance(n, int) for n in (*value.shape, *value.stride())
+        ):
+            return False
+        inputs[node] = torch.empty_strided(
+            value.shape, value.stride(), dtype=value.dtype, device="meta"
+        )
+    args, kwargs = torch.fx.node.map_arg((user.args, user.kwargs), inputs.__getitem__)
+    try:
+        result = user.target(*args, **kwargs)
+    except Exception:
+        return False
+    return bool(
+        isinstance(result, torch.Tensor)
+        and result.shape == output.shape
+        and result.stride() == output.stride()
+    )
+
+
+def _pointwise_reads_broadcast(user: torch.fx.Node, folded: torch.fx.Node) -> bool:
+    """Whether TensorRT loses no speed when a pointwise user reads a broadcast of folded."""
+    if user.target in _SCALE_LAYER_OPS:
+        return _keeps_fusion(user, folded)
+    return _ends_pointwise_run(user)
+
+
+def _ends_pointwise_run(user: torch.fx.Node) -> bool:
+    """Whether user is a pointwise op whose readers are neither pointwise ops nor views.
+
+    Keeping pointwise readers and views out keeps the full constant wherever TensorRT might
+    fuse the op with the ops after it, which a broadcast was measured to prevent.
+    """
+    return (
+        torch.Tag.pointwise in getattr(user.target, "tags", ())
+        and bool(user.users)
+        and all(
+            reader.op == "call_function"
+            and torch.Tag.pointwise not in getattr(reader.target, "tags", ())
+            and not _aliases_input(reader)
+            for reader in user.users
+        )
+    )
+
+
+def _keeps_fusion(user: torch.fx.Node, folded: torch.fx.Node) -> bool:
+    """Whether TensorRT loses no speed when an add, subtract, multiply or divide reads a
+    broadcast of folded.
+
+    TensorRT runs an fp16 or fp32 add, subtract, multiply or divide with a broadcast constant
+    as a Scale layer. Its kernel is slower than the fused pointwise kernel and doesn't fuse
+    with pointwise ops before or after it. Measured, that costs nothing when the op adds a
+    bias to attention scores, and when the result goes only to matmuls or only adds a bias to
+    attention scores and the other operand is made by neither a pointwise op nor a matmul, as
+    TensorRT fuses the op into those. Ops that only reshape, copy or cast are looked through
+    after the op and before a matmul, as TensorRT folds them into the ops around them.
+    """
+    if _adds_bias_to_scores(user, folded):
+        return True
+    others = [node for node in user.all_input_nodes if node is not folded]
+    if (
+        len(others) != 1
+        or torch.Tag.pointwise in getattr(others[0].target, "tags", ())
+        or _producer_past_views(others[0]).target in _MATMUL_OPS
+    ):
+        return False
+    return all(
+        reader.target in _MATMUL_OPS for reader in _readers_past_views(user)
+    ) or all(_adds_bias_to_scores(reader, user) for reader in user.users)
+
+
+def _adds_bias_to_scores(node: torch.fx.Node, bias: torch.fx.Node) -> bool:
+    """Whether node combines bias with the output of a matmul, scaled or not, and its result
+    goes to a softmax or a layer norm, as TensorRT fuses the scores, the bias and the softmax
+    of attention into one kernel."""
+    others = [other for other in node.all_input_nodes if other is not bias]
+    if node.target not in _SCALE_LAYER_OPS or len(others) != 1:
+        return False
+    scores = others[0]
+    while (
+        scores.target in (torch.ops.aten.mul.Tensor, torch.ops.aten.div.Tensor)
+        and isinstance(scores.args[0], torch.fx.Node)
+        and _is_number(scores.args[1])
+    ):
+        scores = scores.args[0]
+    return scores.target in _MATMUL_OPS and all(
+        reader.target in _AFTER_MATMUL_ADD_OPS for reader in _readers_past_views(node)
+    )
+
+
+def _producer_past_views(node: torch.fx.Node) -> torch.fx.Node:
+    """The node that makes node's value, past ops that only reshape, copy or cast it."""
+    while node.target in _PASS_THROUGH_OPS and isinstance(node.args[0], torch.fx.Node):
+        node = node.args[0]
+    return node
+
+
+def _readers_past_views(node: torch.fx.Node) -> Set[torch.fx.Node]:
+    """The readers of node, with each op that only reshapes, copies or casts replaced by its
+    own readers. TensorRT folds those ops into the ones around them."""
+    readers: Set[torch.fx.Node] = set()
+    seen: Set[torch.fx.Node] = set()
+    pending = list(node.users)
+    while pending:
+        reader = pending.pop()
+        if reader in seen:
+            continue
+        seen.add(reader)
+        if reader.target in _PASS_THROUGH_OPS and reader.users:
+            pending.extend(reader.users)
+        else:
+            readers.add(reader)
+    return readers
+
+
+def _is_number(arg: Any) -> bool:
+    """Whether arg is a Python number or a node holding a tensor of one element."""
+    if isinstance(arg, (int, float)):
+        return True
+    if not isinstance(arg, torch.fx.Node):
+        return False
+    value = arg.meta.get("val")
+    if value is None and arg.op == "get_attr":
+        value = getattr(arg.graph.owning_module, arg.target, None)
+    return isinstance(value, torch.Tensor) and value.numel() == 1
 
 
 def replace_node_with_constant(
@@ -367,6 +745,12 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
                 self._repeat_of[node] = first
                 if first in self.node_replacements:
                     return self.node_replacements[first]
+        # The parent computes a node's value before it asks is_impure, so a node that
+        # stays in the graph would still run here. A quantize kernel that cannot run
+        # in this environment would then fail the compile for a value never used.
+        # This comes after the repeat bookkeeping, so repeats share as before.
+        if self.is_impure(node):
+            return self.unknown_value
         return super()._deduce_value(node)
 
     def _fold_key(self, node: torch.fx.Node) -> Optional[Tuple[Any, ...]]:
