@@ -110,10 +110,13 @@ def _is_2_norm(n: torch.fx.Node) -> bool:
     return bool(order == 2)
 
 
-def _write_out_vector_norm(gm: torch.fx.GraphModule, node: torch.fx.Node) -> None:
+def _write_out_vector_norm(
+    gm: torch.fx.GraphModule, node: torch.fx.Node
+) -> torch.fx.Node:
     """Replace a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), with
-    sqrt(sum(x * x, dim, keepdim)) in the dtype of x. PyTorch's decomposition squares
-    and sums a float16 or bfloat16 x in float32, with casts around it."""
+    sqrt(sum(x * x, dim, keepdim)) in the dtype of x, and return the sqrt. PyTorch's
+    decomposition squares and sums a float16 or bfloat16 x in float32, with casts
+    around it."""
     names = [a.name for a in node.target._schema.arguments]
     args = {**dict(zip(names, node.args)), **node.kwargs}
     x = args["self"]
@@ -131,6 +134,7 @@ def _write_out_vector_norm(gm: torch.fx.GraphModule, node: torch.fx.Node) -> Non
     total.meta["val"] = root.meta["val"] = node.meta["val"]
     node.replace_all_uses_with(root)
     gm.graph.erase_node(node)
+    return root
 
 
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
@@ -514,7 +518,10 @@ def rule_based_autocast(
                 and target_dtype == autocast_low_precision_type
                 and _is_2_norm(node)
             ):
-                _write_out_vector_norm(gm, node)
+                root = _write_out_vector_norm(gm, node)
+                # A later cast of the norm, such as one autocast_model_casts
+                # reclassifies, reads the dtype its input was traced with.
+                traced_dtypes[root] = traced_dtypes[node]
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

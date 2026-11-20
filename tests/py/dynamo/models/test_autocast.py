@@ -2324,6 +2324,44 @@ def test_autocast_vector_norm_in_low_precision_with_calibration(value, written_o
 
 
 @pytest.mark.unit
+def test_autocast_model_casts_of_a_vector_norm_in_low_precision():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            n = torch.linalg.vector_norm(h, dim=1, keepdim=True).float()
+            return self.conv2(h / n)
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+        autocast_vector_norm_in_low_precision=True,
+    )
+    graph = pre_export_lowering(
+        torch.export.export(model, (x,)), CompilationSettings(**kwargs)
+    ).graph
+    # The cast of the written-out norm is reclassified like any other.
+    (root,) = graph.find_nodes(op="call_function", target=torch.ops.aten.sqrt.default)
+    assert root.meta["val"].dtype == torch.float16
+    assert [user.meta["val"].dtype for user in root.users] == [torch.float16]
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    ref = model(x)
+    torch.testing.assert_close(
+        trt_model(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
 @pytest.mark.critical
 @pytest.mark.parametrize("model_casts", ["keep", "reclassify"])
 def test_autocast_model_casts(model_casts):
