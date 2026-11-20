@@ -280,8 +280,11 @@ warning and are ignored. With this format, an unknown keyword raises a ``TypeErr
 * ``zero_copy_kv``: let an engine update its KV cache in place. See
   :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord``: also write an ETRecord, a debug record for the ExecuTorch Developer Tools
-  ``Inspector``, as ``<name>_etrecord.bin``. It does not work for a program with TensorRT
-  engines: writing the record fails with a ``SerializeError``.
+  ``Inspector``, as ``<name>_etrecord.bin``. With this save it does not work for a program with
+  TensorRT engines: writing the record fails with a ``SerializeError``.
+  :func:`torch_tensorrt.compile_and_save` can write one, because it keeps each engine as a byte
+  buffer read from its file. The record then holds copies of every engine, and writing it reads
+  them into memory.
 
 :ref:`executorch_deployment` explains the run time side of ``use_cuda_graphs``,
 ``weight_streaming_budget_per_engine`` and ``external_engine_data``.

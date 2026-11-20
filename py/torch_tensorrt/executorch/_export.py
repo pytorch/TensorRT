@@ -598,7 +598,10 @@ def export(
             zero_copy_kv=True)`` owns both steps and needs only the one flag.
         generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
             This copies the whole program, engines included. Saving the record does not
-            work for a program with TensorRT engines: it raises a ``SerializeError``.
+            work for a program from ``torch_tensorrt.dynamo.compile`` with TensorRT engines:
+            it raises a ``SerializeError``. ``torch_tensorrt.compile_and_save`` can write one,
+            because it keeps each engine as a byte buffer read from its file. The record
+            then holds copies of every engine, and writing it reads them into memory.
         weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that
             may stay resident in GPU memory, with the rest streamed from host memory.
             It applies to **each** TensorRT engine separately, not as a total for the

@@ -11,11 +11,12 @@ engines built so far are then held neither on the GPU nor in host memory while t
 """
 
 import contextlib
+import glob
 import logging
 import os
 import tempfile
 from contextvars import ContextVar
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterator, Optional, Sequence, Set, Tuple
 
 import torch
 from torch_tensorrt._utils import _cache_root
@@ -41,8 +42,80 @@ def offload_engines_to_disk() -> Iterator[None]:
         paths = list(files)
         files.clear()
         for path in paths:
-            with contextlib.suppress(FileNotFoundError):
+            try:
                 os.remove(path)
+            except FileNotFoundError:
+                pass  # ExecuTorch deleted it, as the owner of a file it copied or moved.
+            except OSError as error:
+                # Logged, so it can't replace an error that ended the block.
+                logger.warning("Could not delete the engine file %s: %s", path, error)
+
+
+@contextlib.contextmanager
+def moving_engines_into(
+    outputs: Sequence[str], sources: Sequence[Tuple[str, int]]
+) -> Iterator[None]:
+    """Around an ExecuTorch save inside the block that moves the engines into ``outputs``.
+
+    ``sources`` names each file the save may move data from, with the size of that data. If the save
+    fails, this deletes each partial output (``<output>.<random>.partial``) it left, and each source
+    other than an engine file that it moved in part, such as a file of CUDA weights. Neither can be
+    finished: the program is gone and the block deletes the engine files. Afterwards the plan of each
+    engine the save moved, in part or in full, is emptied, so a later read of it through its module
+    raises instead of killing the process with a bus error.
+    """
+    files = _offloaded_engine_files.get()
+    assert files is not None, "engines move only inside offload_engines_to_disk()"
+
+    def partials() -> Set[str]:
+        return {
+            p for path in outputs for p in glob.glob(f"{glob.escape(path)}.*.partial")
+        }
+
+    earlier = partials()
+    try:
+        yield
+    except BaseException as e:
+        moved_in_part = [
+            path
+            for path, size in sources
+            if path not in files and 0 < _size(path) < size
+        ]
+        deleted = []
+        for path in [*sorted(partials() - earlier), *moved_in_part]:
+            with contextlib.suppress(OSError):
+                os.remove(path)
+                deleted.append(path)
+        if deleted:
+            e.add_note(
+                f"Deleted {', '.join(deleted)}: what this save moved can't be finished, since "
+                "the files that hold the rest of it are deleted. Export again."
+            )
+        raise
+    finally:
+        for path, (plan, size) in _engine_files(files).items():
+            if size < plan.numel():
+                plan.set_()  # in place, so every module holding the plan sees it empty
+                files[path] = None
+
+
+def _size(path: str) -> int:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
+
+
+def _engine_files(
+    files: Dict[str, Optional[torch.Tensor]],
+) -> Dict[str, Tuple[torch.Tensor, int]]:
+    """Each mapped engine file whose size can be read, with its mapping and its size now."""
+    found = {}
+    for path, plan in files.items():
+        if plan is not None:
+            with contextlib.suppress(OSError):
+                found[path] = plan, os.path.getsize(path)
+    return found
 
 
 def defer_engine_setup_to_load() -> bool:
