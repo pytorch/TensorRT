@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # type: ignore
+import copy
 import importlib
 import platform
 import unittest
@@ -722,6 +723,103 @@ def test_base_int8_dynamic_shape(ir, dtype):
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)
+
+
+# TensorRT-RTX cannot build an INT4 dequantize into a matmul on Turing (SM 7.5).
+_skip_int4_on_trt_rtx_turing = unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx
+    and torch.cuda.is_available()
+    and torch.cuda.get_device_capability() == (7, 5),
+    "INT4 dequantize into a matmul is not supported on TensorRT-RTX for Turing (SM 7.5)",
+)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dtype, in_features",
+    [(torch.float16, 1024), (torch.bfloat16, 1024), (torch.bfloat16, 1000)],
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+@_skip_int4_on_trt_rtx_turing
+def test_int4_blockwise_weight_only(ir, dtype, in_features):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    model = torch.nn.Linear(in_features, 512).eval().cuda().to(dtype)
+    # A block of zeros has an amax of 0.
+    model.weight.data[:, :128] = 0
+    input_tensor = torch.randn(4, in_features, dtype=dtype).cuda()
+    mtq.quantize(
+        model,
+        mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG,
+        forward_loop=lambda model: model(input_tensor),
+    )
+    output_pyt = model(input_tensor)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+            )
+            outputs_trt = trt_model(input_tensor)
+    assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
+
+    # The engine keeps the weights in 4 bits.
+    serialized_engine = trt_model._run_on_acc_0.serialized_engine
+    weight_size = model.weight.numel() * dtype.itemsize
+    assert len(serialized_engine) < weight_size / 2
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "layer, weight_cfg, error",
+    [(lambda: torch.nn.Conv2d(16, 32, 3), {}, "supports matmul weights only")],
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
+def test_int4_blockwise_weight_only_unsupported(ir, layer, weight_cfg, error):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    quant_cfg = copy.deepcopy(mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG)
+    for entry in quant_cfg["quant_cfg"]:
+        if entry.get("quantizer_name") == "*weight_quantizer":
+            entry["cfg"] = {**entry["cfg"], **weight_cfg}
+    model = layer().eval().cuda().to(torch.bfloat16)
+    if isinstance(model, torch.nn.Conv2d):
+        input_tensor = torch.randn(1, 16, 8, 8, dtype=torch.bfloat16).cuda()
+    else:
+        input_tensor = torch.randn(4, 1024, dtype=torch.bfloat16).cuda()
+    mtq.quantize(model, quant_cfg, forward_loop=lambda model: model(input_tensor))
+
+    with torch.no_grad(), export_torch_mode():
+        exp_program = torch.export.export(model, (input_tensor,), strict=False)
+        with pytest.raises(ValueError, match=error):
+            torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+            )
 
 
 @unittest.skipIf(

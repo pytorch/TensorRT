@@ -191,32 +191,45 @@ Accuracy / Performance Issues
     * Use CUDAGraphs (``enable_cudagraphs=True``) for fixed-shape low-latency
       inference; see :ref:`cuda_graphs`.
 
-**"How do I do weight-only quantization (A16W8 / W8A16)?"**
+**"How do I do weight-only quantization?"**
 
-    Weight-only quantization compresses model weights to INT8 while keeping activations
-    in FP16/BF16. This is common for large language models where memory bandwidth is the
-    bottleneck. To do this with ModelOpt, create a custom quantization config that
-    enables ``weight_quantizer`` but disables ``input_quantizer``:
+    Weight-only quantization compresses model weights while keeping activations in
+    FP16/BF16. This is common for large language models where memory bandwidth is the
+    bottleneck. With ModelOpt, use INT4 block quantization of matmul weights, which
+    makes those weights about 4x smaller:
 
     .. code-block:: python
 
         import modelopt.torch.quantization as mtq
 
-        # Custom weight-only INT8 config
-        quant_cfg = {
-            "quant_cfg": {
-                "*weight_quantizer": {"num_bits": 8, "axis": 0},
-                "*input_quantizer": {"enable": False},  # activations stay FP16
-                "default": {"enable": False},
-            },
-            "algorithm": "max",
-        }
-
-        mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
+        mtq.quantize(model, mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG, forward_loop=calibration_loop)
 
         trt_model = torch_tensorrt.compile(
             model, ir="dynamo", arg_inputs=inputs,
         )
+
+    TensorRT has INT4 weight-only kernels for matmul weights only, so the compile
+    fails for a convolution weight in INT4. ``INT4_BLOCKWISE_WEIGHT_ONLY_CFG`` also
+    quantizes convolutions, so leave them out of the config. Add one entry for each
+    convolution class the model uses, such as ``nn.Conv1d``:
+
+    .. code-block:: python
+
+        import copy
+
+        quant_cfg = copy.deepcopy(mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG)
+        quant_cfg["quant_cfg"].append(
+            {"quantizer_name": "*weight_quantizer", "parent_class": "nn.Conv2d", "enable": False}
+        )
+        mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
+
+    With TensorRT 11.4, some deeper networks with INT4 weights fail with an illegal
+    memory access when the engine runs in the process that built it. The same engine
+    runs correctly in a new process, and ``optimization_level=1`` avoids it.
+
+    INT8 weight-only quantization (``mtq.INT8_WEIGHT_ONLY_CFG``) compiles, but does not
+    make the engine smaller: TensorRT keeps INT8 weights only for a matmul whose
+    activations are INT8 too, and folds the others back into FP16/BF16 weights.
 
     See `NVIDIA ModelOpt documentation <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_
     for the full list of built-in quantization configs and customization options.

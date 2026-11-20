@@ -1116,6 +1116,7 @@ else:
             args[1],
             args[2],
             args[3],
+            narrow_range=args[5],
         )
 
 

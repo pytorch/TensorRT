@@ -49,10 +49,12 @@ def quantize(
     amax: Union[np.ndarray, torch.Tensor, TRTTensor],
     num_bits: int,
     exponent_bits: int,
+    narrow_range: bool = True,
 ) -> TRTTensor:
     """
     Adds quantize and dequantize ops (QDQ) which quantize to INT8 or FP8 based
-    on the output_type set and dequantizes them back.
+    on the output_type set and dequantizes them back. A constant weight quantized
+    to INT4 gets only a dequantize, see _int4_weight.
     """
     with unset_fake_temporarily():
         if isinstance(input_tensor, (torch.Tensor, TRTTensor)):
@@ -67,9 +69,17 @@ def quantize(
                 raise ValueError(
                     f"quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
                 )
+            if (
+                num_bits == 4
+                and exponent_bits == 0
+                and isinstance(input_tensor, torch.Tensor)
+            ):
+                return _int4_weight(
+                    ctx, target, source_ir, name, input_tensor, amax, narrow_range
+                )
             if num_bits != 8 or exponent_bits not in (0, 4):
                 raise ValueError(
-                    f"quantize converter currently only accept INT8 or FP8 based quantize, got {num_bits=}, {exponent_bits=}"
+                    f"quantize converter currently only accept INT8 or FP8 based quantize, or INT4 for a constant weight, got {num_bits=}, {exponent_bits=}"
                 )
         else:
             raise ValueError(
@@ -245,6 +255,112 @@ def _add_int4_constant(
     return constant.get_output(0)
 
 
+def _int4_weight(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    weight: torch.Tensor,
+    amax: Union[np.ndarray, torch.Tensor],
+    narrow_range: bool,
+) -> TRTTensor:
+    """Quantize a constant weight to INT4 now and add only a dequantize layer.
+
+    TensorRT has no INT4 activations, so it keeps 4-bit weights only when they come
+    as an INT4 constant in front of an IDequantizeLayer (weight-only quantization).
+    ModelOpt passes the weight as rows of one block each, with one amax per row, and
+    reshapes the result back to the weight's shape. TensorRT fuses the dequantize
+    into the matmul only when the constant has the matmul weight's shape and the
+    scale and output have the weight's type, so the constant takes the shape of that
+    reshape. Otherwise it dequantizes the whole weight into scratch memory first.
+    """
+    amax = to_torch(amax, None)
+    assert amax is not None
+    if (
+        weight.dim() != 2
+        or amax.numel() != weight.shape[0]
+        or (amax.dim() > 0 and amax.shape[0] != weight.shape[0])
+    ):
+        raise ValueError(
+            f"INT4 quantize of {name} expects one amax per block row, got weight "
+            f"{tuple(weight.shape)} and amax {tuple(amax.shape)}"
+        )
+    # Multiplying by the bound before dividing by amax reproduces how ModelOpt's CUDA
+    # fake quantization rounds bf16 and fp16 weights; w * (7 / amax) rounds some ties
+    # the other way. As in ModelOpt's CUDA kernel, an amax below 2**-24 quantizes its
+    # block to 0. So does an amax whose scale rounds to 0 in the weight's type, so
+    # that no scale is 0.
+    amax = amax.float().reshape(-1, 1)
+    max_bound = 7.0
+    min_bound = -max_bound if narrow_range else -max_bound - 1
+    is_zero = (amax < 2**-24) | ((amax / max_bound).to(weight.dtype) == 0)
+    qdata = weight.to(torch.float32, copy=True)
+    qdata.mul_(max_bound).div_(amax).round_().clamp_(min_bound, max_bound)
+    qdata = qdata.masked_fill_(is_zero, 0.0).to(torch.int8)
+    scale = torch.where(is_zero, 1.0, amax / max_bound)
+
+    # ModelOpt reshapes the block rows back to the weight's shape right after the
+    # quantize. Without that reshape the weight was not split into blocks, so it
+    # already has its own shape.
+    shape = tuple(weight.shape)
+    users = list(ctx.current_node.users) if ctx.current_node is not None else []
+    reshapes = [
+        user
+        for user in users
+        if user.target
+        in (
+            torch.ops.aten._reshape_copy.default,
+            torch.ops.aten._unsafe_view.default,
+            torch.ops.aten.reshape.default,
+            torch.ops.aten.view.default,
+        )
+    ]
+    if reshapes:
+        user_shapes = {
+            tuple(getattr(user.meta.get("val"), "shape", ())) for user in reshapes
+        }
+        user_shape = user_shapes.pop() if len(user_shapes) == 1 else ()
+        if not (
+            len(reshapes) == len(users)
+            and user_shape
+            and all(isinstance(dim, int) for dim in user_shape)
+            and user_shape[-1] % shape[1] == 0
+            and qdata.numel() == int(np.prod(user_shape))
+        ):
+            raise ValueError(
+                f"INT4 quantize of {name} could not find the weight's shape from "
+                f"the reshape after it ({[str(user.target) for user in users]})."
+            )
+        shape = user_shape
+    # TensorRT has weight-only kernels for matmul weights only. ModelOpt pads a conv
+    # kernel's last dim to a whole block, so a 3x3 conv weight would grow many times.
+    if len(shape) != 2:
+        raise ValueError(
+            f"INT4 quantize of {name} supports matmul weights only, got shape {shape}. "
+            "Leave this layer out of the INT4 quantization config."
+        )
+    qdata = qdata.reshape(shape)
+    scale = scale.reshape(*shape[:-1], -1)
+
+    qdata_trt = _add_int4_constant(ctx, qdata, f"{name}_int4_weight")
+    scale_trt = get_trt_tensor(ctx, scale.to(weight.dtype), f"{name}_scale")
+    dequantize_layer = ctx.net.add_dequantize(
+        qdata_trt,
+        scale_trt,
+        output_type=_enums.dtype._from(weight.dtype).to(trt.DataType),
+    )
+    dequantize_layer.axis = len(shape) - 1
+    set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
+    return impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_block_rows",
+        dequantize_layer.get_output(0),
+        tuple(weight.shape),
+    )
+
+
 def _zero_point_is_nonzero(zero_point: object) -> bool:
     if zero_point is None:
         return False
@@ -270,7 +386,9 @@ def dequantize_affine(
     Used by TorchAO weight-only quantization (FP8/INT8/INT4). The quantized
     weight stays a low-precision constant and is dequantized at the GEMM
     boundary so Myelin can fuse DQ into the matmul prologue instead of
-    folding it into a dense high-precision weight.
+    folding it into a dense high-precision weight. An INT8 weight is the
+    exception: TensorRT folds it back into a high-precision weight unless the
+    matmul's activations are INT8 too.
 
     Group-wise INT4 WOQ unpacks to int8 in the PyTorch graph; this converter
     re-packs those nibbles into a trt.DataType.INT4 constant. TensorRT
