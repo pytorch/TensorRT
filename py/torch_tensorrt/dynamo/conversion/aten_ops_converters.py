@@ -30,6 +30,7 @@ from torch_tensorrt._utils import (
     is_tensorrt_version_supported,
     trt_rtx_targets_turing,
 )
+from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -4998,6 +4999,159 @@ def aten_ops_sort(
         args[0],
         dim=args_bounds_check(args, 1, -1),
         descending=args_bounds_check(args, 2, False),
+    )
+
+
+# Each count holds about 5.5 bytes of device memory for the life of the engine, on top of its
+# other activations, and a dynamic length counts at its upper bound. This cap keeps a sort under
+# about 6 MiB, which a small device can afford in every mixture-of-experts layer. It also allows
+# at most 2**13 key values (one tile), well below the 2**15 where the cumulative sums over them
+# make even one tile as slow as a sort in PyTorch.
+_MAX_SORT_COUNTS = 2**20
+# Measured on A100 in a routing layer, a converted sort of up to this many elements saves 0.16
+# to 0.5 ms per layer. From 2**15 elements it can be slower than a sort in PyTorch with the
+# engine split, because TensorRT then fuses the gathers that read the order less well.
+_MAX_SORT_LENGTH = 2**14
+
+
+def _counting_sort_counts(node: Node) -> Optional[int]:
+    """The counts the converter holds for the longest row of ``node``, or None if unbounded."""
+    data = node.args[0].meta["val"]
+    length = data.shape[get_positive_dim(node.kwargs.get("dim", -1), data.dim())]
+    # A dynamic length is judged at its upper bound, where the cost matters.
+    if not isinstance(length, int):
+        length = extract_var_range_info(length)["max"]
+        if length is None:
+            return None
+    tile = impl.topk._COUNTING_SORT_TILE
+    return int(-(-length // tile) * tile * node.meta[NUM_SORT_KEYS])
+
+
+def sort_stable_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """A stable sort of integer positions in one row, such as expert ids in mixture-of-experts routing.
+
+    The converter counts keys, so it needs the number of key values, which the
+    annotate_sort_num_keys lowering pass records when it can prove it. It holds one count per
+    key value for every element of the sorted dim, padded to whole tiles. A dynamic length needs
+    an upper bound: for an nn.Module the max_shape of its Input gives one, and an
+    ExportedProgram needs a bounded dim such as torch.export.Dim(max=...).
+    """
+    # The converter has not run on TensorRT-RTX, whose cumulative layer has its own limits
+    # (see cumsum_validator).
+    if ENABLED_FEATURES.tensorrt_rtx:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} is not converted on TensorRT-RTX; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    # Before 10.8 each cumulative sum in the converter is a loop over the summed dim.
+    if not is_tensorrt_version_supported("10.8.0"):
+        _LOGGER.debug(
+            f"[sort.stable validator] Converting {node.name} needs TensorRT 10.8 or newer; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    data = node.args[0].meta.get("val")
+    if (
+        not isinstance(data, torch.Tensor)
+        or data.dim() == 0
+        or data.dtype not in (torch.int32, torch.int64)
+    ):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} does not sort int32 or int64 keys of rank 1 "
+            "or more; aten.sort.stable will run in PyTorch."
+        )
+        return False
+    dim = get_positive_dim(node.kwargs.get("dim", -1), data.dim())
+    # The converter flattens its input into one row, so it cannot sort more than one.
+    if not all(
+        statically_known_true(size == 1)
+        for d, size in enumerate(data.shape)
+        if d != dim
+    ):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort more than one row, and the "
+            "converter sorts a single row; aten.sort.stable will run in PyTorch."
+        )
+        return False
+    num_keys = node.meta.get(NUM_SORT_KEYS)
+    if num_keys is None:
+        _LOGGER.debug(
+            f"[sort.stable validator] Cannot tell the range of the keys of {node.name}. Only "
+            "positions along a dim of known size, such as topk indices, are supported; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    # An empty row gives the converter zero-size tiles, which fail the engine build. A plain
+    # comparison raises when the length depends on the data; this never guards.
+    if not statically_known_true(data.shape[dim] > 0):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort an empty row; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    counts = _counting_sort_counts(node)
+    if counts is None:
+        _LOGGER.debug(
+            f"[sort.stable validator] The length of {node.name} has no upper bound; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    if counts > _MAX_SORT_COUNTS:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} needs more than {_MAX_SORT_COUNTS} counts, "
+            "where the sort would hold too much device memory; aten.sort.stable will run in "
+            "PyTorch."
+        )
+        return False
+    # The padded length, which is within the cap exactly when the length is, since the cap is
+    # whole tiles.
+    if counts // num_keys > _MAX_SORT_LENGTH:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort more than {_MAX_SORT_LENGTH} "
+            "elements, where the sort can run slower than in PyTorch; aten.sort.stable will "
+            "run in PyTorch."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sort.stable,
+    capability_validator=sort_stable_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_sort_stable(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    counts = _counting_sort_counts(ctx.current_node)
+    # The int32 positions overflow at 2**31 counts. The validator stops far below that, and
+    # this check holds for any caller.
+    if counts is None or counts >= 2**31:
+        raise RuntimeError(
+            f"The stable sort {name} may need 2**31 or more counts, which overflows the int32 "
+            "positions of the counting sort."
+        )
+    return impl.topk.counting_sort(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=kwargs.get("dim", -1),
+        descending=kwargs.get("descending", False),
+        num_keys=ctx.current_node.meta[NUM_SORT_KEYS],
     )
 
 
