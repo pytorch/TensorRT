@@ -1553,8 +1553,8 @@ TEST_F(ExecutionGraphTest, AnOutputTakesTheInferredShapeOnEveryCall) {
       for (size_t j = 0; j < count; ++j) {
         values[j] = static_cast<float>(i * 16 + static_cast<int>(j % 64));
       }
-      ASSERT_EQ(cudaMemcpy(inputs_[0], values.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
-      ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
+      ASSERT_EQ(copy_to_device(inputs_[0], values.data(), count * sizeof(float)), cudaSuccess);
+      ASSERT_EQ(fill_device(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
       ASSERT_EQ(engine.run({io.args, 2}, streams_[0]), Error::Ok);
       ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
       ASSERT_EQ(output.dim(), 2);
