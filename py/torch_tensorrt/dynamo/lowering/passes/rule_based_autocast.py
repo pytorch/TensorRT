@@ -11,8 +11,11 @@ import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-from .nodeclassifier import NodeClassifier, NodeNameSetRule
+from .nodeclassifier import ConstantRangeRule, NodeClassifier, NodeNameSetRule
 from .pass_utils import (
+    _has_no_floating_point_tensors,
+    _has_only_integer_outputs,
+    _is_given_a_dtype,
     _wait_tensor_op,
     clean_up_graph_after_modifications,
     tensors_maybe_written_by,
@@ -47,35 +50,6 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
-
-
-def _is_given_a_dtype(n: torch.fx.Node) -> bool:
-    if not isinstance(n.target, torch._ops.OpOverload):
-        return False
-    for i, a in enumerate(n.target._schema.arguments):
-        if a.name == "dtype":
-            given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
-            return given is not None
-    return False
-
-
-def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
-    tensors = [
-        v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
-    ]
-    return bool(tensors) and not any(
-        t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
-    )
-
-
-def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
-    tensors = [
-        v
-        for m in (n, *n.all_input_nodes)
-        for v in pytree.tree_leaves(m.meta.get("val"))
-        if isinstance(v, torch.Tensor)
-    ]
-    return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
 
 
 def _returns_its_input(n: torch.fx.Node) -> bool:
@@ -197,6 +171,22 @@ def rule_based_autocast(
             f"values may then run in {autocast_low_precision_type}."
         )
 
+    # Refit cannot change the engine's precisions, so it reuses the nodes that the
+    # weights of the compiled program kept in high precision.
+    constant_nodes = settings._autocast_constant_range_nodes
+    if constant_nodes is not None:
+        missing = constant_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions that the constants chose, because "
+                f"these nodes are not in the graph: {sorted(missing)}. Compile the model "
+                "again."
+            )
+    constant_rule = (
+        ConstantRangeRule(autocast_low_precision_type)
+        if constant_nodes is None
+        else NodeNameSetRule(constant_nodes)
+    )
     node_classifier = NodeClassifier(
         gm.graph.nodes,
         excluded_nodes=autocast_excluded_nodes,
@@ -205,10 +195,26 @@ def rule_based_autocast(
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
         custom_rule=replay_rule,
+        constant_rule=constant_rule,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(
         reference_data, reference_shapes
     )
+    if isinstance(constant_rule, ConstantRangeRule):
+        settings._autocast_constant_range_nodes = frozenset(constant_rule.kept)
+    elif settings._autocast_checks_constant_range:
+        check = ConstantRangeRule(autocast_low_precision_type)
+        low = set(low_precision_nodes)
+        overflowing = [
+            n.name for n in gm.graph.nodes if n.name in low and check._check_inner(n)
+        ]
+        if overflowing:
+            raise RuntimeError(
+                "Refit cannot change the precisions of the engine, and these nodes run "
+                f"in {autocast_low_precision_type} but read constants with values "
+                f"that become inf in it: {overflowing}. Compile the model again to keep "
+                f"them in {autocast_high_precision_type}."
+            )
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(

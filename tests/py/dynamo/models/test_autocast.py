@@ -2351,6 +2351,652 @@ def test_autocast_leaves_tiny_factors_alone(scale):
 
 @pytest.mark.unit
 @pytest.mark.critical
+@pytest.mark.parametrize(
+    "case",
+    [
+        "batch_norm",
+        "weight_view",
+        "weight_chunk",
+        "lifted_constant",
+        "scalar",
+        "frozen_batch_norm",
+        "full",
+        "weight_cat",
+    ],
+)
+def test_autocast_keeps_ops_whose_constants_become_inf(case):
+    class BatchNorm(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(8, 16, 3, padding=1)
+            self.bn = nn.BatchNorm2d(16)
+            self.conv2 = nn.Conv2d(16, 8, 3, padding=1)
+            with torch.no_grad():
+                # float16 rounds 1e6 to inf, which would make the BatchNorm scale 0.
+                self.bn.running_var.fill_(1e6)
+                self.bn.weight.fill_(1000.0)
+
+        def forward(self, x):
+            return self.conv2(self.bn(self.conv1(x)))
+
+    class WeightView(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = nn.Parameter(torch.full((16, 16), 1e5))
+
+        def forward(self, x):
+            # The matmul reads the weight through a view.
+            return x @ self.weight.t()
+
+    class WeightChunk(WeightView):
+        def forward(self, x):
+            return x @ self.weight.chunk(2)[0].t()
+
+    class LiftedConstant(nn.Module):
+        def forward(self, x):
+            return x / torch.tensor(1e6, device=x.device)
+
+    class Scalar(nn.Module):
+        def forward(self, x):
+            return x / 1e6
+
+    class FrozenBatchNorm(BatchNorm):
+        # As torchvision's FrozenBatchNorm2d, which computes the scale in the graph.
+        def forward(self, x):
+            bn = self.bn
+            scale = bn.weight * (bn.running_var + bn.eps).rsqrt()
+            bias = bn.bias - bn.running_mean * scale
+            x = self.conv1(x) * scale.reshape(1, -1, 1, 1) + bias.reshape(1, -1, 1, 1)
+            return self.conv2(x)
+
+    class Full(nn.Module):
+        def forward(self, x):
+            return x / torch.full((), 1e6, device=x.device)
+
+    class WeightCat(WeightView):
+        def forward(self, x):
+            return x @ torch.cat([self.weight, self.weight]).t()
+
+    model, x = {
+        "batch_norm": (BatchNorm(), torch.randn(1, 8, 32, 32)),
+        "weight_view": (WeightView(), torch.randn(4, 16) * 1e-4),
+        "weight_chunk": (WeightChunk(), torch.randn(4, 16) * 1e-4),
+        "lifted_constant": (LiftedConstant(), torch.randn(4, 16) * 1e6),
+        "scalar": (Scalar(), torch.randn(4, 16) * 1e6),
+        "frozen_batch_norm": (FrozenBatchNorm(), torch.randn(1, 8, 32, 32)),
+        "full": (Full(), torch.randn(4, 16) * 1e3),
+        "weight_cat": (WeightCat(), torch.randn(4, 16) * 1e-4),
+    }[case]
+    model, x = model.cuda().eval(), x.cuda()
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    ref = model(x)
+    torch.testing.assert_close(
+        trt_model(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+def _autocast_dtype_of_mul(model, x, low_precision_type):
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=low_precision_type
+    )
+    ep = pre_export_lowering(torch.export.export(model, (x,)), settings)
+    (mul,) = ep.graph.find_nodes(op="call_function", target=torch.ops.aten.mul.Tensor)
+    return mul.meta["val"].dtype
+
+
+def _autocast_dtypes(ep, low_precision_type=torch.float16):
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=low_precision_type
+    )
+    ep = pre_export_lowering(ep, settings)
+    return settings, {
+        n.name: n.meta["val"].dtype
+        for n in ep.graph.nodes
+        if isinstance(n.meta.get("val"), torch.Tensor)
+    }
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_skips_integer_ops():
+    class Model(nn.Module):
+        def forward(self, ids, x):
+            return x * (ids == 128000), ids % 100000 + 70000
+
+    ids = torch.randint(0, 10, (4, 8))
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    pre_export_lowering(
+        torch.export.export(Model().eval(), (ids, torch.randn(4, 8))), settings
+    )
+    assert settings._autocast_constant_range_nodes == frozenset()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("write", ["in_place", "through_chunks", "functional"])
+def test_autocast_constant_range_skips_a_buffer_the_program_writes(write):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("scale", torch.full((8,), 1e6))
+
+        def forward(self, x):
+            parts = self.scale.chunk(2) if write == "through_chunks" else [self.scale]
+            for part in parts:
+                part.fill_(2.0)
+            return x * self.scale
+
+    ep = torch.export.export(Model().eval(), (torch.randn(4, 8),))
+    if write == "functional":
+        # The functional program lists the write in its signature, not in the graph.
+        ep = ep.run_decompositions({})
+    settings, _ = _autocast_dtypes(ep)
+    assert settings._autocast_constant_range_nodes == frozenset()
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_follows_computed_constants():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("weight", torch.full((8,), 1000.0))
+            self.register_buffer("running_var", torch.full((8,), 1e6))
+
+        def forward(self, x):
+            scale = self.weight * (self.running_var + 1e-5).rsqrt()
+            return x * scale / torch.full((), 1e6)
+
+    settings, dtypes = _autocast_dtypes(
+        torch.export.export(Model().eval(), (torch.randn(4, 8),))
+    )
+    # The rsqrt reads the 1e6 that the add computes. The scale it gives fits, so the
+    # op that applies it runs in float16.
+    assert dtypes["rsqrt"] == torch.float32
+    assert dtypes["mul_1"] == torch.float16
+    # Autocast does not cast the factory op, so the div that reads it stays in float32.
+    assert dtypes["div"] == torch.float32
+    assert "full" not in settings._autocast_constant_range_nodes
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_follows_computed_constants_in_regions():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("weight", torch.full((8,), 1000.0))
+            self.register_buffer("running_var", torch.full((8,), 1e6))
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                scale = self.weight * (self.running_var + 1e-5).rsqrt()
+            return x * scale
+
+    x = torch.randn(4, 8, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.export(Model().cuda().eval(), (x,)), settings)
+    (rsqrt,) = ep.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.rsqrt.default
+    )
+    assert rsqrt.meta["val"].dtype == torch.float32
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_skips_empty_computed_constants(caplog):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = nn.Parameter(torch.full((4, 8), 1e6))
+
+        def forward(self, x):
+            # An empty slice of a large weight has no values to measure.
+            return torch.cat([x, self.weight[:0]])
+
+    with caplog.at_level(logging.WARNING):
+        _autocast_dtypes(torch.export.export(Model().eval(), (torch.randn(2, 8),)))
+    assert "Cannot compute" not in caplog.text
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_allows_data_dependent_shapes():
+    class Model(nn.Module):
+        def forward(self, x):
+            return x[x > 0] * 2.0
+
+    _, dtypes = _autocast_dtypes(
+        torch.export.export(Model().eval(), (torch.randn(4, 8),))
+    )
+    assert dtypes["mul"] == torch.float16
+
+
+@pytest.mark.unit
+def test_autocast_constant_range_measures_the_part_of_a_weight_an_op_reads():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            table = torch.ones(16, 8)
+            table[-1] = 1e6
+            self.register_buffer("table", table)
+
+        def forward(self, x):
+            return x * self.table[:4]
+
+    assert (
+        _autocast_dtype_of_mul(Model().eval(), torch.randn(4, 8), torch.float16)
+        == torch.float16
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("fill", ["full_like", "new_full", "full"])
+def test_autocast_constant_range_follows_fills_of_dynamic_shapes(fill):
+    class Model(nn.Module):
+        def forward(self, x):
+            if fill == "full_like":
+                return x / torch.full_like(x, 1e6)
+            if fill == "new_full":
+                return x / x.new_full((x.shape[0], 1), 1e6)
+            return x / torch.full((x.shape[0], 1), 1e6)
+
+    ep = torch.export.export(
+        Model().eval(),
+        (torch.randn(4, 8),),
+        dynamic_shapes=({0: torch.export.Dim("batch")},),
+    )
+    _, dtypes = _autocast_dtypes(ep)
+    assert dtypes["div"] == torch.float32
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_refit_keeps_the_precisions_the_constants_chose(caplog):
+    class Model(nn.Module):
+        def __init__(self, running_var):
+            super().__init__()
+            self.conv1 = nn.Conv2d(8, 16, 3, padding=1)
+            self.bn = nn.BatchNorm2d(16)
+            self.conv2 = nn.Conv2d(16, 8, 3, padding=1)
+            with torch.no_grad():
+                self.bn.running_var.fill_(running_var)
+
+        def forward(self, x):
+            return self.conv2(self.bn(self.conv1(x)))
+
+    x = torch.randn(1, 8, 16, 16, device="cuda")
+    model = Model(1e6).cuda().eval()
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        immutable_weights=False,
+    )
+    # Refit cannot change the engine's precisions: the BatchNorm stays in float32
+    # although the new running variance fits in float16.
+    new_model = Model(1.0).cuda().eval()
+    new_model.load_state_dict(model.state_dict() | {"bn.running_var": torch.ones(16)})
+    with caplog.at_level(logging.WARNING):
+        refitted = torch_tensorrt.dynamo.refit_module_weights(
+            trt_model, torch.export.export(new_model, (x,)), arg_inputs=[x]
+        )
+    assert not [r for r in caplog.records if "types different" in r.getMessage()]
+    ref = new_model(x)
+    torch.testing.assert_close(
+        refitted(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+def test_autocast_refit_reuses_and_checks_the_constant_range_nodes():
+    class Model(nn.Module):
+        def __init__(self, running_var):
+            super().__init__()
+            self.bn = nn.BatchNorm1d(8)
+            with torch.no_grad():
+                self.bn.running_var.fill_(running_var)
+
+        def forward(self, x):
+            return self.bn(x)
+
+    x = torch.randn(4, 8)
+
+    def batch_norm_dtype(running_var, settings):
+        ep = pre_export_lowering(
+            torch.export.export(Model(running_var).eval(), (x,)), settings
+        )
+        (bn,) = ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.batch_norm.default
+        )
+        return bn.name, bn.meta["val"].dtype
+
+    def settings():
+        return CompilationSettings(
+            enable_autocast=True, autocast_low_precision_type=torch.float16
+        )
+
+    compiled = settings()
+    name, dtype = batch_norm_dtype(1e6, compiled)
+    assert dtype == torch.float32
+    assert compiled._autocast_constant_range_nodes == {name}
+    # Refit keeps the BatchNorm in float32, although the new running variance fits.
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float32)
+
+    compiled = settings()
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float16)
+    # Refit cannot move the BatchNorm out of float16, where the new running variance
+    # becomes inf, also for an engine that was saved and loaded.
+    compiled = pickle.loads(pickle.dumps(compiled))
+    with pytest.raises(RuntimeError, match=f"{name}.*Compile the model again"):
+        batch_norm_dtype(1e6, compiled)
+
+    compiled = settings()
+    compiled._autocast_constant_range_nodes = frozenset({"not_a_node"})
+    with pytest.raises(RuntimeError, match="not_a_node"):
+        batch_norm_dtype(1e6, compiled)
+
+    # An engine saved before autocast kept nodes for their constants has none, and its
+    # refit keeps its precisions without checking the new weights, as before.
+    old = settings()
+    del old.__dict__["_autocast_constant_range_nodes"]
+    del old.__dict__["_autocast_checks_constant_range"]
+    loaded = pickle.loads(pickle.dumps(old))
+    assert loaded._autocast_constant_range_nodes == frozenset()
+    assert batch_norm_dtype(1e6, loaded) == (name, torch.float16)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("op", ["bucketize", "cumsum"])
+def test_autocast_refit_skips_ops_that_autocast_does_not_cast(op):
+    class Model(nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            self.register_buffer("values", torch.tensor([0.0, value]))
+
+        def forward(self, x):
+            # bucketize makes integers, and cumsum is given a dtype, so autocast never
+            # casts the values they read.
+            if op == "bucketize":
+                return torch.bucketize(x, self.values)
+            return x * 2, torch.cumsum(self.values, 0, dtype=torch.float32)
+
+    x = torch.randn(4, 8)
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    pre_export_lowering(torch.export.export(Model(1.0).eval(), (x,)), settings)
+    ep = pre_export_lowering(torch.export.export(Model(1e6).eval(), (x,)), settings)
+    target, dtype = {
+        "bucketize": (torch.ops.aten.bucketize.Tensor, torch.int64),
+        "cumsum": (torch.ops.aten.cumsum.default, torch.float32),
+    }[op]
+    (node,) = ep.graph.find_nodes(op="call_function", target=target)
+    assert node.meta["val"].dtype == dtype
+
+
+_FLOAT32_MAX = torch.finfo(torch.float32).max
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "low_precision_type, values, keeps",
+    [
+        (torch.float16, [65504.0], False),
+        # Rounds to 65504, the largest float16 value.
+        (torch.float16, [65519.0], False),
+        (torch.float16, [65520.0], True),
+        (torch.float16, [-1e6], True),
+        # bfloat16 has the exponent range of float32.
+        (torch.bfloat16, [1e6], False),
+        (torch.bfloat16, [_FLOAT32_MAX], True),
+        # NaN and inf stay as they are, and must not hide a value that overflows.
+        (torch.float16, [float("inf"), float("-inf"), float("nan"), 1.0], False),
+        (torch.float16, [float("nan"), 1e6], True),
+        (torch.float16, [float("inf"), 1e6], True),
+    ],
+    ids=[
+        "fp16_max",
+        "fp16_rounds_to_max",
+        "fp16_rounds_to_inf",
+        "fp16_negative",
+        "bf16_1e6",
+        "bf16_fp32_max",
+        "fp16_inf_nan",
+        "fp16_nan_and_1e6",
+        "fp16_inf_and_1e6",
+    ],
+)
+def test_autocast_constant_range_of_weights(low_precision_type, values, keeps):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight = nn.Parameter(torch.tensor(values))
+
+        def forward(self, x):
+            return x * self.weight
+
+    dtype = _autocast_dtype_of_mul(
+        Model().eval(), torch.randn(4, len(values)), low_precision_type
+    )
+    assert dtype == (torch.float32 if keeps else low_precision_type)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "low_precision_type, value, keeps",
+    [
+        (torch.float16, 65504.0, False),
+        (torch.float16, 65520.0, True),
+        (torch.float16, 100000, True),
+        (torch.float16, -1e6, True),
+        (torch.bfloat16, 1e6, False),
+        (torch.float16, float("inf"), False),
+        (torch.float16, float("nan"), False),
+    ],
+    ids=[
+        "fp16_max",
+        "fp16_rounds_to_inf",
+        "fp16_int",
+        "fp16_negative",
+        "bf16_1e6",
+        "fp16_inf",
+        "fp16_nan",
+    ],
+)
+def test_autocast_constant_range_of_scalars(low_precision_type, value, keeps):
+    class Model(nn.Module):
+        def forward(self, x):
+            return x * value
+
+    dtype = _autocast_dtype_of_mul(
+        Model().eval(), torch.randn(4, 8), low_precision_type
+    )
+    assert dtype == (torch.float32 if keeps else low_precision_type)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "op", ["where", "masked_fill", "index_put", "sdpa", "index_put_accumulate"]
+)
+def test_autocast_constant_range_skips_values_an_op_only_places(op):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            mask = torch.full((8, 8), torch.finfo(torch.float32).min).triu(1)
+            self.register_buffer("mask", mask)
+
+        def forward(self, x):
+            if op == "where":
+                return torch.where(x > 0, x, self.mask)
+            if op == "masked_fill":
+                return x.masked_fill(x > 0, self.mask[0, -1])
+            if op == "index_put":
+                return x.index_put((torch.tensor([0]),), self.mask)
+            if op == "index_put_accumulate":
+                # The values are added to x, not placed.
+                return x.index_put((torch.tensor([0]),), self.mask, accumulate=True)
+            return torch.nn.functional.scaled_dot_product_attention(
+                x, x, x, attn_mask=self.mask
+            )
+
+    target = {
+        "where": torch.ops.aten.where.self,
+        "masked_fill": torch.ops.aten.masked_fill.Tensor,
+        "index_put": torch.ops.aten.index_put.default,
+        "sdpa": torch.ops.aten.scaled_dot_product_attention.default,
+        "index_put_accumulate": torch.ops.aten.index_put.default,
+    }[op]
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    ep = pre_export_lowering(
+        torch.export.export(Model().eval(), (torch.randn(2, 8, 8),)), settings
+    )
+    # The mask value is -inf in float16 for the next op anyway, so the op that only
+    # places it runs in float16. index_put with accumulate=True adds it, so it does not.
+    (node,) = ep.graph.find_nodes(op="call_function", target=target)
+    keeps = op == "index_put_accumulate"
+    assert node.meta["val"].dtype == (torch.float32 if keeps else torch.float16)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "case",
+    [
+        "float16_view",
+        "bfloat16_view",
+        "no_grad_block",
+        "chunk_of_a_kept_op",
+        "no_grad_block_on_a_large_constant",
+        "view_taken_before_a_no_grad_block",
+        "half_of_a_kept_op",
+        "view_of_an_in_place_op_on_a_fill",
+        "view_returned_by_a_no_grad_block",
+    ],
+)
+def test_autocast_constant_range_keeps_in_place_writes(case):
+    class ViewOfLowPrecision(nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            self.linear = nn.Linear(16, 16)
+            self.value = value
+
+        def forward(self, x):
+            h = self.linear(x)
+            # fill_ writes into a low precision view of h, not into a cast copy.
+            h[:, :4] = torch.tensor(self.value)
+            return h.softmax(-1)
+
+    class NoGradBlock(ViewOfLowPrecision):
+        def forward(self, x):
+            h = self.linear(x)
+            value = torch.full((), self.value, device=x.device)
+            with torch.no_grad():
+                h[:, :4] = value
+            return h.softmax(-1)
+
+    class ChunkOfAKeptOp(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("scale", torch.full((16,), 1e6))
+
+        def forward(self, x):
+            # The clamp reads 1e6 and runs in float32, so the write into a chunk of it
+            # must too, or it would write into a float16 copy.
+            y = self.scale.clamp(max=1000.0)
+            first, _ = y.chunk(2)
+            first[:4] = 0.0
+            return x * y
+
+    class NoGradBlockOnALargeConstant(ChunkOfAKeptOp):
+        def forward(self, x):
+            # The rule does not keep an op that a block writes into, or the block
+            # would write into a cast copy. So y is inf in float16, and only the
+            # part that the block writes is returned.
+            y = self.scale * 1e-3
+            with torch.no_grad():
+                y[:4] = 0.0
+            return x[:, :4] * y[:4]
+
+    class HalfOfAKeptOp(ChunkOfAKeptOp):
+        def forward(self, x):
+            # half() makes a float16 copy of the float32 clamp, and the write goes
+            # into that copy.
+            y = self.scale.clamp(max=1000.0).half()
+            y[:4] = 0.0
+            return x * y
+
+    class ViewReturnedByANoGradBlock(ChunkOfAKeptOp):
+        def forward(self, x):
+            y = self.scale.clamp(max=1000.0)
+            with torch.no_grad():
+                first = y[:4]
+            first.fill_(0.0)
+            return x * y
+
+    class ViewOfAnInPlaceOpOnAFill(nn.Module):
+        def forward(self, x):
+            mask = torch.full((8, 8), -1e9, device=x.device)
+            mask.triu_(1)
+            mask[:, :4] = 0.0
+            return (x[:, :8] + mask).softmax(-1)
+
+    class ViewTakenBeforeANoGradBlock(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("mask", torch.full((16, 16), -1e9))
+
+        def forward(self, x):
+            mask = self.mask.clone()
+            row = mask[0]
+            with torch.no_grad():
+                mask[:, :4] = 0.0
+            return (x + row).softmax(-1)
+
+    model, low_precision_type = {
+        "float16_view": (ViewOfLowPrecision(-1e9), torch.float16),
+        "bfloat16_view": (ViewOfLowPrecision(-_FLOAT32_MAX), torch.bfloat16),
+        "no_grad_block": (NoGradBlock(-1e9), torch.float16),
+        "chunk_of_a_kept_op": (ChunkOfAKeptOp(), torch.float16),
+        "no_grad_block_on_a_large_constant": (
+            NoGradBlockOnALargeConstant(),
+            torch.float16,
+        ),
+        "view_taken_before_a_no_grad_block": (
+            ViewTakenBeforeANoGradBlock(),
+            torch.float16,
+        ),
+        "half_of_a_kept_op": (HalfOfAKeptOp(), torch.float16),
+        "view_of_an_in_place_op_on_a_fill": (ViewOfAnInPlaceOpOnAFill(), torch.float16),
+        "view_returned_by_a_no_grad_block": (
+            ViewReturnedByANoGradBlock(),
+            torch.float16,
+        ),
+    }[case]
+    model = model.cuda().eval()
+    x = torch.randn(8, 16, device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=low_precision_type,
+    )
+    torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
 def test_autocast_keeps_the_upcast_a_view_needs(dtype):
     class Model(nn.Module):

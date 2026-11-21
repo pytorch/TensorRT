@@ -290,6 +290,15 @@ class CompilationSettings:
     _autocast_calibrated_high_precision_nodes: Optional[FrozenSet[str]] = field(
         default=None, repr=False
     )
+    # Set by autocast, not by users: the nodes it kept in high precision because a
+    # constant they read does not fit in the low precision type. Refit reuses them,
+    # so settings that compiled one program must not compile another.
+    _autocast_constant_range_nodes: Optional[FrozenSet[str]] = field(
+        default=None, repr=False
+    )
+    # False for an engine built before autocast kept those nodes. Its refit does not
+    # check the constants of the new weights, as before.
+    _autocast_checks_constant_range: bool = field(default=True, repr=False)
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     max_partition_size: Optional[int] = MAX_PARTITION_SIZE
@@ -416,6 +425,10 @@ class CompilationSettings:
         state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
         state.setdefault("autocast_model_regions", AUTOCAST_MODEL_REGIONS)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
+        # The engine was built before autocast kept nodes for their constants.
+        if "_autocast_constant_range_nodes" not in state:
+            state["_autocast_constant_range_nodes"] = frozenset()
+            state["_autocast_checks_constant_range"] = False
         self.__dict__.update(state)
 
 

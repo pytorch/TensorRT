@@ -5,6 +5,7 @@ import operator
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
+import torch.utils._pytree as pytree
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 
 # When True, clean_up_graph_after_modifications only marks the graph dirty and
@@ -138,6 +139,35 @@ def get_tensor_placeholders(
     ]
 
     return placeholders
+
+
+def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
+    tensors = [
+        v
+        for m in (n, *n.all_input_nodes)
+        for v in pytree.tree_leaves(m.meta.get("val"))
+        if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
+
+
+def _is_given_a_dtype(n: torch.fx.Node) -> bool:
+    if not isinstance(n.target, torch._ops.OpOverload):
+        return False
+    for i, a in enumerate(n.target._schema.arguments):
+        if a.name == "dtype":
+            given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
+            return given is not None
+    return False
+
+
+def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
+    tensors = [
+        v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
+    ]
+    return bool(tensors) and not any(
+        t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
+    )
 
 
 def tensors_written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
