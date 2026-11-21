@@ -457,11 +457,11 @@ jobs:
           # Both channels that carry a pinned ExecuTorch are named directly rather than through the
           # channel variable: a dated development build is only on the nightly channel, and a release
           # is on the test channel. The default index stays in the set for the other requirements,
-          # which means a pin naming a version the default index also publishes could resolve to the
-          # processor-only build from there. pip prefers the labelled CUDA build of the same version,
-          # and what refuses the other is the delegate's own build, which reads the installed
-          # ExecuTorch's local label and stops unless it names a CUDA build, so the failure is a clear
-          # message rather than a configure error about a missing extension.
+          # which means a pin naming a version the default index also publishes could resolve to
+          # PyPI's build, whose metadata has no label. pip prefers the labelled build of the same
+          # version. If it did not, the delegate's own build reads the build label of that
+          # ExecuTorch from its version.py, and stops with a clear message for anything but a CUDA
+          # build, or for a labelled companion, which would have no labelled ExecuTorch to require.
           # The version itself comes from the requirement file, so moving the pin to a newer
           # nightly changes no file in this directory.
           ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \

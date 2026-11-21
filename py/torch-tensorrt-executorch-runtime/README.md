@@ -222,7 +222,10 @@ python -m pip wheel --no-build-isolation --no-deps \
   index while it builds. NVIDIA's index only makes that step faster.
 - The delegate compiles and links against the installed ExecuTorch wheel, which ships the headers,
   the prebuilt runtime and a CMake package. It must be a CUDA wheel. No ExecuTorch source checkout
-  is involved.
+  is involved. PyPI's CUDA wheel has no label in its metadata, so the build reads the label from
+  the wheel's `executorch/version.py`. A labelled version of this wheel has to require the labelled
+  ExecuTorch build it links, and PyPI has none. So when the pin names a release and ExecuTorch
+  comes from PyPI, build an unlabelled version, such as `0.3.0.dev0`.
 - `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` sets this wheel's version. Without it, the version
   is the base version in `version.txt` plus `.dev0` and the Git revision. Nightly builds keep this
   wheel's own base version, with the main wheel's date and CUDA suffix, such as
@@ -305,7 +308,8 @@ whose directory is on the delegate's search path.
 ### Environment variables
 
 - `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION`: import the package without loading the delegate.
-- `TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH`: build against an ExecuTorch other than the pinned one.
+- `TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH`: build against an ExecuTorch other than the pinned
+  CUDA build, or build a labelled version against an ExecuTorch with no label.
 - `TORCH_TENSORRT_EXECUTORCH_DEBUG`: build the delegate with debug information.
 
 Each accepts `1`, `true`, `yes` or `on`, in any case. Any other value, or no value, means off.

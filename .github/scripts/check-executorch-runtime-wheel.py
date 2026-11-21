@@ -238,6 +238,49 @@ def main() -> None:
                         f"the repository pins executorch=={pinned}, but this wheel was built "
                         f"against {installed}, whose version differs from that pin"
                     )
+                # The delegate links CUDA, so the ExecuTorch it was built against has to be a CUDA
+                # build of the pinned major, and the label says which build it is. PyPI refuses local
+                # labels, so its CUDA wheel has none in the metadata. Then the label comes from
+                # version.py, which still records the full version.
+                label = installed.local or ""
+                recorded = ""
+                version_file = Path(
+                    str(
+                        importlib.metadata.distribution(distribution).locate_file(
+                            "executorch/version.py"
+                        )
+                    )
+                )
+                if not label and version_file.is_file():
+                    match = re.search(
+                        r"^__version__[^=\n]*=\s*['\"]([^'\"]+)['\"]",
+                        version_file.read_text(encoding="utf-8"),
+                        re.MULTILINE,
+                    )
+                    if match:
+                        public, _, built_label = match.group(1).partition("+")
+                        if public != installed.public:
+                            reject(
+                                f"this wheel was built against executorch {installed}, but its "
+                                f"version.py records {match.group(1)}, another version, so it does "
+                                "not say which build that was"
+                            )
+                        label = built_label
+                        recorded = f" (its version.py records {match.group(1)})"
+                cuda_major = pins["__cuda_version__"].split(".")[0]
+                if not label.startswith(f"cu{cuda_major}"):
+                    reject(
+                        f"this wheel was built against executorch {installed}{recorded}, which is "
+                        f"not a CUDA {cuda_major} build"
+                    )
+                # A labelled wheel is for the PyTorch indexes, where the ExecuTorch it requires
+                # carries its label too. Built against PyPI's unlabelled ExecuTorch, its
+                # requirement cannot name the build it linked.
+                if version.local and not installed.local:
+                    reject(
+                        f"this wheel is labelled {version}, but it was built against executorch "
+                        f"{installed}, which has no label to require"
+                    )
                 # A wheel for PyPI carries no label, so neither does its requirement.
                 expected_version = str(installed) if version.local else installed.public
             else:

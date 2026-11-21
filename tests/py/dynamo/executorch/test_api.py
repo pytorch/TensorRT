@@ -3242,6 +3242,17 @@ def _elf_object(architecture: str) -> bytes:
         ("requires_an_unpinned_executorch", False),
         ("requires_no_executorch", False),
         ("requires_a_mismatched_executorch_pin", False),
+        # Only a PyPI wheel may be built against PyPI's unlabelled ExecuTorch.
+        ("labelled_wheel_built_against_unlabelled_executorch", False),
+        ("pypi_release_built_against_unlabelled_executorch", True),
+        # Only a CUDA build of the pinned major links. Its label comes from the metadata, or from
+        # version.py when the metadata has none, and version.py has to describe the same version.
+        ("pypi_release_built_against_unlabelled_cpu_executorch", False),
+        ("pypi_release_built_against_unlabelled_bare_executorch", False),
+        ("pypi_release_built_against_unlabelled_mismatched_executorch", False),
+        ("built_against_a_cpu_executorch", False),
+        ("built_against_a_cpu_executorch_whose_version_py_says_cuda", False),
+        ("built_against_a_cuda12_executorch", False),
         ("requires_torch_tensorrt", False),
         ("pins_torch", False),
         ("requires_no_tensorrt", False),
@@ -3295,6 +3306,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     # itself. So a fixture standing in for a correct build has to agree with the pins too.
     tensorrt_version = f'{_pin("__tensorrt_version__")}.99'
     cuda_runtime_version = f'{_pin("__cuda_version__")}.131'
+    cuda_major = _pin("__cuda_version__").split(".")[0]
 
     # ExecuTorch belongs here with the others. The checker reads each of these through
     # importlib.metadata, and the subprocess below runs with this directory ahead of site-packages,
@@ -3303,6 +3315,28 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     # an environment matching the pin, and why a change to the checker could reach CI with a green
     # local run behind it. The label is part of it because the checker compares the whole version.
     installed_executorch = f"{pin}+cu132"
+    if case == "built_against_a_cpu_executorch":
+        installed_executorch = f"{pin}+cpu"
+    elif case == "built_against_a_cpu_executorch_whose_version_py_says_cuda":
+        installed_executorch = f"{pin}+cpu"
+        (tmp_path / "executorch").mkdir()
+        (tmp_path / "executorch/version.py").write_text(
+            f'__version__ = "{pin}+cu132"\n'
+        )
+    elif case == "built_against_a_cuda12_executorch":
+        installed_executorch = f"{pin}+cu126"
+    elif "_built_against_unlabelled_" in case:
+        installed_executorch = pin
+        (tmp_path / "executorch").mkdir()
+        built_as = {"cpu": f"{pin}+cpu", "bare": pin, "mismatched": "0.0.1+cu132"}.get(
+            case.split("_")[-2], f"{pin}+cu132"
+        )
+        # The shape of the real file, where __version__ is not on the first line.
+        (tmp_path / "executorch/version.py").write_text(
+            "from typing import Optional\n"
+            '__all__ = ["__version__", "git_version"]\n'
+            f'__version__ = "{built_as}"\n'
+        )
     dependencies = {
         "executorch": installed_executorch,
         "tensorrt-cu13": tensorrt_version,
@@ -3531,6 +3565,21 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         ),
         "requires_no_tensorrt": "the build used tensorrt-cu13==",
         "requires_an_unpinned_cuda_runtime": "the build used nvidia-cuda-runtime==",
+        "labelled_wheel_built_against_unlabelled_executorch": "which has no label to require",
+        "pypi_release_built_against_unlabelled_cpu_executorch": (
+            f"+cpu), which is not a CUDA {cuda_major} build"
+        ),
+        "pypi_release_built_against_unlabelled_bare_executorch": (
+            f"records {pin}), which is not a CUDA {cuda_major} build"
+        ),
+        "pypi_release_built_against_unlabelled_mismatched_executorch": (
+            "version.py records 0.0.1+cu132, another version"
+        ),
+        "built_against_a_cpu_executorch": f"+cpu, which is not a CUDA {cuda_major} build",
+        "built_against_a_cpu_executorch_whose_version_py_says_cuda": (
+            f"+cpu, which is not a CUDA {cuda_major} build"
+        ),
+        "built_against_a_cuda12_executorch": f"+cu126, which is not a CUDA {cuda_major} build",
     }
     expected_message = expected_messages.get(case)
     if expected_message is not None:
