@@ -37,6 +37,13 @@ class ConvModel(torch.nn.Module):
         return torch.relu(self.conv(x))
 
 
+class _MaterializedCache:
+    def serialize(self):
+        import numpy as np
+
+        return np.arange(8, dtype=np.uint8)
+
+
 def _fresh_conv_model_and_inputs(seed=0):
     torch.manual_seed(seed)
     return ConvModel().eval().cuda(), [torch.randn(2, 3, 16, 16).cuda()]
@@ -397,6 +404,105 @@ class TestRuntimeCacheAutosave(TestCase):
 
         # Must not raise even though ref() is dead.
         _autosave_at_exit(ref)
+
+    @parameterized.expand(["python_empty", "python_with_data", "cpp"])
+    def test_gc_autosave_during_export_leaves_the_graph_unchanged(self, backing):
+        """The garbage collector can run ``__del__`` while another model is
+        being exported. The autosave must not add nodes to that model's graph
+        or change their "torch_fn" metadata, and a cache that holds data must
+        still be written. Without TensorRT-RTX, only the Python handle can be
+        given data here.
+        """
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _RuntimeCacheHandle,
+        )
+
+        if backing == "cpp" and not ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("C++ runtime is not available")
+
+        freed_while_traced = []
+        ref = None
+
+        class _CollectsWhileTraced(torch.nn.Module):
+            def forward(self, x):
+                was_alive = ref is not None and ref() is not None
+                gc.collect()
+                if was_alive:
+                    freed_while_traced.append(ref() is None)
+                # The empty Python handle's save also calls torch.empty, so a
+                # save that the tracer sees shifts this node's "torch_fn" label.
+                return x + torch.empty(2)
+
+        def _nodes(exported):
+            return [
+                (n.target, n.meta.get("torch_fn"))
+                for n in exported.graph.nodes
+                if n.op == "call_function"
+            ]
+
+        gc.collect()
+        expected = _nodes(
+            torch.export.export(_CollectsWhileTraced(), (torch.randn(2),))
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            if backing != "cpp":
+                handle._handle = _RuntimeCacheHandle(path=path)
+            if backing == "python_with_data":
+                handle._handle._cache = _MaterializedCache()
+            ref = weakref.ref(handle)
+            # Keep an automatic collection from freeing the handle before
+            # the one inside ``forward`` does.
+            gc_was_enabled = gc.isenabled()
+            gc.disable()
+            try:
+                # A reference cycle, so only the garbage collector can free it.
+                cycle = [handle, None]
+                cycle[1] = cycle
+                del handle, cycle
+                exported = torch.export.export(
+                    _CollectsWhileTraced(), (torch.randn(2),)
+                )
+            finally:
+                if gc_was_enabled:
+                    gc.enable()
+
+            self.assertEqual(freed_while_traced, [True])
+            self.assertEqual(_nodes(exported), expected)
+            if backing == "python_with_data":
+                with open(path, "rb") as f:
+                    self.assertEqual(f.read(), bytes(range(8)))
+
+    def test_autosave_inside_torch_func_writes_the_cache(self):
+        """A finalizer can also run inside a torch.func transform. A cache
+        that holds data must still be written there.
+        """
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _RuntimeCacheHandle,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            handle._handle = _RuntimeCacheHandle(path=path)
+            handle._handle._cache = _MaterializedCache()
+            holder = [handle]
+            del handle
+
+            def _frees_the_cache(x):
+                holder.clear()
+                return (x * x).sum()
+
+            torch.func.grad(_frees_the_cache)(torch.randn(2))
+
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), bytes(range(8)))
 
     def test_atexit_token_unregistered_after_del(self):
         """``__del__`` removes the handle's atexit hook so the registry does
