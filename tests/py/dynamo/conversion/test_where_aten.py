@@ -172,6 +172,18 @@ class TestWhereConverter(DispatchTestCase):
         condition = torch.tensor([[True, False, True, False]])
         self.run_test(Where(), (condition, x, y))
 
+    @parameterized.expand([("int64", torch.int64), ("int32", torch.int32)])
+    def test_int64_promotion(self, _, y_dtype):
+        # The int64 values are past the int32 range.
+        class Where(nn.Module):
+            def forward(self, condition, x, y):
+                return torch.ops.aten.where.self(condition, x, y)
+
+        condition = torch.tensor([True, False, True])
+        x = torch.tensor([2**32, 5, -(2**33)])
+        y = torch.tensor([1, -7, 3], dtype=y_dtype)
+        self.run_test(Where(), (condition, x, y), rtol=0, atol=0)
+
 
 class TestWhereBoolDtypePreservation(DispatchTestCase):
     def test_where_bool_bool_output_is_bool_not_int32(self):

@@ -30,6 +30,7 @@ class TestErfConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d_dim_dtype_int32", (2, 2), torch.int32, 0, 5),
+            ("2d_dim_dtype_int64", (2, 2), torch.int64, 0, 5),
             ("3d_dim_dtype_int32", (2, 2, 2), torch.int32, 0, 5),
         ]
     )

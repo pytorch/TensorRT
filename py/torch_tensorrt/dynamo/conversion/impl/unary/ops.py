@@ -40,7 +40,7 @@ def exp(
         TRTTensor: A TensorRT tensor represent the result of exp operator.
     """
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -83,7 +83,7 @@ def log(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -160,7 +160,7 @@ def sqrt(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -177,7 +177,7 @@ def recip(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -206,7 +206,7 @@ def sin(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -223,7 +223,7 @@ def cos(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -240,7 +240,7 @@ def tan(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -257,7 +257,7 @@ def sinh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -274,7 +274,7 @@ def cosh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -291,7 +291,7 @@ def asin(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -308,7 +308,7 @@ def acos(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -325,7 +325,7 @@ def atan(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -342,7 +342,7 @@ def asinh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -359,7 +359,7 @@ def acosh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -376,7 +376,7 @@ def atanh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -392,9 +392,18 @@ def ceil(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (trt.int32, trt.int64):
+        # A whole number stays the same, and float32 would round it past 2**24.
+        return impl.cast.to_copy(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_copy",
+            input_val,
+            input_val.dtype,
+            force_layer=True,
+        )
+    if isinstance(input_val, TRTTensor) and input_val.dtype == trt.int8:
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
@@ -409,9 +418,18 @@ def floor(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (trt.int32, trt.int64):
+        # A whole number stays the same, and float32 would round it past 2**24.
+        return impl.cast.to_copy(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_copy",
+            input_val,
+            input_val.dtype,
+            force_layer=True,
+        )
+    if isinstance(input_val, TRTTensor) and input_val.dtype == trt.int8:
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
@@ -508,9 +526,18 @@ def round(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (trt.int32, trt.int64):
+        # A whole number stays the same, and float32 would round it past 2**24.
+        return impl.cast.to_copy(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_copy",
+            input_val,
+            input_val.dtype,
+            force_layer=True,
+        )
+    if isinstance(input_val, TRTTensor) and input_val.dtype == trt.int8:
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
@@ -526,7 +553,7 @@ def isinf(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
@@ -560,7 +587,7 @@ def erf(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 

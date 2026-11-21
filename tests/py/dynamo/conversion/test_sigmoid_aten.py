@@ -59,6 +59,14 @@ class TestSigmoidConverter(DispatchTestCase):
             check_dtype=False,
         )
 
+    def test_sigmoid_int64(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.sigmoid.default(x)
+
+        inputs = [torch.randint(-5, 5, (2, 3), dtype=torch.int64)]
+        self.run_test(TestModule(), inputs)
+
 
 if __name__ == "__main__":
     run_tests()

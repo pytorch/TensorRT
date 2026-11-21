@@ -74,6 +74,16 @@ class TestFloorConverter(DispatchTestCase):
             check_dtype=False,
         )
 
+    @parameterized.expand([(torch.int32,), (torch.int64,)])
+    def test_floor_int_is_exact(self, dtype):
+        class floor(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.floor.default(input)
+
+        # float32 would round these.
+        inputs = [torch.tensor([2**25 + 1, -(2**25) - 3], dtype=dtype)]
+        self.run_test(floor(), inputs, rtol=0, atol=0)
+
 
 if __name__ == "__main__":
     run_tests()

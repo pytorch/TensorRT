@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -113,6 +114,115 @@ class TestSumConverter(DispatchTestCase):
             Sum(),
             inputs,
         )
+
+    @parameterized.expand(
+        [
+            ("all", None, False),
+            ("dim", 1, False),
+        ]
+    )
+    def test_sum_int32_accumulates_in_int64(self, _, dim, keep_dims):
+        # PyTorch sums integers in int64. This total is past 2**31, and its partial sums
+        # are past 2**24, where float32 rounds.
+        class Sum(nn.Module):
+            def forward(self, x):
+                if dim is None:
+                    return torch.ops.aten.sum.default(x)
+                return torch.ops.aten.sum.dim_IntList(x, [dim], keep_dims)
+
+        inputs = [torch.full((2, 4), 2**30 + 1, dtype=torch.int32)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    def test_sum_bool_accumulates_in_int64(self):
+        # The count is int64 in the engine too, so its square does not wrap.
+        class Sum(nn.Module):
+            def forward(self, x):
+                count = torch.ops.aten.sum.default(x)
+                return count * count
+
+        inputs = [torch.ones(70000, dtype=torch.bool)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("int32", torch.int32, torch.int32, 2**24 + 1, 4),
+            ("float", torch.float32, torch.float16, 1000.0, 4096),
+        ]
+    )
+    def test_sum_dtype(self, _, dtype, input_dtype, value, size):
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.sum.default(x, dtype=dtype)
+
+        inputs = [torch.full((2, size // 2), value, dtype=input_dtype)]
+        self.run_test(Sum(), inputs, rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("int8_dtype", torch.int32, torch.int8, False),
+            ("int8_input", torch.int8, None, False),
+            ("float64_from_int32", torch.int32, torch.float64, True),
+        ]
+    )
+    def test_sum_refused_types_run_in_pytorch(
+        self, _, input_dtype, dtype, truncate_double
+    ):
+        # The validator keeps an int8 input or result, and a float64 result from int32,
+        # in PyTorch.
+        class Sum(nn.Module):
+            def forward(self, x):
+                return torch.sum(x, dtype=dtype)
+
+        model = Sum().eval().cuda()
+        x = torch.full((300,), 100, dtype=input_dtype, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            truncate_double=truncate_double,
+        )
+        self.assertFalse(
+            any("_run_on_acc" in name for name, _ in compiled.named_children())
+        )
+        torch.testing.assert_close(compiled(x), model(x))
+
+    @parameterized.expand(
+        [
+            ("sum_int32", lambda x: torch.sum(x.int())),
+            ("prod_float", lambda x: x.float().prod()),
+        ]
+    )
+    def test_reduce_of_cast_int8_runs_in_pytorch(self, _, reduce):
+        # TensorRT cannot reduce an int8 engine input after a cast either.
+        class Reduce(nn.Module):
+            def forward(self, x):
+                return reduce(x)
+
+        model = Reduce().eval().cuda()
+        x = torch.tensor([[-56, 100, 3], [44, -1, 2]], dtype=torch.int8, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1
+        )
+        names = [name for name, _ in compiled.named_children()]
+        self.assertTrue(any("_run_on_gpu" in name for name in names))
+        torch.testing.assert_close(compiled(x), model(x))
+
+    def test_reduce_of_data_gathered_by_int8_index_runs_in_tensorrt(self):
+        # The int8 value is only the index here, so TensorRT can reduce the data.
+        class Reduce(nn.Module):
+            def forward(self, x, i):
+                return x.index_select(0, i.to(torch.int8).long()).sum()
+
+        model = Reduce().eval().cuda()
+        x = torch.randn(5, 3, device="cuda")
+        i = torch.tensor([4, 0, 2], dtype=torch.int32, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x, i)),
+            arg_inputs=[x, i],
+            min_block_size=1,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(compiled(x, i), model(x, i))
 
 
 class TestPrimsSumConverter(DispatchTestCase):
