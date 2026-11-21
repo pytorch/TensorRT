@@ -167,3 +167,48 @@ def _(
     offs: torch.Tensor,
 ) -> torch.Tensor:
     return mat1.new_empty((mat1.shape[0], weight.shape[1]))
+
+
+# Each row multiplied by the expert its index names; equal to batching the selected dequantized weights.
+@torch.library.custom_op("tensorrt::gather_mm_nvfp4", mutates_args=())  # type: ignore[misc]
+def gather_mm_nvfp4(
+    mat1: torch.Tensor,
+    weight: torch.Tensor,
+    weight_scale: torch.Tensor,
+    weight_scale_2: torch.Tensor,
+    index: torch.Tensor,
+) -> torch.Tensor:
+    mat2 = dequantize_nvfp4_experts(weight, weight_scale, weight_scale_2, mat1.dtype)
+    return torch.bmm(mat2[index], mat1.unsqueeze(-1)).squeeze(-1)
+
+
+@gather_mm_nvfp4.register_fake  # type: ignore[misc]
+def _(
+    mat1: torch.Tensor,
+    weight: torch.Tensor,
+    weight_scale: torch.Tensor,
+    weight_scale_2: torch.Tensor,
+    index: torch.Tensor,
+) -> torch.Tensor:
+    return mat1.new_empty((mat1.shape[0], weight.shape[1]))
+
+
+@torch.library.custom_op("tensorrt::gather_mm_mxfp8", mutates_args=())  # type: ignore[misc]
+def gather_mm_mxfp8(
+    mat1: torch.Tensor,
+    weight: torch.Tensor,
+    weight_scale: torch.Tensor,
+    index: torch.Tensor,
+) -> torch.Tensor:
+    mat2 = dequantize_mxfp8_experts(weight, weight_scale, mat1.dtype)
+    return torch.bmm(mat2[index], mat1.unsqueeze(-1)).squeeze(-1)
+
+
+@gather_mm_mxfp8.register_fake  # type: ignore[misc]
+def _(
+    mat1: torch.Tensor,
+    weight: torch.Tensor,
+    weight_scale: torch.Tensor,
+    index: torch.Tensor,
+) -> torch.Tensor:
+    return mat1.new_empty((mat1.shape[0], weight.shape[1]))

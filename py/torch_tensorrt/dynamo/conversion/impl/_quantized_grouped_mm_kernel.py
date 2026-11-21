@@ -3,9 +3,10 @@
 
 """Grouped matrix multiply kernels that read NVFP4 or MXFP8 expert weights, as TensorRT plugins.
 
-They compute ``tensorrt.grouped_mm_nvfp4`` and ``tensorrt.grouped_mm_mxfp8``: each
-row is multiplied only by its own group's weight, dequantized on the fly, so a
-decode step reads 4 or 8 bits per weight instead of 16. One program computes one
+They compute ``tensorrt.grouped_mm_{nvfp4,mxfp8}`` (rows grouped by offsets) and
+``tensorrt.gather_mm_{nvfp4,mxfp8}`` (each row names its group): each row is
+multiplied only by its own group's weight, dequantized on the fly, so a decode step
+reads 4 or 8 bits per weight instead of 16. One program computes one
 row against a block of output columns. That suits the few rows per group of
 decoding, where reading the weights is the whole cost; at many rows per group each
 row reads its group's weights again.
@@ -25,8 +26,12 @@ import triton
 import triton.language as tl
 from torch_tensorrt.kernels import _common, _triton
 
-NVFP4_PLUGIN_NAME = "torch_tensorrt::grouped_mm_nvfp4"
-MXFP8_PLUGIN_NAME = "torch_tensorrt::grouped_mm_mxfp8"
+PLUGIN_NAMES = {
+    (True, False): "torch_tensorrt::grouped_mm_nvfp4",
+    (False, False): "torch_tensorrt::grouped_mm_mxfp8",
+    (True, True): "torch_tensorrt::gather_mm_nvfp4",
+    (False, True): "torch_tensorrt::gather_mm_mxfp8",
+}
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,6 +99,7 @@ def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
     GROUPS_POW2: tl.constexpr,
     BLOCK_N: tl.constexpr,
     BLOCK_K: tl.constexpr,
+    INDEXED: tl.constexpr,
 ):
     pid = tl.program_id(0)
     tiles_n: tl.constexpr = (N + BLOCK_N - 1) // BLOCK_N
@@ -102,8 +108,12 @@ def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
     col_mask = cols < N
     if row >= M:
         return
-    group = _row_group(offs_ptr, row, GROUPS, GROUPS_POW2)
-    if group >= GROUPS:
+    if INDEXED:
+        # offs_ptr holds each row's group index (gather_mm) rather than group offsets (grouped_mm).
+        group = tl.load(offs_ptr + row).to(tl.int32)
+    else:
+        group = _row_group(offs_ptr, row, GROUPS, GROUPS_POW2)
+    if group >= GROUPS or group < 0:
         # Rows past the last offset belong to no group. Zero them, as the dense
         # lowering does, so the output never keeps stale memory.
         tl.store(
@@ -177,6 +187,7 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
     GROUPS_POW2: tl.constexpr,
     BLOCK_N: tl.constexpr,
     BLOCK_K: tl.constexpr,
+    INDEXED: tl.constexpr,
 ):
     pid = tl.program_id(0)
     tiles_n: tl.constexpr = (N + BLOCK_N - 1) // BLOCK_N
@@ -185,8 +196,12 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
     col_mask = cols < N
     if row >= M:
         return
-    group = _row_group(offs_ptr, row, GROUPS, GROUPS_POW2)
-    if group >= GROUPS:
+    if INDEXED:
+        # offs_ptr holds each row's group index (gather_mm) rather than group offsets (grouped_mm).
+        group = tl.load(offs_ptr + row).to(tl.int32)
+    else:
+        group = _row_group(offs_ptr, row, GROUPS, GROUPS_POW2)
+    if group >= GROUPS or group < 0:
         tl.store(
             c_ptr + row.to(tl.int64) * N + cols,
             tl.zeros((BLOCK_N,), dtype=c_ptr.dtype.element_ty),
@@ -232,18 +247,22 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
     )
 
 
-def _signature(pointer: str, nvfp4: bool) -> Dict[str, str]:
+def _signature(pointer: str, nvfp4: bool, indexed: bool) -> Dict[str, str]:
     signature = {"a_ptr": pointer, "w_ptr": "*i32", "s_ptr": "*i32"}
     if nvfp4:
         signature["gs_ptr"] = "*fp32"
-    signature.update({"offs_ptr": "*i32", "M": "i32", "c_ptr": pointer})
+    signature.update(
+        {"offs_ptr": "*i32", "M": "i32", "c_ptr": pointer}
+    )
     return signature
 
 
-def compile_kernel(pointer: str, nvfp4: bool, groups: int, k: int, n: int) -> Any:
+def compile_kernel(
+    pointer: str, nvfp4: bool, groups: int, k: int, n: int, indexed: bool = False
+) -> Any:
     """The kernel's PTX for the current GPU. Raises when it cannot be built for a plugin launch."""
     capability = triton.runtime.driver.active.get_current_target().arch
-    kernel = _compile_for(pointer, nvfp4, groups, k, n, capability)
+    kernel = _compile_for(pointer, nvfp4, groups, k, n, capability, indexed)
     if kernel is None:
         raise RuntimeError(
             "the quantized grouped GEMM kernel does not build for this shape"
@@ -253,13 +272,19 @@ def compile_kernel(pointer: str, nvfp4: bool, groups: int, k: int, n: int) -> An
 
 @functools.lru_cache(maxsize=None)
 def _compile_for(
-    pointer: str, nvfp4: bool, groups: int, k: int, n: int, capability: int
+    pointer: str,
+    nvfp4: bool,
+    groups: int,
+    k: int,
+    n: int,
+    capability: int,
+    indexed: bool,
 ) -> Optional[Any]:
     try:
         block_n, block_k = _TILE
         artifact = _triton.compile_triton_to_ptx(
             _grouped_mm_nvfp4_kernel if nvfp4 else _grouped_mm_mxfp8_kernel,
-            _signature(pointer, nvfp4),
+            _signature(pointer, nvfp4, indexed),
             {
                 "N": n,
                 "K": k,
@@ -267,6 +292,7 @@ def _compile_for(
                 "GROUPS_POW2": triton.next_power_of_2(groups),
                 "BLOCK_N": block_n,
                 "BLOCK_K": block_k,
+                "INDEXED": indexed,
             },
             num_warps=_NUM_WARPS,
             num_stages=1,
@@ -300,13 +326,15 @@ def _describe(
 
 
 def _aot(
-    nvfp4: bool, mat1: trtp.TensorDesc, weight: trtp.TensorDesc, offs: trtp.TensorDesc
+    nvfp4: bool, indexed: bool, mat1: trtp.TensorDesc, weight: trtp.TensorDesc
 ) -> Tuple[
     Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
 ]:
     groups, n = (_common.constant_int(dim) for dim in weight.shape_expr[:2])
     k = _common.constant_int(mat1.shape_expr[1])
-    artifact = compile_kernel("*" + _TRITON_DTYPES[mat1.dtype], nvfp4, groups, k, n)
+    artifact = compile_kernel(
+        "*" + _TRITON_DTYPES[mat1.dtype], nvfp4, groups, k, n, indexed
+    )
     params = trtp.KernelLaunchParams(
         grid_x=mat1.shape_expr[0] * triton.cdiv(n, _TILE[0]),
         grid_y=1,
@@ -321,7 +349,12 @@ def _aot(
     return artifact.kernel_name, artifact.ptx, params, extra_args
 
 
-def _aot_nvfp4(
+_AotResult = Tuple[
+    Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
+]
+
+
+def _aot_grouped_nvfp4(
     mat1: trtp.TensorDesc,
     weight: trtp.TensorDesc,
     scale: trtp.TensorDesc,
@@ -329,26 +362,55 @@ def _aot_nvfp4(
     offs: trtp.TensorDesc,
     outputs: Tuple[trtp.TensorDesc],
     tactic: int,
-) -> Tuple[
-    Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
-]:
-    return _aot(True, mat1, weight, offs)
+) -> _AotResult:
+    return _aot(True, False, mat1, weight)
 
 
-def _aot_mxfp8(
+def _aot_grouped_mxfp8(
     mat1: trtp.TensorDesc,
     weight: trtp.TensorDesc,
     scale: trtp.TensorDesc,
     offs: trtp.TensorDesc,
     outputs: Tuple[trtp.TensorDesc],
     tactic: int,
-) -> Tuple[
-    Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
-]:
-    return _aot(False, mat1, weight, offs)
+) -> _AotResult:
+    return _aot(False, False, mat1, weight)
 
 
-def _describe_mxfp8(
+def _aot_gather_nvfp4(
+    mat1: trtp.TensorDesc,
+    weight: trtp.TensorDesc,
+    scale: trtp.TensorDesc,
+    scale_2: trtp.TensorDesc,
+    index: trtp.TensorDesc,
+    outputs: Tuple[trtp.TensorDesc],
+    tactic: int,
+) -> _AotResult:
+    return _aot(True, True, mat1, weight)
+
+
+def _aot_gather_mxfp8(
+    mat1: trtp.TensorDesc,
+    weight: trtp.TensorDesc,
+    scale: trtp.TensorDesc,
+    index: trtp.TensorDesc,
+    outputs: Tuple[trtp.TensorDesc],
+    tactic: int,
+) -> _AotResult:
+    return _aot(False, True, mat1, weight)
+
+
+def _describe_grouped_nvfp4(
+    mat1: trtp.TensorDesc,
+    weight: trtp.TensorDesc,
+    scale: trtp.TensorDesc,
+    scale_2: trtp.TensorDesc,
+    offs: trtp.TensorDesc,
+) -> trtp.TensorDesc:
+    return _describe(mat1, weight)
+
+
+def _describe_grouped_mxfp8(
     mat1: trtp.TensorDesc,
     weight: trtp.TensorDesc,
     scale: trtp.TensorDesc,
@@ -357,27 +419,42 @@ def _describe_mxfp8(
     return _describe(mat1, weight)
 
 
-def _describe_nvfp4(
+def _describe_gather_nvfp4(
     mat1: trtp.TensorDesc,
     weight: trtp.TensorDesc,
     scale: trtp.TensorDesc,
     scale_2: trtp.TensorDesc,
-    offs: trtp.TensorDesc,
+    index: trtp.TensorDesc,
 ) -> trtp.TensorDesc:
     return _describe(mat1, weight)
 
 
-def plugins() -> Tuple[Any, Any]:
-    """The NVFP4 and MXFP8 plugins, registered with TensorRT on first use."""
+def _describe_gather_mxfp8(
+    mat1: trtp.TensorDesc,
+    weight: trtp.TensorDesc,
+    scale: trtp.TensorDesc,
+    index: trtp.TensorDesc,
+) -> trtp.TensorDesc:
+    return _describe(mat1, weight)
+
+
+_CALLBACKS = {
+    (True, False): (_describe_grouped_nvfp4, _aot_grouped_nvfp4),
+    (False, False): (_describe_grouped_mxfp8, _aot_grouped_mxfp8),
+    (True, True): (_describe_gather_nvfp4, _aot_gather_nvfp4),
+    (False, True): (_describe_gather_mxfp8, _aot_gather_mxfp8),
+}
+
+
+def plugin(nvfp4: bool, indexed: bool) -> Any:
+    """The plugin for one weight format and row-to-group form, registered with TensorRT on first use."""
     global _registered
     with _lock:
         if not _registered:
-            trtp.register(NVFP4_PLUGIN_NAME)(_describe_nvfp4)
-            trtp.aot_impl(NVFP4_PLUGIN_NAME)(_aot_nvfp4)
-            trtp.register(MXFP8_PLUGIN_NAME)(_describe_mxfp8)
-            trtp.aot_impl(MXFP8_PLUGIN_NAME)(_aot_mxfp8)
+            for key, (describe, aot) in _CALLBACKS.items():
+                trtp.register(PLUGIN_NAMES[key])(describe)
+                trtp.aot_impl(PLUGIN_NAMES[key])(aot)
             _registered = True
-    return (
-        trtp.op.torch_tensorrt.grouped_mm_nvfp4,
-        trtp.op.torch_tensorrt.grouped_mm_mxfp8,
+    return getattr(
+        trtp.op.torch_tensorrt, PLUGIN_NAMES[(nvfp4, indexed)].split("::")[1]
     )

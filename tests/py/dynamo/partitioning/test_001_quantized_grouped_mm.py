@@ -88,6 +88,20 @@ class Experts(torch.nn.Module):
         )
 
 
+class BatchedExperts(Experts):
+    """The same experts, each row batched with its own selected weight (no grouping by expert).
+
+    The row's expert comes from an argmax inside the engine, which makes int32 indices there.
+    """
+
+    def forward(self, x, scores):
+        index = scores.argmax(-1)
+        h = torch.bmm(self.weight("up")[index], x.unsqueeze(-1)).squeeze(-1)
+        return torch.bmm(
+            self.weight("down")[index], torch.relu(h).unsqueeze(-1)
+        ).squeeze(-1)
+
+
 def _offsets(counts):
     return torch.cumsum(torch.tensor(counts), 0).to(torch.int32).cuda()
 
@@ -183,6 +197,25 @@ class TestQuantizedGroupedMMKernel(TestCase):
         self.assertTrue(bool((out[grouped:] == 0).all()))
         # Both sides round the weights to the same bfloat16 values; only the summation order differs.
         out, expected = out[:grouped], expected[:grouped]
+        torch.testing.assert_close(
+            out, expected, rtol=2e-2, atol=2e-2 * expected.abs().max().item()
+        )
+
+    @parameterized.expand([("nvfp4", "nvfp4", 128, 256), ("mxfp8", "mxfp8", 256, 128)])
+    def test_gather_form_matches_pytorch(self, _, fmt, k, n):
+        torch.manual_seed(0)
+        groups = 8
+        model = BatchedExperts(fmt, groups, k, n).cuda().eval()
+        index = torch.tensor([5, 1, 7, 1, 0, 3, 3, 6], device="cuda")
+        scores = torch.nn.functional.one_hot(index, groups).to(torch.bfloat16)
+        x = torch.randn(index.shape[0], k, dtype=torch.bfloat16, device="cuda")
+        with torch.no_grad(), _kernel_spy() as spy:
+            compiled = self._compile(model, [x, scores], grouped_mm_kernel=True)
+            out = compiled(x, scores)
+            expected = model(x, scores)
+        self.assertEqual(spy.call_count, 2)
+        self.assertTrue(all(call.kwargs["indexed"] for call in spy.call_args_list))
+        self.assertEqual(_in_pytorch(compiled), [])
         torch.testing.assert_close(
             out, expected, rtol=2e-2, atol=2e-2 * expected.abs().max().item()
         )
