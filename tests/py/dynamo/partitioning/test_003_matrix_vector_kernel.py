@@ -10,6 +10,29 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.conversion import aten_ops_converters, impl
 
 
+class Projections(torch.nn.Module):
+    """Three projections of one input, then an output projection, run three times
+    with the same weights like a looped layer. The biased projection is not merged."""
+
+    def __init__(self):
+        super().__init__()
+        self.q = torch.nn.Linear(256, 384, bias=False)
+        self.k = torch.nn.Linear(256, 128, bias=False)
+        self.g = torch.nn.Linear(256, 384, bias=False)
+        self.b = torch.nn.Linear(256, 8, bias=True)
+        self.o = torch.nn.Linear(384, 256, bias=False)
+
+    def forward(self, x):
+        for _ in range(3):
+            q = self.q(x) * torch.sigmoid(self.g(x))
+            x = (
+                x
+                + self.o(q * self.k(x).repeat(1, 1, 3))
+                + self.b(x).mean(-1, keepdim=True)
+            )
+        return x
+
+
 def _kernel_spy():
     return mock.patch.object(
         impl.linear, "matrix_vector_kernel", wraps=impl.linear.matrix_vector_kernel
@@ -56,6 +79,15 @@ class TestMatrixVectorKernel(TestCase):
             None if model.bias is None else model.bias.float(),
         )
         torch.testing.assert_close(out.float(), expected, rtol=1e-2, atol=1e-2)
+
+    def test_merges_projections_of_one_input(self):
+        torch.manual_seed(0)
+        model = Projections().to("cuda", torch.bfloat16).eval()
+        x = torch.randn(1, 1, 256, dtype=torch.bfloat16, device="cuda") * 0.5
+        out, calls = _compile(model, x)
+        # Per pass: one merged call for q, k and g, one for the biased b, one for o.
+        self.assertEqual(calls, 9)
+        torch.testing.assert_close(out, model(x), rtol=2e-2, atol=2e-2)
 
     @parameterized.expand(
         [
