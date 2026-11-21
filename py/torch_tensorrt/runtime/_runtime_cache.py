@@ -376,7 +376,19 @@ class RuntimeCache:
         try:
             if self.autosave_on_del and self.path:
                 self.autosave_on_del = False
-                self.save()
+                # The garbage collector can run this at any time, for example
+                # while another model is being exported or inside a torch.func
+                # transform. Disabling torch dispatch keeps the save out of the
+                # exported graph, disabling torch function keeps that graph's
+                # "torch_fn" labels unchanged, and disabling functorch keeps
+                # the save working under torch.func. All three are
+                # thread-local, so tracing on another thread is not affected.
+                with (
+                    torch._C._DisableTorchDispatch(),
+                    torch._C.DisableTorchFunction(),
+                    torch._C._DisableFuncTorch(),
+                ):
+                    self.save()
         except Exception:
             pass
 
