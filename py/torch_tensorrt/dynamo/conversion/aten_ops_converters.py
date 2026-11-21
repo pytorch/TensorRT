@@ -2371,9 +2371,21 @@ def to_copy_dtype_validator(
             torch.int64,
             torch.bool,
             torch.int8,
+            torch.uint8,
             torch.float16,
             torch.bfloat16,
         }
+
+        source_meta = getattr(to_copy_node.args[0], "meta", {}).get("val")
+        if to_copy_node.kwargs.get("dtype") == torch.uint8 and (
+            getattr(source_meta, "dtype", None) not in impl.cast.UINT8_CAST_SOURCES
+            or _cast_or_moved_from_int8(to_copy_node.args[0])
+        ):
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node}: no cast to uint8 "
+                f"from {getattr(source_meta, 'dtype', None)} or from an int8 value"
+            )
+            return False
 
         # Validate input node has convertible kwargs
         if "dtype" in to_copy_node.kwargs:
@@ -2433,6 +2445,9 @@ def aten_ops_clone_copy_dtype(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # The validator lets a cast to uint8 through only from impl.cast.UINT8_CAST_SOURCES.
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     return impl.cast.to_copy(
         ctx,
         target,
@@ -2543,6 +2558,8 @@ def aten_ops_clone_copy_placeholder(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     # For clone or copy nodes where the input is also the output,
     # we need to force cast to ensure a layer is added to the TRT engine
     # since TRT engine inputs cannot also be TRT engine outputs
