@@ -6,7 +6,6 @@ from __future__ import annotations
 import ctypes
 import functools
 import gc
-import importlib.util
 import logging
 import os
 import platform
@@ -1114,13 +1113,18 @@ def trim_host_heap() -> None:
 def is_quantized_by_modelopt(model: torch.nn.Module) -> bool:
     """
     Check if the model has been quantized by NVIDIA ModelOpt library.
-    If ModelOpt is installed, use its function to check if the model is quantized.
+    If ModelOpt's TensorQuantizer class is loaded, look for its instances, as ModelOpt's own is_quantized does.
     Otherwise, do name/module-string checks. A caveat is that it can break if ModelOpt renames things.
     """
-    if importlib.util.find_spec("modelopt") is not None:
-        from modelopt.torch.quantization.utils import is_quantized
-
-        return bool(is_quantized(model))
+    # Never import ModelOpt here: on PyTorch builds it does not support, the import raises.
+    # A model can only hold quantizers whose class is already loaded.
+    tensor_quantizer = getattr(
+        sys.modules.get("modelopt.torch.quantization.nn"),
+        "TensorQuantizer",
+        None,
+    )
+    if tensor_quantizer is not None:
+        return any(isinstance(m, tensor_quantizer) for m in model.modules())
 
     for m in model.modules():
         cls = type(m)
