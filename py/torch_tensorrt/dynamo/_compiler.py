@@ -89,6 +89,7 @@ from torch_tensorrt.dynamo.runtime._offloaded_engines import (
 from torch_tensorrt.dynamo.tools.weight_mapping import has_mapped_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    extract_var_range_info,
     get_cpu_memory_usage,
     get_flat_args_with_check,
     get_output_metadata,
@@ -1216,9 +1217,14 @@ def _build_user_symbol_bounds(
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
-) -> Dict[sympy.Symbol, Tuple[int, int]]:
-    """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
-    fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
+) -> Dict[sympy.Symbol, Tuple[int, int, Optional[int]]]:
+    """Map ``sympy.Symbol -> (min, max, opt)`` from dynamic ``Input``s, used to
+    fill ``Dim.DYNAMIC`` upper bounds and set the profile's opt without
+    mutating ``ShapeEnv``. ``opt`` is ``None`` for an ``opt_shape`` value that
+    is missing or does not fit ``[min_shape, max_shape]``, and for every symbol
+    if any input uses ``Input(profiles=...)``, whose per-profile opts are
+    applied separately, or if a shape guard of the exported program does not
+    provably hold at the opts.
 
     Validates against finite exporter bounds: ``user_max > exp_max`` and
     ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
@@ -1259,7 +1265,12 @@ def _build_user_symbol_bounds(
                 if name in sample_kwarg_inputs:
                     flat_inputs.append(sample_kwarg_inputs[name])
 
-    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int, Optional[int]]] = {}
+    shape_env: Any = None
+    # The guard check below cannot see the opts of later profiles.
+    has_profiles = any(isinstance(inp, Input) and inp.profiles for inp in flat_inputs)
+    derived_opts: List[Tuple[str, int, torch.SymInt, int]] = []
+    symbol_dims: Dict[sympy.Symbol, torch.SymInt] = {}
 
     for node, inp in zip(placeholders, flat_inputs):
         if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
@@ -1269,6 +1280,7 @@ def _build_user_symbol_bounds(
             continue
 
         min_shape = inp.shape["min_shape"]
+        opt_shape = inp.shape["opt_shape"]
         max_shape = inp.shape["max_shape"]
 
         if len(fake_val.size()) != len(min_shape):
@@ -1302,17 +1314,50 @@ def _build_user_symbol_bounds(
                     d,
                     expr,
                 )
-                continue
-            if expr in user_symbol_bounds:
+                if not has_profiles and d < len(opt_shape):
+                    derived_opts.append((node.target, d, dim, opt_shape[d]))
                 continue
             user_min = int(min_shape[d])
             user_max = int(max_shape[d])
-            user_symbol_bounds[expr] = (user_min, user_max)
+            user_opt = None
+            if not has_profiles:
+                if d < len(opt_shape) and user_min <= opt_shape[d] <= user_max:
+                    user_opt = int(opt_shape[d])
+                else:
+                    logger.warning(
+                        "Input '%s' dim %d: opt_shape %s does not fit min_shape %s "
+                        "and max_shape %s, so it is ignored for this dimension.",
+                        node.target,
+                        d,
+                        opt_shape,
+                        min_shape,
+                        max_shape,
+                    )
+            if expr in user_symbol_bounds:
+                if user_symbol_bounds[expr] != (user_min, user_max, user_opt):
+                    logger.warning(
+                        "Input '%s' dim %d shares dynamic dimension '%s' with an "
+                        "earlier dimension but declares (min, max, opt) = %s; "
+                        "using the first declaration %s.",
+                        node.target,
+                        d,
+                        expr,
+                        (
+                            user_min,
+                            user_max,
+                            opt_shape[d] if d < len(opt_shape) else None,
+                        ),
+                        user_symbol_bounds[expr],
+                    )
+                continue
+            user_symbol_bounds[expr] = (user_min, user_max, user_opt)
+            symbol_dims[expr] = dim
             logger.debug(
-                "Recorded user-supplied bounds for %s: [%d, %d]",
+                "Recorded user-supplied bounds for %s: [%d, %d], opt %s",
                 expr,
                 user_min,
                 user_max,
+                user_opt,
             )
 
             # The exported program may already bound this symbol to a finite
@@ -1394,6 +1439,83 @@ def _build_user_symbol_bounds(
                 exp_max,
             )
 
+    # An opt equal to the export example gives the profile the engine gets
+    # without opt_shape, so it cannot be what breaks the build.
+    example = (
+        {}
+        if shape_env is None
+        else getattr(shape_env, "backed_var_to_val", None) or shape_env.var_to_val
+    )
+    user_opts = {
+        sym: opt
+        for sym, (_, _, opt) in user_symbol_bounds.items()
+        if opt is not None and opt != example.get(sym)
+    }
+    for target, d, dim, opt in derived_opts:
+        try:
+            derived_opt = extract_var_range_info(dim, user_symbol_bounds).get("opt")
+        except Exception:
+            derived_opt = None
+        if derived_opt != opt:
+            logger.warning(
+                "Input '%s' dim %d is derived from other dimensions (%s), so its "
+                "opt_shape value %d is ignored.",
+                target,
+                d,
+                dim.node.expr,
+                opt,
+            )
+    if user_opts and shape_env is not None:
+        # TensorRT checks the model's shape rules at opt, so an opt that breaks
+        # a guard (e.g. divisible by 4 for a reshape) fails the engine build. A
+        # guard that cannot be evaluated at the opts (a division by 0, or a
+        # data-dependent size) is treated as broken. PyTorch traces sizes as
+        # if they were never 0 or 1, which adds guards such as batch != 1 or
+        # rows**2 >= 2 that are not shape rules of an op, so such a guard that
+        # is already false at the engine's min or max (e.g. min 1) is skipped.
+        values = {**example, **user_opts}
+        ranges = {
+            sym: extract_var_range_info(dim, user_symbol_bounds)
+            for sym, dim in symbol_dims.items()
+        }
+        ends = [
+            {**values, **{sym: r[k] for sym, r in ranges.items() if r[k] is not None}}
+            for k in ("min", "max")
+        ]
+
+        def evaluate(rule: Any, at: Dict[sympy.Symbol, Any]) -> Any:
+            try:
+                return rule.xreplace(at)
+            except Exception:
+                return None
+
+        def assumes_not_one(rule: Any) -> bool:
+            rule = getattr(rule, "canonical", rule)
+            return (
+                (isinstance(rule, sympy.Ne) and rule.rhs == 1)
+                or (isinstance(rule, sympy.Ge) and rule.rhs == 2)
+                or (isinstance(rule, sympy.Gt) and rule.rhs == 1)
+            )
+
+        for rule in shape_env.get_axioms():
+            rule = shape_env.replace(rule)
+            if not rule.free_symbols & user_opts.keys():
+                continue
+            if evaluate(rule, values) != sympy.true and not (
+                assumes_not_one(rule)
+                and any(evaluate(rule, at) == sympy.false for at in ends)
+            ):
+                logger.warning(
+                    "Input.opt_shape breaks or cannot be checked against the "
+                    "exported program's shape guard %s, so every dimension "
+                    "keeps the export example's opt.",
+                    rule,
+                )
+                return {
+                    sym: (lo, hi, None)
+                    for sym, (lo, hi, _) in user_symbol_bounds.items()
+                }
+
     return user_symbol_bounds
 
 
@@ -1463,7 +1585,7 @@ def compile_module(
             "is incompatible with require_full_compilation=True; enable only one."
         )
 
-    # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
+    # Forwarded to the partitioner to bound dynamic dims and set the opt.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
     # graph_signature is None on the torch.compile path, which has no ExportedProgram.
     user_symbol_bounds = (

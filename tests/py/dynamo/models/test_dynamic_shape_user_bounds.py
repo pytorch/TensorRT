@@ -15,8 +15,14 @@ import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._compiler import _build_user_symbol_bounds
-from torch_tensorrt.dynamo.partitioning.common import construct_dynamic_input
+from torch_tensorrt.dynamo.partitioning.common import (
+    construct_dynamic_input,
+    construct_submodule_inputs,
+)
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import extract_var_range_info
+
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 assertions = unittest.TestCase()
 
@@ -33,6 +39,35 @@ def _first_sym_placeholder(ep: torch.export.ExportedProgram, sym_dim: int = 0):
         if sym_dim < len(val.size()) and isinstance(val.size()[sym_dim], torch.SymInt):
             return val, val.size()[sym_dim]
     return None, None
+
+
+def _engine_profiles(trt_mod: torch.nn.Module) -> dict:
+    """``{input name: (min, opt, max)}`` of the single engine in ``trt_mod``."""
+    plans = [
+        m.serialized_engine
+        for _, m in trt_mod.named_modules()
+        if isinstance(m, TorchTensorRTModule)
+    ]
+    assert len(plans) == 1, plans
+    engine = trt.Runtime(trt.Logger(trt.Logger.WARNING)).deserialize_cuda_engine(
+        plans[0]
+    )
+    names = [engine.get_tensor_name(i) for i in range(engine.num_io_tensors)]
+    return {
+        name: tuple(tuple(s) for s in engine.get_tensor_profile_shape(name, 0))
+        for name in names
+        if engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT
+    }
+
+
+class _Reshape(torch.nn.Module):
+    def forward(self, x):
+        return x.reshape(-1, 4, 8) * 2
+
+
+class _CatAdd(torch.nn.Module):
+    def forward(self, x, y):
+        return torch.cat([x, x]) + y
 
 
 class _SmallLinear(torch.nn.Module):
@@ -100,12 +135,16 @@ def test_extract_var_range_info_fills_unbounded_max_from_user():
 
     assert extract_var_range_info(sym_dim)["max"] is None
 
-    info_with_user = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 8)})
+    info_with_user = extract_var_range_info(
+        sym_dim, user_symbol_bounds={expr: (1, 8, None)}
+    )
     assert info_with_user["max"] == 8
     assert info_with_user["min"] == 1
 
     # Different map on the same SymInt must return the new bounds (no caching).
-    info_wider = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16)})
+    info_wider = extract_var_range_info(
+        sym_dim, user_symbol_bounds={expr: (1, 16, None)}
+    )
     assert info_wider["max"] == 16
     assert info_wider["min"] == 1
 
@@ -130,7 +169,7 @@ def test_extract_var_range_info_does_not_widen_lower_bound():
     assert sym_dim is not None
     expr = sym_dim.node.expr
 
-    info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (0, 8)})
+    info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (0, 8, None)})
     assert info["min"] == 1, "exporter lower must not be widened to user's 0"
     assert info["max"] == 8
 
@@ -151,7 +190,7 @@ def test_extract_var_range_info_does_not_override_finite_max():
     assert sym_dim is not None
     expr = sym_dim.node.expr
 
-    info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16)})
+    info = extract_var_range_info(sym_dim, user_symbol_bounds={expr: (1, 16, None)})
     assert info["max"] == 4
 
 
@@ -224,9 +263,9 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
         ep.module(), [dynamic_input], {}, ep.graph_signature
     )
     assert len(bounds) == 1
-    ((sym, (lo, hi)),) = bounds.items()
+    ((sym, (lo, hi, opt)),) = bounds.items()
     assert isinstance(sym, sympy.Symbol)
-    assert (lo, hi) == (1, 8)
+    assert (lo, hi, opt) == (1, 8, 4)
 
     # Static input -> empty map.
     static_input = Input(shape=(2, 8), dtype=torch.float32)
@@ -392,6 +431,7 @@ def test_build_user_symbol_bounds_narrows_to_user_on_subset(caplog):
     info = extract_var_range_info(sym_dim, user_symbol_bounds=bounds)
     assert info["min"] == 12, info
     assert info["max"] == 18, info
+    assert info["opt"] == 15, info
 
 
 @pytest.mark.unit
@@ -471,9 +511,9 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         ep.module(), [tensor_input, scalar_input], {}, ep.graph_signature
     )
     assert len(bounds) == 1, bounds
-    ((sym, (lo, hi)),) = bounds.items()
+    ((sym, (lo, hi, opt)),) = bounds.items()
     assert isinstance(sym, sympy.Symbol)
-    assert (lo, hi) == (1, 8)
+    assert (lo, hi, opt) == (1, 8, 4)
 
 
 @pytest.mark.unit
@@ -526,9 +566,355 @@ def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
     )
 
     bounds_values = set(bounds.values())
-    assert (1, 8) in bounds_values, bounds  # positional-arg branch
-    assert (2, 6) in bounds_values, bounds  # kwarg branch
+    assert (1, 8, 2) in bounds_values, bounds  # positional-arg branch
+    assert (2, 6, 3) in bounds_values, bounds  # kwarg branch
     assert len(bounds) == 2, bounds
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("opt_shape", [(2, 1), (2,)])
+def test_build_user_symbol_bounds_ignores_opt_outside_range(opt_shape, caplog):
+    """An ``opt_shape`` outside ``[min_shape, max_shape]``, or too short, is
+    ignored with a warning, so the dim keeps the export example's opt."""
+    import logging
+
+    class _Double(torch.nn.Module):
+        def forward(self, x):
+            return x * 2
+
+    ep = torch.export.export(
+        _Double(),
+        (torch.randn(2, 4),),
+        dynamic_shapes=({1: torch.export.Dim("n", min=1, max=16)},),
+        strict=False,
+    )
+    spec = Input(min_shape=(2, 2), opt_shape=opt_shape, max_shape=(2, 16))
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        bounds = _build_user_symbol_bounds(ep.module(), [spec], {}, ep.graph_signature)
+    assert list(bounds.values()) == [(2, 16, None)], bounds
+    assert any("does not fit" in r.message for r in caplog.records)
+
+
+class _HalfRows(torch.nn.Module):
+    def forward(self, x):
+        return x.flatten().reshape(x.shape[0] // 2, -1)
+
+
+class _FirstHalf(torch.nn.Module):
+    def forward(self, x):
+        return x.reshape(2, -1, 8)[0]
+
+
+class _CountRows(torch.nn.Module):
+    def forward(self, x):
+        count = torch.nonzero(x[:, 0] > 0).shape[0]
+        return x.flatten().reshape(count, -1)
+
+
+class _ScaleByCount(torch.nn.Module):
+    def forward(self, x):
+        count = torch.nonzero(x[:, 0] > 0).shape[0]
+        torch._check(count >= 1)
+        return x * count
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "model, min_rows, opt_rows, deferred, expected_opt",
+    [
+        (_Reshape(), 4, 6, False, None),  # reshape(-1, 4, 8) needs rows % 4 == 0
+        (_Reshape(), 4, 6, True, None),  # the same rule as a deferred assert
+        (_Reshape(), 4, 4, False, 4),  # rows // 4 != 1 also fails at the min 4
+        (_FirstHalf(), 1, 9, False, None),  # rows % 2 == 0 also fails at the min 1
+        (_HalfRows(), 1, 1, False, None),  # a rule divides by 1 // 2 = 0
+        (_CountRows(), 1, 1, False, None),  # a rule names a data-dependent size
+        (_CountRows(), 1, 16, False, 16),  # opt equals the export example's 16
+        (_ScaleByCount(), 1, 1, False, 1),  # count >= 1 does not name rows
+    ],
+)
+def test_build_user_symbol_bounds_checks_opt_against_guards(
+    model, min_rows, opt_rows, deferred, expected_opt, caplog
+):
+    """TensorRT checks the shape rules at opt, so an opt that breaks a guard,
+    or at which a guard cannot be evaluated, is dropped with a warning instead
+    of failing the build. An opt equal to the export example is not checked."""
+    import logging
+
+    x = torch.randn(16, 8)
+    x[:8, 0] = 1.0
+    x[8:, 0] = -1.0
+    ep = torch.export.export(
+        model,
+        (x,),
+        dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
+        strict=False,
+        prefer_deferred_runtime_asserts_over_guards=deferred,
+    )
+    spec = Input(min_shape=(min_rows, 8), opt_shape=(opt_rows, 8), max_shape=(64, 8))
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        bounds = _build_user_symbol_bounds(ep.module(), [spec], {}, ep.graph_signature)
+    assert [opt for _, _, opt in bounds.values()] == [expected_opt], bounds
+    warned = any("shape guard" in r.message for r in caplog.records)
+    assert warned == (expected_opt is None)
+
+
+class _CausalMask(torch.nn.Module):
+    def forward(self, x):
+        rows = x.shape[0]
+        return x.sum(1) + torch.triu(torch.full((rows, rows), float("-inf")), 1)
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_keeps_opt_at_guard_false_at_engine_min(tmpdir):
+    """After ``torch.export.save`` and ``load``, re-tracing a causal mask adds
+    guards such as ``rows**2 >= 2``. They are false at the engine min 1 too,
+    where the engine builds without ``opt_shape``, so they are not TensorRT
+    rules and opt 1 is kept."""
+    ep = torch.export.export(
+        _CausalMask(),
+        (torch.randn(16, 8),),
+        dynamic_shapes=({0: torch.export.Dim("rows", min=1, max=32)},),
+        strict=False,
+    )
+    path = os.path.join(tmpdir, "causal.pt2")
+    torch.export.save(ep, path)
+    ep = torch.export.load(path).run_decompositions({})
+    spec = Input(min_shape=(1, 8), opt_shape=(1, 8), max_shape=(32, 8))
+    bounds = _build_user_symbol_bounds(ep.module(), [spec], {}, ep.graph_signature)
+    assert [opt for _, _, opt in bounds.values()] == [1], bounds
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "x_opt, y_opt, warns",
+    [
+        (3, 6, False),
+        (3, 7, True),
+        (20, 8, False),  # x's opt is ignored, so 2*b keeps the example's 8
+    ],
+)
+def test_build_user_symbol_bounds_warns_when_derived_opt_is_ignored(
+    x_opt, y_opt, warns, caplog
+):
+    """The opt of a derived dim such as ``2*b`` follows ``b``, so a different
+    ``opt_shape`` value for it is ignored with a warning."""
+    import logging
+
+    b = torch.export.Dim("b", min=1, max=16)
+    ep = torch.export.export(
+        _CatAdd(),
+        (torch.randn(4, 8), torch.randn(8, 8)),
+        dynamic_shapes=({0: b}, {0: 2 * b}),
+        strict=False,
+    )
+    specs = [
+        Input(min_shape=(1, 8), opt_shape=(x_opt, 8), max_shape=(16, 8)),
+        Input(min_shape=(2, 8), opt_shape=(y_opt, 8), max_shape=(32, 8)),
+    ]
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        _build_user_symbol_bounds(ep.module(), specs, {}, ep.graph_signature)
+    assert any("derived" in r.message for r in caplog.records) == warns
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_keeps_example_opt_with_profiles():
+    """Each profile of ``Input(profiles=...)`` brings its own opts, so another
+    input's ``opt_shape`` is not used: the guard check could not see the
+    opts of later profiles."""
+
+    class _Slice(torch.nn.Module):
+        def forward(self, x, y):
+            if y.shape[0] > x.shape[0]:
+                return x * 0
+            return x[: y.shape[0]] + y
+
+    ep = torch.export.export(
+        _Slice(),
+        (torch.randn(16, 8), torch.randn(2, 8)),
+        dynamic_shapes=(
+            {0: torch.export.Dim("a", min=1, max=64)},
+            {0: torch.export.Dim("b", min=1, max=64)},
+        ),
+        strict=False,
+    )
+    x_spec = Input(
+        profiles=[
+            {"min_shape": (1, 8), "opt_shape": (4, 8), "max_shape": (8, 8)},
+            {"min_shape": (8, 8), "opt_shape": (32, 8), "max_shape": (64, 8)},
+        ]
+    )
+    y_spec = Input(min_shape=(1, 8), opt_shape=(2, 8), max_shape=(8, 8))
+    bounds = _build_user_symbol_bounds(
+        ep.module(), [x_spec, y_spec], {}, ep.graph_signature
+    )
+    assert [opt for _, _, opt in bounds.values()] == [None, None], bounds
+
+
+@pytest.mark.unit
+def test_construct_submodule_inputs_user_opt_with_data_dependent_input():
+    """A data-dependent input dim has no export example and keeps the midpoint
+    opt, without making another input of the engine lose its user opt."""
+
+    class _Rows(torch.nn.Module):
+        def forward(self, x):
+            rows = torch.ops.torchtrt_profile_test.dynamic_rows(x)
+            torch._check(rows.shape[0] >= 1000)
+            torch._check(rows.shape[0] <= 1400)
+            return rows
+
+    exported = torch.export.export(
+        _Rows(),
+        (torch.ones(1100, 4),),
+        dynamic_shapes=({0: torch.export.Dim("b", min=1, max=2000)},),
+    )
+    x, b = _first_sym_placeholder(exported)
+    rows = next(
+        node
+        for node in exported.graph.nodes
+        if node.target == torch.ops.torchtrt_profile_test.dynamic_rows.default
+    )
+    graph = torch.fx.Graph()
+    for name, val in (("x", x), ("rows", rows.meta["val"])):
+        graph.placeholder(name).meta["val"] = val
+    graph.output(None)
+
+    x_spec, rows_spec = construct_submodule_inputs(
+        torch.fx.GraphModule(torch.nn.Module(), graph),
+        user_symbol_bounds={b.node.expr: (1, 2000, 3)},
+    )
+    assert x_spec.shape["opt_shape"] == (3, 4)
+    assert rows_spec.shape["opt_shape"] == (1200, 4)
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_checks_every_input_sharing_a_symbol(caplog):
+    """A different (min, max, opt) for one shared dimension is reported
+    instead of being dropped silently."""
+
+    class _Add(torch.nn.Module):
+        def forward(self, x, y):
+            return x + y
+
+    n = torch.export.Dim("n", min=1, max=16)
+    ep = torch.export.export(
+        _Add(),
+        (torch.randn(4, 8), torch.randn(4, 8)),
+        dynamic_shapes=({0: n}, {0: n}),
+        strict=False,
+    )
+    x_spec = Input(min_shape=(1, 8), opt_shape=(2, 8), max_shape=(16, 8))
+    y_spec = Input(min_shape=(1, 8), opt_shape=(8, 8), max_shape=(16, 8))
+
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        bounds = _build_user_symbol_bounds(
+            ep.module(), [x_spec, y_spec], {}, ep.graph_signature
+        )
+    assert list(bounds.values()) == [(1, 16, 2)], bounds
+    assert any("shares dynamic dimension" in r.message for r in caplog.records)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("save_load", [False, True])
+def test_compile_exported_program_uses_input_opt_shape(save_load, tmpdir):
+    """The engine profile's opt follows ``Input.opt_shape``, not the export
+    example, also after ``torch.export.save`` and ``torch.export.load``, where
+    compile finds the guard ``batch != 1``."""
+
+    model = _SmallLinear().eval().cuda()
+    example = torch.randn(16, 8, device="cuda")
+    ep = torch.export.export(
+        model,
+        (example,),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=1, max=32)},),
+        strict=False,
+    )
+    if save_load:
+        path = os.path.join(tmpdir, "linear.pt2")
+        torch.export.save(ep, path)
+        ep = torch.export.load(path)
+    spec = Input(
+        min_shape=(1, 8),
+        opt_shape=(1, 8),
+        max_shape=(32, 8),
+        dtype=torch.float32,
+    )
+    trt_mod = torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
+    assert _engine_profiles(trt_mod) == {"x": ((1, 8), (1, 8), (32, 8))}
+
+    x = torch.randn(3, 8, device="cuda")
+    torch.testing.assert_close(trt_mod(x), model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "dim_max, opt_rows, expected_x_opt",
+    [
+        (None, 3, 3),  # fits, so the user opt is used for b and 2*b
+        # Known limitation: 2*b ignores max_shape and gets the default max
+        # 16384, so 2*9000 does not fit.
+        (None, 9000, 16),
+        (10000, 1, 16),  # 2*1 is below the min of 2*b (b's min is 2)
+    ],
+)
+def test_compile_exported_program_user_opt_with_derived_dim(
+    dim_max, opt_rows, expected_x_opt
+):
+    """With a derived input dim (``2*b``), the user opt is used only if it fits
+    every engine input; otherwise the engine keeps the export example's opt, so
+    models that compile without ``opt_shape`` still compile."""
+
+    b = torch.export.Dim("b", max=dim_max)
+    ep = torch.export.export(
+        _CatAdd(),
+        (torch.randn(16, 8, device="cuda"), torch.randn(32, 8, device="cuda")),
+        dynamic_shapes=({0: b}, {0: 2 * b}),
+        strict=False,
+    )
+    specs = [
+        Input(min_shape=(1, 8), opt_shape=(opt_rows, 8), max_shape=(10000, 8)),
+        Input(min_shape=(2, 8), opt_shape=(2 * opt_rows, 8), max_shape=(20000, 8)),
+    ]
+    trt_mod = torchtrt.dynamo.compile(ep, inputs=specs, min_block_size=1)
+    profiles = _engine_profiles(trt_mod)
+    assert profiles["x"][1] == (expected_x_opt, 8), profiles
+    assert profiles["y"][1] == (2 * expected_x_opt, 8), profiles
+
+    x, y = torch.randn(3, 8, device="cuda"), torch.randn(6, 8, device="cuda")
+    torch.testing.assert_close(trt_mod(x, y), torch.cat([x, x]) + y)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("save_load", [False, True])
+def test_compile_exported_program_drops_opt_that_breaks_a_guard(
+    save_load, tmpdir, caplog
+):
+    """An opt that breaks a shape guard is dropped before the engine build, so
+    the model still compiles with the export example's opt, also after
+    ``torch.export.save`` and ``torch.export.load``."""
+    import logging
+
+    ep = torch.export.export(
+        _Reshape(),
+        (torch.randn(16, 8, device="cuda"),),
+        dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
+        strict=False,
+    )
+    if save_load:
+        path = os.path.join(tmpdir, "reshape.pt2")
+        torch.export.save(ep, path)
+        ep = torch.export.load(path)
+    spec = Input(
+        min_shape=(4, 8), opt_shape=(6, 8), max_shape=(64, 8), dtype=torch.float32
+    )
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        trt_mod = torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
+    assert any("shape guard" in r.message for r in caplog.records)
+    assert _engine_profiles(trt_mod) == {"x": ((4, 8), (16, 8), (64, 8))}
+
+    x = torch.randn(8, 8, device="cuda")
+    torch.testing.assert_close(trt_mod(x), _Reshape()(x))
 
 
 @pytest.mark.unit
