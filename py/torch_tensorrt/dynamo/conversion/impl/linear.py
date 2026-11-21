@@ -13,8 +13,10 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcast,
+    cast_trt_tensor,
     get_transposed_trt_tensor,
     get_trt_tensor,
+    set_layer_name,
 )
 
 
@@ -98,3 +100,49 @@ def _transpose_once(ctx: ConversionContext) -> bool:
         return False
     readers = [user for user in node.args[1].users if user.target == node.target]
     return len(readers) > 1
+
+
+def matrix_vector_kernel(
+    ctx: ConversionContext,
+    target: Union[Target, str],
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    weight: Union[torch.Tensor, np.ndarray],
+    bias: Optional[Union[torch.Tensor, np.ndarray]],
+) -> TRTTensor:
+    """A linear layer with a few rows, with the matrix vector kernel's plugin."""
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _matrix_vector_kernel
+
+    n, k = weight.shape
+    rows = 1
+    for dim in input.shape[:-1]:
+        rows *= dim
+    splits = _matrix_vector_kernel.num_splits(n, k)
+    a = impl.shuffle.reshape(ctx, target, source_ir, f"{name}_rows", input, (rows, k))
+    w = get_trt_tensor(ctx, weight, f"{name}_weight")
+    layer = ctx.net.add_plugin(
+        _matrix_vector_kernel.plugin()(a, w, splits=splits), aot=True
+    )
+    set_layer_name(layer, target, f"{name}_matrix_vector", source_ir)
+    out = layer.get_output(0)
+    if splits > 1:
+        reduce = ctx.net.add_reduce(out, trt.ReduceOperation.SUM, 1, False)
+        set_layer_name(reduce, target, f"{name}_sum_splits", source_ir)
+        out = cast_trt_tensor(
+            ctx, reduce.get_output(0), input.dtype, f"{name}_cast", target, source_ir
+        )
+    out = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_shape", out, (*input.shape[:-1], n)
+    )
+    if bias is not None:
+        out = impl.elementwise.add(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_bias",
+            out,
+            get_trt_tensor(ctx, bias, f"{name}_bias"),
+        )
+    return out

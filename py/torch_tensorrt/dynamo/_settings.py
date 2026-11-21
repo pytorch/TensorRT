@@ -53,6 +53,7 @@ from torch_tensorrt.dynamo._defaults import (
     IMMUTABLE_WEIGHTS,
     L2_LIMIT_FOR_TILING,
     LAZY_ENGINE_INIT,
+    MATRIX_VECTOR_KERNEL,
     MAX_AUX_STREAMS,
     MAX_PARTITION_SIZE,
     MIN_BLOCK_SIZE,
@@ -214,6 +215,7 @@ class CompilationSettings:
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
         grouped_mm_kernel (bool): Run aten._grouped_mm, the grouped matrix multiply of mixture-of-experts layers, in TensorRT with a grouped GEMM kernel that computes only each row's own group. Large layers then skip the dense lowering's extra work, and a dynamic row count stays in TensorRT instead of splitting the graph, so a mixture-of-experts program can build as one engine. The cost: the kernel is a TensorRT plugin compiled with Triton when the engine is built, and its PTX is stored in the engine, so the engine needs a CUDA driver at least as new as the build machine's. It takes ops with bfloat16 or float16 matrices, int32 offsets, no bias, out_dtype unset or equal to the input dtype, more than one group or a dynamic row count, and static K, N and group count, on GPUs with compute capability 8.0 or newer, with TensorRT plugins, Triton 3.5 or newer (3.7 or newer at compute capability 11.0, Jetson Thor, whose code the ptxas of older releases cannot build) and cuda-python installed (cuda-python reads the driver's PTX limit). It is not used for hardware-compatible engines or when cross-compiling for Windows. When the GPU, the installed packages or these settings rule it out, a warning says why. On GPUs with compute capability 10.0 or newer it uses sm_80 instructions, except at compute capability 11.0 (Jetson Thor), where it uses the GPU's own tcgen05 instructions. It can be slower than PyTorch's grouped matrix multiply at large row counts, so measure it. Other ops use the dense lowering and grouped_mm_dense_max_macs. Default is False.
         grouped_mm_dense_max_macs (Optional[int]): Leave aten._grouped_mm, the grouped matrix multiply of mixture-of-experts layers, to PyTorch when its TensorRT lowering would do more than this many multiply-adds (groups * rows * K * N). That lowering multiplies every row by every group's weight, while PyTorch computes only each row's own group. It applies only to ops the grouped GEMM kernel does not take (see grouped_mm_kernel). None turns the limit off. The limit does not apply to an op with one group or under require_full_compilation=True. torch.compile turns require_full_compilation off, so there only None keeps such an op in TensorRT. The dense lowering handles static shapes only, so such an op with a dynamic row count runs in PyTorch whatever this is. Keep None where the op cannot run outside TensorRT: an ExecuTorch save without a partitioner that takes aten._grouped_mm (such as the CUDA partitioner) stops with a missing out variant, and where PyTorch has no fast kernel for it (such as float32, or bfloat16 on an A100) it copies the group offsets to the host, so a module that runs it cannot be captured whole by CUDA graphs. Default is None. Above 2**38 the dense lowering was slower than PyTorch in every case measured on H100 and A100.
+        matrix_vector_kernel (bool): Run aten.linear with one to 16 rows, such as a projection in a decoding step, with a matrix vector kernel. With so few rows the work is reading the weight once; the kernel spreads that read over the whole GPU, which TensorRT's matrix multiply does not do for one row. The cost: the kernel is a TensorRT plugin compiled with Triton when the engine is built, and its PTX is stored in the engine, so the engine needs a CUDA driver at least as new as the build machine's. It takes ops with a bfloat16 or float16 input of static shape with at most 16 rows, a constant weight and bias (if any) of the same dtype, and a K that is a multiple of 16, on GPUs with compute capability 8.0 or newer, with TensorRT plugins, Triton 3.5 or newer and cuda-python installed. It is not used for hardware-compatible engines or when cross-compiling for Windows. When the GPU, the installed packages or these settings rule it out, a warning says why. Other linear ops are converted as before. Default is False.
         replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -312,6 +314,7 @@ class CompilationSettings:
     convert_antialiased_resize: bool = CONVERT_ANTIALIASED_RESIZE
     grouped_mm_kernel: bool = GROUPED_MM_KERNEL
     grouped_mm_dense_max_macs: Optional[int] = GROUPED_MM_DENSE_MAX_MACS
+    matrix_vector_kernel: bool = MATRIX_VECTOR_KERNEL
     replace_interleave_stack_with_cat: bool = REPLACE_INTERLEAVE_STACK_WITH_CAT
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
@@ -414,6 +417,8 @@ class CompilationSettings:
         state.setdefault("grouped_mm_dense_max_macs", None)
         # Engines from settings saved before this field have no grouped GEMM kernel.
         state.setdefault("grouped_mm_kernel", False)
+        # Engines from settings saved before this field have no matrix vector kernel.
+        state.setdefault("matrix_vector_kernel", False)
         state.setdefault(
             "replace_interleave_stack_with_cat", REPLACE_INTERLEAVE_STACK_WITH_CAT
         )
@@ -473,6 +478,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "convert_antialiased_resize",
     "grouped_mm_kernel",
     "grouped_mm_dense_max_macs",
+    "matrix_vector_kernel",
     "replace_interleave_stack_with_cat",
 }
 

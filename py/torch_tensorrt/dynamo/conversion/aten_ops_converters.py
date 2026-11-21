@@ -6303,3 +6303,101 @@ def aten_ops_scaled_dot_product_cudnn_attention(
         return_debug_mask=args_bounds_check(args, 7, False),
         scale=kwargs.get("scale", None),
     )
+
+
+def matrix_vector_kernel_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if settings is None or not settings.matrix_vector_kernel:
+        return False
+    shape = _matrix_vector_kernel_shape(node)
+    if shape is None:
+        return False
+    reason = _grouped_mm_kernel_blocked(settings) or _grouped_mm_kernel_unavailable()
+    if reason is not None:
+        _warn_matrix_vector_kernel_unused(reason)
+        return False
+    from torch_tensorrt.dynamo.conversion.impl import _matrix_vector_kernel
+
+    pointer, m, n, k = shape
+    try:
+        _matrix_vector_kernel.compile_kernel(
+            pointer, m, n, k, _matrix_vector_kernel.num_splits(n, k)
+        )
+    except Exception as exc:
+        _warn_matrix_vector_kernel_unused(
+            f"the kernel does not build for this GPU and shape ({exc})"
+        )
+        return False
+    return True
+
+
+def _matrix_vector_kernel_shape(node: Node) -> Optional[Tuple[str, int, int, int]]:
+    """(pointer type, rows, N, K) for a linear op the kernel takes, or None.
+
+    It takes a bfloat16 or float16 input with static shape and at most MAX_ROWS rows,
+    and a constant weight (and bias, if any) of the same dtype, with K a multiple of 16.
+    """
+    from torch_tensorrt.dynamo.conversion.impl._matrix_vector_kernel import (
+        MAX_ROWS,
+        POINTERS,
+    )
+
+    input_node, weight_node = node.args[:2]
+    bias_node = args_bounds_check(node.args, 2, None)
+    if not isinstance(weight_node, Node) or weight_node.op != "get_attr":
+        return None
+    if bias_node is not None and (
+        not isinstance(bias_node, Node) or bias_node.op != "get_attr"
+    ):
+        return None
+    x = input_node.meta.get("val") if isinstance(input_node, Node) else None
+    w = weight_node.meta.get("val")
+    if not isinstance(x, torch.Tensor) or not isinstance(w, torch.Tensor):
+        return None
+    if (
+        x.dtype not in (torch.bfloat16, torch.float16)
+        or w.dtype != x.dtype
+        or w.dim() != 2
+    ):
+        return None
+    if not all(isinstance(dim, int) for dim in x.shape) or x.dim() < 1:
+        return None
+    rows = math.prod(x.shape[:-1])
+    n, k = w.shape
+    if rows < 1 or rows > MAX_ROWS or x.shape[-1] != k or k % 16:
+        return None
+    return POINTERS[x.dtype], rows, n, k
+
+
+@functools.lru_cache(maxsize=None)
+def _warn_matrix_vector_kernel_unused(reason: str) -> None:
+    _LOGGER.warning(
+        "matrix_vector_kernel is set, but the matrix vector kernel is not used "
+        "because %s. aten.linear is converted as before.",
+        reason,
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.linear.default,
+    capability_validator=matrix_vector_kernel_validator,
+    priority=ConverterPriority.HIGH,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_matrix_vector_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linear.matrix_vector_kernel(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args_bounds_check(args, 2, None),
+    )

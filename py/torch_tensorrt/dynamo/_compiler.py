@@ -170,6 +170,7 @@ def cross_compile_for_windows(
     collapse_high_rank_permutes: bool = _defaults.COLLAPSE_HIGH_RANK_PERMUTES,
     convert_antialiased_resize: bool = _defaults.CONVERT_ANTIALIASED_RESIZE,
     grouped_mm_dense_max_macs: Optional[int] = _defaults.GROUPED_MM_DENSE_MAX_MACS,
+    matrix_vector_kernel: bool = _defaults.MATRIX_VECTOR_KERNEL,
     replace_interleave_stack_with_cat: bool = _defaults.REPLACE_INTERLEAVE_STACK_WITH_CAT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
@@ -270,6 +271,7 @@ def cross_compile_for_windows(
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. Left in PyTorch, each one splits the graph, and the partitioner can then hand many large tensors across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Run antialiased bilinear and bicubic resize (F.interpolate with antialias=True) in TensorRT instead of PyTorch, so it does not split the graph. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
         grouped_mm_dense_max_macs (Optional[int]): Leave aten._grouped_mm, the grouped matrix multiply of mixture-of-experts layers, to PyTorch when its TensorRT lowering would do more than this many multiply-adds (groups * rows * K * N). That lowering multiplies every row by every group's weight, while PyTorch computes only each row's own group. None turns the limit off. The limit does not apply to an op with one group or under require_full_compilation=True. torch.compile turns require_full_compilation off, so there only None keeps the op in TensorRT. The lowering handles static shapes only, so a dynamic row count runs in PyTorch whatever this is. Keep None where the op cannot run outside TensorRT: an ExecuTorch save without a partitioner that takes aten._grouped_mm (such as the CUDA partitioner) stops with a missing out variant, and where PyTorch has no fast kernel for it (such as float32, or bfloat16 on an A100) it copies the group offsets to the host, so a module that runs it cannot be captured whole by CUDA graphs. Default is None. Above 2**38 the dense lowering was slower than PyTorch in every case measured on H100 and A100.
+        matrix_vector_kernel (bool): Run aten.linear with one to 16 rows, such as a projection in a decoding step, with a matrix vector kernel. With so few rows the work is reading the weight once; the kernel spreads that read over the whole GPU, which TensorRT's matrix multiply does not do for one row. The cost: the kernel is a TensorRT plugin compiled with Triton when the engine is built, and its PTX is stored in the engine, so the engine needs a CUDA driver at least as new as the build machine's. It takes ops with a bfloat16 or float16 input of static shape with at most 16 rows, a constant weight and bias (if any) of the same dtype, and a K that is a multiple of 16, on GPUs with compute capability 8.0 or newer, with TensorRT plugins, Triton 3.5 or newer and cuda-python installed. It is not used for hardware-compatible engines or when cross-compiling for Windows. When the GPU, the installed packages or these settings rule it out, a warning says why. Other linear ops are converted as before. Default is False.
         replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         **kwargs: Any,
     Returns:
@@ -437,6 +439,7 @@ def cross_compile_for_windows(
         "collapse_high_rank_permutes": collapse_high_rank_permutes,
         "convert_antialiased_resize": convert_antialiased_resize,
         "grouped_mm_dense_max_macs": grouped_mm_dense_max_macs,
+        "matrix_vector_kernel": matrix_vector_kernel,
         "replace_interleave_stack_with_cat": replace_interleave_stack_with_cat,
     }
 
@@ -2266,6 +2269,7 @@ def convert_exported_program_to_serialized_trt_engine(
     collapse_high_rank_permutes: bool = _defaults.COLLAPSE_HIGH_RANK_PERMUTES,
     convert_antialiased_resize: bool = _defaults.CONVERT_ANTIALIASED_RESIZE,
     grouped_mm_kernel: bool = _defaults.GROUPED_MM_KERNEL,
+    matrix_vector_kernel: bool = _defaults.MATRIX_VECTOR_KERNEL,
     replace_interleave_stack_with_cat: bool = _defaults.REPLACE_INTERLEAVE_STACK_WITH_CAT,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
@@ -2386,6 +2390,7 @@ def convert_exported_program_to_serialized_trt_engine(
         collapse_high_rank_permutes (bool): Rewrite a reshape, permute, reshape chain over more than 8 dimensions, TensorRT's limit, as reshapes and permutes of at most 8 dimensions that give the same values. Window and patch layouts, such as neighborhood attention and the Qwen2-VL image patches, build such chains. This function builds one engine, so without the rewrite such a chain makes the conversion fail. Only static shapes are rewritten. A large engine can need much more time and memory to build and to run, so measure it. Default is False.
         convert_antialiased_resize (bool): Convert antialiased bilinear and bicubic resize (F.interpolate with antialias=True) to TensorRT. This function builds one engine, so without this setting such a resize makes the conversion fail. Only static input and output heights and widths and floating-point inputs are converted. Some sizes run slower than in PyTorch, so measure it. Default is False.
         grouped_mm_kernel (bool): Run aten._grouped_mm with the grouped GEMM kernel where it applies (see compile). This function builds one engine, so an op with a dynamic row count that the kernel declines makes the conversion fail. Default is False.
+        matrix_vector_kernel (bool): Run aten.linear with at most 16 rows with the matrix vector kernel where it applies (see compile). Default is False.
         replace_interleave_stack_with_cat (bool): Write a stack whose only user is a reshape that merges the new axis into a neighbor axis, as in torch.stack([even, odd], dim=3).flatten(2, 3) for a 2x upsample, as a concatenation of unsqueezed inputs. This can make large, image-sized interleaves faster on GPUs where TensorRT fuses the region around them, but slower where TensorRT runs them as separate layers and adds copies, so measure it. Only programs from torch.export are rewritten, not torch.compile graphs. Default is False.
         **kwargs: Any,
     Returns:
@@ -2567,6 +2572,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "collapse_high_rank_permutes": collapse_high_rank_permutes,
         "convert_antialiased_resize": convert_antialiased_resize,
         "grouped_mm_kernel": grouped_mm_kernel,
+        "matrix_vector_kernel": matrix_vector_kernel,
         "replace_interleave_stack_with_cat": replace_interleave_stack_with_cat,
     }
 
