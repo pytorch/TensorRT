@@ -85,6 +85,18 @@ def _e2m1_to_bf16(codes):  # type: ignore[no-untyped-def]
 
 
 @triton.jit  # type: ignore[misc]
+def _e4m3_to_f32(bits, NATIVE_FP8: tl.constexpr):  # type: ignore[no-untyped-def]
+    if NATIVE_FP8:
+        return bits.to(tl.float8e4nv, bitcast=True).to(tl.float32)
+    # GPUs before sm_89 have no FP8 conversion. The sign goes to bit 15 of a float16
+    # and the other seven bits to the exponent and mantissa boundary, which reads the
+    # E4M3 value times 2^-8, subnormals included; a multiply by 2^8 gives the value.
+    b = bits.to(tl.uint16)
+    half = ((b & 0x80) << 8) | ((b & 0x7F) << 7)
+    return half.to(tl.float16, bitcast=True).to(tl.float32) * 256.0
+
+
+@triton.jit  # type: ignore[misc]
 def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
     a_ptr,
     w_ptr,
@@ -100,6 +112,7 @@ def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
     BLOCK_N: tl.constexpr,
     BLOCK_K: tl.constexpr,
     INDEXED: tl.constexpr,
+    NATIVE_FP8: tl.constexpr,
 ):
     pid = tl.program_id(0)
     tiles_n: tl.constexpr = (N + BLOCK_N - 1) // BLOCK_N
@@ -123,7 +136,7 @@ def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
         )
         return
     w_bytes = w_ptr.to(tl.pointer_type(tl.uint8))
-    s_bytes = s_ptr.to(tl.pointer_type(tl.float8e4nv))
+    s_bytes = s_ptr.to(tl.pointer_type(tl.uint8))
     g = group.to(tl.int64)
     # Each thread's eight bytes are one 16-value scale block.
     KB: tl.constexpr = BLOCK_K // 16
@@ -162,9 +175,9 @@ def _grouped_mm_nvfp4_kernel(  # type: ignore[no-untyped-def]
         scale = tl.load(
             s_rows + (k // 16 + kb)[None, :],
             mask=col_mask[:, None] & k_mask[None, :],
-            other=0.0,
+            other=0,
         )
-        acc += tl.sum(block * scale.to(tl.float32), axis=1)
+        acc += tl.sum(block * _e4m3_to_f32(scale, NATIVE_FP8), axis=1)
     acc = acc * tl.load(gs_ptr + group)
     tl.store(
         c_ptr + row.to(tl.int64) * N + cols,
@@ -188,6 +201,7 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
     BLOCK_N: tl.constexpr,
     BLOCK_K: tl.constexpr,
     INDEXED: tl.constexpr,
+    NATIVE_FP8: tl.constexpr,
 ):
     pid = tl.program_id(0)
     tiles_n: tl.constexpr = (N + BLOCK_N - 1) // BLOCK_N
@@ -208,7 +222,7 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
             mask=col_mask,
         )
         return
-    w_values = w_ptr.to(tl.pointer_type(tl.float8e4nv))
+    w_values = w_ptr.to(tl.pointer_type(tl.uint8))
     s_bytes = s_ptr.to(tl.pointer_type(tl.uint8))
     g = group.to(tl.int64)
     KB: tl.constexpr = BLOCK_K // 32
@@ -223,14 +237,15 @@ def _grouped_mm_mxfp8_kernel(  # type: ignore[no-untyped-def]
         w = tl.load(
             w_rows + (k + kb * 32)[None, :, None] + offset[None, None, :],
             mask=col_mask[:, None, None] & k_mask[None, :, None],
-            other=0.0,
+            other=0,
         )
+        w = _e4m3_to_f32(w, NATIVE_FP8)
         a = tl.load(
             a_row + k + kb[:, None] * 32 + offset[None, :],
             mask=k_mask[:, None],
             other=0.0,
         )
-        block = tl.sum(w.to(tl.float32) * a.to(tl.float32)[None], axis=2)
+        block = tl.sum(w * a.to(tl.float32)[None], axis=2)
         exponent = tl.load(
             s_rows + (k // 32 + kb)[None, :],
             mask=col_mask[:, None] & k_mask[None, :],
@@ -251,9 +266,7 @@ def _signature(pointer: str, nvfp4: bool, indexed: bool) -> Dict[str, str]:
     signature = {"a_ptr": pointer, "w_ptr": "*i32", "s_ptr": "*i32"}
     if nvfp4:
         signature["gs_ptr"] = "*fp32"
-    signature.update(
-        {"offs_ptr": "*i32", "M": "i32", "c_ptr": pointer}
-    )
+    signature.update({"offs_ptr": "*i32", "M": "i32", "c_ptr": pointer})
     return signature
 
 
@@ -293,6 +306,8 @@ def _compile_for(
                 "BLOCK_N": block_n,
                 "BLOCK_K": block_k,
                 "INDEXED": indexed,
+                # FP8 conversion needs sm_89; GPUs from sm_100 on build sm_80 code here.
+                "NATIVE_FP8": 89 <= capability < 100,
             },
             num_warps=_NUM_WARPS,
             num_stages=1,
