@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
     prepend_ones,
+    set_layer_name,
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -594,3 +595,42 @@ def scaled_dot_product_cudnn_attention(
         scale,
     )
     return output, None, None, None, 0.0, 0.0, None, None, None
+
+
+def decode_attention_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    query: TRTTensor,
+    key: TRTTensor,
+    value: TRTTensor,
+    attn_mask: Optional[Union[TRTTensor, torch.Tensor]],
+    scale: Optional[float],
+) -> TRTTensor:
+    """Attention of a single query row with the decode attention kernel's plugins."""
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _decode_attention_kernel
+
+    split, masked_split, combine = _decode_attention_kernel.plugins()
+    batch, kv_heads, seq_len = key.shape[:3]
+    splits = _decode_attention_kernel.num_splits(
+        batch if batch > 0 else None, kv_heads, seq_len if seq_len > 0 else None
+    )
+    if scale is None:
+        scale = 1.0 / math.sqrt(query.shape[-1])
+    if attn_mask is None:
+        partials = split(query, key, value, scale=scale, splits=splits)
+    else:
+        mask = get_trt_tensor(ctx, attn_mask, f"{name}_mask")
+        mask = _normalize_attention_mask_rank(ctx, mask, query, name)
+        partials = masked_split(query, key, value, mask, scale=scale, splits=splits)
+    split_layer = ctx.net.add_plugin(partials, aot=True)
+    set_layer_name(split_layer, target, f"{name}_split", source_ir)
+    dtype = "bf16" if query.dtype == trt.bfloat16 else "fp16"
+    combine_layer = ctx.net.add_plugin(
+        combine(split_layer.get_output(0), split_layer.get_output(1), dtype=dtype),
+        aot=True,
+    )
+    set_layer_name(combine_layer, target, f"{name}_combine", source_ir)
+    return combine_layer.get_output(0)

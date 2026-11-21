@@ -95,6 +95,7 @@ CONVERT_ANTIALIASED_RESIZE = False
 GROUPED_MM_KERNEL = False
 # Off, so a default compile converts aten._grouped_mm as before.
 GROUPED_MM_DENSE_MAX_MACS = None
+DECODE_ATTENTION_KERNEL = False
 REPLACE_INTERLEAVE_STACK_WITH_CAT = False
 
 # Global Performance Tuning (TensorRT build-route knobs)

@@ -6,6 +6,7 @@
 import functools
 import importlib.util
 import logging
+import math
 import operator
 import weakref
 from typing import (
@@ -34,7 +35,10 @@ from torch_tensorrt._utils import (
     is_tensorrt_version_supported,
     trt_rtx_targets_turing,
 )
-from torch_tensorrt.dynamo._defaults import GROUPED_MM_DENSE_MAX_MACS
+from torch_tensorrt.dynamo._defaults import (
+    DECODE_ATTENTION_KERNEL,
+    GROUPED_MM_DENSE_MAX_MACS,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -6051,6 +6055,163 @@ def scaled_dot_product_attention_validator(
             )
             return False
     return True
+
+
+def decode_attention_kernel_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if not _decode_attention_kernel_set(settings) or not _decode_attention_kernel_takes(
+        node
+    ):
+        return False
+    reason = _grouped_mm_kernel_blocked(settings) or _grouped_mm_kernel_unavailable()
+    if reason is not None:
+        _warn_decode_attention_kernel_unused(reason)
+        return False
+    # Compile now, while the op can still fall back, rather than during the build.
+    from torch_tensorrt.dynamo.conversion.impl import _decode_attention_kernel
+
+    query, key = (arg.meta["val"] for arg in node.args[:2])
+    attn_mask = args_bounds_check(node.args, 3, None)
+    mask = attn_mask.meta["val"] if isinstance(attn_mask, Node) else attn_mask
+    batch, heads, _, head_dim = query.shape
+    kv_heads, seq_len = key.shape[1:3]
+    mask_batch, mask_heads = False, 1
+    if mask is not None:
+        mask_shape = (1,) * (4 - mask.dim()) + tuple(mask.shape)
+        mask_batch = not (isinstance(mask_shape[0], int) and mask_shape[0] == 1)
+        mask_heads = mask_shape[1]
+    scale = node.kwargs.get("scale")
+    try:
+        _decode_attention_kernel.compile_kernels(
+            _KERNEL_POINTERS[query.dtype],
+            _KERNEL_POINTERS[mask.dtype] if mask is not None else None,
+            heads,
+            kv_heads,
+            head_dim,
+            mask_batch,
+            mask_heads,
+            _decode_attention_kernel.num_splits(
+                batch if isinstance(batch, int) else None,
+                kv_heads,
+                seq_len if isinstance(seq_len, int) else None,
+            ),
+            scale if scale is not None else 1.0 / math.sqrt(head_dim),
+        )
+    except Exception as exc:
+        _warn_decode_attention_kernel_unused(
+            f"the kernel does not build for this GPU and shape ({exc})"
+        )
+        return False
+    return True
+
+
+_KERNEL_POINTERS = {
+    torch.bfloat16: "*bf16",
+    torch.float16: "*fp16",
+    torch.float32: "*fp32",
+}
+
+
+def _decode_attention_kernel_set(settings: Optional[CompilationSettings]) -> bool:
+    return (
+        settings.decode_attention_kernel
+        if settings is not None
+        else DECODE_ATTENTION_KERNEL
+    )
+
+
+def _decode_attention_kernel_takes(node: Node) -> bool:
+    """A single query row in bfloat16 or float16, with an optional float additive mask.
+
+    The head counts and head size are compiled into the kernel; the batch and the
+    cache length may be dynamic. The mask may broadcast over the batch and the
+    query heads only.
+    """
+    tensors = [
+        arg.meta.get("val") if isinstance(arg, Node) else None for arg in node.args[:3]
+    ]
+    if not all(isinstance(val, torch.Tensor) for val in tensors):
+        return False
+    query, key, value = tensors
+    if args_bounds_check(node.args, 4, 0.0) != 0.0 or args_bounds_check(
+        node.args, 5, False
+    ):
+        return False
+    if query.dtype not in (torch.bfloat16, torch.float16) or any(
+        val.dtype != query.dtype for val in (key, value)
+    ):
+        return False
+    if any(val.dim() != 4 for val in tensors) or key.shape != value.shape:
+        return False
+    batch, heads, query_len, head_dim = query.shape
+    kv_batch, kv_heads, seq_len, kv_head_dim = key.shape
+    if not all(isinstance(dim, int) for dim in (heads, query_len, head_dim, kv_heads)):
+        return False
+    if (
+        query_len != 1
+        or kv_head_dim != head_dim
+        or not statically_known_true(kv_batch == batch)
+        or heads % kv_heads != 0
+        or (heads != kv_heads and not node.kwargs.get("enable_gqa", False))
+    ):
+        return False
+    attn_mask = args_bounds_check(node.args, 3, None)
+    if attn_mask is None:
+        return True
+    mask = attn_mask.meta.get("val") if isinstance(attn_mask, Node) else attn_mask
+    if (
+        not isinstance(mask, torch.Tensor)
+        or mask.dtype not in (torch.float32, torch.bfloat16, torch.float16)
+        or mask.dim() > 4
+    ):
+        return False
+    mask_batch, mask_heads, mask_rows, mask_len = (1,) * (4 - mask.dim()) + tuple(
+        mask.shape
+    )
+    return (
+        (mask_batch == 1 or statically_known_true(mask_batch == batch))
+        and mask_heads in (1, heads)
+        and mask_rows == 1
+        and statically_known_true(mask_len == seq_len)
+    )
+
+
+# The registry runs validators on every lookup, so warn once per reason.
+@functools.lru_cache(maxsize=None)
+def _warn_decode_attention_kernel_unused(reason: str) -> None:
+    _LOGGER.warning(
+        "decode_attention_kernel is set, but the decode attention kernel is not used "
+        "because %s. aten.scaled_dot_product_attention is converted as before.",
+        reason,
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.scaled_dot_product_attention.default,
+    capability_validator=decode_attention_kernel_validator,
+    priority=ConverterPriority.HIGH,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,), 2: (TRTTensor,)})
+def aten_ops_decode_attention_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.attention.decode_attention_kernel(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args_bounds_check(args, 3, None),
+        kwargs.get("scale", None),
+    )
 
 
 @dynamo_tensorrt_converter(
