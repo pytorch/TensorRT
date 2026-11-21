@@ -78,7 +78,12 @@ following rules fire:
 * It reads a floating point weight or a number such as the ``1e6`` of ``x / 1e6``,
   with a finite value that becomes ``inf`` in the low precision type, such as a
   BatchNorm running variance of ``1e6`` in fp16. ``NaN`` and ``inf`` constants
-  stay as they are, so they do not count.
+  stay as they are, so they do not count. A value that the graph computes from
+  constants alone, with an input or a number above the float16 range, is a
+  constant too, such as the ``(running_var + eps).rsqrt()`` of a frozen
+  BatchNorm, and so is ``torch.full_like(x, 1e6)``, which reads only the shape
+  of ``x``. A value computed from a chunk of a constant is not covered yet, such
+  as ``(var + eps).rsqrt()`` after ``mean, var = stats.unbind(0)``.
   A tensor that an op only places in its output does not count, such as an
   attention mask tensor in ``torch.where``, ``masked_fill``, ``index_put`` without
   ``accumulate=True``, or the ``attn_mask`` of
