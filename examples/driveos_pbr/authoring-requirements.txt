@@ -1,0 +1,19 @@
+# Linux ARM64 dependencies for the tested NGC 26.06 authoring environment.
+# Installed with --no-deps; the container provides the remaining build tools.
+torch @ https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.16.0.dev20261009%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl --hash=sha256:6ba88800a88b7aac4be51f01f87efddce7b3ecaf825929867f9bc5d500141b50
+cuda-toolkit==13.2.2 --hash=sha256:d12edc1aad1356236a2ee10c0d794b1aff5d3e79bfeca54867c3bb8e5afd87b0
+nvidia-cublas==13.4.1.3 --hash=sha256:4eb1472bf92b741e7cf24da7978dde251b58ddec2092d9f6a04f3623eb4e9a15
+nvidia-cuda-cccl==13.3.4.3.1 --hash=sha256:cd47e7823e3ab369a3e3df3a4c6dbb4cb02176cb85b251eec5f7c9cdfa528ec4
+nvidia-cuda-cupti==13.2.86 --hash=sha256:d9a5c133f73fcb9013f3ada0da6fb54d4117618d81f3f5a0419417ea6ee829d4
+nvidia-cuda-nvrtc==13.2.86 --hash=sha256:1e5d7b411a2eb83f5c71c98d58133a763fc9fa86a4241ee320c5c4782d9ad1fd
+nvidia-cuda-runtime==13.2.86 --hash=sha256:37844957894bfdecf90243568d21a2cb251b66106915b71459a23c8e6ef2da69
+nvidia-cudnn-cu13==9.26.0.51 --hash=sha256:8e5b4f5eccff721416f70ecf4353172fc4d5cdd8ca869fe6f983a4a5b0147b20
+nvidia-cufft==12.2.0.57 --hash=sha256:1ed438568ae1088ba2c25789d10205d4104b8b140b7bd942e39a787947a0fb74
+nvidia-cufile==1.17.1.22 --hash=sha256:bec33d7f1f12691dce330275246587569c2ed90b1ce43b0f94b3e1ce9268744b
+nvidia-cusolver==12.2.0.11 --hash=sha256:8be097fca28de6be0990ab216ee9b804dd51077e1d1d83acf6c9850650bdc64d
+nvidia-cusparse==12.7.10.12 --hash=sha256:597eff2cd83e3ab1d1e3a0dce9c9c879d77cf64ec2659bfdb5af6a5d02e7aaa9
+nvidia-cusparselt-cu13==0.8.1 --hash=sha256:4dca476c50bf4780d46cd0bfbd82e2bc10a08e4fef7950917ce8d7578d22a23f
+nvidia-nccl-cu13==2.30.7 --hash=sha256:ca786ffa5a647c75d4d1f5cc72a6c4f537947e2ba8823d7c8aaf768e7a7b9f77
+nvidia-nvjitlink==13.4.92 --hash=sha256:25f74fad0d654271c921ac4dca614bd6258bc21791242fc7b2289dad7ae9c099
+nvidia-nvshmem-cu13==3.7.2 --hash=sha256:0e748308b9e0a8a8d81859353f3e6c98fbe85a85f652a915a2ba60149a0bd124
+nvidia-nvtx==13.2.86 --hash=sha256:1c6ae1be92fba569dd271f7b9b3056f99f5642726dc6c53d1b93ae4110c398fb

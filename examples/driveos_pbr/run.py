@@ -133,12 +133,12 @@ def main():
     parser.add_argument(
         "--program-dir",
         type=Path,
-        help="Fresh export root containing MODEL/model.pte; overrides ExecuTorch programs only",
+        help="Fresh export root containing MODEL/model.pte",
     )
     parser.add_argument(
         "--native-dir",
         type=Path,
-        help="Installed source build with bin/ and lib/; overrides bundled native runtime",
+        help="Installed source build with bin/ and lib/",
     )
     parser.add_argument(
         "--models",
@@ -173,10 +173,14 @@ def main():
         return
     if not args.output:
         parser.error("--output is required for a benchmark")
+    if set(args.modes) & {"onnx", "executorch"} and not args.native_dir:
+        parser.error("Native modes require --native-dir from build_native.sh")
+    if "executorch" in args.modes and not args.program_dir:
+        parser.error("ExecuTorch requires --program-dir from export_pte.py")
     root = bundle.parent
-    native = args.native_dir.resolve() if args.native_dir else bundle
+    native = args.native_dir.resolve() if args.native_dir else root / "native"
     rebuilt = native_files(native) if args.native_dir else None
-    programs = args.program_dir.resolve() if args.program_dir else bundle
+    programs = args.program_dir.resolve() if args.program_dir else root / "exported"
     program_hashes = {}
     if args.program_dir and "executorch" in args.modes:
         for model in args.models:

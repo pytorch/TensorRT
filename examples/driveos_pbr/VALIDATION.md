@@ -1,5 +1,34 @@
 # Handoff validation — November 17, 2026
 
+## Compact artifact verification — November 20, 2026
+
+`driveos-pbr-thoru-compact-20261120.tar.gz` is 909,108,916 bytes, below the
+1,000,000,000-byte limit. Its SHA-256 is
+`efdff344df9915a1f54d8ad90f28fb87dc3224a4a5366fe31955f891da7fa3ed`.
+
+The compact bundle retains the original checkpoints, ONNX engines/plugin and
+fixtures. It omits the prebuilt runtime/SDK, supplied ExecuTorch programs, Torch
+wheel and CUDA Python installation. Native binaries and programs are rebuilt;
+`setup_python.sh` downloads the pinned Torch/CUDA packages with hash verification.
+Supplemental library aliases use symlinks to one copy of each library.
+
+- The archive hash and every extracted manifest entry passed on DRIVE Thor U.
+- Setup completed in a fresh ARM64 NGC 26.06 container. CUDA tensor allocation
+  passed on the 14-SM target.
+- All 2,672 downloaded NVIDIA package files matched the previous bundle's
+  contents byte for byte.
+- The pinned native runtime/delegate and both C++ benchmark applications rebuilt
+  successfully; the Torch-TensorRT Python compiler built and installed from source.
+- Fresh SegFormer and BEVFormer exports passed eager/compiled comparisons on
+  both snapshots and caller-owned CPU-IO plan checks.
+- All 12 fresh native ExecuTorch processes passed: two models × two snapshots ×
+  three launches, each with 20 warmups and 100 measured calls. Output checks and
+  native dependency audits passed using the newly built runtime and exports.
+  This is an export/runtime verification cohort, not a new three-mode comparison.
+- Six host-independent tests and shell syntax checks passed.
+- The Python environment resides in the shared PBR workspace, with
+  `/opt/pbr-venv` pointing to it, avoiding the Docker writable-layer space limit.
+
 ## Checkpoint-to-program export verification — November 20, 2026
 
 A fresh ARM64 NGC 26.06 container built the Torch-TensorRT Python compiler

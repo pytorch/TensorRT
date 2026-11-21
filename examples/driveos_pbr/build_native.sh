@@ -32,7 +32,6 @@ git -C "$root/deps/executorch" submodule update --init --recursive --depth=1 -- 
   third-party/json third-party/pocketfft backends/xnnpack/third-party/FXdiv \
   backends/xnnpack/third-party/cpuinfo backends/xnnpack/third-party/pthreadpool
 cmake -S "$source_dir" -B "$root/build-native" \
-  -DPBR_BUILD_RUNTIME_FROM_SOURCE=ON \
   -DTORCHTRT_SOURCE_DIR="$root/deps/TensorRT-runtime" \
   -DEXECUTORCH_SOURCE_DIR="$root/deps/executorch" \
   -DCUDAToolkit_ROOT="$cuda_root" \

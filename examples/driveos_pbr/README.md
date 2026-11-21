@@ -58,16 +58,18 @@ also builds the Torch-TensorRT Python compiler from source
 and exports fresh ExecuTorch programs from the supplied checkpoints. The ONNX
 TensorRT engines remain supplied artifacts.
 
-Obtain `driveos-pbr-thoru-20261120.tar.gz` and its SHA-256 file from the PBR
+Obtain `driveos-pbr-thoru-compact-20261120.tar.gz` and its SHA-256 file from the PBR
 attachments. They contain third-party license notices and `bundle/`, including:
 
-- `bevformer/`, `segformer/`: engines, programs, checkpoints, and two fixtures each.
-- `bin/`: native benchmark applications; `lib/`: native CUDA backend shims.
-- `sdk/`: frozen native headers and static libraries for rebuilding the applications.
-- `authoring/`: pinned Torch wheel, Python dependency wheels, CUDA Python libraries,
-  the pinned ExecuTorch export wheel, and supplemental NGC libraries.
+- `bevformer/`, `segformer/`: ONNX-built engines, checkpoints, and two fixtures each.
+- `authoring/`: small Python dependency wheels, the matching TorchVision and
+  ExecuTorch export wheels, and supplemental NGC libraries.
 - `provenance/` and `manifest.json`: artifact origins, CPU-IO metadata changes,
   exact file sizes, and SHA-256 checksums.
+
+The compressed archive is under 1 GB. Setup downloads the pinned PyTorch and
+CUDA Python packages; Internet access and additional installation space are required.
+Native binaries and ExecuTorch programs are built by the steps below.
 
 Large binaries and model weights are **not in Git**. The source branch alone is
 not a complete benchmark installation. Share the archive through the team's
@@ -80,10 +82,10 @@ source dependencies and build outputs. Run the following in the directory contai
 archive and checksum:
 
 ```bash
-sha256sum -c driveos-pbr-thoru-20261120.tar.gz.sha256
+sha256sum -c driveos-pbr-thoru-compact-20261120.tar.gz.sha256
 export PBR_ROOT="$HOME/driveos-pbr"
 mkdir -p "$PBR_ROOT"
-tar -xzf driveos-pbr-thoru-20261120.tar.gz -C "$PBR_ROOT"
+tar -xzf driveos-pbr-thoru-compact-20261120.tar.gz -C "$PBR_ROOT"
 
 ```
 
@@ -91,7 +93,7 @@ The source, bundle, and output directories must all be under `PBR_ROOT` so the
 eager process can access the same files through the container mount. Record the
 Git commit used with the PBR.
 
-## 2. Prepare the Python baseline
+## 2. Prepare the Python environment
 
 Use a configured DRIVE authoring container with NVIDIA device access and mount
 `PBR_ROOT` at `/pbr`. On a host where the NVIDIA Docker runtime is registered:
@@ -115,24 +117,18 @@ Record its revision with `sudo docker exec drive-pbr git -C /pbr/TensorRT rev-pa
 Inside that container:
 
 ```bash
-python3 -m venv --system-site-packages /opt/pbr-venv
-/opt/pbr-venv/bin/python -m pip install --no-deps \
-  /pbr/bundle/authoring/wheels/torch-*.whl \
-  /pbr/bundle/authoring/wheels/torchvision-*.whl
-/opt/pbr-venv/bin/python -m pip install --no-index \
-  --find-links=/pbr/bundle/authoring/wheels -r /pbr/source/requirements.txt
-ln -s /pbr/bundle/authoring/nvidia /opt/pbr-venv/lib/python3.12/site-packages/nvidia
-export LD_LIBRARY_PATH="/pbr/bundle/authoring/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-/opt/pbr-venv/bin/python -c \
-  'import torch; print(torch.__version__); print(torch.cuda.get_device_properties(0))'
+bash /pbr/source/setup_python.sh /pbr
 exit
 ```
 
+`setup_python.sh` stores the Python environment in `/pbr/venv` and links
+`/opt/pbr-venv` to it, keeping these files off Docker’s writable layer.
 The matching TorchVision wheel avoids importing the incompatible stock container
-version. The supplied CUDA Python libraries preserve the tested eager environment. They
-are separate from the target's CUDA 13.3 SDK. Supplemental NGC libraries include
-`libcufile`, `libcusparseLt`, and `libnvshmem_host`, which DRIVE container mounts
-can hide. This setup does not replace host CUDA or TensorRT libraries.
+version. The downloaded CUDA Python packages match the tested environment and
+are separate from the target's CUDA 13.3 SDK. The bundle also retains supplemental
+`libcufile` and `libcusparseLt` libraries from NGC, which DRIVE container mounts
+can hide. NVSHMEM comes from the pinned Python package. This setup does not
+replace host CUDA or TensorRT libraries.
 
 An existing container is also usable: mount the handoff directory and pass its
 actual mount point as `--container-root`. The runner uses `/opt/pbr-venv/bin/python`
@@ -152,16 +148,15 @@ This checks out two source dependencies at fixed commits under `/pbr/deps`:
 - ExecuTorch: `a9665e25097b324a7116efa2bd6602287c9c064f`.
 
 These are dependencies of the single PBR branch, not additional benchmark
-branches to maintain. They preserve the runtime ABI used by the prepared models;
-compiling the rebased branch's current backend against the old programs is a
-different compatibility experiment. The source checkouts must be clean.
+branches to maintain. They keep the compiler and native runtime matched to the
+tested export path. Using the latest upstream backend is a different
+compatibility experiment. The source checkouts must be clean.
 
 The script runs CMake configure, build and install. CMake compiles the
 ExecuTorch runtime, its CUDA backend, the Torch-TensorRT delegate and both C++
 applications. It installs executables in `/pbr/native/bin` and the newly built
-shared libraries in `/pbr/native/lib`. This path does not link the bundled
-`sdk/lib` archives. No separate Bazel invocation is needed. In particular, the
-PBR branch's current `.bazelrc` does not define `--config=driveos`.
+shared libraries in `/pbr/native/lib`. No separate Bazel invocation is needed.
+The PBR branch's current `.bazelrc` does not define `--config=driveos`.
 
 This requires Git/network access for the pinned sources, CMake >=3.24, a C++
 compiler, the DRIVE CUDA/TensorRT development files, and the prepared Python
@@ -175,7 +170,7 @@ Run inside the same container, after the native source build:
 ```bash
 bash /pbr/source/build_authoring.sh /pbr
 export LD_LIBRARY_PATH=/pbr/bundle/authoring/lib
-mkdir -p /pbr/cache/tmp
+mkdir -p /pbr/cache/{tmp,triton,inductor}
 export TMPDIR=/pbr/cache/tmp
 export TRITON_CACHE_DIR=/pbr/cache/triton
 export TORCHINDUCTOR_CACHE_DIR=/pbr/cache/inductor
@@ -189,8 +184,8 @@ export XDG_CACHE_HOME=/pbr/cache
 `build_authoring.sh` builds and installs Torch-TensorRT's Python compiler from
 `deps/TensorRT-runtime`, the same pinned source used for the native delegate.
 `PYTHON_ONLY=1` selects the Python authoring package; CMake already built the
-native delegate. The matching Torch and ExecuTorch Python wheels are supplied
-in the single artifact archive. This does not build PyTorch itself from source.
+native delegate. Setup downloads the matching Torch wheel; the ExecuTorch Python
+wheel is supplied in the artifact archive. This does not build PyTorch itself from source.
 
 The exporter loads the checkpoint, captures the PyTorch graph, compiles supported
 regions with TensorRT, and saves the ExecuTorch program. BEVFormer geometry is
@@ -227,10 +222,9 @@ sudo env LD_LIBRARY_PATH="$LD_LIBRARY_PATH" python3 "$PBR_ROOT/source/run.py" \
 user already has Docker access. All native processes use the same user.
 The `--program-dir` option selects the freshly exported programs; the input
 fixtures, checkpoints, and ONNX engines still come from `bundle`. The runner
-records the fresh program hashes without changing the original bundle. Omit
-`--program-dir` only to measure the original supplied programs.
+records the fresh program hashes without changing the original bundle.
 The `--native-dir` option selects the rebuilt executables and shared libraries.
-Without it, the runner uses the original bundled binaries. The configuration
+Both options are required for the full comparison. The configuration
 record includes hashes of the selected rebuilt files.
 The output directory must be new. A failed command or output mismatch stops the
 matrix and leaves its log; it does not produce a successful summary.
@@ -299,30 +293,13 @@ correctness reports, loaded-library maps, commands, and the aggregate summary.
 Native processes must not load Python, LibTorch, or libc10; the runner checks this.
 `device.txt` records the native GPU name, SM count, and CUDA versions.
 
-## Optional: rebuild only the applications against the frozen SDK
-
-Inside the configured ARM64 container, using the supplied SDK:
-
-```bash
-cmake -S /pbr/source -B /pbr/build \
-  -DPBR_BUNDLE=/pbr/bundle -DCUDAToolkit_ROOT=/usr/local/cuda-13.3 \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build /pbr/build -j2
-cmake --install /pbr/build --prefix /pbr/rebuilt
-```
-
-Use `/pbr/rebuilt/bin/benchmark_et` or `benchmark_trt` for individual runs, with
-`LD_LIBRARY_PATH=/pbr/bundle/lib` plus the CUDA SDK library directory. Rebuilt
-binaries can be selected with `--native-dir "$PBR_ROOT/rebuilt"` after copying
-the matching two shared libraries from `bundle/lib` to `rebuilt/lib`. This is
-an application-only build, separate from the full native source build above.
-Do not silently overwrite the checked
-bundle or regenerate its manifest to hide an artifact change.
+## Optional: rebuild the geometry plugin
 
 `geometry_plugin.cu` contains the fixed-shape BEV camera projection and temporal
 rotation implementation used by the ONNX engine. It can be rebuilt separately:
 
 ```bash
+mkdir -p /pbr/rebuilt
 /usr/local/cuda-13.3/bin/nvcc -std=c++17 -O2 --fmad=false \
   -Xcompiler=-fPIC -shared -arch=sm_110 \
   -I/usr/include/aarch64-linux-gnu \
@@ -330,9 +307,6 @@ rotation implementation used by the ONNX engine. It can be rebuilt separately:
   /pbr/source/geometry_plugin.cu -lnvinfer -o /pbr/rebuilt/libbev_geometry.so
 ```
 
-The native SDK is a frozen binary dependency, identified by the artifact manifest.
-This optional command rebuilds only the applications. The primary
-`build_native.sh` path above also builds the native runtime and delegate.
 The bundle supplies the ONNX engines and fixed fixtures. The fresh `.pte` export
 is a new build; retain its reports and benchmark results together.
 
@@ -343,11 +317,12 @@ is a new build; retain its reports and benchmark results together.
 | `benchmark.h` | Shared fixture reader, pinned buffers, timing, correctness, and memory collection |
 | `tensorrt.cpp` | Loads ONNX-built engines and runs `enqueueV3`; loads the BEV geometry plugin first |
 | `executorch.cpp` | Loads the program, binds caller buffers and stream, and calls `Module::forward` |
+| `setup_python.sh`, `authoring-requirements.txt` | Download and install pinned authoring dependencies |
 | `build_authoring.sh`, `export_pte.py` | Build the Python compiler from source and export both models with caller-owned IO |
 | `eager.py`, `models/` | Original FP32 inference baseline and model adapters |
 | `run.py` | Verifies artifacts, runs fresh processes, and aggregates valid results |
 | `test_run.py` | Tests artifact verification and rejection of incomplete measurements |
-| `CMakeLists.txt`, `source_runtime.cmake`, `build_native.sh` | Build native runtime, delegate and two executables from pinned source, or link the frozen SDK |
+| `CMakeLists.txt`, `source_runtime.cmake`, `build_native.sh` | Build native runtime, delegate and two executables from pinned source |
 | `PBR.md`, `VALIDATION.md`, `THIRD_PARTY.md` | Request, verification record, and source attribution |
 
 Run the host-independent checks with:

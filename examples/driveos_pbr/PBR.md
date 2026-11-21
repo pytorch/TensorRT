@@ -14,8 +14,8 @@ the tradeoffs, not to establish that one implementation always wins.
 **Source:** `pytorch/TensorRT`, branch `abose/PBR-file-driveOS`, directory
 `examples/driveos_pbr`. Record the exact source commit in the filed request.
 
-**Attachments:** `driveos-pbr-thoru-20261120.tar.gz` and its SHA-256 file.
-This single artifact archive accompanies the request; the Git branch intentionally does not contain engines, weights, or compiled libraries.
+**Attachments:** `driveos-pbr-thoru-compact-20261120.tar.gz` and its SHA-256 file.
+The archive is 909.1 MB (under 1 GB). It accompanies the request; the Git branch intentionally does not contain engines, weights, or compiled libraries.
 Insert the team's artifact links when filing.
 
 **Target:** 14-SM Thor U, DRIVE OS 7.2.5.0 Linux, CUDA 13.3, native TensorRT
@@ -27,12 +27,13 @@ not a QNX request or a Thor X measurement.
 | BEVFormer-Tiny | Six 480×800 views plus calibration, motion, previous BEV, and history flag | TensorRT engine with a fixed-shape CUDA geometry plugin | TensorRT engine regions plus AOTInductor geometry |
 | SegFormer-B0 | One 1024×1024 RGB tensor | TensorRT engine | TensorRT-backed program |
 
-**Build:** Run `build_native.sh` to compile the native ExecuTorch runtime, CUDA
+**Build:** Run `setup_python.sh` to install the pinned authoring dependencies,
+then `build_native.sh` to compile the native ExecuTorch runtime, CUDA
 backend, TensorRT delegate and benchmark applications from the pinned source
 dependencies. Run `build_authoring.sh` to build the Torch-TensorRT Python compiler,
 then `export_pte.py` for each model. Select the rebuilt runtime with `--native-dir`
-and fresh programs with `--program-dir`. The ONNX engines and pinned Python
-dependencies are supplied. No separate Bazel step is required for this path.
+and fresh programs with `--program-dir`. The ONNX engines and smaller Python
+wheels are supplied; setup downloads PyTorch and the CUDA Python packages. No separate Bazel step is required for this path.
 
 **Protocol:** Two fixed snapshots per model, three fresh launches per snapshot
 and mode; one first call, 20 warmup calls, and 100 measured calls per process.

@@ -34,7 +34,7 @@ converted to RGB tensors, and normalized:
 Their detailed provenance and preprocessing records accompany the fixtures in
 the bundle. They are not labelled Cityscapes evaluation inputs.
 
-The binary bundle contains NVIDIA CUDA components, PyTorch, ExecuTorch, model
+The binary bundle contains supplemental NVIDIA CUDA components, ExecuTorch, model
 weights, and other third-party dependencies. It is a benchmark attachment for
 recipients entitled to use those components; the source repository license does
 not relicense them. Preserve the bundled license notices when sharing it.

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
-# The prepared programs use the October runtime ABI, not current main's ABI.
+# Keep the native runtime ABI matched to the pinned Python exporter.
 set(TORCHTRT_SOURCE_DIR "" CACHE PATH "Pinned Torch-TensorRT runtime checkout")
 set(EXECUTORCH_SOURCE_DIR "" CACHE PATH "Pinned ExecuTorch checkout")
 if(NOT EXISTS "${TORCHTRT_SOURCE_DIR}/examples/executorch_reference_runner/CMakeLists.txt"

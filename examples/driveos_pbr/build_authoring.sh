@@ -15,10 +15,6 @@ export PATH="/opt/pbr-venv/bin:$PATH"
 export LD_LIBRARY_PATH="$root/bundle/authoring/lib"
 mkdir -p "$root/authoring-wheels" "$root/cache/tmp"
 export TMPDIR="$root/cache/tmp"
-python -m pip install --no-index --no-deps \
-  --find-links="$root/bundle/authoring/wheels" \
-  'executorch==1.6.0.dev20261009+cu132' \
-  'ruamel.yaml==0.19.1' 'flatbuffers==25.12.19'
 # Build the Python compiler from source. The native delegate was built by CMake.
 PYTHON_ONLY=1 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir "$root/authoring-wheels" "$ttrt"
