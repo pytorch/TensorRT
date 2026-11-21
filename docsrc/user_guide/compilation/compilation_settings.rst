@@ -455,8 +455,11 @@ Graph Partitioning
        On GPUs with compute capability 10.0 or newer it uses sm_80 instructions, except
        at compute capability 11.0 (Jetson Thor), where it uses the GPU's own ``tcgen05``
        instructions. It can be slower than PyTorch's grouped matrix multiply at large
-       row counts, so measure it. Other ops use the dense lowering and
-       ``grouped_mm_dense_max_macs``.
+       row counts, so measure it. When the weight is the output of
+       ``tensorrt.dequantize_nvfp4_experts`` or ``tensorrt.dequantize_mxfp8_experts``
+       (expert weights kept in NVFP4 or MXFP8), a kernel that reads the packed weights
+       takes the pair, so the engine stores them packed rather than as 16-bit weights.
+       Other ops use the dense lowering and ``grouped_mm_dense_max_macs``.
    * - ``grouped_mm_dense_max_macs``
      - ``None``
      - Leave ``aten._grouped_mm``, the grouped matrix multiply of mixture-of-experts

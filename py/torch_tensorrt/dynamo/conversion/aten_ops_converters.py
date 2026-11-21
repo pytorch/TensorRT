@@ -5234,6 +5234,80 @@ def aten_ops_grouped_mm_kernel(
     )
 
 
+from torch_tensorrt.dynamo.conversion import experts_custom_op  # noqa: E402,F401
+
+
+def quantized_grouped_mm_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if not _grouped_mm_kernel_set(settings):
+        return False
+    reason = _grouped_mm_kernel_blocked(settings) or _grouped_mm_kernel_unavailable()
+    if reason is not None:
+        _warn_grouped_mm_kernel_unused(reason)
+        return False
+    nvfp4 = node.target == torch.ops.tensorrt.grouped_mm_nvfp4.default
+    mat1, weight = node.args[0], node.args[1]
+    # The packed weights become engine constants; the kernel reads them as int32 words.
+    if not all(
+        isinstance(arg, Node) and arg.op == "get_attr" for arg in node.args[1:-1]
+    ):
+        return False
+    mat1_val, weight_val = mat1.meta.get("val"), weight.meta.get("val")
+    if not isinstance(mat1_val, torch.Tensor) or mat1_val.dim() != 2:
+        return False
+    if mat1_val.dtype not in (torch.bfloat16, torch.float16):
+        return False
+    k = mat1_val.shape[1]
+    if not all(isinstance(dim, int) for dim in (k, *weight_val.shape)):
+        return False
+    # Whole int32 words of weights and scales per row.
+    if k % (64 if nvfp4 else 128):
+        return False
+    from torch_tensorrt.dynamo.conversion.impl import _quantized_grouped_mm_kernel
+
+    pointer = "*bf16" if mat1_val.dtype == torch.bfloat16 else "*fp16"
+    try:
+        _quantized_grouped_mm_kernel.compile_kernel(
+            pointer, nvfp4, weight_val.shape[0], k, weight_val.shape[1]
+        )
+    except Exception as exc:
+        _LOGGER.debug(
+            "%s: the quantized grouped GEMM kernel does not build (%s)", node.name, exc
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.tensorrt.grouped_mm_nvfp4.default,
+    capability_validator=quantized_grouped_mm_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.tensorrt.grouped_mm_mxfp8.default,
+    capability_validator=quantized_grouped_mm_validator,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_quantized_grouped_mm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.moe.quantized_grouped_mm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1:-1],
+        args[-1],
+        nvfp4=target == torch.ops.tensorrt.grouped_mm_nvfp4.default,
+    )
+
+
 def grouped_mm_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:

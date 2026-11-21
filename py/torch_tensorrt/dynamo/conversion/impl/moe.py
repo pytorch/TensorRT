@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -171,5 +171,32 @@ def grouped_mm_kernel(
     plugin = _grouped_mm_kernel.plugin()
     offs = get_trt_tensor(ctx, offs, f"{name}_offs")
     layer = ctx.net.add_plugin(plugin(mat1, mat2, offs), aot=True)
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
+
+
+def quantized_grouped_mm(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    mat1: trt.ITensor,
+    weights: Sequence[torch.Tensor],
+    offs: Union[trt.ITensor, torch.Tensor],
+    nvfp4: bool,
+) -> trt.ITensor:
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _quantized_grouped_mm_kernel
+
+    nvfp4_plugin, mxfp8_plugin = _quantized_grouped_mm_kernel.plugins()
+    inputs = [get_trt_tensor(ctx, mat1, f"{name}_mat1")]
+    for i, weight in enumerate(weights):
+        # TensorRT has no 4-bit or E8M0 type a plugin takes; the same bytes go in as int32.
+        if weight.dtype != torch.float32:
+            weight = weight.contiguous().view(torch.int32)
+        inputs.append(get_trt_tensor(ctx, weight, f"{name}_weight_{i}"))
+    inputs.append(get_trt_tensor(ctx, offs, f"{name}_offs"))
+    plugin = nvfp4_plugin if nvfp4 else mxfp8_plugin
+    layer = ctx.net.add_plugin(plugin(*inputs), aot=True)
     set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)

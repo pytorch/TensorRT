@@ -36,6 +36,7 @@ from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F4
 from .fold_shared_kv_attention import fold_shared_kv_attention
 from .fold_slice_into_constant_pad import fold_slice_into_constant_pad
 from .force_causal_efficient_attention import force_causal_efficient_attention
+from .fuse_dequantize_into_grouped_mm import fuse_dequantize_into_grouped_mm
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .inline_autocast_regions import inline_autocast_regions
@@ -83,6 +84,7 @@ post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     lower_associative_scan,
+    fuse_dequantize_into_grouped_mm,
     mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
