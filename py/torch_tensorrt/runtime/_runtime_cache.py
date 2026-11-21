@@ -376,9 +376,27 @@ class RuntimeCache:
         try:
             if self.autosave_on_del and self.path:
                 self.autosave_on_del = False
-                self.save()
+                # The garbage collector can run this at any time, for example
+                # while another model is being traced. These thread-local
+                # guards keep the save out of that trace: dispatch modes,
+                # "torch_fn" labels, functorch, functionalization wrappers
+                # without data, and the Python dispatcher's operator cache.
+                with (
+                    torch._C._DisableTorchDispatch(),
+                    torch._C.DisableTorchFunction(),
+                    torch._C._DisableFuncTorch(),
+                    torch._C._ExcludeDispatchKeyGuard(
+                        torch._C.DispatchKeySet(torch._C.DispatchKey.Functionalize)
+                        | torch._C.DispatchKeySet(torch._C.DispatchKey.PythonDispatcher)
+                    ),
+                ):
+                    self.save()
         except Exception:
-            pass
+            # Logging itself can fail late in interpreter shutdown.
+            try:
+                logger.debug("RuntimeCache autosave failed", exc_info=True)
+            except Exception:
+                pass
 
     def __getstate__(self) -> dict[str, Any]:
         """Strip the unpicklable atexit token from the pickle stream.
