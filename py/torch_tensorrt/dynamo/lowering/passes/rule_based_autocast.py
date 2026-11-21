@@ -174,6 +174,14 @@ def rule_based_autocast(
     # Refit cannot change the engine's precisions, so it reuses the nodes that the
     # weights of the compiled program kept in high precision.
     constant_nodes = settings._autocast_constant_range_nodes
+    if constant_nodes is not None:
+        missing = constant_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions that the constants chose, because "
+                f"these nodes are not in the graph: {sorted(missing)}. Compile the model "
+                "again."
+            )
     constant_rule = (
         ConstantRangeRule(autocast_low_precision_type)
         if constant_nodes is None
@@ -194,6 +202,19 @@ def rule_based_autocast(
     )
     if isinstance(constant_rule, ConstantRangeRule):
         settings._autocast_constant_range_nodes = frozenset(constant_rule.kept)
+    elif settings._autocast_checks_constant_range:
+        check = ConstantRangeRule(autocast_low_precision_type)
+        low = set(low_precision_nodes)
+        overflowing = [
+            n.name for n in gm.graph.nodes if n.name in low and check._check_inner(n)
+        ]
+        if overflowing:
+            raise RuntimeError(
+                "Refit cannot change the precisions of the engine, and these nodes run "
+                f"in {autocast_low_precision_type} but read constants with values "
+                f"that become inf in it: {overflowing}. Compile the model again to keep "
+                f"them in {autocast_high_precision_type}."
+            )
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(

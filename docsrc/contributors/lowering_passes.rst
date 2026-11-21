@@ -173,7 +173,7 @@ cast nodes into the graph based on a set of rules:
 4. **Op exclusions** — nodes with targets in ``autocast_excluded_ops`` are kept in FP32.
 5. **Constant range** — nodes that read a floating point weight or a number, whose
    finite value becomes ``inf`` in the low precision type are kept in FP32. Refit reuses
-   the nodes this kept at compile time.
+   the nodes this kept at compile time, and raises when new weights need more.
 6. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
    ranges are measured by running the model on calibration data before applying the
    threshold check. Without a dataloader, the range and depth checks are skipped and

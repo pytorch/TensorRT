@@ -2653,6 +2653,93 @@ def test_autocast_refit_keeps_the_precisions_the_constants_chose(caplog):
     )
 
 
+@pytest.mark.unit
+def test_autocast_refit_reuses_and_checks_the_constant_range_nodes():
+    class Model(nn.Module):
+        def __init__(self, running_var):
+            super().__init__()
+            self.bn = nn.BatchNorm1d(8)
+            with torch.no_grad():
+                self.bn.running_var.fill_(running_var)
+
+        def forward(self, x):
+            return self.bn(x)
+
+    x = torch.randn(4, 8)
+
+    def batch_norm_dtype(running_var, settings):
+        ep = pre_export_lowering(
+            torch.export.export(Model(running_var).eval(), (x,)), settings
+        )
+        (bn,) = ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.batch_norm.default
+        )
+        return bn.name, bn.meta["val"].dtype
+
+    def settings():
+        return CompilationSettings(
+            enable_autocast=True, autocast_low_precision_type=torch.float16
+        )
+
+    compiled = settings()
+    name, dtype = batch_norm_dtype(1e6, compiled)
+    assert dtype == torch.float32
+    assert compiled._autocast_constant_range_nodes == {name}
+    # Refit keeps the BatchNorm in float32, although the new running variance fits.
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float32)
+
+    compiled = settings()
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float16)
+    # Refit cannot move the BatchNorm out of float16, where the new running variance
+    # becomes inf, also for an engine that was saved and loaded.
+    compiled = pickle.loads(pickle.dumps(compiled))
+    with pytest.raises(RuntimeError, match=f"{name}.*Compile the model again"):
+        batch_norm_dtype(1e6, compiled)
+
+    compiled = settings()
+    compiled._autocast_constant_range_nodes = frozenset({"not_a_node"})
+    with pytest.raises(RuntimeError, match="not_a_node"):
+        batch_norm_dtype(1e6, compiled)
+
+    # An engine saved before autocast kept nodes for their constants has none, and its
+    # refit keeps its precisions without checking the new weights, as before.
+    old = settings()
+    del old.__dict__["_autocast_constant_range_nodes"]
+    del old.__dict__["_autocast_checks_constant_range"]
+    loaded = pickle.loads(pickle.dumps(old))
+    assert loaded._autocast_constant_range_nodes == frozenset()
+    assert batch_norm_dtype(1e6, loaded) == (name, torch.float16)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("op", ["bucketize", "cumsum"])
+def test_autocast_refit_skips_ops_that_autocast_does_not_cast(op):
+    class Model(nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            self.register_buffer("values", torch.tensor([0.0, value]))
+
+        def forward(self, x):
+            # bucketize makes integers, and cumsum is given a dtype, so autocast never
+            # casts the values they read.
+            if op == "bucketize":
+                return torch.bucketize(x, self.values)
+            return x * 2, torch.cumsum(self.values, 0, dtype=torch.float32)
+
+    x = torch.randn(4, 8)
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    pre_export_lowering(torch.export.export(Model(1.0).eval(), (x,)), settings)
+    ep = pre_export_lowering(torch.export.export(Model(1e6).eval(), (x,)), settings)
+    target, dtype = {
+        "bucketize": (torch.ops.aten.bucketize.Tensor, torch.int64),
+        "cumsum": (torch.ops.aten.cumsum.default, torch.float32),
+    }[op]
+    (node,) = ep.graph.find_nodes(op="call_function", target=target)
+    assert node.meta["val"].dtype == dtype
+
+
 _FLOAT32_MAX = torch.finfo(torch.float32).max
 
 

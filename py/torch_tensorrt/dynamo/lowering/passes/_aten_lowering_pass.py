@@ -335,11 +335,7 @@ def pre_export_lowering(
             and settings.autocast_low_precision_type is not None
         ):
             inline_autocast_regions(ep.graph_module)
-        # Refit reuses the precisions that the weights chose at compile time.
-        if (
-            settings.autocast_low_precision_type is not None
-            and settings._autocast_constant_range_nodes is None
-        ):
+        if settings.autocast_low_precision_type is not None:
             record_weight_magnitudes(ep)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
