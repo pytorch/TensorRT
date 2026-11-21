@@ -163,15 +163,18 @@ When ``enable_autocast=True`` in ``CompilationSettings``, this pass inserts prec
 cast nodes into the graph based on a set of rules:
 
 1. **Output range check** — nodes whose outputs exceed ``autocast_max_output_threshold``
-   are kept in FP32 (guarded against overflow). Needs calibration data (step 5).
+   are kept in FP32 (guarded against overflow). Needs calibration data (step 6).
 2. **Reduction depth check** — nodes with reduction depth exceeding
    ``autocast_max_depth_of_reduction`` are kept in FP32 (guarded against accumulated
-   error). Needs calibration data (step 5).
+   error). Needs calibration data (step 6).
 3. **Name exclusions** — nodes whose module path matches a pattern in
    ``autocast_excluded_nodes``, or whose name matches a pattern in
    ``autocast_excluded_node_names``, are kept in FP32.
 4. **Op exclusions** — nodes with targets in ``autocast_excluded_ops`` are kept in FP32.
-5. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
+5. **Constant range** — nodes that read a floating point weight or a number, whose
+   finite value becomes ``inf`` in the low precision type are kept in FP32. Refit reuses
+   the nodes this kept at compile time.
+6. **Calibration** — if ``autocast_calibration_dataloader`` is provided, actual output
    ranges are measured by running the model on calibration data before applying the
    threshold check. Without a dataloader, the range and depth checks are skipped and
    a warning is logged. Refit instead reuses the precisions that the dataloader chose

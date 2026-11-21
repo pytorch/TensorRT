@@ -4,18 +4,106 @@
 # Borrowed from ModelOpt AutoCast's nodeclassifier.py, modified to fit Torch-TensorRT's needs.
 import abc
 import logging
+import math
 import operator
 import re
-from typing import Collection, Optional
+from typing import Any, Collection, Iterator, Optional
 
 import torch
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
 
-from .inline_autocast_regions import NAME_IN_REGION
+from .inline_autocast_regions import NAME_IN_REGION, _aliases_an_input
+from .pass_utils import (
+    _has_no_floating_point_tensors,
+    _has_only_integer_outputs,
+    _is_given_a_dtype,
+    tensors_maybe_written_by,
+)
 
 logger = logging.getLogger(__name__)
+
+# The largest magnitude of the finite values of a weight, on its placeholder.
+WEIGHT_MAGNITUDE = "_torch_tensorrt_weight_magnitude"
+
+_COPIES = (torch.ops.aten.clone.default, torch.ops.aten.lift_fresh_copy.default)
+
+# Tensor arguments whose values an op only places in its output, such as an attention
+# mask value of torch.finfo(torch.float32).min. The next low precision op reads it as
+# -inf anyway, as scaled_dot_product_attention does inside, so keeping the op in FP32
+# would only add casts.
+_PLACED_ARGUMENTS = {
+    torch.ops.aten.where.self: ("self", "other"),
+    torch.ops.aten.masked_fill.Tensor: ("value",),
+    torch.ops.aten.index_put.default: ("values",),
+    torch.ops.aten.scaled_dot_product_attention.default: ("attn_mask",),
+}
+
+
+def _dtype(node: torch.fx.Node) -> Optional[torch.dtype]:
+    val = node.meta.get("val")
+    if isinstance(val, (list, tuple)):
+        val = val[0] if val else None
+    return getattr(val, "dtype", None)
+
+
+def _reads_tensors(node: torch.fx.Node) -> bool:
+    return any(hasattr(n.meta.get("val"), "dtype") for n in node.all_input_nodes)
+
+
+def _is_written(node: torch.fx.Node, by_a_block: bool = False) -> bool:
+    """Whether an op, or with by_a_block a block such as torch.no_grad, writes into
+    node, also through a view of it."""
+    nodes = [node]
+    for n in nodes:
+        for user in n.users:
+            if n in tensors_maybe_written_by(user) and (
+                not by_a_block
+                or isinstance(user.target, torch._ops.HigherOrderOperator)
+            ):
+                return True
+            if (
+                _aliases_an_input(user) and user.args[0] is n
+            ) or user.target is operator.getitem:
+                nodes.append(user)
+    return False
+
+
+def record_weight_magnitudes(ep: torch.export.ExportedProgram) -> None:
+    """Record the largest magnitude of the finite values of each weight on its
+    placeholder, for ConstantRangeRule. Only bfloat16, float32 and float64 weights
+    count. A buffer that the program writes into is not a constant."""
+    signature = ep.graph_signature
+    names = {
+        **signature.inputs_to_parameters,
+        **signature.inputs_to_buffers,
+        **signature.inputs_to_lifted_tensor_constants,
+    }
+    written = set(signature.buffers_to_mutate.values())
+    for node in ep.graph.find_nodes(op="placeholder"):
+        name = names.get(node.name)
+        tensor = ep.state_dict.get(name, ep.constants.get(name))
+        if (
+            name in written
+            or type(tensor) not in (torch.Tensor, torch.nn.Parameter)
+            or tensor.dtype not in (torch.bfloat16, torch.float32, torch.float64)
+            or tensor.is_meta
+            or not tensor.numel()
+            or _is_written(node)
+        ):
+            continue
+        # aminmax reads the weight once without a copy, but gives NaN for a weight
+        # with a NaN and inf for one with an inf, which do not overflow.
+        low, high = torch.aminmax(tensor.detach())
+        magnitude = torch.maximum(-low, high).item()
+        if not math.isfinite(magnitude):
+            finite = tensor.detach()[tensor.detach().isfinite()]
+            if not finite.numel():
+                continue
+            low, high = torch.aminmax(finite)
+            magnitude = torch.maximum(-low, high).item()
+        node.meta[WEIGHT_MAGNITUDE] = magnitude
 
 
 class NodeRuleBase:
@@ -96,7 +184,7 @@ class NodeNameRegexRule(NodeRuleBase):
 class NodeNameSetRule(NodeRuleBase):
     """Rule for keeping the nodes with the given exact names in high precision."""
 
-    def __init__(self, node_names):
+    def __init__(self, node_names: Collection[str]) -> None:
         """Initialize the rule.
 
         Args:
@@ -104,7 +192,7 @@ class NodeNameSetRule(NodeRuleBase):
         """
         self.node_names = node_names
 
-    def _check_inner(self, node):
+    def _check_inner(self, node: torch.fx.Node) -> bool:
         return node.name in self.node_names
 
 
@@ -171,6 +259,133 @@ class IORangeRule(NodeRuleBase):
             )
         else:
             super()._log_skipped(node, **kwargs)
+
+
+class ConstantRangeRule(NodeRuleBase):
+    """Rule for keeping nodes in high precision when a constant they read, a weight or a
+    number such as the 1e6 of x / 1e6, becomes inf in the low precision type, as a
+    BatchNorm running variance of 1e6 does in float16. Needs no calibration data. NaN
+    and inf stay as they are in the low precision type, so they do not count. The
+    names of the nodes it keeps are in kept."""
+
+    def __init__(self, low_precision_type: torch.dtype) -> None:
+        """Initialize the rule.
+
+        Args:
+            low_precision_type: The type that autocast would cast the constants to.
+        """
+        finfo = torch.finfo(low_precision_type)
+        # Half a unit in the last place above the largest value: the smallest magnitude
+        # that rounds to inf, 65520 for float16.
+        self.overflow = finfo.max + 2 ** (math.frexp(finfo.max)[1] - 2) * finfo.eps
+        self.low_precision_type = low_precision_type
+        self.constant: Optional[tuple[str, float]] = None
+        self.kept: set[str] = set()
+
+    def _constants(self, node: torch.fx.Node) -> Iterator[tuple[str, float]]:
+        names = _PLACED_ARGUMENTS.get(node.target, ())
+        arguments = {
+            arg.name: node.args[i] if i < len(node.args) else node.kwargs.get(arg.name)
+            for i, arg in enumerate(node.target._schema.arguments if names else ())
+        }
+        # index_put with accumulate=True adds its values instead of placing them.
+        placed = set() if arguments.get("accumulate") else {arguments[n] for n in names}
+        for n in node.all_input_nodes:
+            if n in placed:
+                continue
+            # A view such as weight.t(), a chunk of a weight, and a copy such as the
+            # lift_fresh_copy of torch.tensor(1e6), have the values of the weight.
+            while (
+                _aliases_an_input(n) or n.target in (operator.getitem, *_COPIES)
+            ) and isinstance(n.args[0], torch.fx.Node):
+                n = n.args[0]
+            if WEIGHT_MAGNITUDE in n.meta:
+                yield n.name, n.meta[WEIGHT_MAGNITUDE]
+        if not isinstance(node.target, torch._ops.OpOverload):
+            return
+        for i, arg in enumerate(node.target._schema.arguments):
+            value = node.args[i] if i < len(node.args) else node.kwargs.get(arg.name)
+            arg_type = arg.type
+            if isinstance(arg_type, torch.OptionalType):
+                arg_type = arg_type.getElementType()
+            # A number given for a Tensor or a Scalar, not an int such as a dim or the
+            # end of a slice.
+            if (
+                isinstance(arg_type, (torch.TensorType, torch.NumberType))
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+            ):
+                yield arg.name, value
+
+    def _check_inner(self, node: torch.fx.Node) -> bool:
+        if _is_written(node, by_a_block=True):
+            # A block gets one type for all its inputs and may write into any of them,
+            # so a tensor that it takes keeps the type it has without this rule.
+            return False
+        # A view and an in-place op run in the type of the tensor whose memory they
+        # share, since a cast would make an in-place op such as fill_ write into a copy.
+        # A block such as torch.no_grad that writes in place counts as an in-place op.
+        written = tensors_maybe_written_by(node)
+        if written or _aliases_an_input(node):
+            shared = written or [
+                a for a in node.args[:1] if isinstance(a, torch.fx.Node)
+            ]
+        elif isinstance(node.target, torch._ops.HigherOrderOperator):
+            # A block such as torch.no_grad can return a view of a tensor it takes.
+            shared = [n for n in node.all_input_nodes if _dtype(n) is not None]
+        else:
+            shared = []
+        # NodeClassifier skips getitem, so a chunk of a tensor follows the op that made it.
+        shared = [n.args[0] if n.target is operator.getitem else n for n in shared]
+        # A cast such as h.half() shares memory only when it changes nothing.
+        if shared and all(
+            n.name in self.kept and _dtype(n) == _dtype(node) for n in shared
+        ):
+            self.constant = None
+            self.kept.add(node.name)
+            return True
+        if written or (
+            shared
+            and all(
+                n.op == "call_function"
+                and n.name not in self.kept
+                and _reads_tensors(n)
+                for n in shared
+            )
+        ):
+            # An in-place op or a view of a tensor that runs in the low precision type
+            # runs in it too. A factory op such as torch.full is never cast.
+            return False
+        if (
+            _has_no_floating_point_tensors(node)
+            or _has_only_integer_outputs(node)
+            or _is_given_a_dtype(node)
+        ):
+            # Autocast does not cast an integer op such as ids == 128000 or bucketize,
+            # or an op given a dtype such as x.half().
+            return False
+        self.constant = next(
+            (
+                (name, value)
+                for name, value in self._constants(node)
+                if math.isfinite(value) and abs(value) >= self.overflow
+            ),
+            None,
+        )
+        if self.constant is not None:
+            self.kept.add(node.name)
+        return self.constant is not None
+
+    def _log_skipped(self, node: torch.fx.Node, **kwargs: Any) -> None:
+        if self.constant is None:
+            logger.info(
+                f"Skipping node {node.name}: it shares the memory of a kept node"
+            )
+            return
+        logger.info(
+            f"Skipping node {node.name}: constant {self.constant[0]} has magnitude "
+            f"{abs(self.constant[1])}, which is inf in {self.low_precision_type}"
+        )
 
 
 class DepthOfReductionRule(NodeRuleBase):
@@ -278,6 +493,7 @@ class NodeClassifier:
         custom_rule: NodeRuleBase | None = None,
         max_output_threshold: float | None = 512,
         max_depth_of_reduction: int | None = None,
+        constant_rule: NodeRuleBase | None = None,
     ):
         """Initialize the node classifier.
 
@@ -289,6 +505,7 @@ class NodeClassifier:
             custom_rule: Optional custom classification rule.
             max_output_threshold: Maximum absolute value allowed for node I/O.
             max_depth_of_reduction: Maximum depth of reduction allowed in low precision.
+            constant_rule: Optional rule for constants that do not fit in the low precision type.
         """
         self.nodes = nodes
         self.excluded_nodes = excluded_nodes
@@ -297,6 +514,7 @@ class NodeClassifier:
         self.custom_rule = custom_rule
         self.max_output_threshold = max_output_threshold
         self.max_depth_of_reduction = max_depth_of_reduction
+        self.constant_rule = constant_rule
 
     def _gen_block_node_rules(self, reference_magnitudes, reference_shapes):
         """Generate list of rules for blocking nodes from precision conversion.
@@ -326,6 +544,8 @@ class NodeClassifier:
                     reference_shapes,
                 )
             )
+        if self.constant_rule:
+            block_node_rules.append(self.constant_rule)
         if self.custom_rule:
             block_node_rules.append(self.custom_rule)
         return block_node_rules
