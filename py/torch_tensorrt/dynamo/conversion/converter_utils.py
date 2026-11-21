@@ -159,7 +159,8 @@ def is_only_operator_on_placeholder(
 
 
 # Ops that only move data. TensorRT has no uint8 layers for them, so the interpreter widens a
-# uint8 input to int32 first; the values are the same, and nothing computes on them.
+# uint8 input to int32 first, the whole input even when the op keeps only part of it. The
+# values are the same, and nothing computes on them.
 UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.permute.default,
     torch.ops.aten._reshape_copy.default,
@@ -169,6 +170,7 @@ UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.squeeze.dim,
     torch.ops.aten.squeeze.dims,
     torch.ops.aten.expand.default,
+    torch.ops.aten.select.int,
     torch.ops.aten.slice.Tensor,
     torch.ops.aten.cat.default,
     torch.ops.aten.split.Tensor,
@@ -206,12 +208,18 @@ def makes_uint8_tensor(node: torch.fx.Node) -> bool:
     slice_scatter that overwrites the whole tensor with a uint8 source, can hand an
     engine input through as it is, the where converter widens uint8 values first,
     and the interpreter widens the uint8 input of an op that only moves data, so
-    they are left to their converters. A get_attr is not refused: uint8 weights are
-    packed FP4 that the quantization converters read themselves.
+    they are left to their converters. A cast to uint8 is left to its converter too:
+    the validator accepts it only from a source the converter turns into the widened
+    int32 value. A get_attr is not refused: uint8 weights are packed FP4 that the
+    quantization converters read themselves.
     """
     if node.op not in CALLABLE_NODE_OPS:
         return False
-    if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+    if node.target in (
+        torch.ops.aten.clone.default,
+        torch.ops.aten.where.self,
+        torch.ops.aten._to_copy.default,
+    ):
         return False
     if node.target in UINT8_DATA_MOVEMENT_OPS or (
         node.target is operator.getitem
@@ -1420,9 +1428,11 @@ def promote_trt_tensors_to_same_dtype(
     elif lhs.dtype == trt.bool and rhs.dtype == trt.bool:
         # Case 2: If both tensors are bool types, preserve bool
         promoted_dtype = trt.bool
+    elif trt.int64 in (lhs.dtype, rhs.dtype):
+        # Case 3: int64 with another integer or bool stays int64 instead of narrowing
+        promoted_dtype = trt.int64
     else:
-        # Case 3: If both tensors are int types (e.g., int32, int64), promote to int32
-        # (Note: TensorRT does not support int64 for many ops like select/where)
+        # Case 4: Other integer or bool pairs promote to int32
         promoted_dtype = trt.int32
 
     # Cast both tensors to the promoted dtype

@@ -49,6 +49,16 @@ class TestCeilConverter(DispatchTestCase):
             check_dtype=False,
         )
 
+    @parameterized.expand([(torch.int32,), (torch.int64,)])
+    def test_ceil_int_is_exact(self, dtype):
+        class ceil(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.ceil.default(input)
+
+        # float32 would round these.
+        inputs = [torch.tensor([2**25 + 1, -(2**25) - 3], dtype=dtype)]
+        self.run_test(ceil(), inputs, rtol=0, atol=0)
+
     @parameterized.expand(
         [
             (

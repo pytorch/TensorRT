@@ -18,6 +18,15 @@ class TestMeanDimConverter(DispatchTestCase):
         inputs = [torch.randn(1, 10)]
         self.run_test(TestModule(), inputs)
 
+    def test_mean_dim_int64(self):
+        # The mean of 2 and 9 is 5.5, which an int64 average would truncate.
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.mean.dim(x, [0], dtype=torch.float32)
+
+        inputs = [torch.tensor([[1, 2], [5, 9]], dtype=torch.int64)]
+        self.run_test(TestModule(), inputs, rtol=0, atol=0)
+
     def test_mean_dim_of_0d_tensor(self):
         class TestModule(nn.Module):
             def forward(self, x):

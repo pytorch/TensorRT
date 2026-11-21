@@ -69,7 +69,6 @@ from torch_tensorrt.reporting import current_emitter
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _UINT8_VALUE_PICKING_OPS = {
-    torch.ops.aten.select.int,
     torch.ops.aten.index.Tensor,
     torch.ops.aten.gather.default,
 }
