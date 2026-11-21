@@ -229,6 +229,8 @@ Error ExecutionGraph::enqueue_in(
     CUgreenCtx stream_green) {
   auto& context = *handle.exec_ctx;
   const size_t count = handle.num_inputs + handle.num_outputs;
+  moves_.resize(count, 0);
+  staged_.resize(count, false);
   // A recorded graph keeps the scratch address it was recorded with. The shared pool frees that
   // buffer when it grows, so a graph recorded on another buffer must not be replayed.
   if (scratch != scratch_) {
@@ -244,9 +246,11 @@ Error ExecutionGraph::enqueue_in(
     capture_failed_ = false;
     own_buffers_failed_ = false;
     failed_captures_ = 0;
-    // A caller that moved its buffers away from recordings on them twice keeps moving them under new shapes
-    // too, so it stays on buffers this graph owns instead of paying more recordings for every set of shapes.
-    staged_ = moves_ > 1;
+    // A buffer the caller moved away from recordings on it twice keeps moving under new shapes too, so it
+    // stays on a buffer this graph owns instead of paying more recordings for every set of shapes.
+    for (size_t i = 0; i < count; ++i) {
+      staged_[i] = moves_[i] > 1;
+    }
     staged_until_repeat_ = false;
     shape_epoch_ = handle.shape_epoch;
   }
@@ -261,23 +265,63 @@ Error ExecutionGraph::enqueue_in(
   // A graph reads and writes the addresses it was recorded on. A caller that hands in new buffers on
   // every call, or alternates two sets, would record on every call, so a first recording goes on the
   // caller's addresses only when they repeat the previous call's, and on buffers this graph owns until
-  // they do. A caller that moves its buffers away from a recording on them once gets a new recording on
-  // the new ones; one that keeps moving them switches to buffers this graph owns at the second move.
+  // they do. A caller that moves a buffer away from a recording on it once gets a new recording on the
+  // new one; one that keeps moving it switches to a buffer this graph owns at the second move. Each
+  // buffer counts on its own, so the ones that stay put are read and written in place.
+  const auto replays_on_addresses = [&] {
+    for (size_t i = 0; i < count; ++i) {
+      if (!staged_[i] && addresses[i] != recorded_[i]) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const auto moved_since_previous = [&] {
+    for (size_t i = 0; i < count; ++i) {
+      if (!staged_[i] && addresses[i] != previous_[i]) {
+        return true;
+      }
+    }
+    return false;
+  };
   if (!other_context) {
     bool waits_for_repeat = false;
-    if (!staged_ && addresses != recorded_ && graph_exec_ != nullptr) {
+    if (graph_exec_ != nullptr && !replays_on_addresses()) {
       drop_graph();
-      staged_ = ++moves_ > 1;
-    } else if (!staged_ && graph_exec_ == nullptr && warmed_up_ && addresses != previous_) {
+      for (size_t i = 0; i < count; ++i) {
+        if (!staged_[i] && addresses[i] != recorded_[i] && ++moves_[i] > 1) {
+          staged_[i] = true;
+        }
+      }
+    } else if (graph_exec_ == nullptr && warmed_up_ && moved_since_previous()) {
       // Without buffers of its own, the graph runs these calls plainly.
       waits_for_repeat = own_buffers_failed_;
-      staged_ = !own_buffers_failed_;
-      staged_until_repeat_ = !own_buffers_failed_;
-    } else if (staged_until_repeat_ && addresses == previous_) {
-      drop_graph();
-      release_buffers(stream);
-      staged_ = false;
+      if (!own_buffers_failed_) {
+        for (size_t i = 0; i < count; ++i) {
+          staged_[i] = staged_[i] || addresses[i] != previous_[i];
+        }
+        staged_until_repeat_ = true;
+      }
+    }
+    // This runs after either branch above, so a buffer that repeats goes back in place also on a call where another
+    // moves. One that moved twice stays staged for good.
+    if (staged_until_repeat_) {
+      bool settled = false;
       staged_until_repeat_ = false;
+      for (size_t i = 0; i < count; ++i) {
+        if (staged_[i] && moves_[i] < 2 && addresses[i] == previous_[i]) {
+          staged_[i] = false;
+          settled = true;
+        }
+        // Recomputed only here. A recording for another context clears it, so the bindings it staged never settle.
+        staged_until_repeat_ = staged_until_repeat_ || (staged_[i] && moves_[i] < 2);
+      }
+      if (settled) {
+        drop_graph();
+        if (std::find(staged_.begin(), staged_.end(), true) == staged_.end()) {
+          release_buffers(stream);
+        }
+      }
     }
     previous_ = addresses;
     if (waits_for_repeat) {
@@ -288,9 +332,10 @@ Error ExecutionGraph::enqueue_in(
   // serves records one in the engine's context, on buffers this graph owns. Until that recording can
   // go ahead the call fails. The graph and the failure count of the engine's own calls stay, unless the
   // call's shapes were new, since the shape change above has then reset both.
-  const bool records_for_other_context =
-      other_context && (graph_exec_ == nullptr || (!staged_ && addresses != recorded_));
-  const bool own_buffers = staged_ || records_for_other_context;
+  const bool records_for_other_context = other_context && (graph_exec_ == nullptr || !replays_on_addresses());
+  const bool own_buffers =
+      records_for_other_context || std::find(staged_.begin(), staged_.end(), true) != staged_.end();
+  const auto copies = [&](size_t i) { return records_for_other_context || staged_[i]; };
   std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
   if (records_for_other_context) {
     // Pooled calls never get here: execute() refuses a pooled call from another regular context first.
@@ -307,12 +352,15 @@ Error ExecutionGraph::enqueue_in(
     buffers_.resize(count, nullptr);
     capacities_.resize(count, 0);
     for (size_t i = 0; i < count; ++i) {
+      if (!copies(i)) {
+        continue;
+      }
       // TensorRT refuses a null address even for an empty tensor.
       const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
       if (capacities_[i] < bytes) {
         // New buffers need no warm-up, since warmed_up_ already says whether the engine ran these shapes
-        // in its own context, and a graph on the caller's buffers stays valid.
-        if (staged_) {
+        // in its own context, and a graph that does not read this buffer stays valid.
+        if (staged_[i]) {
           drop_graph();
         }
         // Doubling keeps shapes that grow a little at a time from allocating at every growth.
@@ -340,11 +388,14 @@ Error ExecutionGraph::enqueue_in(
           }
           fall_back("buffer allocation failed", allocation);
           release_buffers(stream);
-          // The caller's addresses need no buffers of this graph, so a later call that repeats them still
-          // records on them, and calls that keep moving run plainly until then.
           if (staged_until_repeat_) {
-            staged_ = false;
+            // Only the bindings that waited for a repeat go back to the caller's addresses, and calls run plainly
+            // until one repeats the previous call's address for every binding read in place. A binding that moved
+            // twice stays staged, and the next recording allocates a buffer for it again.
             staged_until_repeat_ = false;
+            for (size_t j = 0; j < count; ++j) {
+              staged_[j] = staged_[j] && moves_[j] > 1;
+            }
             own_buffers_failed_ = true;
           } else {
             capture_failed_ = true;
@@ -356,14 +407,14 @@ Error ExecutionGraph::enqueue_in(
       }
     }
     for (size_t i = 0; i < count; ++i) {
-      if (!handle.bind_address(i, buffers_[i])) {
+      if (!handle.bind_address(i, copies(i) ? buffers_[i] : addresses[i])) {
         ET_LOG(
             Error,
             "TensorRTBackend::execute: CUDA graph setTensorAddress failed for '%s'",
             binding_name(handle, i).c_str());
         return Error::InvalidState;
       }
-      if (i < handle.num_inputs && binding_bytes[i] != 0) {
+      if (i < handle.num_inputs && binding_bytes[i] != 0 && copies(i)) {
         const auto error = cuda_error(
             cudaMemcpyAsync(buffers_[i], addresses[i], binding_bytes[i], cudaMemcpyDefault, stream), "input copy");
         if (error != Error::Ok) {
@@ -464,12 +515,25 @@ Error ExecutionGraph::enqueue_in(
     }
     drop_graph();
     graph_exec_ = exec;
-    staged_ = own_buffers;
-    recorded_ = own_buffers ? buffers_ : addresses;
-    if (!own_buffers) {
-      // A graph on the caller's addresses leaves this graph's buffers unused. New shapes can clear the
-      // repeat that would otherwise free them, so they are freed here.
-      release_buffers(stream);
+    if (records_for_other_context) {
+      // Every call copies every binding from now on until the shapes or the profile change, so a repeat does not
+      // record again.
+      staged_until_repeat_ = false;
+      std::fill(staged_.begin(), staged_.end(), true);
+    }
+    recorded_ = addresses;
+    for (size_t i = 0; i < count; ++i) {
+      if (copies(i)) {
+        recorded_[i] = buffers_[i];
+      }
+    }
+    // A buffer this recording does not read is unused from now on.
+    for (size_t i = 0; i < buffers_.size(); ++i) {
+      if (buffers_[i] != nullptr && !copies(i)) {
+        retire(buffers_[i], stream);
+        buffers_[i] = nullptr;
+        capacities_[i] = 0;
+      }
     }
   }
   if (graph_exec_ != nullptr) {
@@ -484,14 +548,12 @@ Error ExecutionGraph::enqueue_in(
     }
     warmed_up_ = true;
   }
-  if (staged_) {
-    for (size_t i = handle.num_inputs; i < count; ++i) {
-      if (binding_bytes[i] != 0) {
-        const auto error = cuda_error(
-            cudaMemcpyAsync(addresses[i], buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream), "output copy");
-        if (error != Error::Ok) {
-          return error;
-        }
+  for (size_t i = handle.num_inputs; i < count; ++i) {
+    if (binding_bytes[i] != 0 && copies(i)) {
+      const auto error = cuda_error(
+          cudaMemcpyAsync(addresses[i], buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream), "output copy");
+      if (error != Error::Ok) {
+        return error;
       }
     }
   }
