@@ -20,11 +20,12 @@ from torch_tensorrt.kernels import _common, _triton
 
 PLUGIN_NAME = "torch_tensorrt::grouped_mm"
 
-# With 3 pipeline stages these tiles need up to 48 KiB of shared memory for 16-bit
-# types, the most TensorRT gives a plugin kernel.
-_BLOCK_M = 128
-_BLOCK_N = 128
-_BLOCK_K = 32
+# (BLOCK_M, BLOCK_N, BLOCK_K). With 3 pipeline stages this tile needs at most 48 KiB
+# of shared memory for 16-bit types, the most TensorRT gives a plugin kernel.
+_TILES = (128, 128, 32)
+# tcgen05 needs 16 bytes more, so 128x128x32 no longer fits 3 stages; a wider,
+# shallower tile does, and was the fastest that fit for the shapes measured on Thor.
+_TCGEN05_TILES = (128, 256, 16)
 _NUM_WARPS = 4
 _NUM_STAGES = (3, 2)
 
@@ -138,24 +139,27 @@ def _signature(pointer: str) -> Dict[str, str]:
     }
 
 
-def _compile(pointer: str, groups: int, k: int, n: int) -> Any:
+def _compile(pointer: str, groups: int, k: int, n: int) -> Tuple[Any, int, int]:
     """The kernel's PTX for the current GPU, with the deepest pipeline that fits.
 
-    Raises, saying why, when the kernel cannot be built for a plugin launch. The
-    converter's validator compiles it first, so a failure declines the op instead of
-    failing the engine build, and the build reuses the cached result.
+    Returns the artifact with the BLOCK_M and BLOCK_N it was built with. Raises,
+    saying why, when the kernel cannot be built for a plugin launch. The
+    converter's validator compiles it first, so a failure declines the op instead
+    of failing the engine build, and the build reuses the cached result.
     """
     capability = triton.runtime.driver.active.get_current_target().arch
-    artifact = _compile_for(pointer, groups, k, n, capability)
-    if isinstance(artifact, str):
-        raise RuntimeError(artifact)
-    return artifact
+    kernel = _compile_for(pointer, groups, k, n, capability)
+    if isinstance(kernel, str):
+        raise RuntimeError(kernel)
+    return kernel
 
 
 # Failures are cached too, because the converter registry runs validators on every lookup.
 @functools.lru_cache(maxsize=None)
-def _compile_for(pointer: str, groups: int, k: int, n: int, capability: int) -> Any:
-    """The kernel, or why it does not build."""
+def _compile_for(
+    pointer: str, groups: int, k: int, n: int, capability: int
+) -> Union[Tuple[Any, int, int], str]:
+    """The kernel with its BLOCK_M and BLOCK_N, or why it does not build."""
     try:
         return _build(pointer, groups, k, n, capability)
     except Exception as exc:
@@ -165,20 +169,23 @@ def _compile_for(pointer: str, groups: int, k: int, n: int, capability: int) -> 
         )
 
 
-def _build(pointer: str, groups: int, k: int, n: int, capability: int) -> Any:
+def _build(
+    pointer: str, groups: int, k: int, n: int, capability: int
+) -> Tuple[Any, int, int]:
+    # tcgen05 was measured only on Jetson Thor.
+    tcgen05 = capability == 110
+    block_m, block_n, block_k = _TCGEN05_TILES if tcgen05 else _TILES
     constexprs = {
         "N": n,
         "K": k,
         "GROUPS": groups,
         "GROUPS_POW2": triton.next_power_of_2(groups),
-        "BLOCK_M": _BLOCK_M,
-        "BLOCK_N": _BLOCK_N,
-        "BLOCK_K": _BLOCK_K,
+        "BLOCK_M": block_m,
+        "BLOCK_N": block_n,
+        "BLOCK_K": block_k,
     }
-    # On sm_100 to sm_110, Triton's tl.dot uses tcgen05, which was not measured with
-    # these tiles. sm_80's mma.sync runs on every later GPU, and Triton already uses it
-    # on sm_120 and sm_121.
-    arch = 80 if capability >= 100 else None
+    # Other GPUs from sm_100 on get sm_80's mma.sync, which runs on all of them.
+    arch = 80 if capability >= 100 and not tcgen05 else None
     for num_stages in _NUM_STAGES:
         artifact = _triton.compile_triton_to_ptx(
             _grouped_mm_kernel,
@@ -193,7 +200,8 @@ def _build(pointer: str, groups: int, k: int, n: int, capability: int) -> Any:
             arch=arch,
         )
         if artifact.shared_mem <= _common.AOT_MAX_DYNAMIC_SHARED_MEM:
-            return artifact
+            # The launch grid must use the tile the kernel was built with.
+            return artifact, block_m, block_n
     raise RuntimeError(
         f"the grouped GEMM kernel needs {artifact.shared_mem} bytes of shared memory, "
         f"more than the {_common.AOT_MAX_DYNAMIC_SHARED_MEM} a TensorRT plugin kernel gets"
@@ -213,13 +221,13 @@ def _aot_impl(
     if groups is None or k is None or n is None:
         raise ValueError("the grouped GEMM kernel needs a static group count, K and N")
     pointer = "*" + _TRITON_DTYPES[mat1.dtype]
-    artifact = _compile(pointer, groups, k, n)
+    artifact, block_m, block_n = _compile(pointer, groups, k, n)
 
     def grid(inputs: Tuple[trtp.TensorDesc, ...], _: object) -> object:
         # Each group and the rows past the last offset can end in a partial row
         # tile, which adds at most one tile per group.
         rows = inputs[0].shape_expr[0]
-        return (trtp.cdiv(rows, _BLOCK_M) + groups) * triton.cdiv(n, _BLOCK_N)
+        return (trtp.cdiv(rows, block_m) + groups) * triton.cdiv(n, block_n)
 
     launch = _common.make_pointer_aot_fn(
         PLUGIN_NAME,

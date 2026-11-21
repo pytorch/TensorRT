@@ -126,30 +126,35 @@ class TestGroupedMMKernel(TestCase):
 
     @parameterized.expand(
         [
-            # sm_90 is the one target where Triton uses its own Hopper instructions.
-            ("hopper", 90, b"wgmma", None),
-            # From sm_100 on, Triton's own instructions need tensor memory, which the
-            # plugin launch refuses, so the kernel uses sm_80's.
-            ("blackwell", 100, None, b"tcgen05"),
+            ("hopper", 90, 0, b"wgmma", None),
+            # Only Jetson Thor uses tcgen05, with tensor memory. Other GPUs from
+            # sm_100 on use sm_80's mma.sync.
+            ("blackwell", 100, 86, b"mma.sync", b"tcgen05"),
+            ("thor", 110, 90, b"tcgen05", None),
         ]
     )
-    def test_code_for_newer_gpus_fits_a_plugin_launch(self, _, arch, used, unused):
+    def test_code_for_newer_gpus_fits_a_plugin_launch(
+        self, _, arch, min_isa, used, unused
+    ):
         # Compiles for the target on whatever GPU runs the test.
         import triton
+        from packaging.version import Version
         from torch_tensorrt.dynamo.conversion.impl import _grouped_mm_kernel
         from torch_tensorrt.kernels import _common, _triton
         from triton.backends.compiler import GPUTarget
 
-        # PTX ISA 8.6 (CUDA 12.8) is the first that can target sm_100.
+        # The first PTX ISA that can target each GPU: 8.6 for sm_100, 9.0 for sm_110.
         driver_isa = _triton._driver_max_ptx_version()
-        if arch >= 100 and driver_isa is not None and driver_isa < 86:
-            self.skipTest("the CUDA driver cannot load PTX for sm_100")
+        if driver_isa is not None and driver_isa < min_isa:
+            self.skipTest(f"the CUDA driver cannot load PTX for sm_{arch}")
+        if arch == 110 and Version(triton.__version__) < Version("3.7"):
+            self.skipTest("Triton builds tcgen05 for sm_110 only from 3.7 on")
         with mock.patch.object(
             triton.runtime.driver.active,
             "get_current_target",
             return_value=GPUTarget("cuda", arch, 32),
         ):
-            artifact = _grouped_mm_kernel._build("*bf16", 16, 2048, 768, arch)
+            artifact, _, _ = _grouped_mm_kernel._build("*bf16", 16, 2048, 768, arch)
         self.assertIn(f".target sm_{arch}".encode(), artifact.ptx)
         if used:
             self.assertIn(used, artifact.ptx)
@@ -170,7 +175,9 @@ class TestGroupedMMKernel(TestCase):
                 _triton, "compile_triton_to_ptx", wraps=_triton.compile_triton_to_ptx
             ) as compile_,
         ):
-            artifact = _grouped_mm_kernel._build("*bf16", 16, 2048, 768, capability)
+            artifact, _, _ = _grouped_mm_kernel._build(
+                "*bf16", 16, 2048, 768, capability
+            )
         self.assertEqual(
             [call.kwargs["num_stages"] for call in compile_.call_args_list], [6, 3]
         )
@@ -182,7 +189,8 @@ class TestGroupedMMKernel(TestCase):
 
         capability = triton.runtime.driver.active.get_current_target().arch
         with (
-            mock.patch.object(_grouped_mm_kernel, "_BLOCK_K", 256),
+            mock.patch.object(_grouped_mm_kernel, "_TILES", (128, 128, 256)),
+            mock.patch.object(_grouped_mm_kernel, "_TCGEN05_TILES", (128, 256, 256)),
             self.assertRaisesRegex(RuntimeError, "shared memory"),
         ):
             _grouped_mm_kernel._build("*bf16", 16, 2048, 768, capability)
@@ -281,6 +289,56 @@ class TestGroupedMMKernel(TestCase):
                 rtol=1e-2,
                 atol=1e-2,
             )
+
+    @parameterized.expand(
+        [
+            # CI has no Thor, so run Thor's tile here with this GPU's instructions. That
+            # checks the grid and the masks for BLOCK_N=256 and BLOCK_K=16.
+            ("thor_tile", (128, 256, 16), (128, 256, 16)),
+            # The launch grid must come from the compiled kernel. A grid worked out again
+            # from a tile setting that changed after the build would leave rows unwritten.
+            ("tile_changed_after_build", (128, 128, 32), (128, 256, 16)),
+        ]
+    )
+    def test_engine_launch_uses_the_built_tile(self, _, build_tiles, launch_tiles):
+        from torch_tensorrt.dynamo.conversion.impl import _grouped_mm_kernel
+
+        groups, k, n, rows = 4, 64, 384, 300
+
+        class GroupedMM(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = torch.nn.Parameter(
+                    torch.randn(groups, k, n, dtype=torch.bfloat16) * 0.05
+                )
+
+            def forward(self, x, offs):
+                return torch.ops.aten._grouped_mm.default(x, self.w, offs)
+
+        model = GroupedMM().eval().cuda()
+        # An empty group, partial row and column tiles, and rows past the last offset.
+        ends = [70, 70, 200, 260]
+        x = torch.randn(rows, k, dtype=torch.bfloat16, device="cuda")
+        out = torch.full((rows, n), 7.0, dtype=torch.bfloat16, device="cuda")
+        _grouped_mm_kernel._compile_for.cache_clear()
+        self.addCleanup(_grouped_mm_kernel._compile_for.cache_clear)
+        with mock.patch.multiple(
+            _grouped_mm_kernel, _TILES=build_tiles, _TCGEN05_TILES=build_tiles
+        ):
+            _grouped_mm_kernel._compile("*bf16", groups, k, n)
+        with mock.patch.multiple(
+            _grouped_mm_kernel, _TILES=launch_tiles, _TCGEN05_TILES=launch_tiles
+        ):
+            kernel_ops, out = _run_engine(model, x, _offsets([70, 0, 130, 60]), out)
+        self.assertEqual(kernel_ops, 1)
+        for group, (start, end) in enumerate(zip([0] + ends[:-1], ends)):
+            torch.testing.assert_close(
+                out[start:end],
+                x[start:end] @ model.w[group].detach(),
+                rtol=1e-2,
+                atol=1e-2,
+            )
+        self.assertEqual(torch.count_nonzero(out[ends[-1] :]).item(), 0)
 
     def test_compile_failure_falls_back(self):
         # A kernel that does not build, for example under a new Triton or GPU,
