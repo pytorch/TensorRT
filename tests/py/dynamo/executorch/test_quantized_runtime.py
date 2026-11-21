@@ -25,6 +25,10 @@ def requires_runtime():
     for package in ("torch_tensorrt_executorch_runtime", "modelopt"):
         if importlib.util.find_spec(package) is None:
             pytest.skip(f"needs the {package} package")
+    if not hasattr(torch.jit, "script"):
+        pytest.skip(
+            "modelopt needs a PyTorch build with TorchScript (torch.jit.script)"
+        )
 
 
 class _Model(torch.nn.Module):

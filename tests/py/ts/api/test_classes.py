@@ -5,6 +5,7 @@ import copy
 import unittest
 from typing import Dict
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
@@ -14,6 +15,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModu
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
 )
+@pytest.mark.runs_without_torchscript
 class TestInput(unittest.TestCase):
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()

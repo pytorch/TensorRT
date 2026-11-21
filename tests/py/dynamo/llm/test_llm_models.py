@@ -20,8 +20,8 @@ import argparse
 @pytest.mark.unit
 @pytest.mark.parametrize("precision", ["FP16", "BF16", "FP32"])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
