@@ -15,6 +15,10 @@ import pytest
 import torch
 
 pytestmark = pytest.mark.unit
+_needs_torchscript = pytest.mark.skipif(
+    not hasattr(torch.jit, "load"),
+    reason="needs a PyTorch build with TorchScript (torch.jit.load)",
+)
 ROOT = Path(__file__).parents[4]
 PORTABLE = "executorch.extension.pybindings.portable_lib"
 DELEGATE = "torch_tensorrt_executorch_runtime"
@@ -264,7 +268,7 @@ def test_native_failures_propagate_without_fallback(
         pytest.fail("ExecuTorch errors must not reach another format's loader")
 
     monkeypatch.setattr(torch.export, "load", unexpected)
-    monkeypatch.setattr(torch.jit, "load", unexpected)
+    monkeypatch.setattr(torch.jit, "load", unexpected, raising=False)
     target, attribute = {
         "register": (boundary.delegate, "register"),
         "load": (boundary.portable, "_load_for_executorch_from_buffer"),
@@ -394,7 +398,7 @@ def test_standard_dispatch_and_kwargs(
         return expected
 
     monkeypatch.setattr(torch.export, "load", export_load)
-    monkeypatch.setattr(torch.jit, "load", jit_load)
+    monkeypatch.setattr(torch.jit, "load", jit_load, raising=False)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = compiler.load(
@@ -416,7 +420,9 @@ def test_standard_dispatch_and_kwargs(
 
 
 @pytest.mark.parametrize("options", [{}, {"format": None}])
-@pytest.mark.parametrize("format", ["export", "jit"])
+@pytest.mark.parametrize(
+    "format", ["export", pytest.param("jit", marks=_needs_torchscript)]
+)
 def test_standard_formats_round_trip_real_cpu_torch(
     compiler, boundary, options, format
 ):

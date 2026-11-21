@@ -219,8 +219,8 @@ def test_resnet18_half(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -284,8 +284,8 @@ def test_base_fp4_dynamic_shapes(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -344,8 +344,8 @@ def test_base_fp4_static_shapes(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -415,8 +415,8 @@ def test_nvfp4_nd_input_quantizer(ir):
     "FP8 quantization requires compute capability 8.9 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -478,8 +478,8 @@ def test_fp8_and_input_quantizer(ir):
     "FP8 quantization requires compute capability 8.9 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -549,8 +549,8 @@ def test_base_fp8(ir):
     ],
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -609,8 +609,8 @@ def test_zero_amax(ir, quant, dtype, calib_value, dynamic_amax, run_input):
 @pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -663,8 +663,8 @@ def test_base_int8(ir, dtype):
 @pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "ModelOpt is required to run this test, and it needs torch.jit.script",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -821,6 +821,10 @@ def test_fp8_mha_softmax_quantizer_annotation(ir):
 @unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
     "FP8 quantization requires compute capability 8.9 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt") or not hasattr(torch.jit, "script"),
+    "the quantize_op converter needs ModelOpt to import, and it needs torch.jit.script",
 )
 @pytest.mark.trt_api
 @pytest.mark.unit
