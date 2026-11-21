@@ -434,16 +434,28 @@ Give the outputs GPU buffers from C++
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A program exported as in `Keep inputs and outputs on the GPU`_, with all 4 settings shown there,
-does not allocate its outputs. Give it a buffer on the engine's GPU for each output once, before
-the first call, and every call writes there. Without it, the first call fails. This holds only for
-an input that a GPU delegate reads and an output that a GPU delegate writes. One that a CPU
-operator reads or writes stays in host memory, as ``device()`` in its metadata says, and needs host
-memory instead. Read the output's shape from what ``forward`` returns: for a dynamic shape, the
-buffer is sized for the largest shape. Set any options from `Setting a runtime option`_ before
-``set_output``, which loads the method. ``cudaMalloc`` needs the CUDA toolkit: add
-``find_package(CUDAToolkit REQUIRED)`` and ``CUDA::cudart`` to the CMake file. The program below
-stops unless its input and output are float and on the GPU, and assumes that the engine's GPU is
-the current device. It does this for one input and one output:
+reads its input from GPU memory and has no memory for its outputs. Before the first call, give it
+one persistent GPU buffer per output with ``Module::set_output``. Every ``forward`` call then
+writes the output into that same buffer, so read or copy it before the next call. Without the
+buffers, the first call fails with error ``0x12`` (``InvalidArgument``), and the log mentions
+``set_output_data_ptr``.
+
+This is true only for an input that a GPU delegate reads and an output that a GPU delegate writes.
+An operator that TensorRT does not take runs on the CPU when the export has no ``CudaPartitioner``.
+If it reads an input or writes an output, that tensor stays in host memory, and a GPU pointer there
+crashes the process. ``device()`` in each tensor's metadata says where it is. For a tensor on the
+CPU, give host memory instead.
+
+The program below does this for one input and one output.
+
+* It stops unless both are float and on the GPU.
+* Set any runtime options (see `Setting a runtime option`_) before ``set_output``, because that
+  call loads the method.
+* Read the output's shape from what ``forward`` returns. For a dynamic shape, the buffer is sized
+  for the largest shape, and the result says how much of it the call wrote.
+* ``cudaMalloc`` comes from the CUDA toolkit, so add ``find_package(CUDAToolkit REQUIRED)`` and
+  link ``CUDA::cudart``.
+* It assumes that the engine's GPU is the current device.
 
 .. code-block:: cpp
 
