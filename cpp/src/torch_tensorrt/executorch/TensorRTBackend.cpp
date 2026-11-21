@@ -971,7 +971,7 @@ cudaError_t copy_to_row_major(void* dst, const exec_aten::Tensor& src, cudaStrea
   return cudaSuccess;
 }
 
-// What execute() needs to know about a buffer, from one cudaPointerGetAttributes per buffer.
+// What execute() needs to know about a buffer, from one cuPointerGetAttributes per buffer.
 struct BufferPlacement {
   // Device or managed memory.
   bool cuda_accessible = false;
@@ -979,24 +979,36 @@ struct BufferPlacement {
   int foreign_device = -1;
 };
 
+// Asks the driver for only these 4 attributes, which costs less than a cudaPointerGetAttributes and gives the same
+// answers. Plain host memory is not an error here: it reads as memory type 0.
 BufferPlacement placement_of(const void* ptr, int engine_device) {
+  static const auto get_attributes =
+      driver_entry_point<PFN_cuPointerGetAttributes_v7000>("cuPointerGetAttributes", 7000);
   BufferPlacement placement;
-  if (ptr == nullptr) {
+  if (ptr == nullptr || get_attributes == nullptr) {
     return placement;
   }
-  cudaPointerAttributes attrs{};
-  // Let through: an older runtime reports plain host memory as an outright failure.
-  if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
-    cudaGetLastError();
+  unsigned int type = 0;
+  unsigned int managed = 0;
+  int device = -1;
+  CUdeviceptr device_pointer = 0;
+  CUpointer_attribute attributes[] = {
+      CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
+      CU_POINTER_ATTRIBUTE_IS_MANAGED,
+      CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL,
+      CU_POINTER_ATTRIBUTE_DEVICE_POINTER};
+  void* values[] = {&type, &managed, &device, &device_pointer};
+  if (get_attributes(4, attributes, values, reinterpret_cast<CUdeviceptr>(ptr)) != CUDA_SUCCESS) {
     return placement;
   }
-  placement.cuda_accessible = attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
-  // A non-null devicePointer is an address usable from here, which is the question. Asking instead
+  // Managed memory reads as device memory on most GPUs, and as host memory on a Jetson Orin.
+  placement.cuda_accessible = type == CU_MEMORYTYPE_DEVICE || managed != 0;
+  // A non-null device pointer is an address usable from here, which is the question. Asking instead
   // whether the two cards CAN reach each other answered yes on every pair measured and still faulted,
   // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
-  // once it is.
-  if (attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device && attrs.devicePointer == nullptr) {
-    placement.foreign_device = attrs.device;
+  // once it is. Managed memory is never refused.
+  if (type == CU_MEMORYTYPE_DEVICE && managed == 0 && device != engine_device && device_pointer == 0) {
+    placement.foreign_device = device;
   }
   return placement;
 }
