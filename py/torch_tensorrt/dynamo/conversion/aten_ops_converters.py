@@ -5,6 +5,7 @@
 
 import functools
 import logging
+import math
 import operator
 from typing import (
     Any,
@@ -4165,16 +4166,70 @@ def aten_ops_cdist_forward(
     )
 
 
+POOL_SPATIAL_RANK = {
+    torch.ops.aten.avg_pool1d.default: 1,
+    torch.ops.aten.avg_pool2d.default: 2,
+    torch.ops.aten.avg_pool3d.default: 3,
+    torch.ops.aten.max_pool1d.default: 1,
+    torch.ops.aten.max_pool2d.default: 2,
+    torch.ops.aten.max_pool3d.default: 3,
+}
+
+
+def ceil_mode_pool_supported(
+    pool_node: Node, settings: Optional[CompilationSettings]
+) -> bool:
+    """ceil_mode pools ran in PyTorch before the converters supported them, so inputs the
+    converters cannot build stay there: unbatched inputs, a kernel listed for fewer
+    dimensions than the op pools, windows of 100000 or more elements, integer inputs, and
+    float64 without truncate_double."""
+    val = (
+        pool_node.args[0].meta.get("val")
+        if isinstance(pool_node.args[0], Node)
+        else None
+    )
+    kernel_size = pool_node.args[1]
+    spatial_rank = POOL_SPATIAL_RANK[pool_node.target]
+    if val is None:
+        _LOGGER.debug("ceil_mode pooling needs the input shape, which is unknown.")
+        return False
+    if not isinstance(kernel_size, (list, tuple)) or len(kernel_size) != spatial_rank:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a kernel size for each of the {spatial_rank} pooled dimensions, got kernel_size={kernel_size}."
+        )
+        return False
+    # TensorRT rejects a 2D window of 100000 or more elements. 3D allows more, but such
+    # pools are rare, so they keep running in PyTorch.
+    if math.prod(kernel_size) >= 100000:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a window of fewer than 100000 elements, got kernel_size={kernel_size}."
+        )
+        return False
+    if val.dim() != spatial_rank + 2:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a batched input, got shape={tuple(val.shape)}."
+        )
+        return False
+    if not val.dtype.is_floating_point:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a floating point input, got {val.dtype}."
+        )
+        return False
+    if val.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
+        _LOGGER.debug("ceil_mode pooling of float64 needs truncate_double=True.")
+        return False
+    return True
+
+
 def avg_pool_param_validator(
     pool_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
 
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
+    if ceil_mode and not ceil_mode_pool_supported(pool_node, settings):
         return False
 
     if divisor_override is not None:
@@ -4412,14 +4467,19 @@ def max_pool_param_validator(
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
 
+    # Passing ceil_mode makes export write out the default dilation as a list of ones.
+    if (
+        ceil_mode
+        and isinstance(dilation, (list, tuple))
+        and all(d == 1 for d in dilation)
+    ):
+        dilation = 1
+
     if dilation != 1:
         _LOGGER.debug(f"Currently we don't support dilation, got dilation={dilation}.")
         return False
 
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
+    if ceil_mode and not ceil_mode_pool_supported(pool_node, settings):
         return False
 
     return True

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import math
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -20,6 +20,21 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 
 
+def _ceil_mode_extra_padding(
+    kernel_size: Sequence[int], stride: Sequence[int], padding: Sequence[int]
+) -> List[int]:
+    """Post-padding to add per pooled dimension so that TensorRT's floor rounding gives
+    PyTorch's ceil_mode windows, for any input size.
+
+    PyTorch adds a last window when it starts less than one stride past the last start
+    where a whole window fits, and before the right padding. TensorRT keeps a window when
+    it ends within the post-padding, so the extra post-padding is
+    min(stride - 1, kernel - 1 - padding). It is smaller than the window, which exclusive
+    average pooling requires. TensorRT's round-up mode does not fit: it can keep a last
+    window that PyTorch drops, and its edge averages differ with count_include_pad."""
+    return [min(s - 1, k - 1 - p) for k, s, p in zip(kernel_size, stride, padding)]
+
+
 def avg_poolNd(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -33,9 +48,6 @@ def avg_poolNd(
     count_include_pad: bool = True,
     divisor_override: Optional[int] = None,
 ) -> TRTTensor:
-    if ceil_mode is not False:
-        raise RuntimeError("ceil_mode is not yet supported!")
-
     if divisor_override is not None:
         raise RuntimeError("divisor_override is not yet supported!")
 
@@ -43,12 +55,25 @@ def avg_poolNd(
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride == []:
-        stride = kernel_size
-    else:
-        stride = extend_attr_to_tuple(stride, dim)
+    stride_nd = kernel_size if stride == [] else extend_attr_to_tuple(stride, dim)
+    padding_nd = extend_attr_to_tuple(padding, dim)
 
-    padding = extend_attr_to_tuple(padding, dim)
+    # Where the extra padding is zero in every dimension, ceil_mode can add no window.
+    # The floor mode path is then exact, and it avoids the copy the zero padding makes.
+    extra_padding = _ceil_mode_extra_padding(kernel_size, stride_nd, padding_nd)
+    can_add_window = ceil_mode and any(extra_padding)
+
+    # PyTorch's divisor counts the padding but never the positions past it that
+    # ceil_mode's last window covers, while TensorRT counts all padding or none. So the
+    # padding becomes real zeros and only real elements count.
+    layer_padding = padding_nd
+    if can_add_window and count_include_pad and any(padding_nd):
+        # constant_padNd takes (front, back) pairs, last dimension first.
+        pads = [p for p in reversed(padding_nd) for _ in range(2)]
+        input = impl.pad.constant_padNd(
+            ctx, target, source_ir, f"{name}_pad", input, pads, 0
+        )
+        layer_padding = (0,) * dim
 
     # add average pooling layer
     pool_layer = ctx.net.add_pooling_nd(
@@ -57,9 +82,11 @@ def avg_poolNd(
         window_size=kernel_size,
     )
 
-    pool_layer.stride_nd = stride
-    pool_layer.padding_nd = padding
-    pool_layer.average_count_excludes_padding = not count_include_pad
+    pool_layer.stride_nd = stride_nd
+    pool_layer.padding_nd = layer_padding
+    if can_add_window:
+        pool_layer.post_padding = [p + e for p, e in zip(layer_padding, extra_padding)]
+    pool_layer.average_count_excludes_padding = can_add_window or not count_include_pad
 
     set_layer_name(pool_layer, target, name, source_ir)
     return pool_layer.get_output(0)
@@ -77,25 +104,15 @@ def max_poolNd(
     dilation: Union[int, Sequence[int]] = 1,
     ceil_mode: bool = False,
 ) -> TRTTensor:
-    if has_dynamic_shape(input.shape):
-        assert input.shape[1] != -1, "Channel dim can't be dynamic for pooling."
-
-    if dilation != 1:
+    if any(d != 1 for d in extend_attr_to_tuple(dilation, len(kernel_size))):
         raise RuntimeError("dilation is not yet supported!")
-
-    if ceil_mode is not False:
-        raise RuntimeError("ceil_mode is not yet supported!")
 
     dim = len(kernel_size)
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride == []:
-        stride = kernel_size
-    else:
-        stride = extend_attr_to_tuple(stride, dim)
-
-    padding = extend_attr_to_tuple(padding, dim)
+    stride_nd = kernel_size if stride == [] else extend_attr_to_tuple(stride, dim)
+    padding_nd = extend_attr_to_tuple(padding, dim)
 
     # add max pooling layer
     pool_layer = ctx.net.add_pooling_nd(
@@ -104,8 +121,11 @@ def max_poolNd(
         window_size=kernel_size,
     )
 
-    pool_layer.stride_nd = stride
-    pool_layer.padding_nd = padding
+    pool_layer.stride_nd = stride_nd
+    pool_layer.padding_nd = padding_nd
+    if ceil_mode:
+        extra_padding = _ceil_mode_extra_padding(kernel_size, stride_nd, padding_nd)
+        pool_layer.post_padding = [p + e for p, e in zip(padding_nd, extra_padding)]
 
     set_layer_name(pool_layer, target, name, source_ir)
     return pool_layer.get_output(0)
