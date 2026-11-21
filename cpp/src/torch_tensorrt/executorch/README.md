@@ -477,8 +477,18 @@ thread-local capture. Without the refusal, you would learn of these only when
 - Only pooled calls check, and only their own stream. A capture on another stream is not caught.
   So do not overlap `execute()` with a global capture on any thread, or with a thread-local capture
   on the calling thread. This holds for every stream, and also with the option off or for an engine
-  that needs no scratch: the call's final `cudaStreamSynchronize`, or the `cudaFree(nullptr)` on a
-  default stream, can invalidate the capture too.
+  that needs no scratch. These calls in `execute()`, for example, can invalidate the capture:
+  - its final `cudaStreamSynchronize`;
+  - the `cudaMalloc` that grows a staging buffer, and the `cudaFree` of the buffer it replaces;
+  - the `cudaFree(nullptr)` it makes before a call on a default stream, before any call of an engine
+    with CUDA graphs on, and before a switch of optimization profile. It makes this call only on a
+    thread with no current CUDA context.
+
+  So on a thread with a context current, the call can queue the engine before it is refused. A thread
+  has one once it has used CUDA, or once `execute()` has switched devices or checked a pooled call.
+  Before it returns its error, `execute()` waits for what it queued, so none of it is still running.
+  Its outputs, and any input the engine updates in place, may then already be written, so a retry
+  runs those updates a second time.
 
 None of this makes capturing the delegate itself supported.
 
