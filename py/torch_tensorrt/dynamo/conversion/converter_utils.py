@@ -159,7 +159,8 @@ def is_only_operator_on_placeholder(
 
 
 # Ops that only move data. TensorRT has no uint8 layers for them, so the interpreter widens a
-# uint8 input to int32 first; the values are the same, and nothing computes on them.
+# uint8 input to int32 first, the whole input even when the op keeps only part of it. The
+# values are the same, and nothing computes on them.
 UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.permute.default,
     torch.ops.aten._reshape_copy.default,
@@ -169,6 +170,7 @@ UINT8_DATA_MOVEMENT_OPS = {
     torch.ops.aten.squeeze.dim,
     torch.ops.aten.squeeze.dims,
     torch.ops.aten.expand.default,
+    torch.ops.aten.select.int,
     torch.ops.aten.slice.Tensor,
     torch.ops.aten.cat.default,
     torch.ops.aten.split.Tensor,
