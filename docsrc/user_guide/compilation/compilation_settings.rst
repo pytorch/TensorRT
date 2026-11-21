@@ -435,6 +435,28 @@ Graph Partitioning
        ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
        graph. Only static input and output heights and widths and floating-point
        inputs are converted. Some sizes run slower than in PyTorch, so measure it.
+   * - ``grouped_mm_dense_max_macs``
+     - ``None``
+     - Leave ``aten._grouped_mm``, the grouped matrix multiply of mixture-of-experts
+       layers, to PyTorch when its TensorRT lowering would do more than this many
+       multiply-adds (groups * rows * K * N). That lowering multiplies every row by
+       every group's weight, while PyTorch computes only each row's own group.
+       ``None`` turns the limit off. The limit does not apply to an op with one group,
+       under ``require_full_compilation=True``, or in
+       ``convert_exported_program_to_serialized_trt_engine``, which cannot leave an
+       operator to PyTorch. ``torch.compile`` turns ``require_full_compilation`` off, so
+       there only ``None`` keeps the op in TensorRT. The lowering handles static shapes
+       only, so it never takes an op with a dynamic row count, whatever this is: the op
+       then runs in PyTorch, or the compile fails where no operator can be left to
+       PyTorch. Keep ``None``
+       where the op cannot run outside TensorRT: an ExecuTorch save without a
+       partitioner that takes it (such as the CUDA partitioner) stops with a missing
+       out variant, and where PyTorch has no fast kernel for it (such as float32, or
+       bfloat16 on an A100) it copies the group offsets to the host,
+       so the module cannot be captured whole by CUDA graphs. Above ``2**38`` the
+       dense lowering was slower than PyTorch in every case measured on H100 and A100.
+       Earlier releases converted an op with a dynamic row count by pinning it to the
+       example size. A program saved that way cannot be refitted; compile it again.
    * - ``replace_interleave_stack_with_cat``
      - ``False``
      - Write a stack whose only user is a reshape that merges the new axis into a
@@ -550,7 +572,8 @@ rebuilt from scratch:
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
+``convert_antialiased_resize``, ``grouped_mm_dense_max_macs``,
+``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)

@@ -92,6 +92,8 @@ FALLBACK_DATA_DEPENDENT_OPS = False
 FALLBACK_PYTORCH_PLUGIN_OPS = False
 COLLAPSE_HIGH_RANK_PERMUTES = False
 CONVERT_ANTIALIASED_RESIZE = False
+# Off, so a default compile keeps a statically shaped aten._grouped_mm in TensorRT.
+GROUPED_MM_DENSE_MAX_MACS = None
 REPLACE_INTERLEAVE_STACK_WITH_CAT = False
 
 # Global Performance Tuning (TensorRT build-route knobs)
