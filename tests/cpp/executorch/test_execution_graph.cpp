@@ -1582,9 +1582,14 @@ TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {
   auto graph = std::make_unique<LoadedGraphEngine>();
   ASSERT_NO_FATAL_FAILURE(load_graph(*graph));
   ASSERT_NO_FATAL_FAILURE(stage_default(*graph, 2, 8));
+  const void* input = graph->handle()->exec_ctx->getTensorAddress("input_0");
+  const void* output = graph->handle()->exec_ctx->getTensorAddress("output_0");
   CudaCalls calls;
   graph.reset();
-  EXPECT_EQ(calls.free_calls, 2u);
+  // By address, since a build that links ExecuTorch's CUDA extension statically also counts TensorRT's frees
+  // through its allocator.
+  EXPECT_EQ(std::count(calls.frees.begin(), calls.frees.end(), input), 1);
+  EXPECT_EQ(std::count(calls.frees.begin(), calls.frees.end(), output), 1);
 }
 
 TEST_F(ExecutionGraphReplayTest, EnqueueRefusedDuringCaptureFallsBackWithFreshOutputs) {

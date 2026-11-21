@@ -63,6 +63,7 @@ struct CudaCalls {
   size_t free_calls = 0;
   // cudaFree(nullptr), which makes the device's primary context current when none is.
   size_t context_calls = 0;
+  std::vector<void*> frees;
   size_t memcpy_calls = 0;
   // The copy with this 1-based count fails without being queued.
   size_t fail_memcpy_call = 0;
