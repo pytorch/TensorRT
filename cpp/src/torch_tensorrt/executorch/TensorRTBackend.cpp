@@ -379,7 +379,13 @@ class StreamDrainOnEarlyReturn {
   StreamDrainOnEarlyReturn& operator=(const StreamDrainOnEarlyReturn&) = delete;
   ~StreamDrainOnEarlyReturn() {
     if (armed_) {
+      // Relaxed, so a global capture on another thread cannot refuse this wait and leave the call's work running.
+      cudaStreamCaptureMode mode = cudaStreamCaptureModeRelaxed;
+      const bool relaxed = cudaThreadExchangeStreamCaptureMode(&mode) == cudaSuccess;
       (void)cudaStreamSynchronize(stream_);
+      if (relaxed) {
+        (void)cudaThreadExchangeStreamCaptureMode(&mode);
+      }
       cudaGetLastError();
     }
   }
@@ -2296,8 +2302,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return profile_err;
   }
   // A new thread has no current context, and the device guard sets one only when it switches devices.
-  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set.
+  // cudaFree(nullptr) makes the primary context current. Graph replay, default streams and profile switches need
+  // a context on every call, and cuCtxGetCurrent costs a fraction of cudaFree(nullptr), so that runs only when
+  // cuCtxGetCurrent finds none.
   const auto make_context_current = [&engine]() -> Error {
+    static const auto get_current = driver_entry_point<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+    CUcontext current = nullptr;
+    if (get_current != nullptr && get_current(&current) == CUDA_SUCCESS && current != nullptr) {
+      return Error::Ok;
+    }
     const cudaError_t err = cudaFree(nullptr);
     if (err == cudaSuccess) {
       return Error::Ok;
@@ -2662,9 +2675,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   // TensorRT's enqueue can look up a default stream's context through the driver, and graph replay compares the
   // stream's context with the current one, and both fail while no context is current. Outside
-  // cudaStreamCaptureModeRelaxed a capture cannot take make_context_current, so it runs after the pooled capture
-  // refusal and the argument checks. Any earlier, it would fail first under a capture, hiding their error and
-  // invalidating the capture.
+  // cudaStreamCaptureModeRelaxed a capture cannot take the cudaFree(nullptr) that make_context_current makes on a
+  // thread with no current context, so it runs after the pooled capture refusal and the argument checks. Any
+  // earlier, it would fail first under a capture, hiding their error and invalidating the capture.
   if (engine->execution_graph || stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
     const Error context_err = make_context_current();
     if (context_err != Error::Ok) {

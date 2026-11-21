@@ -1372,7 +1372,7 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
   }
   ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), 64, cudaMemcpyHostToDevice), cudaSuccess);
   ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
-  size_t mallocs = 0, launches = 0, captures = 0;
+  size_t mallocs = 0, launches = 0, captures = 0, context_calls = 0;
   Error result = Error::Internal;
   // No CUDA call may run on this thread before execute, so it starts with no current context.
   std::thread fresh([&] {
@@ -1381,9 +1381,11 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
     captures = calls.captures.size();
     mallocs = calls.malloc_calls;
     launches = calls.launches.size();
+    context_calls = calls.context_calls;
   });
   fresh.join();
   EXPECT_EQ(result, Error::Ok);
+  EXPECT_EQ(context_calls, 1u);
   EXPECT_EQ(mallocs, 0u);
   EXPECT_EQ(captures, 0u);
   EXPECT_EQ(launches, 1u);
@@ -1393,6 +1395,22 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
   for (size_t i = 0; i < output.size(); ++i) {
     EXPECT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f);
   }
+}
+
+// cudaFree(nullptr) costs more than the checks around a replay, so a call that finds a context current skips it.
+TEST_F(ExecutionGraphReplayTest, ReplaysWithAContextCurrentMakeNoContextCall) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  CudaCalls calls;
+  for (int i = 2; i < 5; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  EXPECT_EQ(calls.launches.size(), 3u);
+  EXPECT_EQ(calls.context_calls, 0u);
 }
 
 TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {
