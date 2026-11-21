@@ -535,7 +535,9 @@ class LoadedEngine {
       if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
         return Error::MemoryAllocationFailed;
       }
-      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
+      // A pageable copy can return before it lands, and the legacy stream does not order the run's stream.
+      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess ||
+          cudaStreamSynchronize(cudaStreamLegacy) != cudaSuccess) {
         return Error::Internal;
       }
     }
@@ -557,7 +559,8 @@ class LoadedEngine {
       return true;
     }
     const std::vector<float> host(elems(), value);
-    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess;
+    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess &&
+        cudaStreamSynchronize(cudaStreamLegacy) == cudaSuccess;
   }
 
   // Runs one inference on `stream`. Returns without waiting for the enqueue,
