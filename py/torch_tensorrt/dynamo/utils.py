@@ -488,14 +488,19 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
 
 def extract_var_range_info(
     symbolic_integer: torch.SymInt,
-    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    user_symbol_bounds: Optional[
+        Dict[sympy.Symbol, Tuple[int, int, Optional[int]]]
+    ] = None,
 ) -> Dict[str, Optional[int]]:
     """Return ``{min, max, opt}`` for a symbolic integer.
 
-    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
-    when the exporter's upper is unbounded; finite exporter bounds always win.
-    The lower is intersected with the exporter's so the 0/1 specialization
-    survives even if the user passes ``min_shape=0``.
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max, opt)}``) fills an
+    unbounded exporter upper and narrows a plain symbol's range to the user's
+    subset; it never widens finite exporter bounds. The lower is intersected
+    with the exporter's so the 0/1 specialization survives even if the user
+    passes ``min_shape=0``. A user ``opt`` replaces the export example's value
+    for that symbol, also inside composite exprs. It is not clamped, so it may
+    fall outside ``[min, max]``; :func:`construct_submodule_inputs` checks that.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -516,6 +521,14 @@ def extract_var_range_info(
     ) or getattr(shape_env, "unbacked_var_to_val", None)
     if unbacked_map is None:
         unbacked_map = {}
+    var_to_val_map = {
+        **var_to_val_map,
+        **{
+            sym: bounds[2]
+            for sym, bounds in (user_symbol_bounds or {}).items()
+            if bounds[2] is not None
+        },
+    }
     var_val = (
         var_to_val_map.get(expr, None)
         or unbacked_map.get(expr, None)
@@ -559,7 +572,7 @@ def extract_var_range_info(
         and isinstance(expr, sympy.Symbol)
         and expr in user_symbol_bounds
     ):
-        user_min, user_max = user_symbol_bounds[expr]
+        user_min, user_max, _ = user_symbol_bounds[expr]
         min_val = max(min_val, int(user_min))
         max_val = int(user_max) if max_val is None else min(max_val, int(user_max))
 

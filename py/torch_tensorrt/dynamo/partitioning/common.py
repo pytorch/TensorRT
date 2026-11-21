@@ -144,6 +144,11 @@ def _example_kwargs(example_tensors: bool, is_shape_tensor: bool) -> Dict[str, A
     return {} if example_tensors or is_shape_tensor else {"torch_tensor": None}
 
 
+def _default_max(min_value: int) -> int:
+    """Max used for a dynamic dim that has no upper bound."""
+    return max(min_value, 1) * (2**12)
+
+
 def construct_dynamic_input(
     input_shape: torch.Size,
     input_dtype: torch.dtype,
@@ -151,7 +156,9 @@ def construct_dynamic_input(
     is_shape_tensor: bool = False,
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
-    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    user_symbol_bounds: Optional[
+        Dict[sympy.Symbol, Tuple[int, int, Optional[int]]]
+    ] = None,
     example_tensors: bool = True,
 ) -> Input:
     """
@@ -162,8 +169,8 @@ def construct_dynamic_input(
             propagate optimization profiles to this (intermediate) input.
         num_profiles: Number of profiles to emit when ``profile_source_bounds``
             is provided.
-        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
-            :func:`extract_var_range_info` to fill unbounded exporter uppers.
+        user_symbol_bounds: Optional ``{sym: (min, max, opt)}`` map; forwarded to
+            :func:`extract_var_range_info` to bound dynamic dims and set opt.
         example_tensors: Whether the Input carries a random example tensor (see
             :func:`construct_submodule_inputs`).
     Returns:
@@ -189,7 +196,7 @@ def construct_dynamic_input(
                 unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
-                fallback_max = max(unwrapped_min_max_opt["min"], 1) * (2**12)
+                fallback_max = _default_max(unwrapped_min_max_opt["min"])
                 logger.warning(
                     f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: max(min({unwrapped_min_max_opt['min']}), 1) * 2^12 = {fallback_max}). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
@@ -277,7 +284,9 @@ def get_input(
     is_shape_tensor: bool = False,
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
-    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    user_symbol_bounds: Optional[
+        Dict[sympy.Symbol, Tuple[int, int, Optional[int]]]
+    ] = None,
     example_tensors: bool = True,
 ) -> Input:
     """
@@ -318,11 +327,44 @@ def get_input(
         )
 
 
+def _user_opt_misfit(
+    module: torch.fx.GraphModule,
+    user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int, Optional[int]]],
+    example_bounds: Dict[sympy.Symbol, Tuple[int, int, Optional[int]]],
+) -> Optional[str]:
+    """Describe the first dynamic input dim of ``module`` whose opt from
+    ``Input.opt_shape`` is outside the ``[min, max]`` that
+    :func:`construct_dynamic_input` will use, or return None.
+    """
+    for node in module.graph.nodes:
+        if node.op != "placeholder":
+            continue
+        val = node.meta.get("val", node.meta.get("tensor_meta"))
+        dims = [val] if isinstance(val, torch.SymInt) else getattr(val, "shape", [])
+        for d, dim in enumerate(dims):
+            if not isinstance(dim, torch.SymInt):
+                continue
+            try:
+                info = extract_var_range_info(dim, user_symbol_bounds)
+            except Exception as e:
+                return f"input '{node.name}' dim {d}: {e}"
+            opt = info.get("opt")
+            if opt == extract_var_range_info(dim, example_bounds).get("opt"):
+                continue
+            lo = info["min"] if info["min"] is not None else 1
+            hi = info["max"] if info["max"] is not None else _default_max(lo)
+            if opt is None or not lo <= opt <= hi:
+                return f"input '{node.name}' dim {d}: opt {opt}, min {lo}, max {hi}"
+    return None
+
+
 def construct_submodule_inputs(
     module: torch.fx.GraphModule,
     profile_source_bounds: Optional[ProfileSourceBounds] = None,
     num_profiles: int = 0,
-    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    user_symbol_bounds: Optional[
+        Dict[sympy.Symbol, Tuple[int, int, Optional[int]]]
+    ] = None,
     example_tensors: bool = True,
 ) -> Sequence[Input]:
     """
@@ -336,8 +378,10 @@ def construct_submodule_inputs(
             symbolic shape.
         num_profiles: Number of profiles corresponding to
             ``profile_source_bounds``.
-        user_symbol_bounds: Optional ``{sym: (min, max)}`` map; forwarded to
-            :func:`get_input` to fill unbounded exporter uppers.
+        user_symbol_bounds: Optional ``{sym: (min, max, opt)}`` map; forwarded to
+            :func:`get_input` to bound dynamic dims and set opt. If a user opt
+            does not fit an input's range, every input keeps the export
+            example's opt instead.
         example_tensors: Whether each Input carries a random example tensor in
             ``torch_tensor``, as Input does by default. Building an engine reads
             only shapes and dtypes (with tuning on, the sweeper makes its own
@@ -349,6 +393,21 @@ def construct_submodule_inputs(
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
     with unset_fake_temporarily():
+        if user_symbol_bounds:
+            example_bounds: Dict[sympy.Symbol, Tuple[int, int, Optional[int]]] = {
+                sym: (lo, hi, None) for sym, (lo, hi, _) in user_symbol_bounds.items()
+            }
+            misfit = _user_opt_misfit(module, user_symbol_bounds, example_bounds)
+            # Dropping only the misfit's symbols could give a mix of user and
+            # example opts that breaks a shape guard, so drop every user opt.
+            if misfit is not None:
+                logger.warning(
+                    "Input.opt_shape does not fit a TensorRT engine input (%s), "
+                    "so the engine uses the export example's sizes for opt "
+                    "instead.",
+                    misfit,
+                )
+                user_symbol_bounds = example_bounds
         torchtrt_inputs = []
         module_inputs = [
             node for node in module.graph.nodes if node.op == "placeholder"

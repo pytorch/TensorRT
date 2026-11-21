@@ -44,6 +44,15 @@ Please take a look at ``_tracer.py`` file to understand how this works under the
 - torch_tensorrt.dynamo.compile (which compiles an torch.export.ExportedProgram object using TensorRT)
 
 In the conversion to TensorRT, the graph already has the dynamic shape information in the node's metadata which will be used during engine building phase.
+The ``opt_shape`` of each ``torch_tensorrt.Input`` sets the shape that TensorRT tunes the engine for. A derived dimension such as
+``2*b`` follows the opt of ``b``. If an opt cannot be shown to fit the program, the size of the export example is used for opt instead,
+with a warning. An opt outside ``min_shape`` and ``max_shape`` is ignored only for that dynamic dimension. An opt outside the range of
+a TensorRT engine input makes that engine use the export example's opt for every dimension. An opt that breaks a shape rule of the
+program, or at which a rule cannot be checked, makes every input use the export example's opt. This skips a rule that PyTorch adds
+because it traces sizes as if they were never 1 (such as ``batch != 1``) when ``min_shape`` or ``max_shape`` already breaks it. A
+derived dimension keeps the range that the exported program gives it, which does not follow ``min_shape`` and ``max_shape``. For
+example, with ``Dim("b")`` the range of ``2*b`` starts at 4, so ``opt_shape`` 1 for ``b`` gives ``2*b`` the opt 2, and that engine uses
+the export example's opt. When any input uses ``profiles``, ``opt_shape`` is not used.
 
 Custom Dynamic Shape Constraints
 ---------------------------------
