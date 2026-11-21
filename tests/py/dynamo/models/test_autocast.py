@@ -2479,22 +2479,25 @@ def test_autocast_constant_range_skips_integer_ops():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("through_chunks", [False, True])
-def test_autocast_constant_range_skips_a_buffer_the_program_writes(through_chunks):
+@pytest.mark.parametrize("write", ["in_place", "through_chunks", "functional"])
+def test_autocast_constant_range_skips_a_buffer_the_program_writes(write):
     class Model(nn.Module):
         def __init__(self):
             super().__init__()
             self.register_buffer("scale", torch.full((8,), 1e6))
 
         def forward(self, x):
-            for part in self.scale.chunk(2) if through_chunks else [self.scale]:
+            parts = self.scale.chunk(2) if write == "through_chunks" else [self.scale]
+            for part in parts:
                 part.fill_(2.0)
             return x * self.scale
 
-    assert (
-        _autocast_dtype_of_mul(Model().eval(), torch.randn(4, 8), torch.float16)
-        == torch.float16
-    )
+    ep = torch.export.export(Model().eval(), (torch.randn(4, 8),))
+    if write == "functional":
+        # The functional program lists the write in its signature, not in the graph.
+        ep = ep.run_decompositions({})
+    settings, _ = _autocast_dtypes(ep)
+    assert settings._autocast_constant_range_nodes == frozenset()
 
 
 @pytest.mark.unit
