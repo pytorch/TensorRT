@@ -130,8 +130,9 @@ std::vector<uint8_t> build_blob(bool alias, int profiles = 1) {
   return wrap_plan(*plan, metadata, alias);
 }
 
-// Two softmaxes over different axes keep the chain from fusing into one pass, so the engine needs scratch.
-std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols, bool alias = false) {
+// Two softmaxes over different axes keep the chain from fusing into one pass, so the engine needs scratch. With
+// `dynamic_rows`, any number of rows up to `rows` runs.
+std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols, bool alias = false, bool dynamic_rows = false) {
   static TRTLogger logger;
   TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
   if (!builder) {
@@ -142,7 +143,8 @@ std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols, bool alias =
   if (!network || !config) {
     return {};
   }
-  auto* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{rows, cols});
+  auto* input =
+      network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{dynamic_rows ? -1 : rows, cols});
   auto* over_cols = input ? network->addSoftMax(*input) : nullptr;
   if (!over_cols) {
     return {};
@@ -155,6 +157,15 @@ std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols, bool alias =
   over_rows->setAxes(1u << 0);
   over_rows->getOutput(0)->setName("output_0");
   network->markOutput(*over_rows->getOutput(0));
+  if (dynamic_rows) {
+    auto* profile = builder->createOptimizationProfile();
+    if (!profile || !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2{1, cols}) ||
+        !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2{rows, cols}) ||
+        !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2{rows, cols}) ||
+        config->addOptimizationProfile(profile) < 0) {
+      return {};
+    }
+  }
   TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
   if (!plan) {
     return {};
@@ -265,6 +276,53 @@ std::vector<uint8_t> build_kv_blob() {
   return wrap_plan(
       *plan,
       R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"input_1","is_input":true},{"name":"output_0","is_input":false},{"name":"output_1","is_input":false}],"device_id":0,"aliased_io":[{"output":"output_0","input":"input_0","kind":"kv_cache_update"}]})",
+      true);
+}
+
+// One decode step: writes a token's key into a cache of kDecodeSlots slots at the position input_2 holds, in place,
+// and returns the token plus 1.
+constexpr int32_t kDecodeSlots = 8;
+
+std::vector<uint8_t> build_kv_decode_blob() {
+  static TRTLogger logger;
+  TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
+  if (!builder) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(0));
+  TRTUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+  if (!network || !config) {
+    return {};
+  }
+  const float bias = 1;
+  auto* cache = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims4{1, 1, kDecodeSlots, 4});
+  auto* update = network->addInput("input_1", nvinfer1::DataType::kFLOAT, nvinfer1::Dims4{1, 1, 1, 4});
+  auto* position = network->addInput("input_2", nvinfer1::DataType::kINT32, nvinfer1::Dims{1, {1}});
+  auto* addend = network->addConstant({4, {1, 1, 1, 1}}, {nvinfer1::DataType::kFLOAT, &bias, 1});
+  if (!cache || !update || !position || !addend) {
+    return {};
+  }
+  auto* write = network->addKVCacheUpdate(*cache, *update, *position, nvinfer1::KVCacheMode::kLINEAR);
+  if (!write) {
+    return {};
+  }
+  write->getOutput(0)->setName("output_0");
+  network->markOutput(*write->getOutput(0));
+  auto* sum = network->addElementWise(*update, *addend->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
+  if (!sum) {
+    return {};
+  }
+  sum->getOutput(0)->setName("output_1");
+  network->markOutput(*sum->getOutput(0));
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
+  if (!plan) {
+    return {};
+  }
+  return wrap_plan(
+      *plan,
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"input_1","is_input":true},)"
+      R"({"name":"input_2","is_input":true},{"name":"output_0","is_input":false},{"name":"output_1","is_input":false}],)"
+      R"("device_id":0,"aliased_io":[{"output":"output_0","input":"input_0","kind":"kv_cache_update"}]})",
       true);
 }
 
@@ -445,6 +503,7 @@ class ExecutionGraphTest : public ::testing::Test {
     blob_ = build_blob(false);
     alias_blob_ = build_blob(true);
     kv_blob_ = build_kv_blob();
+    kv_decode_blob_ = build_kv_decode_blob();
     ASSERT_FALSE(blob_.empty());
     ASSERT_FALSE(alias_blob_.empty());
     // Observe the default before any test changes the process-wide option.
@@ -569,6 +628,33 @@ class ExecutionGraphTest : public ::testing::Test {
     }
   }
 
+  void run_and_check(
+      LoadedGraphEngine& graph,
+      int input_slot,
+      int output_slot,
+      SizesType rows,
+      SizesType cols,
+      int seed) {
+    cudaStream_t stream = streams_[0];
+    const size_t count = static_cast<size_t>(rows) * cols;
+    std::vector<float> input(count);
+    for (size_t i = 0; i < count; ++i) {
+      input[i] = static_cast<float>(seed * 16 + static_cast<int>(i));
+    }
+    ASSERT_EQ(
+        cudaMemcpyAsync(inputs_[input_slot], input.data(), count * sizeof(float), cudaMemcpyHostToDevice, stream),
+        cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(outputs_[output_slot], 0xff, kMaxBytes, stream), cudaSuccess);
+    ASSERT_EQ(graph.run(inputs_[input_slot], outputs_[output_slot], rows, cols, stream), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+    std::vector<float> output(count);
+    ASSERT_EQ(
+        cudaMemcpy(output.data(), outputs_[output_slot], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    for (size_t i = 0; i < count; ++i) {
+      ASSERT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f) << "element " << i;
+    }
+  }
+
   // Alternates the two slots until the graph gives up following the caller's addresses: a warm-up,
   // a recording on slot 0, a recording on slot 1 when they move, a recording on the graph's own buffers
   // when they move again, and a replay on those buffers.
@@ -593,6 +679,7 @@ class ExecutionGraphTest : public ::testing::Test {
   static std::vector<uint8_t> blob_;
   static std::vector<uint8_t> alias_blob_;
   static std::vector<uint8_t> kv_blob_;
+  static std::vector<uint8_t> kv_decode_blob_;
   static bool default_has_graph_;
   static bool saved_default_has_graph_;
   static bool memory_pools_;
@@ -606,6 +693,7 @@ class ExecutionGraphTest : public ::testing::Test {
 std::vector<uint8_t> ExecutionGraphTest::blob_;
 std::vector<uint8_t> ExecutionGraphTest::alias_blob_;
 std::vector<uint8_t> ExecutionGraphTest::kv_blob_;
+std::vector<uint8_t> ExecutionGraphTest::kv_decode_blob_;
 bool ExecutionGraphTest::default_has_graph_ = false;
 bool ExecutionGraphTest::saved_default_has_graph_ = false;
 bool ExecutionGraphTest::memory_pools_ = false;
@@ -1061,6 +1149,532 @@ TEST_F(ExecutionGraphReplayTest, OutputOnlyMovesWriteTheNewOutput) {
   EXPECT_TRUE(graph.is_captured());
 }
 
+// Only the output keeps moving. The graph copies it through a buffer of its own and reads the input where the
+// caller keeps it, so an input that stays put, such as a weight, costs no copy and no second buffer. When that
+// input moves once, the graph records again on its new address.
+TEST_F(ExecutionGraphReplayTest, AnInputThatStaysPutIsReadInPlaceWhileTheOutputMoves) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  CudaCalls calls;
+  const int output_slots[] = {0, 0, 1, 0, 1, 0, 1};
+  for (int i = 0; i < 7; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, output_slots[i], 2, 8, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 3u);
+  EXPECT_EQ(calls.malloc_calls, 1u);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+  EXPECT_NE(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[1]);
+  // A replay copies the output out and nothing in.
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 1u);
+  EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+
+  CudaCalls moved;
+  ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 1, 2, 8, 7));
+  EXPECT_EQ(moved.captures.size(), 1u);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 0, 2, 8, 8));
+  EXPECT_EQ(moved.captures.size(), 1u);
+}
+
+// The motivating case: a weight input stays put next to an activation input that moves twice and then keeps
+// moving. Only the activation goes through a buffer of the graph's own, so a replay copies it alone, and the
+// weight, the other input and every output are read and written in place. When the other input then moves twice
+// too, it is copied next to the activation, and the weight still stays in place.
+TEST_F(ExecutionGraphReplayTest, AWeightInputStaysInPlaceWhileAnActivationInputMoves) {
+  static const std::vector<uint8_t> blob = build_three_path_blob();
+  ASSERT_FALSE(blob.empty());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(blob), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  // 64 floats are 256 bytes, so every view is aligned and none overlaps another.
+  constexpr size_t kLength = 64;
+  float* const weight = static_cast<float*>(inputs_[0]);
+  float* const activations[] = {static_cast<float*>(inputs_[1]), static_cast<float*>(inputs_[1]) + kLength};
+  float* const other_inputs[] = {weight + kLength, static_cast<float*>(inputs_[1]) + 2 * kLength};
+  float* const outputs[] = {
+      static_cast<float*>(outputs_[0]),
+      static_cast<float*>(outputs_[0]) + kLength,
+      static_cast<float*>(outputs_[0]) + 2 * kLength};
+  std::vector<float> weight_values(kLength), other_values(kLength);
+  for (size_t i = 0; i < kLength; ++i) {
+    weight_values[i] = static_cast<float>(i);
+  }
+  // Every fill goes on the stream the engine runs on, so it is ordered before the engine reads it.
+  ASSERT_EQ(
+      cudaMemcpyAsync(weight, weight_values.data(), kLength * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+      cudaSuccess);
+  SizesType sizes[] = {static_cast<SizesType>(kLength)};
+  DimOrderType dim_order[] = {0};
+  StridesType strides[] = {1};
+  std::vector<float> activation_values(kLength);
+  const auto fill = [&](float* activation, float* other_input, int seed) {
+    for (size_t i = 0; i < kLength; ++i) {
+      activation_values[i] = static_cast<float>(seed * 100 + static_cast<int>(i));
+      other_values[i] = static_cast<float>(-seed * 100 - static_cast<int>(i));
+    }
+    ASSERT_EQ(
+        cudaMemcpyAsync(
+            activation, activation_values.data(), kLength * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+        cudaSuccess);
+    ASSERT_EQ(
+        cudaMemcpyAsync(other_input, other_values.data(), kLength * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+        cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+  };
+  const auto call = [&](float* activation, float* other_input) {
+    TensorImpl input_0(ScalarType::Float, 1, sizes, weight, dim_order, strides);
+    TensorImpl input_1(ScalarType::Float, 1, sizes, activation, dim_order, strides);
+    TensorImpl input_2(ScalarType::Float, 1, sizes, other_input, dim_order, strides);
+    TensorImpl output_0(ScalarType::Float, 1, sizes, outputs[0], dim_order, strides);
+    TensorImpl output_1(ScalarType::Float, 1, sizes, outputs[1], dim_order, strides);
+    TensorImpl output_2(ScalarType::Float, 1, sizes, outputs[2], dim_order, strides);
+    EValue values[] = {
+        EValue(Tensor(&input_0)),
+        EValue(Tensor(&input_1)),
+        EValue(Tensor(&input_2)),
+        EValue(Tensor(&output_0)),
+        EValue(Tensor(&output_1)),
+        EValue(Tensor(&output_2))};
+    EValue* args[] = {&values[0], &values[1], &values[2], &values[3], &values[4], &values[5]};
+    return graph.run({args, 6}, streams_[0]);
+  };
+  const auto check = [&] {
+    const std::vector<float>* expected_inputs[] = {&weight_values, &activation_values, &other_values};
+    std::vector<float> actual(kLength);
+    for (size_t p = 0; p < 3; ++p) {
+      ASSERT_EQ(cudaMemcpy(actual.data(), outputs[p], kLength * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t i = 0; i < kLength; ++i) {
+        ASSERT_FLOAT_EQ(actual[i], (*expected_inputs[p])[i] * 2.0f + 1.0f) << "output_" << p << " element " << i;
+      }
+    }
+  };
+  const auto run = [&](float* activation, float* other_input, int seed) {
+    ASSERT_NO_FATAL_FAILURE(fill(activation, other_input, seed));
+    ASSERT_EQ(call(activation, other_input), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    ASSERT_NO_FATAL_FAILURE(check());
+  };
+  auto& context = *graph.handle()->exec_ctx;
+  {
+    CudaCalls calls;
+    const int activation_slots[] = {0, 0, 1, 0, 1, 0, 1};
+    for (int i = 0; i < 7; ++i) {
+      SCOPED_TRACE(i);
+      ASSERT_NO_FATAL_FAILURE(run(activations[activation_slots[i]], other_inputs[0], i));
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_EQ(calls.malloc_calls, 1u);
+  }
+  EXPECT_EQ(context.getTensorAddress("input_0"), weight);
+  EXPECT_EQ(context.getTensorAddress("input_2"), other_inputs[0]);
+  EXPECT_NE(context.getTensorAddress("input_1"), activations[0]);
+  EXPECT_NE(context.getTensorAddress("input_1"), activations[1]);
+  for (size_t p = 0; p < 3; ++p) {
+    EXPECT_EQ(context.getTensorAddress(("output_" + std::to_string(p)).c_str()), outputs[p]) << "output_" << p;
+  }
+  // A replay copies the activation in and nothing else.
+  ASSERT_NO_FATAL_FAILURE(fill(activations[0], other_inputs[0], 7));
+  {
+    CudaCalls replay;
+    ASSERT_EQ(call(activations[0], other_inputs[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_TRUE(replay.captures.empty());
+    EXPECT_EQ(replay.memcpy_calls, 1u);
+    EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  }
+  ASSERT_NO_FATAL_FAILURE(check());
+
+  // The other input moves twice while the activation keeps moving: it records once on its new address, then goes
+  // on a buffer of its own next to the activation's.
+  {
+    CudaCalls calls;
+    const int slots[][2] = {{1, 1}, {0, 0}, {1, 1}};
+    for (int i = 0; i < 3; ++i) {
+      SCOPED_TRACE(i + 8);
+      ASSERT_NO_FATAL_FAILURE(run(activations[slots[i][0]], other_inputs[slots[i][1]], i + 8));
+    }
+    EXPECT_EQ(calls.captures.size(), 2u);
+    EXPECT_EQ(calls.malloc_calls, 1u);
+  }
+  EXPECT_EQ(context.getTensorAddress("input_0"), weight);
+  EXPECT_NE(context.getTensorAddress("input_1"), activations[0]);
+  EXPECT_NE(context.getTensorAddress("input_1"), activations[1]);
+  EXPECT_NE(context.getTensorAddress("input_2"), other_inputs[0]);
+  EXPECT_NE(context.getTensorAddress("input_2"), other_inputs[1]);
+  // A replay now copies both moving inputs in, and still not the weight.
+  ASSERT_NO_FATAL_FAILURE(fill(activations[0], other_inputs[0], 11));
+  {
+    CudaCalls replay;
+    ASSERT_EQ(call(activations[0], other_inputs[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_TRUE(replay.captures.empty());
+    EXPECT_EQ(replay.memcpy_calls, 2u);
+  }
+  ASSERT_NO_FATAL_FAILURE(check());
+}
+
+// Each output counts its own moves: when only output_1 moves twice, it alone goes on a buffer of the graph's own,
+// and every input and the other outputs stay in place. output_1 is longer than the inputs before it, so a replay
+// that copies it out with another binding's length leaves part of it unwritten.
+TEST_F(ExecutionGraphReplayTest, AnOutputThatMovesTwiceIsCopiedAloneWhileTheOtherOutputsStayPut) {
+  static const std::vector<uint8_t> blob = build_three_path_blob();
+  ASSERT_FALSE(blob.empty());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(blob), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  // Offsets and lengths in floats. 64 floats are 256 bytes, so every view is aligned and none overlaps another.
+  constexpr size_t kArena = 2048;
+  constexpr size_t kOutputs = 768;
+  const size_t lengths[] = {64, 256, 64};
+  void* raw = nullptr;
+  ASSERT_EQ(cudaMalloc(&raw, kArena * sizeof(float)), cudaSuccess);
+  std::unique_ptr<void, decltype(&cudaFree)> arena_guard(raw, &cudaFree);
+  float* const arena = static_cast<float*>(raw);
+  float* const inputs[] = {arena, arena + 256, arena + 512};
+  float* const output_1_slots[] = {arena + 1024, arena + 1536};
+  SizesType sizes[] = {64, 256, 64};
+  DimOrderType dim_order[] = {0};
+  StridesType strides[] = {1};
+  std::vector<float> input_values[3];
+  float* outputs[] = {arena + kOutputs, nullptr, arena + 1280};
+  const auto fill = [&](int slot, int seed) {
+    outputs[1] = output_1_slots[slot];
+    for (size_t p = 0; p < 3; ++p) {
+      input_values[p].resize(lengths[p]);
+      for (size_t i = 0; i < lengths[p]; ++i) {
+        input_values[p][i] = static_cast<float>(seed * 1000 + static_cast<int>(p * 300 + i));
+      }
+      ASSERT_EQ(
+          cudaMemcpyAsync(
+              inputs[p], input_values[p].data(), lengths[p] * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+          cudaSuccess);
+    }
+    ASSERT_EQ(cudaMemsetAsync(arena + kOutputs, 0xff, (kArena - kOutputs) * sizeof(float), streams_[0]), cudaSuccess);
+  };
+  const auto call = [&] {
+    TensorImpl input_0(ScalarType::Float, 1, &sizes[0], inputs[0], dim_order, strides);
+    TensorImpl input_1(ScalarType::Float, 1, &sizes[1], inputs[1], dim_order, strides);
+    TensorImpl input_2(ScalarType::Float, 1, &sizes[2], inputs[2], dim_order, strides);
+    TensorImpl output_0(ScalarType::Float, 1, &sizes[0], outputs[0], dim_order, strides);
+    TensorImpl output_1(ScalarType::Float, 1, &sizes[1], outputs[1], dim_order, strides);
+    TensorImpl output_2(ScalarType::Float, 1, &sizes[2], outputs[2], dim_order, strides);
+    EValue values[] = {
+        EValue(Tensor(&input_0)),
+        EValue(Tensor(&input_1)),
+        EValue(Tensor(&input_2)),
+        EValue(Tensor(&output_0)),
+        EValue(Tensor(&output_1)),
+        EValue(Tensor(&output_2))};
+    EValue* args[] = {&values[0], &values[1], &values[2], &values[3], &values[4], &values[5]};
+    return graph.run({args, 6}, streams_[0]);
+  };
+  const auto check = [&] {
+    for (size_t p = 0; p < 3; ++p) {
+      std::vector<float> actual(lengths[p]);
+      ASSERT_EQ(cudaMemcpy(actual.data(), outputs[p], lengths[p] * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t i = 0; i < lengths[p]; ++i) {
+        ASSERT_FLOAT_EQ(actual[i], input_values[p][i] * 2.0f + 1.0f) << "output_" << p << " element " << i;
+      }
+    }
+  };
+  {
+    CudaCalls calls;
+    const int slots[] = {0, 0, 1, 0, 1, 0, 1};
+    for (int i = 0; i < 7; ++i) {
+      SCOPED_TRACE(i);
+      ASSERT_NO_FATAL_FAILURE(fill(slots[i], i));
+      ASSERT_EQ(call(), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      ASSERT_NO_FATAL_FAILURE(check());
+    }
+    EXPECT_EQ(calls.captures.size(), 3u);
+    EXPECT_EQ(calls.malloc_calls, 1u);
+  }
+  auto& context = *graph.handle()->exec_ctx;
+  for (size_t p = 0; p < 3; ++p) {
+    EXPECT_EQ(context.getTensorAddress(("input_" + std::to_string(p)).c_str()), inputs[p]) << "input_" << p;
+  }
+  EXPECT_EQ(context.getTensorAddress("output_0"), outputs[0]);
+  EXPECT_EQ(context.getTensorAddress("output_2"), outputs[2]);
+  EXPECT_NE(context.getTensorAddress("output_1"), output_1_slots[0]);
+  EXPECT_NE(context.getTensorAddress("output_1"), output_1_slots[1]);
+  // A replay copies output_1 out and nothing else.
+  ASSERT_NO_FATAL_FAILURE(fill(0, 7));
+  {
+    CudaCalls replay;
+    ASSERT_EQ(call(), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_TRUE(replay.captures.empty());
+    EXPECT_EQ(replay.memcpy_calls, 1u);
+    EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  }
+  ASSERT_NO_FATAL_FAILURE(check());
+}
+
+// Inputs and outputs that move at different calls each count on their own, so N of them can cost 3N+1 recordings
+// for one set of shapes: one when they all move before the first recording, one as each settles, then one at the
+// first move of each and one at its second, which puts it on a buffer of the graph's own for good.
+TEST_F(ExecutionGraphReplayTest, BindingsThatMoveOneAfterAnotherReachTheBoundOfThreeRecordingsEachAndOne) {
+  static const std::vector<uint8_t> blob = build_three_path_blob();
+  ASSERT_FALSE(blob.empty());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(blob), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  constexpr size_t kLength = 64;
+  constexpr int kPaths = 3;
+  // Input p in slot s is the p-th view of inputs_[s], and output p the p-th view of outputs_[0].
+  const auto input = [&](int p, int slot) { return static_cast<float*>(inputs_[slot]) + p * kLength; };
+  const auto output = [&](int p) { return static_cast<float*>(outputs_[0]) + p * kLength; };
+  SizesType sizes[] = {static_cast<SizesType>(kLength)};
+  DimOrderType dim_order[] = {0};
+  StridesType strides[] = {1};
+  std::vector<float> values[kPaths];
+  const auto call = [&](const int(&slots)[kPaths], int seed) {
+    for (int p = 0; p < kPaths; ++p) {
+      values[p].resize(kLength);
+      for (size_t i = 0; i < kLength; ++i) {
+        values[p][i] = static_cast<float>(seed * 100 + p * 10) + static_cast<float>(i) / 8.0f;
+      }
+      ASSERT_EQ(
+          cudaMemcpyAsync(
+              input(p, slots[p]), values[p].data(), kLength * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+          cudaSuccess);
+    }
+    ASSERT_EQ(cudaMemsetAsync(outputs_[0], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
+    TensorImpl input_0(ScalarType::Float, 1, sizes, input(0, slots[0]), dim_order, strides);
+    TensorImpl input_1(ScalarType::Float, 1, sizes, input(1, slots[1]), dim_order, strides);
+    TensorImpl input_2(ScalarType::Float, 1, sizes, input(2, slots[2]), dim_order, strides);
+    TensorImpl output_0(ScalarType::Float, 1, sizes, output(0), dim_order, strides);
+    TensorImpl output_1(ScalarType::Float, 1, sizes, output(1), dim_order, strides);
+    TensorImpl output_2(ScalarType::Float, 1, sizes, output(2), dim_order, strides);
+    EValue evalues[] = {
+        EValue(Tensor(&input_0)),
+        EValue(Tensor(&input_1)),
+        EValue(Tensor(&input_2)),
+        EValue(Tensor(&output_0)),
+        EValue(Tensor(&output_1)),
+        EValue(Tensor(&output_2))};
+    EValue* args[] = {&evalues[0], &evalues[1], &evalues[2], &evalues[3], &evalues[4], &evalues[5]};
+    ASSERT_EQ(graph.run({args, 6}, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    std::vector<float> actual(kLength);
+    for (int p = 0; p < kPaths; ++p) {
+      ASSERT_EQ(cudaMemcpy(actual.data(), output(p), kLength * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t i = 0; i < kLength; ++i) {
+        ASSERT_FLOAT_EQ(actual[i], values[p][i] * 2.0f + 1.0f) << "output_" << p << " element " << i;
+      }
+    }
+  };
+  const int slots[][kPaths] = {
+      {0, 0, 0}, // a warm-up
+      {1, 1, 1}, // all move: a recording on the graph's own buffers
+      {1, 0, 0}, // input_0 settles
+      {1, 0, 1}, // input_1 settles
+      {1, 0, 1}, // input_2 settles
+      {0, 0, 1}, // input_0 moves once
+      {1, 0, 1}, // and twice
+      {1, 1, 1},
+      {1, 0, 1},
+      {1, 0, 0},
+      {1, 0, 1},
+      {0, 1, 0}, // every input is on a buffer of the graph's own, so this replays
+  };
+  const size_t captures[] = {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0};
+  size_t total = 0;
+  for (size_t c = 0; c < 12; ++c) {
+    SCOPED_TRACE(c);
+    CudaCalls calls;
+    ASSERT_NO_FATAL_FAILURE(call(slots[c], static_cast<int>(c)));
+    EXPECT_EQ(calls.captures.size(), captures[c]);
+    EXPECT_EQ(calls.launches.size(), c == 0 ? 0u : 1u);
+    total += calls.captures.size();
+  }
+  EXPECT_EQ(total, 3u * kPaths + 1);
+  auto& context = *graph.handle()->exec_ctx;
+  for (int p = 0; p < kPaths; ++p) {
+    for (int slot = 0; slot < 2; ++slot) {
+      EXPECT_NE(context.getTensorAddress(("input_" + std::to_string(p)).c_str()), input(p, slot)) << "input_" << p;
+    }
+    EXPECT_EQ(context.getTensorAddress(("output_" + std::to_string(p)).c_str()), output(p)) << "output_" << p;
+  }
+}
+
+// An output that moved twice stays on the graph's buffer under new shapes, and the input that stayed put is still
+// read in place.
+TEST_F(ExecutionGraphReplayTest, NewShapesKeepOnlyTheBuffersThatMovedTwiceStaged) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int slot : {0, 0, 1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  CudaCalls calls;
+  for (int i = 0; i < 4; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 1 - i % 2, 4, 4, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.malloc_calls, 0u);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[1], 4, 4, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 1u);
+  EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// Under new shapes, a caller that alternates two whole sets of buffers records once and replays from the 3rd call,
+// also when an output was staged for good under the old shapes.
+TEST_F(ExecutionGraphReplayTest, AlternatingSetsUnderNewShapesRecordOnceAfterAnOutputWasStaged) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int slot : {0, 0, 1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  CudaCalls calls;
+  for (int i = 0; i < 6; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, i % 2, 1 - i % 2, 4, 4, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(5, streams_[0]));
+}
+
+// A failed allocation for an input that waits for a repeat sends that input back to the caller's address, but an
+// output that moved twice stays on a buffer of the graph's own, so the calls after it still record and replay.
+TEST_F(ExecutionGraphReplayTest, AFailedAllocationForAnInputKeepsAnOutputThatMovedTwiceStaged) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int slot : {0, 0, 1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 1, 4, 4, 4));
+  {
+    CudaCalls failing;
+    failing.fail_malloc_call = 1;
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 0, 4, 4, 5));
+    EXPECT_EQ(failing.malloc_calls, 1u);
+  }
+  CudaCalls calls;
+  for (int i = 0; i < 6; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 1 - i % 2, 4, 4, 6 + i));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(6, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+}
+
+// An input that moved once before the first recording, while the output keeps moving, goes back in place
+// once it repeats, and the buffer the graph kept for it goes.
+TEST_F(ExecutionGraphReplayTest, AnInputThatMovedBeforeTheFirstRecordingGoesBackInPlaceOnceItRepeats) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  CudaCalls calls;
+  const int slots[][2] = {{1, 0}, {0, 1}, {0, 0}, {0, 1}, {0, 0}};
+  for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, slots[i][0], slots[i][1], 2, 8, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 2u);
+  EXPECT_EQ(calls.malloc_calls, 2u);
+  EXPECT_EQ(calls.retirements, std::vector<cudaStream_t>(1, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+  CudaCalls replay;
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+  EXPECT_EQ(replay.memcpy_calls, 1u);
+  EXPECT_EQ(replay.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+// An input staged until it repeats goes back in place on the call that repeats it, also when the output it is read
+// next to moves on that same call, so the two changes cost one recording. When it does not repeat on that call, it
+// stays staged and its later moves record nothing.
+TEST_F(ExecutionGraphReplayTest, AStagedInputThatRepeatsWhileTheOutputMovesGoesBackInPlaceInOneRecording) {
+  {
+    SCOPED_TRACE("repeats");
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    CudaCalls calls;
+    const int slots[][2] = {{0, 0}, {1, 0}, {1, 1}, {1, 1}};
+    for (int i = 0; i < 4; ++i) {
+      SCOPED_TRACE(i);
+      ASSERT_NO_FATAL_FAILURE(run_and_check(graph, slots[i][0], slots[i][1], 2, 8, i));
+      if (i == 2) {
+        EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+      }
+    }
+    EXPECT_EQ(calls.captures.size(), 2u);
+  }
+  {
+    SCOPED_TRACE("moves again");
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    CudaCalls calls;
+    const int slots[][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+    for (int i = 0; i < 4; ++i) {
+      SCOPED_TRACE(i);
+      ASSERT_NO_FATAL_FAILURE(run_and_check(graph, slots[i][0], slots[i][1], 2, 8, i));
+    }
+    EXPECT_EQ(calls.captures.size(), 2u);
+    EXPECT_NE(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[1]);
+  }
+}
+
+// An output that waits for a repeat does not count the moves of the input next to it, so it goes back in place when
+// it repeats, also after the input moved twice.
+TEST_F(ExecutionGraphReplayTest, AnOutputThatWaitsForARepeatDoesNotCountTheMovesOfAnInput) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  CudaCalls calls;
+  const int slots[][2] = {{0, 0}, {0, 1}, {1, 0}, {0, 1}, {0, 1}};
+  for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, slots[i][0], slots[i][1], 2, 8, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 4u);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[1]);
+}
+
+// Which bindings stay staged carries across changes of shapes: a binding that moved twice stays on the graph's
+// buffer under the new shapes and when the old ones come back, a binding that moved once goes back in place, and a
+// binding staged until it repeats settles without taking the one that moved twice with it.
+TEST_F(ExecutionGraphReplayTest, StagingCarriesAcrossShapeChanges) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  const auto bound = [&](const char* name) { return graph.handle()->exec_ctx->getTensorAddress(name); };
+  // The input moves once and the output twice.
+  const int before[][2] = {{0, 0}, {0, 0}, {1, 0}, {1, 1}, {1, 0}};
+  for (int i = 0; i < 5; ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, before[i][0], before[i][1], 2, 8, i));
+  }
+  {
+    SCOPED_TRACE("new shapes");
+    CudaCalls calls;
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 0, 4, 4, 5));
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 0, 4, 4, 6));
+    EXPECT_EQ(bound("input_0"), inputs_[1]);
+    EXPECT_NE(bound("output_0"), outputs_[0]);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 1, 4, 4, 7));
+    EXPECT_EQ(calls.captures.size(), 1u);
+  }
+  {
+    SCOPED_TRACE("old shapes again");
+    CudaCalls calls;
+    // The input moves before the first recording, so it is staged until it repeats, next to the output.
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 1, 1, 2, 8, 8));
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 1, 2, 8, 9));
+    EXPECT_NE(bound("input_0"), inputs_[0]);
+    EXPECT_NE(bound("output_0"), outputs_[1]);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 1, 2, 8, 10));
+    EXPECT_EQ(bound("input_0"), inputs_[0]);
+    EXPECT_NE(bound("output_0"), outputs_[1]);
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 0, 2, 8, 11));
+    EXPECT_EQ(calls.captures.size(), 2u);
+  }
+}
+
 // With or without graphs, a call gives TensorRT a shape or an address again only when it changed. What the
 // test sets on the TensorRT context behind the delegate's back stays there exactly when the call is skipped.
 TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
@@ -1473,21 +2087,21 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamLaunchErrorsDrainAndRecover) {
 }
 
 TEST_F(ExecutionGraphTest, NoCallerStreamIneligibleEnginesStayPlain) {
-  for (int mode = 0; mode < 3; ++mode) {
+  for (int mode = 0; mode < 2; ++mode) {
     SCOPED_TRACE(mode);
     ASSERT_EQ(set_graphs(mode != 0), Error::Ok);
     LoadedGraphEngine graph;
     {
       CudaCalls initialization;
       initialization.disable_memory_pools = mode == 1;
-      ASSERT_EQ(graph.load(mode == 2 ? alias_blob_ : blob_), Error::Ok);
+      ASSERT_EQ(graph.load(blob_), Error::Ok);
     }
     EXPECT_EQ(graph.handle()->execution_graph, nullptr);
     CudaCalls calls;
     for (int i = 0; i < 4; ++i) {
       ASSERT_NO_FATAL_FAILURE(compare_default(graph, i % 2, 2, 8, i));
       EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[i % 2]);
-      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), mode == 2 ? inputs_[i % 2] : outputs_[i % 2]);
+      EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), outputs_[i % 2]);
     }
     EXPECT_EQ(calls.malloc_calls, 0u);
     EXPECT_TRUE(calls.captures.empty());
@@ -1620,10 +2234,12 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
   EXPECT_EQ(cudaStreamDestroy(blocking), cudaSuccess);
 }
 
-// Counts the errors TensorRT logs, so a test can check that its steps logged none.
+// Counts the errors TensorRT logs, so a test can check that its steps logged none, and keeps the last error
+// execute() logged on this thread, so a test can check what it said.
 std::atomic<int> tensorrt_errors{0};
+thread_local std::string last_execute_error;
 
-void count_tensorrt_errors(
+void tap_log(
     et_timestamp_t,
     et_pal_log_level_t level,
     const char*,
@@ -1632,9 +2248,19 @@ void count_tensorrt_errors(
     const char* message,
     size_t length) {
   std::fprintf(stderr, "%c %.*s\n", static_cast<char>(level), static_cast<int>(length), message);
-  if (std::string_view(message, length).rfind("TensorRT: ", 0) == 0) {
+  const std::string_view line(message, length);
+  if (line.rfind("TensorRT: ", 0) == 0) {
     tensorrt_errors.fetch_add(1);
   }
+  if (line.rfind("TensorRTBackend::execute: ", 0) == 0) {
+    last_execute_error = line;
+  }
+}
+
+// Once per process, since a second registration logs an error.
+bool tap_logs() {
+  static const bool tapped = register_pal(PalImpl::create(tap_log, __FILE__));
+  return tapped;
 }
 
 // Green contexts need a driver and a GPU that support them. Tests that need one skip where creation is
@@ -2059,6 +2685,188 @@ TEST_F(ExecutionGraphReplayTest, FailedRecordingsFromAnotherRegularContextLeaveT
   }
   EXPECT_TRUE(back.captures.empty());
   EXPECT_EQ(back.launches, std::vector<cudaStream_t>(3, streams_[0]));
+}
+
+// The same, for an own graph that reads its input in place and copies only its moving output: the failed call
+// from the other context allocates a buffer for that input, which the own graph never reads, so the graph stays.
+TEST_F(ExecutionGraphReplayTest, FailedRecordingsFromAnotherRegularContextLeaveAnOwnGraphThatCopiesOnlyItsOutput) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int slot : {0, 0, 1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    calls.fail_captures = 1;
+    EXPECT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::InvalidState);
+    EXPECT_EQ(calls.captures.size(), 1u);
+  }
+  EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  restore.reset();
+  CudaCalls back;
+  for (int slot : {1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot + 4));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(2, streams_[0]));
+  // Each call uploads its input, and the graph copies only the output: the input is still read in place.
+  EXPECT_EQ(back.memcpy_calls, 4u);
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+}
+
+// A call from another regular context that brings the address an own graph reads in place, and any address for
+// the binding it copies, replays that graph without recording. The engine's own calls keep replaying it too.
+TEST_F(ExecutionGraphReplayTest, ACallFromAnotherRegularContextReplaysAPartlyCopiedGraphOnItsInPlaceAddresses) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  // The output moves twice, so the graph reads its input in place and copies its output.
+  for (int slot : {0, 0, 1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+  const size_t count = 16;
+  std::vector<float> input(count), actual(count);
+  for (size_t i = 0; i < count; ++i) {
+    input[i] = static_cast<float>(100 + i);
+  }
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  // The fill goes on the stream the call runs on, so it is ordered before the engine reads it.
+  ASSERT_EQ(
+      cudaMemcpyAsync(inputs_[0], input.data(), count * sizeof(float), cudaMemcpyHostToDevice, other_stream),
+      cudaSuccess);
+  ASSERT_EQ(cudaMemsetAsync(outputs_[1], 0xff, count * sizeof(float), other_stream), cudaSuccess);
+  {
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[1], 2, 8, other_stream), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_EQ(calls.malloc_calls, 0u);
+    // Only the output is copied out.
+    EXPECT_EQ(calls.memcpy_calls, 1u);
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, other_stream));
+  }
+  ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  for (size_t j = 0; j < count; ++j) {
+    ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+  }
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  restore.reset();
+  CudaCalls back;
+  for (int slot : {1, 0}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot + 4));
+  }
+  EXPECT_TRUE(back.captures.empty());
+  EXPECT_EQ(back.launches, std::vector<cudaStream_t>(2, streams_[0]));
+  EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[0]);
+}
+
+// After a recording for another regular context, every binding is copied until the shapes change, so calls that
+// alternate between the two contexts replay that one graph instead of recording at every switch.
+TEST_F(ExecutionGraphReplayTest, CallsAlternatingWithAnotherRegularContextReplayOneGraph) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  // The output moves before the first recording, so it alone is staged until it repeats.
+  for (int slot : {0, 1}) {
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, slot, 2, 8, slot));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  const size_t count = 16;
+  std::vector<float> input(count), actual(count);
+  CudaCalls calls;
+  for (int i = 0; i < 3; ++i) {
+    SCOPED_TRACE(i);
+    // The other context's input differs from the one the engine's own graph reads in place, so a replay of that
+    // graph would leave the wrong values in the other context's output.
+    for (size_t j = 0; j < count; ++j) {
+      input[j] = static_cast<float>(100 * (i + 1) + static_cast<int>(j));
+    }
+    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+    ASSERT_EQ(
+        cudaMemcpyAsync(inputs_[1], input.data(), count * sizeof(float), cudaMemcpyHostToDevice, other_stream),
+        cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(outputs_[1], 0xff, count * sizeof(float), other_stream), cudaSuccess);
+    ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+    ASSERT_EQ(cudaMemcpy(actual.data(), outputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    for (size_t j = 0; j < count; ++j) {
+      ASSERT_FLOAT_EQ(actual[j], input[j] * 2.0f + 1.0f) << "element " << j;
+    }
+    ASSERT_NO_FATAL_FAILURE(run_and_check(graph, 0, 0, 2, 8, i));
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  const std::vector<cudaStream_t> alternating = {
+      other_stream, streams_[0], other_stream, streams_[0], other_stream, streams_[0]};
+  EXPECT_EQ(calls.launches, alternating);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
 }
 
 // The delegate keeps the buffer it copies an unaligned input through for later calls, so it allocates it
@@ -2616,9 +3424,7 @@ TEST_F(ExecutionGraphReplayTest, AnEngineLoadedUnderAGreenContextOutlivesIt) {
   ASSERT_NO_FATAL_FAILURE(green->create());
   CUcontext green_context = nullptr;
   ASSERT_EQ(from_green(&green_context, green->context), CUDA_SUCCESS);
-  // Once per process, since a second registration logs an error.
-  static const bool counting = register_pal(PalImpl::create(count_tensorrt_errors, __FILE__));
-  ASSERT_TRUE(counting);
+  ASSERT_TRUE(tap_logs());
   const int errors = tensorrt_errors.load();
   const int retains = primary_context_retains.load();
   const int releases = primary_context_releases.load();
@@ -3745,19 +4551,45 @@ TEST_F(ExecutionGraphReplayTest, PooledRecordingDoesNotWaitForTheCaptureLock) {
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
-// With pooled scratch allowed to replay, aliased outputs are the guard that keeps such an engine plain.
-TEST_F(ExecutionGraphReplayTest, PooledEngineWithAliasedOutputsStaysPlain) {
+// An engine on the shared activation scratch that updates its input in place replays on that input, and each
+// replay updates it again, as a call without a graph does.
+TEST_F(ExecutionGraphReplayTest, PooledEngineWithAliasedOutputsReplaysInPlace) {
   const auto blob = build_scratch_blob(8, 32, true);
   ASSERT_FALSE(blob.empty());
   ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
-  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
-  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  BackendOption plain_options[] = {option(kScratchOption, true), option(kGraphOption, false)};
+  ASSERT_EQ(set_options({plain_options, 2}), Error::Ok);
   {
-    LoadedGraphEngine engine;
+    LoadedGraphEngine plain, engine;
+    ASSERT_EQ(plain.load(blob), Error::Ok);
+    ASSERT_EQ(plain.handle()->execution_graph, nullptr);
+    ASSERT_EQ(set_graphs(true), Error::Ok);
     ASSERT_EQ(engine.load(blob), Error::Ok);
     ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
     ASSERT_GT(engine.handle()->num_aliased_outputs, 0u);
-    EXPECT_EQ(engine.handle()->execution_graph, nullptr);
+    ASSERT_NE(engine.handle()->execution_graph, nullptr);
+    std::vector<float> start(kMaxElements);
+    for (size_t i = 0; i < start.size(); ++i) {
+      start[i] = static_cast<float>(static_cast<int>(i % 23) - 11) / 4.0f;
+    }
+    for (int slot = 0; slot < 2; ++slot) {
+      ASSERT_EQ(
+          cudaMemcpyAsync(inputs_[slot], start.data(), kMaxBytes, cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+    }
+    CudaCalls calls;
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_EQ(plain.run(inputs_[0], outputs_[0], 8, 32, streams_[0]), Error::Ok);
+      ASSERT_EQ(engine.run(inputs_[1], outputs_[1], 8, 32, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.launches.size(), 2u);
+    EXPECT_TRUE(engine.is_captured());
+    std::vector<float> expected(kMaxElements), actual(kMaxElements);
+    ASSERT_EQ(cudaMemcpy(expected.data(), inputs_[0], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(actual.data(), inputs_[1], kMaxBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+    EXPECT_NE(expected, start);
+    EXPECT_EQ(actual, expected);
   }
   EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
@@ -4196,49 +5028,360 @@ TEST_F(ExecutionGraphReplayTest, InvalidOptionTypesLeaveTheWholeRequestUnapplied
   }
 }
 
-TEST_F(ExecutionGraphTest, UserAliasesKeepCallerStorageWithoutReplayAllocations) {
+// An engine that updates its input in place replays on the caller's buffer and allocates none of its own, also
+// when the buffer moves before the first recording, where TensorRT checks nothing for a user alias. A call on
+// another buffer runs without the graph and leaves the buffer the graph was recorded on alone; a call that
+// repeats the new buffer records on it.
+TEST_F(ExecutionGraphReplayTest, UserAliasesReplayOnCallerStorageAndRecordAgainWhenItMoves) {
   LoadedGraphEngine graph;
   ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
-  EXPECT_EQ(graph.handle()->execution_graph, nullptr);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
   ASSERT_EQ(graph.handle()->num_aliased_outputs, 1u);
   constexpr size_t count = 16;
-  for (int run = 0; run < 5; ++run) {
-    const int slot = run < 2 ? 0 : (run + 1) % 2;
-    std::vector<float> input(count, static_cast<float>(run + 1));
+  std::vector<float> held[2] = {std::vector<float>(count, 0.0f), std::vector<float>(count, 0.0f)};
+  for (int slot = 0; slot < 2; ++slot) {
     ASSERT_EQ(
-        cudaMemcpyAsync(inputs_[slot], input.data(), count * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+        cudaMemcpyAsync(inputs_[slot], held[slot].data(), count * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
         cudaSuccess);
+  }
+  const int slots[] = {0, 1, 1, 1, 0, 0, 0};
+  const size_t captures[] = {0, 0, 1, 0, 0, 1, 0};
+  const size_t launches[] = {0, 0, 1, 1, 0, 1, 1};
+  for (int run = 0; run < 7; ++run) {
+    SCOPED_TRACE(run);
+    const int slot = slots[run];
     ASSERT_EQ(cudaMemsetAsync(outputs_[slot], 0xff, kMaxBytes, streams_[0]), cudaSuccess);
     {
       CudaCalls calls;
       ASSERT_EQ(graph.run(inputs_[slot], outputs_[slot], 2, 8, streams_[0]), Error::Ok);
       EXPECT_EQ(calls.malloc_calls, 0u);
       EXPECT_EQ(calls.memcpy_calls, 1u);
-      EXPECT_TRUE(calls.captures.empty());
-      EXPECT_TRUE(calls.launches.empty());
+      EXPECT_EQ(calls.captures.size(), captures[run]);
+      EXPECT_EQ(calls.launches.size(), launches[run]);
     }
     ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
     EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), inputs_[slot]);
     EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("output_0"), inputs_[slot]);
-    std::vector<float> mutated(count), reflected(count);
-    ASSERT_EQ(cudaMemcpy(mutated.data(), inputs_[slot], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-    ASSERT_EQ(cudaMemcpy(reflected.data(), outputs_[slot], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
-    for (size_t i = 0; i < count; ++i) {
-      ASSERT_FLOAT_EQ(mutated[i], input[i] * 2.0f + 1.0f);
+    for (float& value : held[slot]) {
+      value = value * 2.0f + 1.0f;
     }
-    EXPECT_EQ(reflected, mutated);
+    for (int buffer = 0; buffer < 2; ++buffer) {
+      std::vector<float> actual(count);
+      ASSERT_EQ(cudaMemcpy(actual.data(), inputs_[buffer], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      EXPECT_EQ(actual, held[buffer]) << "buffer " << buffer;
+    }
+    std::vector<float> reflected(count);
+    ASSERT_EQ(cudaMemcpy(reflected.data(), outputs_[slot], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    EXPECT_EQ(reflected, held[slot]);
   }
+}
+
+// Buffers that move away from a recording on them a second time would make an engine with aliased outputs record
+// again after every move. It runs without a graph until they stay put, also under new shapes, never on buffers of
+// its own, and says so once.
+TEST_F(ExecutionGraphReplayTest, AliasedOutputsWhoseBuffersKeepMovingStopRecording) {
+  ASSERT_TRUE(tap_logs());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  const std::string stopped = "moved away from its CUDA graph twice";
+  const int slots[] = {0, 0, 1, 1, 0, 0, 1, 1};
+  const size_t recordings[] = {0, 1, 0, 1, 0, 0, 0, 0};
+  for (int run = 0; run < 8; ++run) {
+    SCOPED_TRACE(run);
+    last_execute_error.clear();
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(inputs_[slots[run]], outputs_[slots[run]], 2, 8, streams_[0]), Error::Ok);
+    EXPECT_EQ(calls.malloc_calls, 0u);
+    EXPECT_EQ(calls.captures.size(), recordings[run]);
+    EXPECT_EQ(calls.launches.size(), recordings[run]);
+    EXPECT_EQ(last_execute_error.find(stopped) != std::string::npos, run == 4) << last_execute_error;
+  }
+  for (int run = 0; run < 3; ++run) {
+    SCOPED_TRACE(run);
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 4, 4, streams_[0]), Error::Ok);
+    EXPECT_EQ(calls.malloc_calls, 0u);
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_TRUE(calls.launches.empty());
+  }
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// A move away from no recording is not counted, so a cache that moves on every call never records and never stops.
+// The engine says so once, after ExecutionGraph::kSettledCalls such calls.
+TEST_F(ExecutionGraphReplayTest, AnAliasedBufferThatMovesOnEveryCallIsLoggedOnce) {
+  ASSERT_TRUE(tap_logs());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  CudaCalls calls;
+  for (int call = 0; call < 2 * ExecutionGraph::kSettledCalls; ++call) {
+    SCOPED_TRACE(call);
+    last_execute_error.clear();
+    ASSERT_EQ(graph.run(inputs_[call % 2], outputs_[call % 2], 2, 8, streams_[0]), Error::Ok);
+    EXPECT_EQ(
+        last_execute_error.find("moved on each of the last") != std::string::npos,
+        call == ExecutionGraph::kSettledCalls)
+        << last_execute_error;
+  }
+  EXPECT_TRUE(calls.captures.empty());
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// A cache that stays put for ExecutionGraph::kSettledCalls calls between moves, such as a new cache for each
+// conversation or a server that switches between two cache slots, counts each move from zero. Every switch costs
+// one call without a graph and one recording, and replay never stops.
+TEST_F(ExecutionGraphReplayTest, AnAliasedBufferThatMovesRarelyKeepsReplaying) {
+  ASSERT_TRUE(tap_logs());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  for (int slot = 0; slot < 2; ++slot) {
+    ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+  }
+  constexpr int calls_per_slot = ExecutionGraph::kSettledCalls + 1;
+  for (int round = 0; round < 4; ++round) {
+    SCOPED_TRACE(round);
+    const int slot = round % 2;
+    last_execute_error.clear();
+    CudaCalls calls;
+    for (int call = 0; call < calls_per_slot; ++call) {
+      ASSERT_EQ(graph.run(inputs_[slot], outputs_[slot], 2, 8, streams_[0]), Error::Ok);
+    }
+    EXPECT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.launches.size(), static_cast<size_t>(calls_per_slot - 1));
+    EXPECT_EQ(calls.malloc_calls, 0u);
+    EXPECT_EQ(last_execute_error.find("moved away from its CUDA graph twice"), std::string::npos) << last_execute_error;
+  }
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// An engine whose cache moved away from its recordings twice runs without a graph until the cache stays put for
+// ExecutionGraph::kSettledCalls calls, also under new shapes. Then it records again on the caller's cache, not on a
+// buffer of its own, and counts the next move from zero.
+TEST_F(ExecutionGraphReplayTest, AnAliasedEngineThatStoppedRecordsAgainOnceItsCacheStaysPut) {
+  ASSERT_TRUE(tap_logs());
+  for (bool new_shapes : {false, true}) {
+    SCOPED_TRACE(new_shapes ? "new shapes after the stop" : "same shapes");
+    LoadedGraphEngine graph;
+    ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+    ASSERT_NE(graph.handle()->execution_graph, nullptr);
+    for (int slot = 0; slot < 2; ++slot) {
+      ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+    }
+    SizesType rows = 2;
+    SizesType cols = 8;
+    const auto run = [&](int slot, size_t captures, size_t launches) {
+      CudaCalls calls;
+      ASSERT_EQ(graph.run(inputs_[slot], outputs_[slot], rows, cols, streams_[0]), Error::Ok);
+      EXPECT_EQ(calls.captures.size(), captures);
+      EXPECT_EQ(calls.launches.size(), launches);
+      EXPECT_EQ(calls.malloc_calls, 0u);
+    };
+    // Records on cache 0, moves to cache 1 and records there, then moves back, which stops recording.
+    const int slots[] = {0, 0, 1, 1};
+    const size_t recordings[] = {0, 1, 0, 1};
+    for (int call = 0; call < 4; ++call) {
+      ASSERT_NO_FATAL_FAILURE(run(slots[call], recordings[call], recordings[call]));
+    }
+    last_execute_error.clear();
+    ASSERT_NO_FATAL_FAILURE(run(0, 0, 0));
+    EXPECT_NE(last_execute_error.find("moved away from its CUDA graph twice"), std::string::npos) << last_execute_error;
+    if (new_shapes) {
+      rows = 4;
+      cols = 4;
+    }
+    for (int call = 1; call < ExecutionGraph::kSettledCalls; ++call) {
+      SCOPED_TRACE(call);
+      ASSERT_NO_FATAL_FAILURE(run(0, 0, 0));
+    }
+    ASSERT_NO_FATAL_FAILURE(run(0, 1, 1));
+    auto& context = *graph.handle()->exec_ctx;
+    EXPECT_EQ(context.getTensorAddress("input_0"), inputs_[0]);
+    EXPECT_EQ(context.getTensorAddress("output_0"), inputs_[0]);
+    ASSERT_NO_FATAL_FAILURE(run(0, 0, 1));
+    last_execute_error.clear();
+    ASSERT_NO_FATAL_FAILURE(run(1, 0, 0));
+    ASSERT_NO_FATAL_FAILURE(run(1, 1, 1));
+    EXPECT_EQ(last_execute_error.find("moved away from its CUDA graph twice"), std::string::npos) << last_execute_error;
+    EXPECT_EQ(context.getTensorAddress("input_0"), inputs_[1]);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  }
+}
+
+// New shapes record again anyway, so buffers that change along with them are not counted as moves. A caller that
+// keeps one set of buffers for prefill and another for decode replays decode in every round, with no copies of
+// the graph's own, with or without aliased outputs.
+TEST_F(ExecutionGraphReplayTest, BuffersThatChangeWithTheShapesAreNotCountedAsMoves) {
+  for (bool aliased : {false, true}) {
+    SCOPED_TRACE(aliased);
+    LoadedGraphEngine graph;
+    if (aliased) {
+      ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+    } else {
+      ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    }
+    // An aliased output is copied into its own output slot on every call, replay or not.
+    const size_t copies = aliased ? 1 : 0;
+    for (int round = 0; round < 4; ++round) {
+      SCOPED_TRACE(round);
+      {
+        CudaCalls calls;
+        ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+        EXPECT_EQ(calls.malloc_calls, 0u);
+        EXPECT_EQ(calls.memcpy_calls, copies);
+        EXPECT_TRUE(calls.captures.empty());
+      }
+      for (int step = 0; step < 5; ++step) {
+        SCOPED_TRACE(step);
+        CudaCalls calls;
+        ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 4, 4, streams_[0]), Error::Ok);
+        EXPECT_EQ(calls.malloc_calls, 0u);
+        EXPECT_EQ(calls.memcpy_calls, copies);
+        EXPECT_EQ(calls.captures.size(), step == 1 ? 1u : 0u);
+        EXPECT_EQ(calls.launches.size(), step >= 1 ? 1u : 0u);
+      }
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  }
+}
+
+// Runs an engine of a `side` x `side` softmax with CUDA graph replay off, which then stays off, so that the shared
+// activation scratch grows to its size.
+void grow_shared_scratch(int side, cudaStream_t stream) {
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  const auto bigger = build_scratch_blob(side, side);
+  ASSERT_FALSE(bigger.empty());
+  LoadedGraphEngine grower;
+  ASSERT_EQ(grower.load(bigger), Error::Ok);
+  void* input = nullptr;
+  void* output = nullptr;
+  ASSERT_EQ(cudaMalloc(&input, size_t(side) * side * sizeof(float)), cudaSuccess);
+  ASSERT_EQ(cudaMalloc(&output, size_t(side) * side * sizeof(float)), cudaSuccess);
+  const size_t capacity = shared_scratch_capacity_for_testing(0);
+  ASSERT_EQ(cudaMemsetAsync(input, 0, size_t(side) * side * sizeof(float), stream), cudaSuccess);
+  ASSERT_EQ(grower.run(input, output, side, side, stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  EXPECT_GT(shared_scratch_capacity_for_testing(0), capacity);
+  EXPECT_EQ(cudaFree(input), cudaSuccess);
+  EXPECT_EQ(cudaFree(output), cudaSuccess);
+}
+
+// A growth of the shared scratch drops the graph, and buffers that moved at that call still count, so an engine
+// with aliased outputs whose buffers change at each growth stops recording at the second move.
+TEST_F(ExecutionGraphReplayTest, BuffersThatMoveWhenTheScratchGrowsStillCount) {
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  const auto alias = build_scratch_blob(8, 32, true);
+  ASSERT_FALSE(alias.empty());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(alias), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    for (int slot = 0; slot < 2; ++slot) {
+      ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+    }
+    const size_t recordings[] = {1, 1, 0, 0};
+    for (int round = 0; round < 4; ++round) {
+      SCOPED_TRACE(round);
+      if (round != 0) {
+        ASSERT_NO_FATAL_FAILURE(grow_shared_scratch(64 << round, streams_[0]));
+      }
+      const int slot = round % 2;
+      CudaCalls calls;
+      for (int repeat = 0; repeat < 2; ++repeat) {
+        ASSERT_EQ(engine.run(inputs_[slot], outputs_[slot], 8, 32, streams_[0]), Error::Ok);
+      }
+      EXPECT_EQ(calls.captures.size(), recordings[round]);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// A growth of the shared scratch also drops the warm-up, which counts a move between calls that run without a
+// graph. Such a move at a growth still counts, so the cache that comes back to its recording and leaves it again
+// stops recording at that call, not one recording later.
+TEST_F(ExecutionGraphReplayTest, AMoveBetweenCallsWithoutAGraphStillCountsWhenTheScratchGrows) {
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  const auto alias = build_scratch_blob(8, 32, true);
+  ASSERT_FALSE(alias.empty());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  ASSERT_TRUE(tap_logs());
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(alias), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    for (int slot = 0; slot < 2; ++slot) {
+      ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+    }
+    const int slots[] = {0, 0, 0, 1, 0, 1, 1, 0};
+    for (int run = 0; run < 8; ++run) {
+      SCOPED_TRACE(run);
+      if (run == 5) {
+        ASSERT_NO_FATAL_FAILURE(grow_shared_scratch(128, streams_[0]));
+      }
+      last_execute_error.clear();
+      CudaCalls calls;
+      ASSERT_EQ(engine.run(inputs_[slots[run]], outputs_[slots[run]], 8, 32, streams_[0]), Error::Ok);
+      EXPECT_EQ(calls.captures.size(), run == 1 ? 1u : 0u);
+      EXPECT_EQ(last_execute_error.find("moved away from its CUDA graph twice") != std::string::npos, run == 5)
+          << last_execute_error;
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// A growth of the shared scratch alone is not a move, and neither are buffers that change in the same call as the
+// shapes, so an engine with aliased outputs records again after every such growth.
+TEST_F(ExecutionGraphReplayTest, AScratchGrowthWithoutAMoveAtTheSameShapesIsNotCounted) {
+  for (bool new_shapes : {false, true}) {
+    SCOPED_TRACE(new_shapes ? "buffers and shapes change at each growth" : "same buffers and shapes");
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    const auto alias = build_scratch_blob(8, 32, true, true);
+    ASSERT_FALSE(alias.empty());
+    BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+    ASSERT_EQ(set_options({options, 2}), Error::Ok);
+    {
+      LoadedGraphEngine engine;
+      ASSERT_EQ(engine.load(alias), Error::Ok);
+      ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+      for (int slot = 0; slot < 2; ++slot) {
+        ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+      }
+      for (int round = 0; round < 4; ++round) {
+        SCOPED_TRACE(round);
+        if (round != 0) {
+          ASSERT_NO_FATAL_FAILURE(grow_shared_scratch(64 << round, streams_[0]));
+        }
+        const int slot = new_shapes ? round % 2 : 0;
+        const int rows = slot == 0 ? 8 : 4;
+        CudaCalls calls;
+        for (int repeat = 0; repeat < 2; ++repeat) {
+          ASSERT_EQ(engine.run(inputs_[slot], outputs_[slot], rows, 32, streams_[0]), Error::Ok);
+        }
+        EXPECT_EQ(calls.captures.size(), 1u);
+      }
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    }
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
 TEST_F(ExecutionGraphTest, KvAliasesKeepCallerStorageForThreadedAndElidedOutputs) {
   ASSERT_FALSE(kv_blob_.empty());
   LoadedGraphEngine graph;
   ASSERT_EQ(graph.load(kv_blob_), Error::Ok);
-  ASSERT_EQ(graph.handle()->execution_graph, nullptr);
+  // The cache alternates between two buffers on every call, so the graph never records.
+  ASSERT_EQ(graph.handle()->execution_graph != nullptr, memory_pools_);
   ASSERT_EQ(graph.handle()->num_aliased_outputs, 1u);
   for (bool elided : {false, true}) {
     for (int run = 0; run < 5; ++run) {
-      const int slot = run % 2;
+      const int slot = (run + (elided ? 1 : 0)) % 2;
       std::vector<float> cache(16, static_cast<float>(run));
       ASSERT_EQ(cudaMemcpyAsync(inputs_[slot], cache.data(), 64, cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
       const float update[] = {9, 10, 11, 12};
@@ -4287,6 +5430,471 @@ TEST_F(ExecutionGraphTest, KvAliasesKeepCallerStorageForThreadedAndElidedOutputs
       }
     }
   }
+}
+
+// A decode loop keeps its cache in one buffer, so the engine that writes it records on the 2nd step and replays
+// after that, and every step writes the cache and the output as an engine without a graph does.
+TEST_F(ExecutionGraphReplayTest, KvCacheDecodeReplaysOnAStableCacheAndMatchesPlain) {
+  ASSERT_FALSE(kv_decode_blob_.empty());
+  LoadedGraphEngine plain, graph;
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  ASSERT_EQ(plain.load(kv_decode_blob_), Error::Ok);
+  ASSERT_EQ(plain.handle()->execution_graph, nullptr);
+  ASSERT_EQ(set_graphs(true), Error::Ok);
+  ASSERT_EQ(graph.load(kv_decode_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  constexpr size_t cache_count = kDecodeSlots * 4;
+  struct Buffers {
+    void* cache = nullptr;
+    void* update = nullptr;
+    void* position = nullptr;
+    void* output = nullptr;
+  } buffers[2];
+  for (Buffers& b : buffers) {
+    ASSERT_EQ(cudaMalloc(&b.cache, cache_count * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&b.update, 4 * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&b.position, sizeof(int32_t)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&b.output, 4 * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(b.cache, 0, cache_count * sizeof(float), streams_[0]), cudaSuccess);
+  }
+  const auto step = [&](LoadedGraphEngine& engine, const Buffers& b) {
+    SizesType cache_sizes[] = {1, 1, kDecodeSlots, 4};
+    SizesType token_sizes[] = {1, 1, 1, 4};
+    SizesType position_sizes[] = {1};
+    DimOrderType dim_order[] = {0, 1, 2, 3};
+    StridesType cache_strides[] = {kDecodeSlots * 4, kDecodeSlots * 4, 4, 1};
+    StridesType token_strides[] = {4, 4, 4, 1};
+    StridesType position_strides[] = {1};
+    TensorImpl cache_impl(ScalarType::Float, 4, cache_sizes, b.cache, dim_order, cache_strides);
+    TensorImpl update_impl(ScalarType::Float, 4, token_sizes, b.update, dim_order, token_strides);
+    TensorImpl position_impl(ScalarType::Int, 1, position_sizes, b.position, dim_order, position_strides);
+    TensorImpl output_impl(ScalarType::Float, 4, token_sizes, b.output, dim_order, token_strides);
+    EValue cache{Tensor(&cache_impl)};
+    EValue update{Tensor(&update_impl)};
+    EValue position{Tensor(&position_impl)};
+    EValue output{Tensor(&output_impl)};
+    EValue* args[] = {&cache, &update, &position, &output};
+    return engine.run({args, 4}, streams_[0]);
+  };
+  constexpr int steps = 20;
+  CudaCalls calls;
+  for (int i = 0; i < steps; ++i) {
+    SCOPED_TRACE(i);
+    const float token[] = {static_cast<float>(i), i + 0.5f, -static_cast<float>(i), 1.0f / (i + 1)};
+    const int32_t position = i % kDecodeSlots;
+    for (const Buffers& b : buffers) {
+      ASSERT_EQ(cudaMemcpyAsync(b.update, token, sizeof(token), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+      ASSERT_EQ(
+          cudaMemcpyAsync(b.position, &position, sizeof(position), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+    }
+    ASSERT_EQ(step(plain, buffers[0]), Error::Ok);
+    ASSERT_EQ(step(graph, buffers[1]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    std::vector<float> caches[2], outputs[2];
+    for (int e = 0; e < 2; ++e) {
+      caches[e].resize(cache_count);
+      outputs[e].resize(4);
+      ASSERT_EQ(
+          cudaMemcpy(caches[e].data(), buffers[e].cache, cache_count * sizeof(float), cudaMemcpyDeviceToHost),
+          cudaSuccess);
+      ASSERT_EQ(
+          cudaMemcpy(outputs[e].data(), buffers[e].output, 4 * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+    }
+    for (int c = 0; c < 4; ++c) {
+      ASSERT_FLOAT_EQ(caches[0][position * 4 + c], token[c]);
+      ASSERT_FLOAT_EQ(outputs[0][c], token[c] + 1.0f);
+    }
+    EXPECT_EQ(caches[1], caches[0]);
+    EXPECT_EQ(outputs[1], outputs[0]);
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches.size(), static_cast<size_t>(steps - 1));
+  EXPECT_EQ(calls.malloc_calls, 0u);
+  EXPECT_TRUE(graph.is_captured());
+  for (Buffers& b : buffers) {
+    for (void* p : {b.cache, b.update, b.position, b.output}) {
+      EXPECT_EQ(cudaFree(p), cudaSuccess);
+    }
+  }
+}
+
+// Only the cache stays on the caller's buffer: a token, a position and an output that come at a new address on every
+// call go through buffers of the graph's own, so the decode loop still replays.
+TEST_F(ExecutionGraphReplayTest, KvCacheDecodeReplaysWhileItsOtherInputsAndOutputMove) {
+  ASSERT_FALSE(kv_decode_blob_.empty());
+  LoadedGraphEngine plain, graph;
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  ASSERT_EQ(plain.load(kv_decode_blob_), Error::Ok);
+  ASSERT_EQ(set_graphs(true), Error::Ok);
+  ASSERT_EQ(graph.load(kv_decode_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  constexpr size_t cache_count = kDecodeSlots * 4;
+  constexpr int sets = 3;
+  void* caches[2] = {};
+  void* updates[sets + 1] = {};
+  void* positions[sets + 1] = {};
+  void* outputs[sets + 1] = {};
+  for (void*& cache : caches) {
+    ASSERT_EQ(cudaMalloc(&cache, cache_count * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(cache, 0, cache_count * sizeof(float), streams_[0]), cudaSuccess);
+  }
+  for (int k = 0; k <= sets; ++k) {
+    ASSERT_EQ(cudaMalloc(&updates[k], 4 * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&positions[k], sizeof(int32_t)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&outputs[k], 4 * sizeof(float)), cudaSuccess);
+  }
+  const auto step = [&](LoadedGraphEngine& engine, void* cache, int k) {
+    SizesType cache_sizes[] = {1, 1, kDecodeSlots, 4};
+    SizesType token_sizes[] = {1, 1, 1, 4};
+    SizesType position_sizes[] = {1};
+    DimOrderType dim_order[] = {0, 1, 2, 3};
+    StridesType cache_strides[] = {kDecodeSlots * 4, kDecodeSlots * 4, 4, 1};
+    StridesType token_strides[] = {4, 4, 4, 1};
+    StridesType position_strides[] = {1};
+    TensorImpl cache_impl(ScalarType::Float, 4, cache_sizes, cache, dim_order, cache_strides);
+    TensorImpl update_impl(ScalarType::Float, 4, token_sizes, updates[k], dim_order, token_strides);
+    TensorImpl position_impl(ScalarType::Int, 1, position_sizes, positions[k], dim_order, position_strides);
+    TensorImpl output_impl(ScalarType::Float, 4, token_sizes, outputs[k], dim_order, token_strides);
+    EValue cache_value{Tensor(&cache_impl)};
+    EValue update{Tensor(&update_impl)};
+    EValue position{Tensor(&position_impl)};
+    EValue output{Tensor(&output_impl)};
+    EValue* args[] = {&cache_value, &update, &position, &output};
+    return engine.run({args, 4}, streams_[0]);
+  };
+  constexpr int steps = 12;
+  CudaCalls calls;
+  for (int i = 0; i < steps; ++i) {
+    SCOPED_TRACE(i);
+    const float token[] = {static_cast<float>(i), i + 0.5f, -static_cast<float>(i), 1.0f / (i + 1)};
+    const int32_t position = i % kDecodeSlots;
+    const int k = i % sets;
+    for (int set : {sets, k}) {
+      ASSERT_EQ(cudaMemcpyAsync(updates[set], token, sizeof(token), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+      ASSERT_EQ(
+          cudaMemcpyAsync(positions[set], &position, sizeof(position), cudaMemcpyHostToDevice, streams_[0]),
+          cudaSuccess);
+    }
+    ASSERT_EQ(step(plain, caches[0], sets), Error::Ok);
+    ASSERT_EQ(step(graph, caches[1], k), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_EQ(graph.handle()->exec_ctx->getTensorAddress("input_0"), caches[1]);
+    std::vector<float> cache_values[2], output_values[2];
+    for (int e = 0; e < 2; ++e) {
+      cache_values[e].resize(cache_count);
+      output_values[e].resize(4);
+      ASSERT_EQ(
+          cudaMemcpy(cache_values[e].data(), caches[e], cache_count * sizeof(float), cudaMemcpyDeviceToHost),
+          cudaSuccess);
+      ASSERT_EQ(
+          cudaMemcpy(output_values[e].data(), outputs[e == 0 ? sets : k], 4 * sizeof(float), cudaMemcpyDeviceToHost),
+          cudaSuccess);
+    }
+    EXPECT_EQ(cache_values[1], cache_values[0]);
+    EXPECT_EQ(output_values[1], output_values[0]);
+  }
+  EXPECT_EQ(calls.captures.size(), 1u);
+  EXPECT_EQ(calls.launches.size(), static_cast<size_t>(steps - 1));
+  EXPECT_TRUE(graph.is_captured());
+  for (void* p : caches) {
+    EXPECT_EQ(cudaFree(p), cudaSuccess);
+  }
+  for (int k = 0; k <= sets; ++k) {
+    for (void* p : {updates[k], positions[k], outputs[k]}) {
+      EXPECT_EQ(cudaFree(p), cudaSuccess);
+    }
+  }
+}
+
+// Once the cache has moved away from a recording twice, nothing records again, so the buffers the graph kept for the
+// token, the position and the output are freed at that call.
+TEST_F(ExecutionGraphReplayTest, AnAliasedEngineThatStopsRecordingFreesItsOwnBuffers) {
+  ASSERT_FALSE(kv_decode_blob_.empty());
+  LoadedGraphEngine plain;
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  ASSERT_EQ(plain.load(kv_decode_blob_), Error::Ok);
+  ASSERT_EQ(set_graphs(true), Error::Ok);
+  constexpr size_t cache_count = kDecodeSlots * 4;
+  constexpr int sets = 3;
+  // Caches 0 and 1 for the graph engine, cache 2 for the plain one, which follows the same updates.
+  void* caches[3] = {};
+  void* updates[sets] = {};
+  void* positions[sets] = {};
+  void* outputs[sets + 1] = {};
+  for (void*& cache : caches) {
+    ASSERT_EQ(cudaMalloc(&cache, cache_count * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(cache, 0, cache_count * sizeof(float), streams_[0]), cudaSuccess);
+  }
+  for (int k = 0; k < sets; ++k) {
+    ASSERT_EQ(cudaMalloc(&updates[k], 4 * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMalloc(&positions[k], sizeof(int32_t)), cudaSuccess);
+  }
+  for (void*& output : outputs) {
+    ASSERT_EQ(cudaMalloc(&output, 4 * sizeof(float)), cudaSuccess);
+  }
+  const auto step = [&](LoadedGraphEngine& engine, void* cache, int k, void* output) {
+    SizesType cache_sizes[] = {1, 1, kDecodeSlots, 4};
+    SizesType token_sizes[] = {1, 1, 1, 4};
+    SizesType position_sizes[] = {1};
+    DimOrderType dim_order[] = {0, 1, 2, 3};
+    StridesType cache_strides[] = {kDecodeSlots * 4, kDecodeSlots * 4, 4, 1};
+    StridesType token_strides[] = {4, 4, 4, 1};
+    StridesType position_strides[] = {1};
+    TensorImpl cache_impl(ScalarType::Float, 4, cache_sizes, cache, dim_order, cache_strides);
+    TensorImpl update_impl(ScalarType::Float, 4, token_sizes, updates[k], dim_order, token_strides);
+    TensorImpl position_impl(ScalarType::Int, 1, position_sizes, positions[k], dim_order, position_strides);
+    TensorImpl output_impl(ScalarType::Float, 4, token_sizes, output, dim_order, token_strides);
+    EValue cache_value{Tensor(&cache_impl)};
+    EValue update{Tensor(&update_impl)};
+    EValue position{Tensor(&position_impl)};
+    EValue output_value{Tensor(&output_impl)};
+    EValue* args[] = {&cache_value, &update, &position, &output_value};
+    return engine.run({args, 4}, streams_[0]);
+  };
+  // Calls 1 and 2 record and replay with the token, position and output staged, and call 3 moves the cache. In the
+  // first pattern call 4 records on it and call 5 moves it back, which stops recording. In the second the cache
+  // alternates from call 3 on, so nothing records again, and call 5 moves it away from the recording a second time.
+  const struct {
+    int cache_of_call[7];
+    size_t captures[7];
+    size_t launches[7];
+    size_t retirements[7];
+  } patterns[] = {
+      {{0, 0, 0, 1, 1, 0, 0}, {0, 1, 0, 0, 1, 0, 0}, {0, 1, 1, 0, 1, 0, 0}, {0, 0, 0, 0, 0, 3, 0}},
+      {{0, 0, 0, 1, 0, 1, 0}, {0, 1, 0, 0, 0, 0, 0}, {0, 1, 1, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 3, 0}},
+  };
+  for (const auto& pattern : patterns) {
+    SCOPED_TRACE(&pattern - patterns);
+    LoadedGraphEngine graph;
+    ASSERT_EQ(graph.load(kv_decode_blob_), Error::Ok);
+    ASSERT_NE(graph.handle()->execution_graph, nullptr);
+    bool stopped = false;
+    for (int i = 0; i < 7; ++i) {
+      SCOPED_TRACE(i);
+      const float token[] = {static_cast<float>(i), i + 0.5f, -static_cast<float>(i), 1.0f / (i + 1)};
+      const int32_t position = i % kDecodeSlots;
+      const int k = i % sets;
+      ASSERT_EQ(cudaMemcpyAsync(updates[k], token, sizeof(token), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+      ASSERT_EQ(
+          cudaMemcpyAsync(positions[k], &position, sizeof(position), cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
+      ASSERT_EQ(step(plain, caches[2], k, outputs[sets]), Error::Ok);
+      {
+        CudaCalls calls;
+        ASSERT_EQ(step(graph, caches[pattern.cache_of_call[i]], k, outputs[k]), Error::Ok);
+        EXPECT_EQ(calls.captures.size(), pattern.captures[i]);
+        EXPECT_EQ(calls.launches.size(), pattern.launches[i]);
+        EXPECT_EQ(calls.retirements.size(), pattern.retirements[i]);
+        stopped = stopped || pattern.retirements[i] != 0;
+        if (stopped) {
+          EXPECT_EQ(calls.malloc_calls, 0u);
+        }
+      }
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      std::vector<float> expected(4), actual(4);
+      ASSERT_EQ(cudaMemcpy(expected.data(), outputs[sets], 4 * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      ASSERT_EQ(cudaMemcpy(actual.data(), outputs[k], 4 * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (int c = 0; c < 4; ++c) {
+        ASSERT_FLOAT_EQ(expected[c], token[c] + 1.0f);
+      }
+      EXPECT_EQ(actual, expected);
+    }
+  }
+  for (void* p : caches) {
+    EXPECT_EQ(cudaFree(p), cudaSuccess);
+  }
+  for (int k = 0; k < sets; ++k) {
+    EXPECT_EQ(cudaFree(updates[k]), cudaSuccess);
+    EXPECT_EQ(cudaFree(positions[k]), cudaSuccess);
+  }
+  for (void* p : outputs) {
+    EXPECT_EQ(cudaFree(p), cudaSuccess);
+  }
+}
+
+// A prefill on its own buffer whose last chunk has the decode shapes, then decode on another buffer, round after
+// round: the decode buffer leaves only a recording made under the chunk's shapes, which is not a move, so decode
+// records once per round and replays.
+TEST_F(ExecutionGraphReplayTest, AChunkedPrefillEndingAtTheDecodeShapesKeepsDecodeReplaying) {
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  for (int slot = 0; slot < 2; ++slot) {
+    ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+  }
+  for (int round = 0; round < 3; ++round) {
+    SCOPED_TRACE(round);
+    for (int chunk = 0; chunk < 2; ++chunk) {
+      ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 4, 4, streams_[0]), Error::Ok);
+    for (int step = 0; step < 4; ++step) {
+      SCOPED_TRACE(step);
+      CudaCalls calls;
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 4, 4, streams_[0]), Error::Ok);
+      EXPECT_EQ(calls.captures.size(), step == 1 ? 1u : 0u);
+      EXPECT_EQ(calls.launches.size(), step >= 1 ? 1u : 0u);
+    }
+  }
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// A one-token prompt on the prefill buffer has the decode shapes, so it moves the cache away from the decode
+// recording with no change of shapes. A second such prompt within ExecutionGraph::kSettledCalls calls of the first
+// stops recording. A longer prompt moves the cache with new shapes, which does not count, so decode records again
+// once kSettledCalls calls pass without a one-token prompt, also with fewer decode steps than that in each round.
+TEST_F(ExecutionGraphReplayTest, OneTokenPromptsOnThePrefillBufferPauseDecodeReplay) {
+  ASSERT_TRUE(tap_logs());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  for (int slot = 0; slot < 2; ++slot) {
+    ASSERT_EQ(cudaMemsetAsync(inputs_[slot], 0, kMaxBytes, streams_[0]), cudaSuccess);
+  }
+  const std::string stopped = "moved away from its CUDA graph twice";
+  for (int round = 0; round < 3; ++round) {
+    SCOPED_TRACE(round);
+    last_execute_error.clear();
+    ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 4, 4, streams_[0]), Error::Ok);
+    EXPECT_EQ(last_execute_error.find(stopped) != std::string::npos, round == 2) << last_execute_error;
+    for (int step = 0; step < 4; ++step) {
+      SCOPED_TRACE(step);
+      CudaCalls calls;
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 4, 4, streams_[0]), Error::Ok);
+      EXPECT_EQ(calls.captures.size(), round < 2 && step == 1 ? 1u : 0u);
+      EXPECT_EQ(calls.launches.size(), round < 2 && step >= 1 ? 1u : 0u);
+    }
+  }
+  const int rounds = ExecutionGraph::kSettledCalls / 5 + 2;
+  for (int round = 0; round < rounds; ++round) {
+    SCOPED_TRACE(round);
+    ASSERT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+    for (int step = 0; step < 4; ++step) {
+      SCOPED_TRACE(step);
+      CudaCalls calls;
+      ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 4, 4, streams_[0]), Error::Ok);
+      // Counted from the prompt that stopped recording, past its 4 decode steps and 5 calls a round, step 1 is call
+      // 5 * round + 7.
+      const bool replays = 5 * round + 7 >= ExecutionGraph::kSettledCalls;
+      EXPECT_EQ(calls.captures.size(), replays && step == 1 ? 1u : 0u);
+      EXPECT_EQ(calls.launches.size(), replays && step >= 1 ? 1u : 0u);
+    }
+  }
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// A call from another regular context replays the graph of an engine with aliased outputs on the buffers it was
+// recorded on. Other buffers, or no graph yet, would need buffers of the graph's own, so such a call fails, says
+// which, and changes nothing, and the engine's own calls keep replaying.
+TEST_F(ExecutionGraphReplayTest, AliasedOutputsReplayFromAnotherRegularContextOnlyOnTheRecordedBuffers) {
+  const auto create_context = driver_entry<PFN_cuCtxCreate_v3020>("cuCtxCreate", 3020);
+  const auto destroy_context = driver_entry<PFN_cuCtxDestroy_v4000>("cuCtxDestroy", 4000);
+  const auto get_current = driver_entry<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+  const auto set_current = driver_entry<PFN_cuCtxSetCurrent_v4000>("cuCtxSetCurrent", 4000);
+  ASSERT_NE(create_context, nullptr);
+  ASSERT_NE(destroy_context, nullptr);
+  ASSERT_NE(get_current, nullptr);
+  ASSERT_NE(set_current, nullptr);
+  int device = 0;
+  ASSERT_EQ(cudaGetDevice(&device), cudaSuccess);
+  CUcontext primary = nullptr;
+  CUcontext other = nullptr;
+  ASSERT_EQ(get_current(&primary), CUDA_SUCCESS);
+  ASSERT_EQ(create_context(&other, 0, device), CUDA_SUCCESS);
+  std::unique_ptr<void, std::function<void(void*)>> restore(&primary, [&](void*) {
+    set_current(primary);
+    destroy_context(other);
+  });
+  cudaStream_t other_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&other_stream), cudaSuccess);
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(alias_blob_), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  constexpr size_t count = 16;
+  const std::vector<float> zeros(count, 0.0f);
+  for (int slot = 0; slot < 2; ++slot) {
+    ASSERT_EQ(
+        cudaMemcpyAsync(inputs_[slot], zeros.data(), count * sizeof(float), cudaMemcpyHostToDevice, streams_[0]),
+        cudaSuccess);
+  }
+  ASSERT_TRUE(tap_logs());
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  ASSERT_FALSE(graph.is_captured());
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    last_execute_error.clear();
+    EXPECT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, other_stream), Error::InvalidState);
+    EXPECT_NE(last_execute_error.find("and there is none"), std::string::npos) << last_execute_error;
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_TRUE(calls.launches.empty());
+    EXPECT_EQ(calls.malloc_calls, 0u);
+  }
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  {
+    CudaCalls calls;
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, other_stream), Error::Ok);
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, other_stream));
+  }
+  {
+    CudaCalls calls;
+    last_execute_error.clear();
+    EXPECT_EQ(graph.run(inputs_[1], outputs_[1], 2, 8, other_stream), Error::InvalidState);
+    EXPECT_NE(last_execute_error.find("and this call brings other ones"), std::string::npos) << last_execute_error;
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_TRUE(calls.launches.empty());
+    EXPECT_EQ(calls.malloc_calls, 0u);
+  }
+  // An engine that stopped recording because its cache kept moving says so.
+  ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  void* caches[2] = {};
+  for (void*& cache : caches) {
+    ASSERT_EQ(cudaMalloc(&cache, kMaxBytes), cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(cache, 0, kMaxBytes, streams_[0]), cudaSuccess);
+  }
+  {
+    LoadedGraphEngine moving;
+    ASSERT_EQ(moving.load(alias_blob_), Error::Ok);
+    for (int slot : {0, 0, 1, 1, 0}) {
+      ASSERT_EQ(moving.run(caches[slot], reference_output_, 2, 8, streams_[0]), Error::Ok);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+    CudaCalls calls;
+    last_execute_error.clear();
+    EXPECT_EQ(moving.run(caches[0], reference_output_, 2, 8, other_stream), Error::InvalidState);
+    EXPECT_NE(last_execute_error.find("while the buffer of an aliased output keeps moving"), std::string::npos)
+        << last_execute_error;
+    EXPECT_TRUE(calls.captures.empty());
+    EXPECT_TRUE(calls.launches.empty());
+    ASSERT_EQ(set_current(primary), CUDA_SUCCESS);
+  }
+  for (void* cache : caches) {
+    EXPECT_EQ(cudaFree(cache), cudaSuccess);
+  }
+  ASSERT_EQ(set_current(other), CUDA_SUCCESS);
+  EXPECT_EQ(cudaStreamSynchronize(other_stream), cudaSuccess);
+  EXPECT_EQ(cudaStreamDestroy(other_stream), cudaSuccess);
+  restore.reset();
+  {
+    CudaCalls back;
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+    EXPECT_TRUE(back.captures.empty());
+    EXPECT_EQ(back.launches, std::vector<cudaStream_t>(1, streams_[0]));
+  }
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+  std::vector<float> updated(count), untouched(count);
+  ASSERT_EQ(cudaMemcpy(updated.data(), inputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  ASSERT_EQ(cudaMemcpy(untouched.data(), inputs_[1], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+  // Four updates of 2x + 1 from zero.
+  EXPECT_EQ(updated, std::vector<float>(count, 15.0f));
+  EXPECT_EQ(untouched, zeros);
 }
 
 TEST_F(ExecutionGraphReplayTest, ExecuteAndDestroyRestoreAnotherCurrentDevice) {

@@ -303,26 +303,35 @@ loaded. The first match wins:
 
 How it runs: the first call with a set of input shapes runs normally, the second records the graph
 and launches it, and later calls replay it. When the second call brings the buffers of the first,
-the graph is on those buffers, unless earlier buffers moved twice (see below), and later calls with
-the same buffers replay it with no copies of its own. A buffer the delegate copies without replay,
-such as host memory on a GPU that does not read host memory directly, pinned or not, memory not
-aligned to 256 bytes, or an input not in row-major order, is still copied. A call of an engine that
-uses the shared activation scratch does not wait while another engine loads, is destroyed or
-records. It runs normally, and a later call records. A stream of another regular CUDA context is the
-exception (see below).
+the graph is on those buffers, except the ones that moved twice (see below), and later calls with
+the same buffers replay it and copy only the ones that moved twice. A buffer the delegate copies
+without replay, such as host memory on a GPU that does not read host memory directly, pinned or not,
+memory not aligned to 256 bytes, or an input not in row-major order, is still copied. A call of an
+engine that uses the shared activation scratch does not wait while another engine loads, is
+destroyed or records. It runs normally, and a later call records. A stream of another regular CUDA
+context is the exception (see below).
 
 Keep each input and output in the same buffer from call to call, as ExecuTorch's memory planning
-does, and as a caller that reuses its device tensors does. A graph goes on the caller's buffers once
-a call brings the same buffers as the call before it. Until then it goes on one GPU buffer of its
-own per input and output, for each graph, and every call after the first copies its inputs in and
-its outputs out. When the buffers of a graph on the caller's buffers change, that call records again
-on the new ones. When they change a second time, for any shapes, that graph stops following them,
-also after the shapes or the profile change: it records on buffers of its own, and every call
-copies. The plain graph and the graph of each green context count their own changes. For an engine
-with few kernels, or with large inputs and outputs, these copies can cost more than they save. So a
-caller that moves its buffers on every call, or alternates two sets, records once for each set of
-shapes in each graph, as one that keeps them does, and both first replay on the 3rd call. Each
-growth of the shared scratch in between adds a call without a graph and then a recording.
+does, and as a caller that reuses its device tensors does. Each input and output goes on the
+caller's buffer once a call brings the same buffer for it as the call before it. Until then it goes
+on a GPU buffer of its own, one for each graph, and every call after the first copies it in or out.
+When an input or output the graph reads or writes in place changes, that call records again on the
+new buffer. When the same input or output changes a second time, for any shapes, that graph stops
+following it, also after the shapes or the profile change: it records that input or output on a
+buffer of its own, and every call copies it. Buffers that change in the same call as the shapes or
+the profile are not counted, since new shapes record again. The others stay in place, so inputs
+that never move, such as weights passed as inputs, are not copied even when an output moves on every
+call. An aliased output and the input it updates never go on buffers of their own (see below). The
+plain graph and the graph of each green context count their own changes. For an engine with few
+kernels, or with large inputs and outputs, these copies can cost more than they save. So a caller
+that moves its buffers on every call, or alternates two sets, records once for each set of shapes in
+each graph, as one that keeps them does, and both first replay on the 3rd call, unless the engine
+has aliased outputs. Inputs and outputs that change at different calls each count on their own, so N
+of them that change one after another can cost up to 3N+1 recordings for one set of shapes in each
+graph, apart from an aliased output and its input. More can come from each growth of the shared
+scratch, which also adds a call without a graph, from a call on a stream of another regular CUDA
+context (see below), and from a recording that fails, or that a call on the shared scratch skips
+while another engine loads, is destroyed or records.
 
 CUDA allows a green context handle on one CPU thread at a time. The delegate takes a lock around
 its own calls on the handle, but your threads do not take that lock, so do not use the same green
@@ -364,20 +373,22 @@ Some calls do not replay:
 - A change of input shapes, or of the optimization profile, records again.
   A growth of the shared activation scratch below runs one call without a graph, then records again
   on the same buffers as before. A loop that changes shape or profile on every call never replays.
-- An engine with aliased outputs, a GPU without stream-ordered memory, or a driver older than CUDA
-  12.5 never replays. The delegate logs the reason.
+- A GPU without stream-ordered memory, or a driver older than CUDA 12.5, never replays. The delegate
+  logs the reason.
+- An engine with aliased outputs, such as one that updates a KV cache in place, does not replay
+  while the cache keeps moving. See below.
 - A green context stream while a regular context other than its device's primary one is current,
   and a plain stream while a green context is current, take the ordinary path, and the recorded
   graphs are kept.
 - A stream on another device fails, with or without replay. So does a stream from a regular CUDA
-  context other than the one the engine was loaded in, except that, while the stream's own context is
-  current, the engine's own graph replays on it. When that caller's buffers are not the
-  ones the graph was recorded on, and the graph is not already on buffers of its own, the engine
-  records again in its own context, on buffers of its own, and from then on every call of the engine
-  that replays on a plain stream, its own included, copies the inputs in and the outputs out until
-  its shapes or its profile change. When that recording cannot go ahead (the engine's own context
-  has not run the shapes yet, or the recording fails), the call fails with an error that says why.
-  The engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
+  context other than the one the engine was loaded in, except that, while the stream's own context
+  is current, the engine's own graph replays on it. When that caller brings another buffer for any
+  input or output the graph reads or writes in place, an engine without aliased outputs records
+  again in its own context, on buffers of its own, and from then on every call of the engine that
+  replays on a plain stream, its own included, copies the inputs in and the outputs out until its
+  shapes or its profile change. When that recording cannot go ahead (the engine's own context has
+  not run the shapes yet, or the recording fails), the call fails with an error that says why. The
+  engine's own calls keep their graph, unless that call brought new shapes, which drop it. The
   buffers the delegate keeps for such a call are allocated in the engine's context, so that other
   context may be destroyed first.
 - An engine on the shared activation scratch fails on a stream of another device or of another
@@ -397,6 +408,46 @@ Some calls do not replay:
   that gives up its place to a newer green context starts over.
 
 Engines on the shared activation scratch replay too.
+
+**Engines that update a cache in place.** An engine with aliased outputs writes an input in place
+and returns it, such as a decoder step that updates its KV cache. The delegate keeps that input and
+its aliased output on the caller's buffer, never on a buffer of the graph's own, since that would
+copy the whole cache on every call. Its other inputs and outputs follow the rules above. The cache
+buffer follows these rules:
+
+- While it moves, calls run without a graph. The first call that brings the same buffer as the
+  call before it records again on it. After 32 calls in a row that each move it, the engine logs
+  that.
+- A move to another buffer than the one of the last recording under the current shapes counts. A
+  move that comes with new shapes or a new profile does not, since those record again.
+- At the second counted move with fewer than 32 calls in between, the engine runs without a graph
+  and logs that. Once 32 calls pass without a counted move, the count starts over and the engine
+  records again.
+- Plain streams and each green context keep their own count. A green context's count starts over
+  when its graph is dropped to make room for another green context.
+
+Some examples:
+
+- A decode loop with ExecuTorch's memory planning keeps the cache in place. It records on its 2nd
+  call with a set of shapes and replays while the shapes stay the same. A new token or position
+  tensor on every call goes through a buffer of the graph's own, as for any engine, so decode still
+  replays.
+- With one set of buffers for prefill and another for decode, decode replays in every round, also
+  when the last prefill chunk has the decode shapes.
+- A one-token prompt on the prefill buffer has the decode shapes, so it moves the cache and counts.
+  A second one within 32 calls stops recording for at least 32 calls.
+- A new cache for each conversation, or a server that switches between cache slots every few
+  hundred tokens, costs one call without a graph and one recording at each switch, and replays in
+  between.
+- A loop that switches caches on every call never records. One that switches every few calls
+  stops recording at its second switch.
+
+An updated input that the engine also returns in a separate output tensor is copied into that
+tensor after every call, replay or not.
+
+A call on a stream of another regular CUDA context replays such an engine's graph only when it
+brings the buffers the graph reads and writes in place. Otherwise it fails with an error that says
+why.
 
 **When recording is unsafe.** The delegate keeps its own engine loads and destroys from overlapping
 a recording. It cannot protect against the rest of the process. While a recording runs, these are

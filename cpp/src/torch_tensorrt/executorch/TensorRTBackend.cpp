@@ -738,13 +738,8 @@ Error initialize_engine_io(EngineHandle& handle) {
   return Error::Ok;
 }
 
-// Called once the aliased outputs are known. Each reason replay stays off is logged, because a caller
-// who turned it on expects it.
+// Each reason replay stays off is logged, because a caller who turned it on expects it.
 void enable_cuda_graphs(EngineHandle& handle) {
-  if (handle.num_aliased_outputs > 0) {
-    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine with aliased outputs");
-    return;
-  }
   int memory_pools_supported = 0;
   if (cudaDeviceGetAttribute(&memory_pools_supported, cudaDevAttrMemoryPoolsSupported, handle.device_id) !=
       cudaSuccess) {

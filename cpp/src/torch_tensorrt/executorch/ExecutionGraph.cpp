@@ -229,14 +229,62 @@ Error ExecutionGraph::enqueue_in(
     CUgreenCtx stream_green) {
   auto& context = *handle.exec_ctx;
   const size_t count = handle.num_inputs + handle.num_outputs;
+  moves_.resize(count, 0);
+  staged_.resize(count, false);
+  // A plain graph and its buffers live in the context TensorRT ran the engine in, so a stream of
+  // another regular context, where TensorRT cannot run, still replays it.
+  const CUcontext record_context =
+      stream_green == nullptr && handle.context != nullptr ? handle.context : stream_context;
+  const bool other_context = record_context != stream_context;
+  // An aliased output has to share its input's buffer, and a buffer of this graph for it would mean copying the
+  // whole buffer back after every call, such as a whole KV cache for one new token. So such a binding stays on
+  // the caller's address: while it moves the calls run plainly, and at its second counted move the graph stops
+  // recording until kSettledCalls calls pass without another.
+  const auto in_place_only = [&](size_t i) {
+    return i < handle.num_inputs ? handle.input_is_alias_target[i]
+                                 : handle.output_aliased_input_idx[i - handle.num_inputs] >= 0;
+  };
+  const auto stopped = [&] {
+    for (size_t i = 0; i < count; ++i) {
+      if (in_place_only(i) && moves_[i] > 1) {
+        return true;
+      }
+    }
+    return false;
+  };
+  bool in_place_counted = false;
+  const auto count_move = [&](size_t i) {
+    in_place_counted = in_place_counted || in_place_only(i);
+    const bool was_stopped = stopped();
+    // Every rule tells apart only no move, one, and more, and a cache that keeps moving while stopped would
+    // otherwise overflow the count.
+    moves_[i] = std::min(moves_[i] + 1, 2);
+    if (!was_stopped && stopped()) {
+      ET_LOG(
+          Info,
+          "TensorRTBackend::execute: the buffer of an aliased output moved away from its CUDA graph twice, so the "
+          "engine runs with enqueueV3 until %d calls pass without another such move",
+          kSettledCalls);
+    }
+  };
   // A recorded graph keeps the scratch address it was recorded with. The shared pool frees that
-  // buffer when it grows, so a graph recorded on another buffer must not be replayed.
+  // buffer when it grows, so a graph recorded on another buffer must not be replayed. A move of an aliased output
+  // or its input away from a recording at the same shapes still counts, also between calls that ran without a graph
+  // since the growth drops the warm-up that counts those, or each growth would let it record once more.
   if (scratch != scratch_) {
+    if (!other_context && !capture_failed_ && !recorded_.empty() && handle.shape_epoch == shape_epoch_) {
+      for (size_t i = 0; i < count; ++i) {
+        if (in_place_only(i) && addresses[i] != recorded_[i] && addresses[i] != previous_[i]) {
+          count_move(i);
+        }
+      }
+    }
     reset_graph();
     scratch_ = scratch;
   }
   // A graph replays the kernels of the shapes and the profile it was captured under, so a change of
-  // either must record again.
+  // either must record again. Buffers that change along with the shapes are not counted as a move: new shapes
+  // record again.
   // Each graph holds one recording, so alternating profiles every call never replays; a
   // recording per profile is the upgrade if that pattern matters.
   if (handle.shape_epoch != shape_epoch_) {
@@ -244,43 +292,129 @@ Error ExecutionGraph::enqueue_in(
     capture_failed_ = false;
     own_buffers_failed_ = false;
     failed_captures_ = 0;
-    // A caller that moved its buffers away from recordings on them twice keeps moving them under new shapes
-    // too, so it stays on buffers this graph owns instead of paying more recordings for every set of shapes.
-    staged_ = moves_ > 1;
+    // A buffer the caller moved away from recordings on it twice keeps moving under new shapes too, so it
+    // stays on a buffer this graph owns instead of paying more recordings for every set of shapes.
+    for (size_t i = 0; i < count; ++i) {
+      staged_[i] = !in_place_only(i) && moves_[i] > 1;
+    }
     staged_until_repeat_ = false;
     shape_epoch_ = handle.shape_epoch;
+    // The last recording was under other shapes, so a buffer that leaves its addresses has not moved away from a
+    // recording of these shapes, such as a decode cache after a prefill whose last chunk had the decode shapes.
+    recorded_.clear();
   }
   if (capture_failed_) {
     return enqueue_plain(context, stream);
   }
-  // A plain graph and its buffers live in the context TensorRT ran the engine in, so a stream of
-  // another regular context, where TensorRT cannot run, still replays it.
-  const CUcontext record_context =
-      stream_green == nullptr && handle.context != nullptr ? handle.context : stream_context;
-  const bool other_context = record_context != stream_context;
   // A graph reads and writes the addresses it was recorded on. A caller that hands in new buffers on
   // every call, or alternates two sets, would record on every call, so a first recording goes on the
   // caller's addresses only when they repeat the previous call's, and on buffers this graph owns until
-  // they do. A caller that moves its buffers away from a recording on them once gets a new recording on
-  // the new ones; one that keeps moving them switches to buffers this graph owns at the second move.
+  // they do. A caller that moves a buffer away from a recording on it once gets a new recording on the
+  // new one; one that keeps moving it switches to a buffer this graph owns at the second move. Each
+  // buffer counts on its own, so the ones that stay put are read and written in place.
+  const auto replays_on_addresses = [&] {
+    for (size_t i = 0; i < count; ++i) {
+      if (!staged_[i] && addresses[i] != recorded_[i]) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const auto moved_since_previous = [&] {
+    for (size_t i = 0; i < count; ++i) {
+      if (!staged_[i] && addresses[i] != previous_[i]) {
+        return true;
+      }
+    }
+    return false;
+  };
   if (!other_context) {
     bool waits_for_repeat = false;
-    if (!staged_ && addresses != recorded_ && graph_exec_ != nullptr) {
+    if (graph_exec_ != nullptr && !replays_on_addresses()) {
       drop_graph();
-      staged_ = ++moves_ > 1;
-    } else if (!staged_ && graph_exec_ == nullptr && warmed_up_ && addresses != previous_) {
+      for (size_t i = 0; i < count; ++i) {
+        if (!staged_[i] && addresses[i] != recorded_[i]) {
+          count_move(i);
+          staged_[i] = !in_place_only(i) && moves_[i] > 1;
+          waits_for_repeat = waits_for_repeat || in_place_only(i);
+        }
+      }
+    } else if (graph_exec_ == nullptr && warmed_up_ && moved_since_previous()) {
       // Without buffers of its own, the graph runs these calls plainly.
       waits_for_repeat = own_buffers_failed_;
-      staged_ = !own_buffers_failed_;
-      staged_until_repeat_ = !own_buffers_failed_;
-    } else if (staged_until_repeat_ && addresses == previous_) {
-      drop_graph();
-      release_buffers(stream);
-      staged_ = false;
+      for (size_t i = 0; i < count; ++i) {
+        if (addresses[i] == previous_[i]) {
+          continue;
+        }
+        if (in_place_only(i)) {
+          // Counted here too, or a cache that alternates between two buffers after a recording would never stop.
+          if (!recorded_.empty() && addresses[i] != recorded_[i]) {
+            count_move(i);
+          }
+          waits_for_repeat = true;
+        } else if (!own_buffers_failed_) {
+          staged_[i] = true;
+        }
+      }
+      if (!own_buffers_failed_) {
+        staged_until_repeat_ = true;
+      }
+    }
+    // This runs after either branch above, so a buffer that repeats goes back in place also on a call where another
+    // moves. One that moved twice stays staged for good.
+    if (staged_until_repeat_) {
+      bool settled = false;
       staged_until_repeat_ = false;
+      for (size_t i = 0; i < count; ++i) {
+        if (staged_[i] && moves_[i] < 2 && addresses[i] == previous_[i]) {
+          staged_[i] = false;
+          settled = true;
+        }
+        // Recomputed only here. A recording for another context clears it, so the bindings it staged never settle.
+        staged_until_repeat_ = staged_until_repeat_ || (staged_[i] && moves_[i] < 2);
+      }
+      if (settled) {
+        drop_graph();
+        if (std::find(staged_.begin(), staged_.end(), true) == staged_.end()) {
+          release_buffers(stream);
+        }
+      }
+    }
+    // Moves that are rare next to the calls between them, such as a new cache for each conversation, never stop
+    // replay, while a buffer that keeps moving stays without a graph.
+    bool in_place_moved = previous_.empty();
+    for (size_t i = 0; i < count && !in_place_moved; ++i) {
+      in_place_moved = in_place_only(i) && addresses[i] != previous_[i];
+    }
+    settled_calls_ = in_place_counted ? 0 : std::min(settled_calls_ + 1, kSettledCalls);
+    moving_calls_ = in_place_moved && waits_for_repeat ? std::min(moving_calls_ + 1, kSettledCalls + 1) : 0;
+    if (settled_calls_ >= kSettledCalls) {
+      for (size_t i = 0; i < count; ++i) {
+        if (in_place_only(i)) {
+          moves_[i] = 0;
+        }
+      }
     }
     previous_ = addresses;
+    if (stopped()) {
+      // Nothing records until the buffer settles, so buffers of this graph's own, such as a staged token's, would only
+      // hold memory.
+      release_buffers(stream);
+      const auto error = enqueue_plain(context, stream);
+      // A call that ran these shapes is their warm-up, so moves still count after a scratch growth reset it.
+      warmed_up_ = warmed_up_ || error == Error::Ok;
+      return error;
+    }
     if (waits_for_repeat) {
+      // A move away from no recording is not counted, so that separate prefill and decode caches keep replaying.
+      // A cache that moves on every call then never records and never stops, so say why.
+      if (moving_calls_ == kSettledCalls) {
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: the buffer of an aliased output moved on each of the last %d calls, so they "
+            "ran with enqueueV3; a CUDA graph records on that buffer once a call repeats it",
+            kSettledCalls);
+      }
       return enqueue_plain(context, stream);
     }
   }
@@ -288,11 +422,23 @@ Error ExecutionGraph::enqueue_in(
   // serves records one in the engine's context, on buffers this graph owns. Until that recording can
   // go ahead the call fails. The graph and the failure count of the engine's own calls stay, unless the
   // call's shapes were new, since the shape change above has then reset both.
-  const bool records_for_other_context =
-      other_context && (graph_exec_ == nullptr || (!staged_ && addresses != recorded_));
-  const bool own_buffers = staged_ || records_for_other_context;
+  const bool records_for_other_context = other_context && (graph_exec_ == nullptr || !replays_on_addresses());
+  const bool own_buffers =
+      records_for_other_context || std::find(staged_.begin(), staged_.end(), true) != staged_.end();
+  const auto copies = [&](size_t i) { return records_for_other_context || staged_[i]; };
   std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex(), std::defer_lock);
   if (records_for_other_context) {
+    // That recording would put an aliased output on a buffer of this graph.
+    if (handle.num_aliased_outputs > 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: an engine with aliased outputs replays a call on a stream of another regular "
+          "CUDA context only on the buffers of a CUDA graph its own calls recorded, and %s",
+          graph_exec_ != nullptr ? "this call brings other ones"
+              : stopped()        ? "it records none while the buffer of an aliased output keeps moving"
+                                 : "there is none");
+      return Error::InvalidState;
+    }
     // Pooled calls never get here: execute() refuses a pooled call from another regular context first.
     if (!warmed_up_) {
       ET_LOG(
@@ -307,12 +453,15 @@ Error ExecutionGraph::enqueue_in(
     buffers_.resize(count, nullptr);
     capacities_.resize(count, 0);
     for (size_t i = 0; i < count; ++i) {
+      if (!copies(i)) {
+        continue;
+      }
       // TensorRT refuses a null address even for an empty tensor.
       const size_t bytes = binding_bytes[i] == 0 ? 1 : binding_bytes[i];
       if (capacities_[i] < bytes) {
         // New buffers need no warm-up, since warmed_up_ already says whether the engine ran these shapes
-        // in its own context, and a graph on the caller's buffers stays valid.
-        if (staged_) {
+        // in its own context, and a graph that does not read this buffer stays valid.
+        if (staged_[i]) {
           drop_graph();
         }
         // Doubling keeps shapes that grow a little at a time from allocating at every growth.
@@ -340,11 +489,14 @@ Error ExecutionGraph::enqueue_in(
           }
           fall_back("buffer allocation failed", allocation);
           release_buffers(stream);
-          // The caller's addresses need no buffers of this graph, so a later call that repeats them still
-          // records on them, and calls that keep moving run plainly until then.
           if (staged_until_repeat_) {
-            staged_ = false;
+            // Only the bindings that waited for a repeat go back to the caller's addresses, and calls run plainly
+            // until one repeats the previous call's address for every binding read in place. A binding that moved
+            // twice stays staged, and the next recording allocates a buffer for it again.
             staged_until_repeat_ = false;
+            for (size_t j = 0; j < count; ++j) {
+              staged_[j] = staged_[j] && moves_[j] > 1;
+            }
             own_buffers_failed_ = true;
           } else {
             capture_failed_ = true;
@@ -356,14 +508,14 @@ Error ExecutionGraph::enqueue_in(
       }
     }
     for (size_t i = 0; i < count; ++i) {
-      if (!handle.bind_address(i, buffers_[i])) {
+      if (!handle.bind_address(i, copies(i) ? buffers_[i] : addresses[i])) {
         ET_LOG(
             Error,
             "TensorRTBackend::execute: CUDA graph setTensorAddress failed for '%s'",
             binding_name(handle, i).c_str());
         return Error::InvalidState;
       }
-      if (i < handle.num_inputs && binding_bytes[i] != 0) {
+      if (i < handle.num_inputs && binding_bytes[i] != 0 && copies(i)) {
         const auto error = cuda_error(
             cudaMemcpyAsync(buffers_[i], addresses[i], binding_bytes[i], cudaMemcpyDefault, stream), "input copy");
         if (error != Error::Ok) {
@@ -464,12 +616,25 @@ Error ExecutionGraph::enqueue_in(
     }
     drop_graph();
     graph_exec_ = exec;
-    staged_ = own_buffers;
-    recorded_ = own_buffers ? buffers_ : addresses;
-    if (!own_buffers) {
-      // A graph on the caller's addresses leaves this graph's buffers unused. New shapes can clear the
-      // repeat that would otherwise free them, so they are freed here.
-      release_buffers(stream);
+    if (records_for_other_context) {
+      // Every call copies every binding from now on until the shapes or the profile change, so a repeat does not
+      // record again.
+      staged_until_repeat_ = false;
+      std::fill(staged_.begin(), staged_.end(), true);
+    }
+    recorded_ = addresses;
+    for (size_t i = 0; i < count; ++i) {
+      if (copies(i)) {
+        recorded_[i] = buffers_[i];
+      }
+    }
+    // A buffer this recording does not read is unused from now on.
+    for (size_t i = 0; i < buffers_.size(); ++i) {
+      if (buffers_[i] != nullptr && !copies(i)) {
+        retire(buffers_[i], stream);
+        buffers_[i] = nullptr;
+        capacities_[i] = 0;
+      }
     }
   }
   if (graph_exec_ != nullptr) {
@@ -484,14 +649,12 @@ Error ExecutionGraph::enqueue_in(
     }
     warmed_up_ = true;
   }
-  if (staged_) {
-    for (size_t i = handle.num_inputs; i < count; ++i) {
-      if (binding_bytes[i] != 0) {
-        const auto error = cuda_error(
-            cudaMemcpyAsync(addresses[i], buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream), "output copy");
-        if (error != Error::Ok) {
-          return error;
-        }
+  for (size_t i = handle.num_inputs; i < count; ++i) {
+    if (binding_bytes[i] != 0 && copies(i)) {
+      const auto error = cuda_error(
+          cudaMemcpyAsync(addresses[i], buffers_[i], binding_bytes[i], cudaMemcpyDefault, stream), "output copy");
+      if (error != Error::Ok) {
+        return error;
       }
     }
   }

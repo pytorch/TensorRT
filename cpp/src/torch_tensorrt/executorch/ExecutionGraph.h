@@ -71,13 +71,18 @@ std::shared_mutex& cuda_graph_capture_mutex();
 ::executorch::runtime::Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream);
 
 // Records a TensorRT enqueue into a CUDA graph and replays it: on the caller's buffers while they
-// stay put, and on buffers of its own once they keep moving.
+// stay put, and on buffers of its own for the ones that keep moving, except an aliased output and its input.
 class ExecutionGraph {
  public:
   ExecutionGraph() = default;
   ExecutionGraph(const ExecutionGraph&) = delete;
   ExecutionGraph& operator=(const ExecutionGraph&) = delete;
   ~ExecutionGraph();
+
+  // Calls in a row without a counted move of an aliased output or its input, after which their moves count from zero
+  // again. A recording costs about what 4 replays save, so a buffer that moves this rarely pays its recordings back
+  // many times over.
+  static constexpr int kSettledCalls = 32;
 
   // Requires the engine's device and a context to be current and the handle lock to be held. The
   // caller drains the stream before it releases that lock. addresses and binding_bytes hold one
@@ -130,21 +135,32 @@ class ExecutionGraph {
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
   int failed_captures_ = 0;
-  // Times the caller's addresses moved away from a recording on them, across shapes and profiles.
-  int moves_ = 0;
+  // Times the caller's address of each binding moved away from a recording on it, across shapes and profiles. A
+  // recording under other shapes does not count. For an aliased output and its input, a move at a growth of the
+  // shared scratch counts too, and so does one between calls that run without a graph, and the count starts over
+  // after kSettledCalls calls without such a move.
+  std::vector<int> moves_;
+  // Calls in a row in this graph's context without a counted move of an aliased output or its input.
+  int settled_calls_ = 0;
+  // Calls in a row in this graph's context that ran plainly because an aliased output or its input moved, so a cache
+  // that never stays put is logged.
+  int moving_calls_ = 0;
+  // The bindings the graph records on buffers_, which every call copies in or out. The others stay on the
+  // caller's addresses, so an input that stays put, such as a weight, is not copied while an output that moves on
+  // every call is. A binding goes on buffers_ once its address moved away from a recording on it twice, which
+  // lasts across changes of shapes and profile, or while staged_until_repeat_ holds it. A recording for a call
+  // from another regular context puts every binding on buffers_. An aliased output and its input never go on
+  // buffers_: their calls run plainly while that would be needed.
+  std::vector<bool> staged_;
   bool warmed_up_ = false;
   bool capture_failed_ = false;
-  // Buffers of this graph could not be allocated for these shapes, so recordings go on the caller's addresses.
+  // Buffers of this graph could not be allocated for these shapes. So while no graph is recorded, a call that moves
+  // any binding read in place runs plainly instead of staging it, until a call repeats them all.
   bool own_buffers_failed_ = false;
-  // A graph recorded on the caller's addresses replays with no copies while they stay put. Once they
-  // have moved twice in total, while staged_until_repeat_, or when a call from another regular context
-  // brings other ones, the graph is recorded on buffers_ instead, and every call copies its inputs in and
-  // its outputs out. After two moves that lasts across changes of shapes and profile; otherwise only until
-  // the next one.
-  bool staged_ = false;
-  // Recording goes to buffers_ because a call brought other addresses than the call before it. The first
-  // call that repeats the previous call's addresses records on them instead, or first warms up again when
-  // the shared scratch pool has grown.
+  // Recording goes to buffers_ for the bindings a call brought at other addresses than the call before it,
+  // while no graph is recorded. Each goes back to the caller's address at the first call from this graph's own
+  // context that repeats the previous call's address for it, or first warms up again when the shared scratch
+  // pool has grown. A recording for a call from another regular context ends this.
   bool staged_until_repeat_ = false;
   // The graphs of green context calls, by green context id, most recently called first. This one
   // serves plain contexts.
