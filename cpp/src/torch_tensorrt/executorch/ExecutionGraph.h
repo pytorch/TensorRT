@@ -71,13 +71,18 @@ std::shared_mutex& cuda_graph_capture_mutex();
 ::executorch::runtime::Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream);
 
 // Records a TensorRT enqueue into a CUDA graph and replays it: on the caller's buffers while they
-// stay put, and on buffers of its own for the ones that keep moving.
+// stay put, and on buffers of its own for the ones that keep moving, except an aliased output and its input.
 class ExecutionGraph {
  public:
   ExecutionGraph() = default;
   ExecutionGraph(const ExecutionGraph&) = delete;
   ExecutionGraph& operator=(const ExecutionGraph&) = delete;
   ~ExecutionGraph();
+
+  // Calls in a row without a counted move of an aliased output or its input, after which their moves count from zero
+  // again. A recording costs about what 4 replays save, so a buffer that moves this rarely pays its recordings back
+  // many times over.
+  static constexpr int kSettledCalls = 32;
 
   // Requires the engine's device and a context to be current and the handle lock to be held. The
   // caller drains the stream before it releases that lock. addresses and binding_bytes hold one
@@ -130,13 +135,22 @@ class ExecutionGraph {
   uint64_t shape_epoch_ = 0;
   cudaGraphExec_t graph_exec_ = nullptr;
   int failed_captures_ = 0;
-  // Times the caller's address of each binding moved away from a recording on it, across shapes and profiles.
+  // Times the caller's address of each binding moved away from a recording on it, across shapes and profiles. A
+  // recording under other shapes does not count. For an aliased output and its input, a move at a growth of the
+  // shared scratch counts too, and so does one between calls that run without a graph, and the count starts over
+  // after kSettledCalls calls without such a move.
   std::vector<int> moves_;
+  // Calls in a row in this graph's context without a counted move of an aliased output or its input.
+  int settled_calls_ = 0;
+  // Calls in a row in this graph's context that ran plainly because an aliased output or its input moved, so a cache
+  // that never stays put is logged.
+  int moving_calls_ = 0;
   // The bindings the graph records on buffers_, which every call copies in or out. The others stay on the
   // caller's addresses, so an input that stays put, such as a weight, is not copied while an output that moves on
   // every call is. A binding goes on buffers_ once its address moved away from a recording on it twice, which
   // lasts across changes of shapes and profile, or while staged_until_repeat_ holds it. A recording for a call
-  // from another regular context puts every binding on buffers_.
+  // from another regular context puts every binding on buffers_. An aliased output and its input never go on
+  // buffers_: their calls run plainly while that would be needed.
   std::vector<bool> staged_;
   bool warmed_up_ = false;
   bool capture_failed_ = false;
