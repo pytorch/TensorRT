@@ -1466,6 +1466,76 @@ TEST_F(ExecutionGraphReplayTest, ReplaysWithAContextCurrentMakeNoContextCall) {
   EXPECT_EQ(calls.context_calls, 0u);
 }
 
+// Where a buffer lives is asked with one driver query per binding on every call, also on a replay.
+TEST_F(ExecutionGraphReplayTest, EachBufferIsAskedWhereItLivesWithOneDriverQuery) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  CudaCalls calls;
+  for (int i = 2; i < 5; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  EXPECT_EQ(calls.launches.size(), 3u);
+  EXPECT_EQ(calls.pointer_queries, 6u);
+}
+
+// The single-device form of ABufferOnAnotherDeviceIsRefused, with the driver's answer made up: a buffer on another
+// GPU is refused as an input, an output or an aliased output, unless this engine can reach it.
+TEST_F(ExecutionGraphTest, ABufferReportedOnAnotherDeviceIsRefusedUnlessReachable) {
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  LoadedGraphEngine plain, alias;
+  ASSERT_EQ(plain.load(blob_), Error::Ok);
+  ASSERT_EQ(alias.load(alias_blob_), Error::Ok);
+  {
+    CudaCalls calls;
+    calls.report_reachable_on_another_device = inputs_[0];
+    EXPECT_EQ(plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+  }
+  CudaCalls calls;
+  calls.report_on_another_device = inputs_[0];
+  EXPECT_EQ(plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::InvalidArgument);
+  calls.report_on_another_device = outputs_[0];
+  EXPECT_EQ(plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::InvalidArgument);
+  EXPECT_EQ(alias.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::InvalidArgument);
+  ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+}
+
+// Managed memory is bound as it is, also as an aliased input, both where the driver reports it as device memory and
+// where it reports it as host memory with the managed flag set, as on a Jetson Orin.
+TEST_F(ExecutionGraphTest, ManagedMemoryIsBoundInPlaceAlsoWhereItReadsAsHostMemory) {
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  LoadedGraphEngine plain, alias;
+  ASSERT_EQ(plain.load(blob_), Error::Ok);
+  ASSERT_EQ(alias.load(alias_blob_), Error::Ok);
+  if (plain.handle()->pageable_host_access) {
+    GTEST_SKIP() << "device " << plain.handle()->device_id << " reads host memory directly, so execute() binds any "
+                 << "buffer without copies, whatever the driver reports";
+  }
+  float* input = nullptr;
+  float* output = nullptr;
+  ASSERT_EQ(cudaMallocManaged(&input, kMaxBytes), cudaSuccess);
+  ASSERT_EQ(cudaMallocManaged(&output, kMaxBytes), cudaSuccess);
+  for (const bool reads_as_host : {false, true}) {
+    SCOPED_TRACE(reads_as_host ? "reads as host memory" : "reads as device memory");
+    std::fill(input, input + 16, 3.0f);
+    CudaCalls calls;
+    calls.report_managed_as_host = reads_as_host;
+    EXPECT_EQ(plain.run(input, output, 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_EQ(calls.memcpy_calls, 0u) << "managed memory was staged through copies";
+    EXPECT_EQ(output[0], 7.0f);
+    EXPECT_EQ(alias.run(input, output, 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    // The aliased run's one copy is of the updated input into the program's slot for the aliased output.
+    EXPECT_EQ(calls.memcpy_calls, 1u) << "the aliased managed input was staged through copies";
+  }
+  EXPECT_EQ(cudaFree(input), cudaSuccess);
+  EXPECT_EQ(cudaFree(output), cudaSuccess);
+}
+
 TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {
   auto graph = std::make_unique<LoadedGraphEngine>();
   ASSERT_NO_FATAL_FAILURE(load_graph(*graph));
