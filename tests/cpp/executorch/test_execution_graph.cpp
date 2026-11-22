@@ -1338,6 +1338,59 @@ TEST_F(ExecutionGraphReplayTest, NoCallerStreamCaptureFailureFallsBackAndRecover
   EXPECT_EQ(recovery.launches, std::vector<cudaStream_t>(3, cudaStreamPerThread));
 }
 
+// A call that overlaps a global capture on another thread fails, as the README warns. The capture refuses its
+// recording, or on moved addresses the buffers of the graph's own, which is no failure of the engine, so such calls
+// must not turn replay off.
+TEST_F(ExecutionGraphReplayTest, CallsOverlappingAGlobalCaptureDoNotTurnReplayOff) {
+  for (const bool moved : {false, true}) {
+    SCOPED_TRACE(moved ? "on moved addresses" : "on the same addresses");
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    ASSERT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    std::promise<void> capturing;
+    std::promise<void> overlapped;
+    cudaError_t begin_err = cudaErrorUnknown;
+    std::thread capturer([&] {
+      cudaStream_t stream = nullptr;
+      begin_err = cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+      if (begin_err == cudaSuccess) {
+        begin_err = cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal);
+      }
+      capturing.set_value();
+      overlapped.get_future().wait();
+      cudaGraph_t captured = nullptr;
+      (void)cudaStreamEndCapture(stream, &captured);
+      if (captured != nullptr) {
+        cudaGraphDestroy(captured);
+      }
+      cudaStreamDestroy(stream);
+    });
+    capturing.get_future().wait();
+    {
+      CudaCalls calls;
+      // One refused allocation would be enough to turn replay off, and refused recordings would take 3.
+      const int slot = moved ? 1 : 0;
+      const int overlapping_calls = moved ? 1 : 3;
+      for (int i = 0; i < overlapping_calls; ++i) {
+        EXPECT_EQ(graph.run(inputs_[slot], outputs_[slot], 2, 8, streams_[0]), Error::Internal);
+      }
+      EXPECT_EQ(calls.captures.size(), moved ? 0u : 3u);
+      EXPECT_EQ(calls.malloc_calls, moved ? 1u : 0u);
+    }
+    overlapped.set_value();
+    capturer.join();
+    ASSERT_EQ(begin_err, cudaSuccess);
+    cudaGetLastError();
+    CudaCalls calls;
+    EXPECT_EQ(graph.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    EXPECT_EQ(calls.captures.size(), 1u);
+    EXPECT_EQ(calls.launches.size(), 1u);
+    EXPECT_TRUE(graph.is_captured());
+  }
+}
+
 TEST_F(ExecutionGraphReplayTest, AFailedRecordingIsRetriedOnTheNextCall) {
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
@@ -1372,7 +1425,7 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
   }
   ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), 64, cudaMemcpyHostToDevice), cudaSuccess);
   ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
-  size_t mallocs = 0, launches = 0, captures = 0;
+  size_t mallocs = 0, launches = 0, captures = 0, context_calls = 0;
   Error result = Error::Internal;
   // No CUDA call may run on this thread before execute, so it starts with no current context.
   std::thread fresh([&] {
@@ -1381,9 +1434,11 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
     captures = calls.captures.size();
     mallocs = calls.malloc_calls;
     launches = calls.launches.size();
+    context_calls = calls.context_calls;
   });
   fresh.join();
   EXPECT_EQ(result, Error::Ok);
+  EXPECT_EQ(context_calls, 1u);
   EXPECT_EQ(mallocs, 0u);
   EXPECT_EQ(captures, 0u);
   EXPECT_EQ(launches, 1u);
@@ -1393,6 +1448,22 @@ TEST_F(ExecutionGraphReplayTest, FirstNoStreamCallOnAFreshThreadReplays) {
   for (size_t i = 0; i < output.size(); ++i) {
     EXPECT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f);
   }
+}
+
+// cudaFree(nullptr) costs more than the checks around a replay, so a call that finds a context current skips it.
+TEST_F(ExecutionGraphReplayTest, ReplaysWithAContextCurrentMakeNoContextCall) {
+  LoadedGraphEngine graph;
+  ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  ASSERT_TRUE(graph.is_captured());
+  CudaCalls calls;
+  for (int i = 2; i < 5; ++i) {
+    ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, i));
+  }
+  EXPECT_EQ(calls.launches.size(), 3u);
+  EXPECT_EQ(calls.context_calls, 0u);
 }
 
 TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {

@@ -340,6 +340,11 @@ Error ExecutionGraph::enqueue_in(
           }
           fall_back("buffer allocation failed", allocation);
           release_buffers(stream);
+          // Refused by a global capture on another thread, like the cudaGraphInstantiate below, so a later call
+          // still tries again.
+          if (allocation == cudaErrorStreamCaptureUnsupported) {
+            return enqueue_plain(context, stream);
+          }
           // The caller's addresses need no buffers of this graph, so a later call that repeats them still
           // records on them, and calls that keep moving run plainly until then.
           if (staged_until_repeat_) {
@@ -388,6 +393,7 @@ Error ExecutionGraph::enqueue_in(
     cudaGraphExec_t exec = nullptr;
     cudaError_t error = cudaErrorDeviceUninitialized;
     bool enqueued = true;
+    bool refused_by_a_capture = false;
     {
       // The engine is captured on a stream of its own in record_context. The scope ends before the launch
       // below, which runs on the caller's stream, in whichever context it belongs to.
@@ -410,6 +416,9 @@ Error ExecutionGraph::enqueue_in(
       capture_lock.unlock();
       if (error == cudaSuccess && enqueued) {
         error = cudaGraphInstantiate(&exec, graph, nullptr, nullptr, 0);
+        // A global capture on another thread refuses this, which says nothing about whether the engine can be
+        // recorded, so it does not count toward turning replay off.
+        refused_by_a_capture = error == cudaErrorStreamCaptureUnsupported;
       }
       if (graph != nullptr) {
         cudaGraphDestroy(graph);
@@ -449,7 +458,7 @@ Error ExecutionGraph::enqueue_in(
       if (records_for_other_context) {
         return Error::InvalidState;
       }
-      if (++failed_captures_ == kMaxCaptureAttempts) {
+      if (!refused_by_a_capture && ++failed_captures_ == kMaxCaptureAttempts) {
         ET_LOG(
             Error,
             "TensorRTBackend::execute: CUDA graph recording failed %d times; until its input shapes or profile "

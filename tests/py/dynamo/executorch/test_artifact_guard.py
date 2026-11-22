@@ -1273,6 +1273,10 @@ _CONVERSION_WIDTHS = {"%d": 11, "%zu": 20, "%lld": 20}
             "cpp/src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
             "TensorRTBackend::execute: TensorRT could not size the activation scratch",
         ),
+        (
+            "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+            "TensorRTBackend::execute: usual causes, in order:",
+        ),
     ],
 )
 @pytest.mark.unit
