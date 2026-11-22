@@ -2178,6 +2178,7 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "no_grad_view_of_outputs",
         "views_then_new_write",
         "set_in_no_grad",
+        "set_offset_in_no_grad",
         "type_as_in_reader",
         "type_as_written_later",
         "write_before_disabled",
@@ -2188,6 +2189,7 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "disabled_cache",
         "write_inner",
         "write_repeat",
+        "dropout_residual",
     ],
 )
 def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
@@ -2360,6 +2362,17 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
                 w.add_(10.0)
             return y.float()
 
+    class SetOffsetInNoGrad(nn.Module):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+            with torch.no_grad():
+                w = torch.empty_like(y)
+                w.set_(y, 0, y.shape, y.stride())
+                w.add_(10.0)
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                return (y @ x.T).float()
+
     class TypeAsInReader(nn.Module):
         def forward(self, x, pos):
             with torch.autocast(x.device.type, dtype=torch.float16):
@@ -2510,6 +2523,14 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
                 self.cache.index_copy_(0, pos, self.linear(x).half())
             return self.cache.float()
 
+    class SetInDisabled(Cache):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, enabled=False):
+                w = torch.empty_like(self.cache)
+                w.set_(self.cache, 0, self.cache.shape, self.cache.stride())
+                w.add_(self.linear(x).half())
+            return self.cache.float()
+
     class Fresh(nn.Module):
         def __init__(self):
             super().__init__()
@@ -2582,6 +2603,14 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
             h[:, :2].add_(1.0)
             with torch.autocast(x.device.type, enabled=False):
                 return self.linear2(h.float())
+
+    class DropoutResidual(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # dropout in eval returns the new value linear1 gives.
+                h = nn.functional.dropout(self.linear1(x), 0.5, False)
+                h += x
+            return h.float()
 
     class WriteDisabledOutput(Fresh):
         def forward(self, x, pos):
@@ -2823,6 +2852,10 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
             SetInNoGrad,
             {"autocast_excluded_node_names": {"matmul.*", "slice.*"}},
         ),
+        "set_offset_in_no_grad": (
+            SetOffsetInNoGrad,
+            {"autocast_excluded_node_names": {"matmul.*"}},
+        ),
         # type_as and add_ stay in float32, so no cast that autocast adds hides a
         # write into v.
         "type_as_in_reader": (
@@ -2867,6 +2900,8 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         "to_copy": (ToCopy, {}),
         "pow": (Pow, {"autocast_excluded_ops": {torch.ops.aten.pow.Tensor_Tensor}}),
         "disabled_cache": (DisabledCache, {}),
+        "set_in_disabled": (SetInDisabled, {}),
+        "dropout_residual": (DropoutResidual, {}),
         "fresh": (Fresh, {}),
         "write_inner": (WriteInner, {}),
         "write_repeat": (WriteRepeat, {}),
@@ -2916,6 +2951,8 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         "type_as_in_reader",
         "type_as_written_later",
         "write_inner",
+        "dropout_residual",
+        "set_offset_in_no_grad",
     )
     if mode == "reclassify":
         inlined += ("disabled_cache",)
@@ -2965,6 +3002,7 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         "write_before_disabled",
         "write_disabled_output",
         "disabled_cache",
+        "set_in_disabled",
     ],
 )
 def test_autocast_model_regions_reclassify_all_keeps_values(case):
@@ -2983,8 +3021,17 @@ def test_autocast_model_regions_reclassify_all_keeps_values(case):
         lambda v: torch.nn.functional.dropout(v, training=False),
         # Its inputs differ in dtype, so it does not run again.
         lambda v: torch.broadcast_tensors(torch.zeros_like(v, dtype=torch.float), v)[1],
+        # Its kernel is not its decomposition, so it does not run again.
+        lambda v: torch.unsafe_split(v, 1, dim=1)[0],
     ],
-    ids=["type_as", "einsum", "broadcast_tensors", "dropout", "two_dtypes"],
+    ids=[
+        "type_as",
+        "einsum",
+        "broadcast_tensors",
+        "dropout",
+        "two_dtypes",
+        "unsafe_split",
+    ],
 )
 def test_autocast_model_regions_keeps_values_of_a_loaded_program(op):
     from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
@@ -3124,6 +3171,75 @@ def test_autocast_model_regions_sees_a_foreach_write_in_a_loaded_program():
     )
     ep = pre_export_lowering(torch.export.load(buffer), settings)
     torch.testing.assert_close(ep.module()(x, n)[0], model(x, n)[0])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("disabled", [False, True], ids=["no_grad", "enabled_false"])
+def test_autocast_model_regions_sees_a_write_through_einsum_in_a_loaded_program(
+    disabled,
+):
+    class Model(nn.Module):
+        def forward(self, x, n):
+            k = n.item()
+            torch._check(k >= 1)
+            torch._check(k <= x.shape[1])
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                y = x.T @ x
+                v = y[:k]
+            block = (
+                torch.autocast(x.device.type, enabled=False)
+                if disabled
+                else torch.no_grad()
+            )
+            with block:
+                # Its shape is data dependent, so einsum does not run again.
+                s = torch.einsum("ij->ji", v).add_(10.0).sum()
+            return y.float(), s
+
+    model = Model().cuda().eval()
+    x, n = torch.randn(1, 8, device="cuda"), torch.tensor(3, device="cuda")
+    buffer = io.BytesIO()
+    torch.export.save(torch.export.export(model, (x, n)), buffer)
+    buffer.seek(0)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+        autocast_excluded_node_names={"matmul.*", "slice.*"},
+    )
+    ep = pre_export_lowering(torch.export.load(buffer), settings)
+    torch.testing.assert_close(ep.module()(x, n)[0], model(x, n)[0])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_autocast_model_regions_keeps_a_region_whose_op_fails_without_autocast(dtype):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("total", torch.zeros(()))
+
+        def forward(self, x):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                # Autocast runs nuclear_norm in float32, which it needs.
+                n = torch.nuclear_norm(x)
+                self.total.add_(n)
+            return n * 2.0 + self.total
+
+    model = Model().cuda().eval()
+    x = torch.randn(8, 8, device="cuda").to(dtype)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_regions="reclassify",
+    )
+    ep = pre_export_lowering(torch.export.export(copy.deepcopy(model), (x,)), settings)
+    assert ep.graph.find_nodes(
+        op="call_function", target=torch.ops.higher_order.wrap_with_autocast
+    )
+    lowered = ep.module()
+    for _ in range(2):
+        torch.testing.assert_close(lowered(x).float(), model(x), rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.unit

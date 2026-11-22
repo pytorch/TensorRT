@@ -46,7 +46,7 @@ def _storages(val: Any) -> Set[StorageWeakRef]:
 def _can_return_an_input(op: torch.fx.Node) -> bool:
     """Whether op is an aten op whose kernel is its decomposition, such as type_as,
     dropout or einsum, which can return an input though its schema does not say it.
-    Other ops follow their schema."""
+    Other ops show that only in their traced values."""
     return (
         isinstance(op.target, torch._ops.OpOverload)
         and op.target.namespace == "aten"
@@ -68,14 +68,35 @@ def _runs_again(op: torch.fx.Node) -> bool:
     returns a view of a cast, and without autocast a view of the input. A result with
     a data dependent shape would get a new symbol in a second run, and an op whose
     floating point inputs differ in dtype, which autocast allowed, can fail outside
-    autocast, so these do not run again."""
+    autocast, so these do not run again. Neither does an op that fails without
+    autocast, such as nuclear_norm of float16, which autocast runs in float32. The
+    result is kept in op.meta under _RAN_AGAIN."""
     inputs = [a.meta.get("val") for a in op.all_input_nodes]
     dtypes = {v.dtype for v in inputs if isinstance(v, torch.Tensor)}
-    return (
+    if not (
         _can_return_an_input(op)
         and not free_unbacked_symbols(op.meta.get("val"))
         and len({d for d in dtypes if d.is_floating_point}) <= 1
-    )
+    ):
+        return False
+    # The passes ask about the same op many times, and the result changes only with
+    # the traced values of its inputs.
+    ran = op.meta.get(_RAN_AGAIN)
+    if (
+        ran is None
+        or len(ran[0]) != len(inputs)
+        or any(map(operator.is_not, ran[0], inputs))
+    ):
+        args, kwargs = torch.fx.node.map_arg(
+            (op.args, op.kwargs), lambda a: a.meta["val"]
+        )
+        try:
+            with detect_fake_mode(inputs), torch._C._DisableAutocast():
+                result = op.target(*args, **kwargs)
+        except RuntimeError:
+            result = None
+        ran = op.meta[_RAN_AGAIN] = (inputs, result)
+    return ran[1] is not None
 
 
 def _inputs_sharing_memory(
@@ -86,21 +107,8 @@ def _inputs_sharing_memory(
     inputs = op.all_input_nodes
     val = value.meta.get("val")
     if _runs_again(op):
-        # The passes ask about the same op many times, and the result changes only
-        # with the traced values of its inputs.
-        vals = [a.meta["val"] for a in inputs]
-        ran = op.meta.get(_RAN_AGAIN)
-        if (
-            ran is None
-            or len(ran[0]) != len(vals)
-            or any(map(operator.is_not, ran[0], vals))
-        ):
-            args, kwargs = torch.fx.node.map_arg(
-                (op.args, op.kwargs), lambda a: a.meta["val"]
-            )
-            with detect_fake_mode(vals), torch._C._DisableAutocast():
-                ran = op.meta[_RAN_AGAIN] = (vals, op.target(*args, **kwargs))
-        val = ran[1] if value is op else ran[1][value.args[1]]
+        ran = op.meta[_RAN_AGAIN][1]
+        val = ran if value is op else ran[value.args[1]]
     storages = _storages(val)
     return [a for a in inputs if not storages.isdisjoint(_storages(a.meta.get("val")))]
 
@@ -125,9 +133,10 @@ def _returns_an_input(node: torch.fx.Node) -> bool:
 
 # The ops known to return an input or a view of it though their schema does not say
 # it. Only for these does _may_be_an_input assume so, since ops such as linear and
-# batch_norm, whose inputs often differ in dtype in a region, return new memory.
-# einsum returns a view only of a single operand, which has one dtype, so it runs
-# again.
+# batch_norm, whose inputs often differ in dtype in a region, return new memory, and
+# a region that writes in place into their result can be inlined. A region or block
+# that writes into the result of any op the traced values do not show counts as
+# writing into all its operands, see _written_by.
 _MAY_RETURN_AN_INPUT = {
     torch.ops.aten.alpha_dropout,
     torch.ops.aten.atleast_1d,
@@ -142,16 +151,15 @@ _MAY_RETURN_AN_INPUT = {
 }
 
 
-def _may_be_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool:
-    """Whether op can return an input that its traced value does not show: it is an
-    op known to return an input, not a cast that copied, it does not run again, and
-    the traced values do not show the memory that ops share, as on a program loaded
-    with torch.export.load, where an in-place op among writes, pairs of an op and the
-    tensor it writes into, has memory of its own. A writer that returns nothing to
-    compare, such as _foreach_add_ or a region, counts as such an op."""
+def _may_hide_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool:
+    """Whether op could return an input that its traced value does not show: it is
+    not a cast that copied, it does not run again, and the traced values do not
+    show the memory that ops share, as on a program loaded with torch.export.load,
+    where an in-place op among writes, pairs of an op and the tensor it writes into,
+    has memory of its own. A writer that returns nothing to compare, such as
+    _foreach_add_ or a region, counts as such an op."""
     return (
         isinstance(op.target, torch._ops.OpOverload)
-        and op.target.overloadpacket in _MAY_RETURN_AN_INPUT
         and not _copies(op)
         and not _runs_again(op)
         and any(
@@ -159,6 +167,16 @@ def _may_be_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool:
             or _storages(n.meta.get("val")).isdisjoint(_storages(w.meta.get("val")))
             for n, w in writes
         )
+    )
+
+
+def _may_be_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool:
+    """Whether op is known to return an input and the traced values do not show it,
+    see _may_hide_an_input."""
+    return (
+        isinstance(op.target, torch._ops.OpOverload)
+        and op.target.overloadpacket in _MAY_RETURN_AN_INPUT
+        and _may_hide_an_input(op, writes)
     )
 
 
@@ -202,6 +220,13 @@ def _region_output(value: torch.fx.Node) -> Optional[torch.fx.Node]:
     return _body(block).graph.output_node().args[0][value.args[1]]
 
 
+# set_ gives its input the memory of the other tensor.
+_SET = {
+    torch.ops.aten.set_.source_Tensor,
+    torch.ops.aten.set_.source_Tensor_storage_offset,
+}
+
+
 def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
     """The tensor whose memory a value shares directly: the input of a view or an
     in-place op, or for an output of a region or a torch.no_grad block, the value of
@@ -214,8 +239,7 @@ def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
             return base
         return _operands(value.args[0])[placeholders.index(base)]
     op = value.args[0] if value.target == operator.getitem else value
-    if op.target == torch.ops.aten.set_.source_Tensor:
-        # set_ gives its input the memory of the other tensor.
+    if op.target in _SET:
         return op.args[1]
     if _returns_an_input(op) and not _copies(op):
         return (
@@ -268,8 +292,11 @@ def _written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     # Each op of a chain of in-place ops writes into the one before, which has the
     # same memory, so only the start of a chain is followed back.
     written = {_base(w) for w in values if _source(w) not in values}
+    # As any op, such as unsafe_split, can return a view of an input without its
+    # schema saying it, a write into the result of an op that the traced values do not
+    # show may be a write into an operand.
     if any(
-        _may_be_an_input(op, writes)
+        _may_hide_an_input(op, writes)
         for op in (w.args[0] if w.target == operator.getitem else w for w in written)
     ):
         return list(_operands(node))
@@ -352,9 +379,17 @@ def _writes_only_a_new_value(
                 return False
             value, writer = output, output.graph.output_node()
             continue
+        op = value.args[0] if value.target == operator.getitem else value
+        if op.target in _SET or (
+            not _aliases_an_input(op) and _returns_an_input(op) and not _copies(op)
+        ):
+            # A write into the result of set_, or of an op that returns its input
+            # though its schema does not say it, such as an eval dropout, is a write
+            # into that input.
+            value, writer = _source(value), value
+            continue
         written = tensors_written_by(value)
         if len(written) != 1:
-            op = value.args[0] if value.target == operator.getitem else value
             return (
                 isinstance(op.target, torch._ops.OpOverload)
                 and (not _returns_an_input(op) or _copies(op))
