@@ -2039,6 +2039,9 @@ def test_autocast_model_regions_follows_a_long_chain_of_in_place_ops():
         autocast_model_regions="reclassify",
     )
     ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
+    assert torch.ops.higher_order.wrap_with_autocast not in (
+        n.target for n in ep.graph.nodes
+    )
     torch.testing.assert_close(ep.module()(x).float(), Model()(x), rtol=1e-2, atol=1e-2)
 
 
@@ -2164,6 +2167,7 @@ def _(t: torch.Tensor) -> torch.Tensor:
         "write_between_and_in_region",
         "foreach_then_region_write",
         "no_grad_between_regions",
+        "no_grad_in_region",
         "chain",
         "type_as_in_no_grad",
         "dropout_in_no_grad",
@@ -2646,6 +2650,18 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
             with torch.autocast(x.device.type, dtype=torch.float16):
                 return self.linear2(h).float()
 
+    class NoGradInRegion(Fresh):
+        def forward(self, x, pos):
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                h = self.linear1(x)
+            # Export splits this region around the block, and the part that writes
+            # into h keeps its autocast.
+            with torch.autocast(x.device.type, dtype=torch.float16):
+                with torch.no_grad():
+                    h.add_(1.0)
+                y = self.linear2(h)
+            return y.float() + h.float()
+
     class Chain(Fresh):
         def forward(self, x, pos):
             with torch.autocast(x.device.type, dtype=torch.float16):
@@ -2742,7 +2758,7 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         "read_then_write": (ReadThenWrite, {}),
         "write_region_output": (WriteRegionOutput, {}),
         "write_disabled_output": (WriteDisabledOutput, {}),
-        # In the next 10 cases linear1 runs in float32, so its cast to float16 is a copy.
+        # In the next 11 cases linear1 runs in float32, so its cast to float16 is a copy.
         "write_between_regions": (
             WriteBetweenRegions,
             {"autocast_excluded_nodes": {"^linear1$"}},
@@ -2773,6 +2789,10 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         ),
         "no_grad_between_regions": (
             NoGradBetweenRegions,
+            {"autocast_excluded_nodes": {"^linear1$"}},
+        ),
+        "no_grad_in_region": (
+            NoGradInRegion,
             {"autocast_excluded_nodes": {"^linear1$"}},
         ),
         "chain": (
@@ -2907,6 +2927,7 @@ def test_autocast_model_regions_keeps_values(case, mode="reclassify"):
         "write_in_kept_region",
         "foreach_in_kept_region",
         "write_between_and_in_region",
+        "no_grad_in_region",
     ):
         # Only the region that writes into its input keeps its autocast.
         (region,) = [

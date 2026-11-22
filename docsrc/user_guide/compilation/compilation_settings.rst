@@ -255,7 +255,11 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        be lost when the rules give the op that writes, or a view it writes through, a
        dtype other than the dtype of that output, as with ``bfloat16`` regions and
        ``autocast_low_precision_type=torch.float16``. This also happens with
-       ``"keep"``.
+       ``"keep"``. In a program loaded with ``torch.export.load``, the other two
+       values can also lose such a write when it goes through ``broadcast_tensors``
+       of tensors in different floating point dtypes, or through an eval
+       ``dropout``, ``broadcast_tensors`` or ``type_as`` of a tensor with a
+       data-dependent size.
        Autocast logs, at INFO level, some of the regions that another value of
        ``autocast_model_regions`` could let it choose in: under ``"keep"``, regions
        with ``enabled=False`` or in a dtype other than ``autocast_low_precision_type``,

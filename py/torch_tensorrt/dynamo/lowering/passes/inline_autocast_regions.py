@@ -414,6 +414,8 @@ def _can_inline(
             _can_inline(body, node, include_disabled, inlined, operands)
         ):
             return False
+        # Export splits a region around a torch.no_grad() block, so no such block
+        # is inside a body, and the writes in a nested region are checked above.
         if not all(
             _writes_only_a_new_value(w, node, operands, include_disabled, inlined)
             for w in tensors_written_by(node)
@@ -656,8 +658,8 @@ def inline_autocast_regions(
     each output of a region in the dtype the region gave it. A region whose values
     inlining could change keeps its autocast, see _can_inline. A region that keeps
     its autocast gets its inputs in the dtypes it was traced with. Regions with
-    enabled=False keep theirs too, unless include_disabled. With low_precision_type,
-    it logs the regions with enabled=False, see log_kept_regions.
+    enabled=False keep theirs too, unless include_disabled, and with
+    low_precision_type it logs them, see log_kept_regions.
     """
     copied: Dict[torch.fx.Node, bool] = {}
     inlined: Dict[torch.fx.Node, bool] = {}
