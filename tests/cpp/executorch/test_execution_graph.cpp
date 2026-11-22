@@ -1481,7 +1481,8 @@ TEST_F(ExecutionGraphReplayTest, ReplaysWithAContextCurrentMakeNoContextCall) {
   EXPECT_EQ(calls.context_calls, 0u);
 }
 
-// Where a buffer lives is asked with one driver query per binding on every call, also on a replay.
+// Where a buffer lives is asked with one driver query per binding on every call, also on a replay. Only a buffer on
+// another GPU, asked from a thread with no current context, gets a second one.
 TEST_F(ExecutionGraphReplayTest, EachBufferIsAskedWhereItLivesWithOneDriverQuery) {
   LoadedGraphEngine graph;
   ASSERT_NO_FATAL_FAILURE(load_graph(graph));
@@ -1509,6 +1510,20 @@ TEST_F(ExecutionGraphTest, ABufferReportedOnAnotherDeviceIsRefusedUnlessReachabl
     calls.report_reachable_on_another_device = inputs_[0];
     EXPECT_EQ(plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::Ok);
   }
+  // No CUDA call may run on a new thread before execute, so it has no current context and the driver gives no address.
+  const auto run_on_a_new_thread = [&](const void* reachable, const void* unreachable) {
+    Error result = Error::Internal;
+    std::thread([&] {
+      CudaCalls calls;
+      calls.report_reachable_on_another_device = reachable;
+      calls.report_on_another_device = unreachable;
+      result = plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]);
+    }).join();
+    return result;
+  };
+  EXPECT_EQ(run_on_a_new_thread(inputs_[0], nullptr), Error::Ok);
+  EXPECT_EQ(run_on_a_new_thread(outputs_[0], nullptr), Error::Ok);
+  EXPECT_EQ(run_on_a_new_thread(nullptr, inputs_[0]), Error::InvalidArgument);
   CudaCalls calls;
   calls.report_on_another_device = inputs_[0];
   EXPECT_EQ(plain.run(inputs_[0], outputs_[0], 2, 8, streams_[0]), Error::InvalidArgument);

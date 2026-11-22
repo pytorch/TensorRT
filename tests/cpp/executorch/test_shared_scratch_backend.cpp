@@ -3222,6 +3222,8 @@ TEST_F(SharedScratchBackendTest, ACallOverlappingAGlobalCaptureReturnsInternalAn
     LoadedEngine engine;
     ASSERT_EQ(engine.load(blob(), 25), Error::Ok);
     ASSERT_FALSE(engine.handle()->shared_scratch);
+    // TensorRT advises one enqueue before any capture, since the first may do setup that a capture forbids.
+    ASSERT_EQ(engine.run_on_the_synchronized_path(), Error::Ok);
     ASSERT_TRUE(engine.fill_output(kSentinel));
     // Work queued ahead of the engine, so a call that returns before what it queued has finished is seen.
     const auto queued = std::chrono::steady_clock::now();
