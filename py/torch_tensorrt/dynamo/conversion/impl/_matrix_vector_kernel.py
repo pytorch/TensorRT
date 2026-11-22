@@ -26,10 +26,10 @@ PLUGIN_NAME = "torch_tensorrt::matrix_vector"
 
 # tl.dot needs at least 16 rows, so the kernel computes 16 and stores the real ones.
 MAX_ROWS = 16
-# (BLOCK_N, num_warps, num_stages), within 5% of the best tile for every decoder
-# projection measured on H100 with a BLOCK_K of 128, and within the 48 KiB of
-# shared memory a TensorRT plugin kernel gets.
-_TILE = (32, 2, 3)
+# (BLOCK_N, num_warps, num_stages), within 3% of the best tile for every decoder
+# projection measured on H100 and on DGX Spark, and within the 48 KiB of shared
+# memory a TensorRT plugin kernel gets.
+_TILE = (16, 2, 4)
 
 _TRITON_DTYPES = {trt.bfloat16: "bf16", trt.float16: "fp16"}
 POINTERS = {torch.bfloat16: "*bf16", torch.float16: "*fp16"}
@@ -74,15 +74,15 @@ def _matrix_vector_kernel(  # type: ignore[no-untyped-def]
 
 
 def block_k(k: int) -> int:
-    """The largest BLOCK_K up to 128 that divides K; K must be a multiple of 16."""
-    size = 128
+    """The largest BLOCK_K up to 256 that divides K; K must be a multiple of 16."""
+    size = 256
     while k % size:
         size //= 2
     return size
 
 
 def num_splits(n: int, k: int) -> int:
-    """Slices of K, as many as keep up to two programs per streaming multiprocessor."""
+    """Slices of K, as many as keep up to four programs per streaming multiprocessor."""
     sms = torch.cuda.get_device_properties(
         torch.cuda.current_device()
     ).multi_processor_count
@@ -90,7 +90,7 @@ def num_splits(n: int, k: int) -> int:
     size = block_k(k)
     splits = 1
     for candidate in range(2, 9):
-        if k % (candidate * size) == 0 and tiles * candidate <= 2 * sms:
+        if k % (candidate * size) == 0 and tiles * candidate <= 4 * sms:
             splits = candidate
     return splits
 
