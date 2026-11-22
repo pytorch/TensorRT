@@ -63,7 +63,7 @@ def pinned_executorch_version() -> str:
     ]
 
 
-def executorch_cmake_prefix_path() -> str:
+def executorch_cmake_prefix_path(runtime_version: str) -> str:
     """Locate the CMake package of the ExecuTorch wheel this delegate builds against.
 
     The delegate links the runtime out of the installed wheel, so the wheel that is present
@@ -99,6 +99,24 @@ def executorch_cmake_prefix_path() -> str:
     # processor-only build of the pinned date, which cannot supply the CUDA runtime the delegate
     # links, and the wheel this build then publishes requires the label it did not check.
     label = distribution.version.partition("+")[2]
+    unlabelled = not label
+    # PyPI refuses local labels, so the CUDA wheel ExecuTorch publishes there reports a bare version
+    # in its metadata. The wheel's version.py still records the full version it was built as.
+    shown = distribution.version
+    version_file = package_root / "version.py"
+    if unlabelled and version_file.is_file():
+        match = re.search(
+            r"^__version__[^=\n]*=\s*['\"]([^'\"]+)['\"]",
+            version_file.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            built = match.group(1)
+            if public_version(built) == installed:
+                label = built.partition("+")[2]
+                shown += f" (its version.py records {built})"
+            else:
+                shown += f" (its version.py records {built}, another version, so its label is ignored)"
     # The row too, not just the shape of the label. The delegate links CUDA 13, so a CUDA 12 build
     # of the pinned date passes a prefix test and then publishes a wheel requiring an ExecuTorch
     # that cannot run beside it. The major is the comparable part: the build row picks the minor.
@@ -107,15 +125,29 @@ def executorch_cmake_prefix_path() -> str:
     )["__cuda_version__"].split(".")[0]
     wrong_version = public_version(pinned) != installed
     wrong_build = not label.startswith(f"cu{cuda_major}")
-    if (wrong_version or wrong_build) and os.getenv(
+    enforced = os.getenv(
         "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", ""
-    ).lower() not in ("1", "true", "yes", "on"):
+    ).lower() not in ("1", "true", "yes", "on")
+    if (wrong_version or wrong_build) and enforced:
         raise RuntimeError(
-            f"The installed ExecuTorch is {distribution.version} but dev_dep_versions.yml pins "
+            f"The installed ExecuTorch is {shown} but dev_dep_versions.yml pins "
             f"{pinned} and the delegate needs a CUDA build. The delegate links this wheel's "
             "runtime and declares a dependency on it, so building against another version or "
             "another build ships a wheel that requires the wrong ExecuTorch. Install the pinned "
             "CUDA wheel, or set TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH=1 to build anyway."
+        )
+    # A CUDA label marks a wheel for the PyTorch indexes, whose requirement has to name the labelled
+    # ExecuTorch build it links. A metadata version with no label leaves nothing to name. Other
+    # labels, such as the default Git revision, mark a local build and require the bare version.
+    if unlabelled and runtime_version.partition("+")[2].startswith("cu") and enforced:
+        raise RuntimeError(
+            f"The runtime version {runtime_version} has a CUDA label, which marks a wheel for the "
+            "PyTorch indexes. That wheel has to require the labelled ExecuTorch build it links, but "
+            f"the installed ExecuTorch reports {distribution.version} with no label. Build a version "
+            "without a CUDA label, for example "
+            f"TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION={public_version(runtime_version)}, install the "
+            "labelled CUDA wheel from the PyTorch index, or set "
+            "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH=1 to build anyway."
         )
     return str(prefix)
 
@@ -248,7 +280,7 @@ class BazelBuild(build_py):
             "--config=python",
             f"--compilation_mode={compilation_mode}",
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
-            f"--action_env=EXECUTORCH_CMAKE_PREFIX_PATH={executorch_cmake_prefix_path()}",
+            f"--action_env=EXECUTORCH_CMAKE_PREFIX_PATH={executorch_cmake_prefix_path(self.distribution.get_version())}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
         dist_dir_arch = (
@@ -324,7 +356,7 @@ class BazelBuild(build_py):
             f"-DCMAKE_BUILD_TYPE={build_type}",
             f"-DCMAKE_INSTALL_PREFIX={install_dir.as_posix()}",
             f"-DTORCH_TENSORRT_SOURCE_DIR={REPO_ROOT.as_posix()}",
-            f"-DCMAKE_PREFIX_PATH={pathlib.Path(executorch_cmake_prefix_path()).as_posix()}",
+            f"-DCMAKE_PREFIX_PATH={pathlib.Path(executorch_cmake_prefix_path(self.distribution.get_version())).as_posix()}",
         ]
         # The main build already fetched the TensorRT SDK. Its import libraries
         # and headers are needed here; the installed TensorRT wheel supplies DLLs.
@@ -491,7 +523,7 @@ require_supported_cuda()
 runtime_version = get_runtime_version()
 executorch_version = installed_version("executorch")
 # A wheel for PyPI has no local label, because PyPI refuses one, and neither does PyPI's ExecuTorch,
-# so its requirement drops the label too. Every other build names the exact CUDA build it linked.
+# so its requirement drops the label too. Every other build names the installed version exactly.
 if "+" not in runtime_version:
     executorch_version = public_version(executorch_version)
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)

@@ -3326,9 +3326,9 @@ def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
 def test_the_readme_pin_install_names_both_executorch_channels():
     """The README's build-time install names the exact pin, so it needs the index the pin lives on.
 
-    A development build is only on the nightly index and a release only on the test index. Without
-    the test index, a release pin resolves to PyPI's processor-only build and the delegate build
-    stops.
+    A development build is only on the nightly index, and a labelled release is on the test index.
+    Without the test index, a release pin resolves to PyPI's build, whose metadata has no label, and
+    the delegate build stops for the labelled version the README builds.
     """
     path = "py/torch-tensorrt-executorch-runtime/README.md"
     pin = f'"executorch=={_versions()["__executorch_version__"]}"'
@@ -3350,9 +3350,9 @@ def test_every_requirement_file_install_names_both_executorch_channels():
     That scan walks requirement literals inside pip commands, which is how it checks the index.
     Passing the pin through a file removes the literal from the command, so without this a
     channel could be dropped or pointed at another index and every other guard here would still
-    pass. ExecuTorch's CUDA wheels exist only on PyTorch's indexes: a development build on the
-    nightly one, a release on the test one. An install missing the channel of the current pin
-    resolves to a processor-only build, and one missing the other breaks when the pin moves.
+    pass. ExecuTorch's labelled CUDA wheels exist only on PyTorch's indexes: a development build on
+    the nightly one, a release on the test one. An install missing the channel of the current pin
+    resolves to a build without that label, and one missing the other breaks when the pin moves.
     """
     wrong = []
     for line in _git("grep", "-nI", "-e", "-r packaging/executorch_").splitlines():
