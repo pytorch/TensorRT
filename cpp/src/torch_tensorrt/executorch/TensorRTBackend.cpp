@@ -1014,6 +1014,10 @@ BufferPlacement placement_of(const void* ptr, int engine_device) {
   return placement;
 }
 
+bool has_sizes(const exec_aten::Tensor& tensor, const nvinfer1::Dims& dims) {
+  return tensor.dim() == dims.nbDims && std::equal(tensor.sizes().begin(), tensor.sizes().end(), dims.d);
+}
+
 // A caller's hold on one device's shared scratch: the device lock, plus the
 // buffer a growth displaced, freed once that lock is dropped.
 //
@@ -2474,6 +2478,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: inferShapes could not resolve %d tensor(s)", n_unresolved);
       return Error::InvalidState;
     }
+    engine->output_dims.resize(num_outputs);
+    for (size_t o = 0; o < num_outputs; ++o) {
+      engine->output_dims[o] = ctx->getTensorShape(engine->output_binding_names[o].c_str());
+    }
     engine->shapes_inferred = true;
   }
 
@@ -2546,7 +2554,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       // nbytes() below sizes both the reflect copy and ExecuTorch's write-back, so
       // the tensor has to carry the shape TRT inferred before either of them reads it.
-      nvinfer1::Dims a_dims = ctx->getTensorShape(name.c_str());
+      const nvinfer1::Dims& a_dims = engine->output_dims[o];
       if (a_dims.nbDims < 0 || a_dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
         ET_LOG(Error, "TensorRTBackend::execute: invalid rank for aliased output '%s'", name.c_str());
         return Error::InvalidState;
@@ -2555,11 +2563,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       for (int d = 0; d < a_dims.nbDims; ++d) {
         a_sizes[d] = static_cast<SizesType>(a_dims.d[d]);
       }
-      Error a_resize_err =
-          executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
-      if (a_resize_err != Error::Ok) {
-        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
-        return a_resize_err;
+      if (!has_sizes(et_alias_out, a_dims)) {
+        Error a_resize_err =
+            executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
+        if (a_resize_err != Error::Ok) {
+          ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
+          return a_resize_err;
+        }
       }
       // Nothing to copy when the slot holds no bytes, which is a shape TensorRT inferred as empty
       // rather than a mistake, so it is skipped rather than refused.
@@ -2628,8 +2638,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     // Update the ExecuTorch tensor shape to the actual TRT output shape.
-    // getTensorShape() is valid after inferShapes() has been called.
-    nvinfer1::Dims actual_dims = ctx->getTensorShape(name.c_str());
+    const nvinfer1::Dims& actual_dims = engine->output_dims[o];
     if (actual_dims.nbDims < 0 || actual_dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(Error, "TensorRTBackend::execute: invalid output rank for '%s'", name.c_str());
       return Error::InvalidState;
@@ -2642,7 +2651,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // 1-element 1-D shape, so resizing would be rejected. Skip it when the
     // element count already agrees.
     const bool scalar_output = et_out.dim() == 0 && actual_dims.nbDims == 1 && actual_dims.d[0] == 1;
-    if (!scalar_output) {
+    if (!scalar_output && !has_sizes(et_out, actual_dims)) {
       Error resize_err =
           executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
       if (resize_err != Error::Ok) {
