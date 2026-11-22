@@ -35,9 +35,13 @@ PLUGIN_NAMES = {
 
 _LOGGER = logging.getLogger(__name__)
 
-# (BLOCK_N, BLOCK_K), measured on H100 for 2304x2304 and 2304x1152 expert layers.
-_TILE = (16, 256)
-_NUM_WARPS = 4
+# BLOCK_N and BLOCK_K bounds, measured on H100 and DGX Spark for 2304x2304 and
+# 2304x1152 expert layers. The inline PTX converts four weight bytes at a time, so
+# each thread must hold a multiple of four: BLOCK_N * MIN_BLOCK_K / 2 >= 4 * 32 * warps.
+_BLOCK_N = 8
+_MIN_BLOCK_K = 64
+_MAX_BLOCK_K = 256
+_NUM_WARPS = 2
 
 _TRITON_DTYPES = {trt.bfloat16: "bf16", trt.float16: "fp16"}
 
@@ -270,6 +274,14 @@ def _signature(pointer: str, nvfp4: bool, indexed: bool) -> Dict[str, str]:
     return signature
 
 
+def _block_k(k: int) -> int:
+    """The largest BLOCK_K up to _MAX_BLOCK_K that divides K, so no block is half masked."""
+    size = _MAX_BLOCK_K
+    while size > _MIN_BLOCK_K and k % size:
+        size //= 2
+    return size
+
+
 def compile_kernel(
     pointer: str, nvfp4: bool, groups: int, k: int, n: int, indexed: bool = False
 ) -> Any:
@@ -294,7 +306,7 @@ def _compile_for(
     indexed: bool,
 ) -> Optional[Any]:
     try:
-        block_n, block_k = _TILE
+        block_n, block_k = _BLOCK_N, _block_k(k)
         artifact = _triton.compile_triton_to_ptx(
             _grouped_mm_nvfp4_kernel if nvfp4 else _grouped_mm_mxfp8_kernel,
             _signature(pointer, nvfp4, indexed),
@@ -310,7 +322,7 @@ def _compile_for(
                 "NATIVE_FP8": 89 <= capability < 100,
             },
             num_warps=_NUM_WARPS,
-            num_stages=1,
+            num_stages=3,
             pointer_alignment=dict.fromkeys(("a_ptr", "w_ptr", "s_ptr", "c_ptr"), 16),
             # Other GPUs from sm_100 on run sm_80's instructions.
             arch=80 if capability >= 100 else None,
@@ -351,7 +363,7 @@ def _aot(
         "*" + _TRITON_DTYPES[mat1.dtype], nvfp4, groups, k, n, indexed
     )
     params = trtp.KernelLaunchParams(
-        grid_x=mat1.shape_expr[0] * triton.cdiv(n, _TILE[0]),
+        grid_x=mat1.shape_expr[0] * triton.cdiv(n, _BLOCK_N),
         grid_y=1,
         grid_z=1,
         block_x=artifact.num_warps * 32,
