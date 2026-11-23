@@ -5246,25 +5246,17 @@ _MAX_SORT_COUNTS = 2**20
 _MAX_SORT_LENGTH = 2**14
 
 
-def _keys_made_in_engine(node: Node) -> bool:
-    """Whether the topk, argmax or argmin that makes the keys of ``node`` converts too."""
+def _key_chain_converts(node: Node) -> bool:
+    """Whether every op from the keys of ``node`` back to the topk, argmax or argmin that makes
+    them has a converter, asked of the converter registry, which holds the settings of the
+    current compile. Whether partitioning puts them in the engine of the sort is checked later,
+    by refuse_sorts_split_from_keys.
+    """
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
+    from torch_tensorrt.dynamo.lowering.passes.annotate_sort_num_keys import key_chain
 
-    # annotate_sort_num_keys proved that the first input of each op on this path holds the keys.
-    keys = node.args[0]
-    while (
-        isinstance(keys, Node)
-        and keys.op == "call_function"
-        and keys in DYNAMO_CONVERTERS
-    ):
-        if keys.target in (
-            torch.ops.aten.topk.default,
-            torch.ops.aten.argmax.default,
-            torch.ops.aten.argmin.default,
-        ):
-            return True
-        keys = keys.args[0]
-    return False
+    chain = key_chain(node.args[0])
+    return chain is not None and all(n in DYNAMO_CONVERTERS for n in chain)
 
 
 def sort_stable_validator(
@@ -5326,13 +5318,13 @@ def sort_stable_validator(
         return False
     # The range holds for the shapes the keys were made from at compile time. Keys made in
     # PyTorch come from whatever the caller passes, so a wider input would give keys past the
-    # range. The validator runs again on the TensorRT subgraph, where a producer that
-    # partitioning left out is a placeholder, so such a sort fails to convert instead.
-    if not _keys_made_in_engine(node):
+    # range. The partitioners send a sort to PyTorch when they do not put it in the engine that
+    # makes its keys.
+    if not _key_chain_converts(node):
         _LOGGER.debug(
-            f"[sort.stable validator] The keys of {node.name} are not made in the same "
-            "TensorRT engine, so their range is not known when it runs; aten.sort.stable "
-            "will run in PyTorch."
+            f"[sort.stable validator] Some op that makes the keys of {node.name} has no "
+            "converter, so their range is not known when it runs; aten.sort.stable will run "
+            "in PyTorch."
         )
         return False
     # The resource partitioner splits engines after this check, and it can put the producer of

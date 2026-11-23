@@ -13,9 +13,11 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import ENABLED_FEATURES, Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
+from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     sort_stable_validator,
     sort_validator,
@@ -371,7 +373,7 @@ class TestSortStableAnyTensorRT(unittest.TestCase):
             self.assertLogs(_CONVERTERS_LOGGER, level="DEBUG") as logs,
         ):
             self.assertFalse(sort_stable_validator(sort))
-        self.assertIn("not made in the same", logs.output[0])
+        self.assertIn("has no converter", logs.output[0])
 
     def test_range_after_registered_passes(self):
         # A pass registered by a user runs after the built-in ones and can change the keys.
@@ -436,6 +438,11 @@ class TestSortStableAnyTensorRT(unittest.TestCase):
 
 @_NEEDS_STABLE_SORT_CONVERTER
 class TestSortStableValidator(unittest.TestCase):
+    def setUp(self):
+        # The validator asks the registry whether the keys convert, and the registry keeps the
+        # torch_executed_ops of the last compile in this process.
+        DYNAMO_CONVERTERS.set_compilation_settings(CompilationSettings())
+
     @parameterized.expand(
         [
             ("topk", _topk_ids, 8),
@@ -464,6 +471,37 @@ class TestSortStableValidator(unittest.TestCase):
         with self.assertLogs(_CONVERTERS_LOGGER, level="DEBUG") as logs:
             self.assertFalse(sort_stable_validator(node, settings))
         self.assertIn("resource partitioning", logs.output[0])
+
+    @parameterized.expand(
+        [
+            # topk goes to the inductor block, which comes first, so the sort runs in PyTorch.
+            ("split", ["inductor", "tensorrt"], None),
+            ("kept", ["tensorrt", "inductor"], "tensorrt"),
+        ]
+    )
+    def test_hierarchical_partitioner(self, _, priority, sort_backend):
+        node = _stable_sort_node(
+            lambda x: torch.sort(_topk_ids(x), stable=True), torch.randn(4, 8)
+        )
+        partitioned, _ = partitioning.hierarchical_adjacency_partition(
+            node.graph.owning_module,
+            min_block_size=1,
+            backend_support_map={
+                "inductor": {torch.ops.aten.topk.default},
+                "tensorrt": DYNAMO_CONVERTERS.keys(),
+            },
+            backend_priority=priority,
+        )
+        backends = {"tensorrt", "inductor"}
+        placed = {
+            next((b for b in backends if b in name), None)
+            for name, sub in partitioned.named_children()
+            for n in sub.graph.nodes
+            if n.target is torch.ops.aten.sort.stable
+        }
+        if any(n.target is torch.ops.aten.sort.stable for n in partitioned.graph.nodes):
+            placed.add(None)
+        self.assertEqual(placed, {sort_backend})
 
     @parameterized.expand(
         [
@@ -540,12 +578,13 @@ class TestSortStableCompile(TestCase):
         trt_mod = torch_tensorrt.compile(
             mod, ir="dynamo", inputs=inputs, min_block_size=1, **kwargs
         )
+        # The global partitioner leaves PyTorch ops in the top graph, the fast one in submodules.
         in_pytorch = [
-            str(node.target)
-            for name, sub in trt_mod.named_children()
-            if "_run_on_gpu" in name
+            node.target
+            for sub in trt_mod.modules()
+            if isinstance(sub, torch.fx.GraphModule)
             for node in sub.graph.nodes
-            if node.op == "call_function"
+            if node.op == "call_function" and node.target is not operator.getitem
         ]
         return trt_mod, in_pytorch
 
@@ -562,10 +601,64 @@ class TestSortStableCompile(TestCase):
             [torch.randn(1000, 16).cuda()],
             torch_executed_ops={"torch.ops.aten.topk.default"},
         )
-        self.assertIn("aten.sort.stable", " ".join(in_pytorch))
+        self.assertIn(torch.ops.aten.sort.stable, in_pytorch)
         for num_experts in (16, 128):
             scores = torch.randn(1000, num_experts).cuda()
             torch.testing.assert_close(trt_mod(scores), mod(scores), rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            # The multiply that runs in PyTorch reads the keys and feeds the add that reads the
+            # order, so the global partitioner cannot put the keys in the engine of the sort.
+            (
+                "global_partitioner",
+                (64, 8),
+                {
+                    "use_fast_partitioner": False,
+                    "torch_executed_ops": {"torch.ops.aten.mul.Tensor"},
+                },
+            ),
+            # TensorRT takes at most 8 dims, so the fast partitioner runs topk in PyTorch.
+            ("rank_9_scores", (1,) * 7 + (64, 8), {}),
+        ]
+    )
+    def test_sort_split_from_keys(self, _, shape, settings):
+        class Routing(nn.Module):
+            def forward(self, scores):
+                experts = torch.topk(scores, 2, dim=-1)[1].reshape(-1)
+                return experts.argsort(stable=True) + experts * 3
+
+        mod = Routing().eval().cuda()
+        scores = torch.randn(shape).cuda()
+        trt_mod, in_pytorch = self._compile(mod, [scores], **settings)
+        self.assertIn(torch.ops.aten.sort.stable, in_pytorch)
+        torch.testing.assert_close(trt_mod(scores), mod(scores), rtol=0, atol=0)
+
+    @parameterized.expand(
+        [
+            ("fast_partitioner", True),
+            ("global_partitioner", False),
+        ]
+    )
+    def test_order_read_by_a_later_engine(self, _, use_fast_partitioner):
+        # The keys come from the graph input alone, so the add's engine would recompute the order
+        # if it could, with a sort whose keys it does not make.
+        class Routing(nn.Module):
+            def forward(self, scores):
+                experts = torch.topk(scores, 2, dim=-1)[1].reshape(-1)
+                order = experts.argsort(stable=True)
+                return order + order * 3
+
+        mod = Routing().eval().cuda()
+        scores = torch.randn(64, 8).cuda()
+        trt_mod, in_pytorch = self._compile(
+            mod,
+            [scores],
+            use_fast_partitioner=use_fast_partitioner,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        self.assertEqual(in_pytorch, [torch.ops.aten.mul.Tensor])
+        torch.testing.assert_close(trt_mod(scores), mod(scores), rtol=0, atol=0)
 
     def test_weight_replaced_by_a_pass(self):
         # The pass gives the router 8 more experts that never win, which shifts every expert id
@@ -620,10 +713,16 @@ class TestSortStableCompile(TestCase):
                     trt_mod, in_pytorch = self._compile(mod, [x])
                 finally:
                     _remove_lowering_pass(index=-1)
-                self.assertIn("aten.sort.stable", " ".join(in_pytorch))
+                self.assertIn(torch.ops.aten.sort.stable, in_pytorch)
                 torch.testing.assert_close(trt_mod(x), mod(x), rtol=0, atol=0)
 
-    def test_dynamic_length_at_every_size(self):
+    @parameterized.expand(
+        [
+            ("fast_partitioner", {}),
+            ("global_partitioner", {"use_fast_partitioner": False}),
+        ]
+    )
+    def test_dynamic_length_at_every_size(self, _, settings):
         class Routing(nn.Module):
             def forward(self, scores):
                 experts = torch.topk(scores, 8, dim=-1)[1].reshape(-1)
@@ -635,7 +734,7 @@ class TestSortStableCompile(TestCase):
                 min_shape=(1, 128), opt_shape=(500, 128), max_shape=(1000, 128)
             )
         ]
-        trt_mod, in_pytorch = self._compile(mod, inputs)
+        trt_mod, in_pytorch = self._compile(mod, inputs, **settings)
         self.assertEqual(in_pytorch, [])
         # One partial tile, whole tiles (4096 keys) and the largest size.
         for tokens in (1, 512, 1000):

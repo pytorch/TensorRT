@@ -3,7 +3,7 @@
 
 import logging
 import operator
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 from torch.fx.node import Argument, Node
@@ -32,37 +32,49 @@ _VALUE_PRESERVING_OPS = {
 }
 
 
-def _num_index_values(node: Argument) -> Optional[int]:
-    """If ``node`` holds positions along one dim of a tensor, the size of that dim.
+def key_chain(node: Argument) -> Optional[List[Node]]:
+    """The nodes from ``node`` back to the topk, argmax or argmin whose positions it holds.
 
-    Such positions come from the indices that topk, argmax and argmin return, and they
-    stay in ``[0, size)`` through ops that only move values or cast them to int32 or int64.
+    Positions along one dim of a tensor come from the indices that topk, argmax and argmin
+    return, and they stay in ``[0, size)`` through ops that only move values or cast them to
+    int32 or int64. The last node is the topk, argmax or argmin. None if ``node`` holds
+    anything else.
     """
+    chain = []
     while isinstance(node, Node):
-        if node.target in _VALUE_PRESERVING_OPS:
+        chain.append(node)
+        if node.target in _VALUE_PRESERVING_OPS or (
+            node.target == torch.ops.aten._to_copy.default
+            and node.kwargs.get("dtype") in (torch.int32, torch.int64)
+        ):
             node = node.args[0]
-        elif node.target == torch.ops.aten._to_copy.default and node.kwargs.get(
-            "dtype"
-        ) in (torch.int32, torch.int64):
-            node = node.args[0]
-        else:
-            break
-    if not isinstance(node, Node):
-        return None
-
-    if node.target is operator.getitem and node.args[1] == 1:
-        source = node.args[0]
-        if isinstance(source, Node) and source.target == torch.ops.aten.topk.default:
-            dim = (
-                source.args[2] if len(source.args) > 2 else source.kwargs.get("dim", -1)
-            )
+        elif node.target in (
+            torch.ops.aten.argmax.default,
+            torch.ops.aten.argmin.default,
+        ):
+            return chain
+        elif (
+            node.target is operator.getitem
+            and node.args[1] == 1
+            and isinstance(node.args[0], Node)
+            and node.args[0].target == torch.ops.aten.topk.default
+        ):
+            return chain + [node.args[0]]
         else:
             return None
-    elif node.target in (torch.ops.aten.argmax.default, torch.ops.aten.argmin.default):
-        source = node
-        dim = node.args[1] if len(node.args) > 1 else node.kwargs.get("dim")
-    else:
+    return None
+
+
+def _num_index_values(node: Argument) -> Optional[int]:
+    """If ``node`` holds positions along one dim of a tensor, the size of that dim."""
+    chain = key_chain(node)
+    if chain is None:
         return None
+    source = chain[-1]
+    if source.target == torch.ops.aten.topk.default:
+        dim = source.args[2] if len(source.args) > 2 else source.kwargs.get("dim", -1)
+    else:
+        dim = source.args[1] if len(source.args) > 1 else source.kwargs.get("dim")
 
     if not isinstance(source.args[0], Node):
         return None

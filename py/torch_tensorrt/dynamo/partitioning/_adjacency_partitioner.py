@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo.partitioning.common import (
     get_node_module_types,
     node_in_torch_executed_module,
     recompute_input_only_nodes,
+    refuse_sorts_split_from_keys,
 )
 from torch_tensorrt.dynamo.utils import to_torch_device
 
@@ -344,10 +345,10 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                     result.append(subgraph)
         return result
 
-    def partition_graph(self) -> torch.fx.GraphModule:
-        """Partitions the GraphModule into subgraphs based on operator support
+    def propose_subgraphs(self) -> List[Subgraph]:
+        """Groups the nodes of the GraphModule into subgraphs based on operator support
 
-        Returns a GraphModule with submodules for each segment
+        Returns the subgraphs, in order, each marked as accelerated or not
         """
         unsupported = getattr(self.operator_support, "unsupported_operators", None)
         # unsupported_operators leaves out operators with side effects, so also check
@@ -382,10 +383,8 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                 "require_full_compilation + full operator support: "
                 "wrapping graph as a single TRT submodule (skipping adjacency split)"
             )
-            subgraphs = [Subgraph(is_acc=True, nodes=nodes)]
             self.num_trt_accelerated_subgraphs = 1
-            self.tag(subgraphs)
-            return self.split(remove_tag=True)
+            return [Subgraph(is_acc=True, nodes=nodes)]
 
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
@@ -421,10 +420,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
-
-        # Tag the accelerated nodes and split the graph accordingly
-        self.tag(subgraphs)
-        return self.split(remove_tag=True)
+        return subgraphs
 
     def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
         """Generates starter nodes for partitioning + segmentation"""
@@ -546,21 +542,28 @@ def partition(
                 f"{unmatched}. Ensure the module names are fully-qualified class names."
             )
 
-    # Construct
-    supported_ops = OpSupportTester(
-        torch_executed_ops=torch_executed_ops,
-        torch_executed_modules=torch_executed_modules,
-    )
-    partitioner = TRTPartitioner(
-        gm,
-        supported_ops,
-        min_block_size=min_block_size,
-        require_full_compilation=require_full_compilation,
-        skip_fusion=skip_fusion,
-        assume_full_support=assume_full_support,
-    )
+    while True:
+        supported_ops = OpSupportTester(
+            torch_executed_ops=torch_executed_ops,
+            torch_executed_modules=torch_executed_modules,
+        )
+        partitioner = TRTPartitioner(
+            gm,
+            supported_ops,
+            min_block_size=min_block_size,
+            require_full_compilation=require_full_compilation,
+            skip_fusion=skip_fusion,
+            assume_full_support=assume_full_support,
+        )
+        subgraphs = partitioner.propose_subgraphs()
+        if not refuse_sorts_split_from_keys(
+            set(s.nodes) for s in subgraphs if s.is_acc
+        ):
+            break
 
-    partitioned_graph = partitioner.partition_graph()
+    # Tag the accelerated nodes and split the graph accordingly
+    partitioner.tag(subgraphs)
+    partitioned_graph = partitioner.split(remove_tag=True)
 
     supported_ops.print_support_overview(partitioner.num_trt_accelerated_subgraphs)
 
