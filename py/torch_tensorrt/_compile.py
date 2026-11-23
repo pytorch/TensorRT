@@ -1548,8 +1548,10 @@ def compile_and_save(
         torch_tensorrt.save(trt_gm, file_path, output_format=output_format, **save_options)
 
     but each engine is written to a file as soon as it is built, so no built engine is held on the GPU
-    or in host memory while the next ones build. With ``output_format="executorch"`` no engine is ever
-    loaded: the save streams each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``).
+    or in host memory while the next ones build. With ``output_format="executorch"`` the save streams
+    each file into the ``.pte`` (or the ``.ptd`` with ``external_engine_data``). It loads only an engine
+    marked as needing an output allocator, one at a time, to ask TensorRT whether its outputs have
+    fixed shapes.
     The other formats save each engine from a loaded one, so their engines are loaded once all of them
     are built, and their save needs as much memory as after ``compile``.
 
