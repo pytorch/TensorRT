@@ -993,7 +993,7 @@ class TestCollapseHighRankPermutes(TestCase):
 
     def _compile(self, mod, inputs, dynamic_shapes=None, collapse=True, **settings):
         if collapse:
-            settings["collapse_high_rank_permutes"] = True
+            settings.setdefault("collapse_high_rank_permutes", True)
         trt_mod = torch_tensorrt.dynamo.compile(
             torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes),
             list(inputs),
@@ -1012,6 +1012,18 @@ class TestCollapseHighRankPermutes(TestCase):
                 x = torch.randn(*x, device="cuda")
                 self.assertEqual(
                     list(self._compile(mod, (x,), collapse=False)),
+                    ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+                )
+
+    def test_each_setting_runs_only_its_rewrite(self):
+        for mod, x, on in (
+            (self.ExpandedPatches(), (2, 3, 8, 8), "collapse_high_rank_permutes"),
+            (self.WithPatches(), (2, 2, 3, 8, 8), "collapse_high_rank_expands"),
+        ):
+            with self.subTest(on=on):
+                x = torch.randn(*x, device="cuda")
+                self.assertEqual(
+                    list(self._compile(mod, (x,), collapse=False, **{on: True})),
                     ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
                 )
 
@@ -1072,7 +1084,9 @@ class TestCollapseHighRankPermutes(TestCase):
         logger = "torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes"
         x = torch.randn(2, 3, 8, 8, device="cuda")
         with self.assertLogs(logger, level="DEBUG") as logs:
-            parts = self._compile(self.ExpandedPatches(), (x,))
+            parts = self._compile(
+                self.ExpandedPatches(), (x,), collapse_high_rank_expands=True
+            )
         self.assertEqual(list(parts), ["_run_on_acc_0"])
         self.assertIn("Rewrote 1 expand(s)", "\n".join(logs.output))
 
@@ -1090,7 +1104,7 @@ class TestCollapseHighRankPermutes(TestCase):
 
         gm = torch.export.export(Cloned(), (torch.randn(2, 3, 8, 16),)).graph_module
         gm = collapse_high_rank_permutes(
-            gm, CompilationSettings(collapse_high_rank_permutes=True)
+            gm, CompilationSettings(collapse_high_rank_expands=True)
         )
         shapes = {
             n.target: n.meta["val"].shape
@@ -1118,7 +1132,9 @@ class TestCollapseHighRankPermutes(TestCase):
         before = [(n.target, n.args) for n in gm.graph.nodes]
         gm = collapse_high_rank_permutes(
             gm,
-            CompilationSettings(collapse_high_rank_permutes=True),
+            CompilationSettings(
+                collapse_high_rank_permutes=True, collapse_high_rank_expands=True
+            ),
         )
         self.assertEqual([(n.target, n.args) for n in gm.graph.nodes], before)
 
@@ -1144,7 +1160,7 @@ class TestCollapseHighRankPermutes(TestCase):
                 mod = Repeat(dim, sizes)
                 gm = torch.export.export(mod, (x,)).graph_module
                 gm = collapse_high_rank_permutes(
-                    gm, CompilationSettings(collapse_high_rank_permutes=True)
+                    gm, CompilationSettings(collapse_high_rank_expands=True)
                 )
                 targets = [n.target for n in gm.graph.nodes]
                 self.assertNotIn(torch.ops.aten.unsqueeze.default, targets)
@@ -1171,7 +1187,12 @@ class TestCollapseHighRankPermutes(TestCase):
             ),
         ):
             with self.subTest(settings=settings):
-                parts = self._compile(WithExpandedPatches(), (x,), **settings)
+                parts = self._compile(
+                    WithExpandedPatches(),
+                    (x,),
+                    collapse_high_rank_expands=True,
+                    **settings,
+                )
                 # An excluded _reshape_copy also splits off the view before the permute.
                 unsqueezes = [
                     n
@@ -1220,6 +1241,7 @@ class TestCollapseHighRankPermutes(TestCase):
                     Model(),
                     (torch.randn(2, 3, 8, 16, device="cuda"),),
                     torch_executed_modules={f"{kept.__module__}.{kept.__qualname__}"},
+                    collapse_high_rank_expands=True,
                 )
                 targets = [
                     n.target
@@ -1252,9 +1274,19 @@ class TestCollapseHighRankPermutes(TestCase):
 
     def test_torch_compile_and_serialized_engine(self):
         logger = "torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes"
-        for mod, x, rewrote in (
-            (self.WithPatches(), torch.randn(2, 2, 3, 8, 8), "Rewrote 1 permute(s)"),
-            (self.ExpandedPatches(), torch.randn(2, 3, 8, 8), "Rewrote 1 expand(s)"),
+        for mod, x, setting, rewrote in (
+            (
+                self.WithPatches(),
+                torch.randn(2, 2, 3, 8, 8),
+                "collapse_high_rank_permutes",
+                "Rewrote 1 permute(s)",
+            ),
+            (
+                self.ExpandedPatches(),
+                torch.randn(2, 3, 8, 8),
+                "collapse_high_rank_expands",
+                "Rewrote 1 expand(s)",
+            ),
         ):
             with self.subTest(mod=type(mod).__name__):
                 x = x.cuda()
@@ -1263,7 +1295,7 @@ class TestCollapseHighRankPermutes(TestCase):
                     mod,
                     backend="torch_tensorrt",
                     options={
-                        "collapse_high_rank_permutes": True,
+                        setting: True,
                         "min_block_size": 1,
                         "pass_through_build_failures": True,
                     },
@@ -1278,7 +1310,7 @@ class TestCollapseHighRankPermutes(TestCase):
                         torch.export.export(mod, (x,)),
                         [x],
                         min_block_size=1,
-                        collapse_high_rank_permutes=True,
+                        **{setting: True},
                     )
                 self.assertIn(rewrote, "\n".join(logs.output))
 
@@ -1357,7 +1389,7 @@ class TestCollapseHighRankPermutes(TestCase):
             (NotExpanded(), torch.randn(2, 3, 8, 8, device="cuda")),
         ):
             with self.subTest(mod=type(mod).__name__):
-                self._compile(mod, (x,))
+                self._compile(mod, (x,), collapse_high_rank_expands=True)
 
     def test_expanded_dynamic_shape(self):
         x = torch.randn(2, 3, 8, 8, device="cuda")
@@ -1368,6 +1400,7 @@ class TestCollapseHighRankPermutes(TestCase):
                     self.ExpandedPatches(),
                     (x,),
                     dynamic_shapes=({0: batch},),
+                    collapse_high_rank_expands=True,
                 )
             ),
             ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
@@ -1383,7 +1416,9 @@ class TestCollapseHighRankPermutes(TestCase):
 
         x = torch.randn(2, 2, 3, 8, 8, device="cuda")
         self.assertEqual(
-            list(self._compile(PatchesRepeated(), (x,))),
+            list(
+                self._compile(PatchesRepeated(), (x,), collapse_high_rank_expands=True)
+            ),
             ["_run_on_acc_0"],
         )
 
@@ -1396,7 +1431,10 @@ class TestCollapseHighRankPermutes(TestCase):
                 return y.reshape(2, 16, 48) * 2
 
         x = torch.randn(2, 3, 8, 8, device="cuda")
-        self.assertEqual(list(self._compile(TwoRepeats(), (x,))), ["_run_on_acc_0"])
+        self.assertEqual(
+            list(self._compile(TwoRepeats(), (x,), collapse_high_rank_expands=True)),
+            ["_run_on_acc_0"],
+        )
 
     def test_expanded_reader_over_8_dims(self):
         """A reader over 8 dims stays in PyTorch, so the engine would return the
@@ -1414,7 +1452,7 @@ class TestCollapseHighRankPermutes(TestCase):
         gm = torch.export.export(TwoReaders(), (torch.randn(2, 3, 8, 16),)).graph_module
         before = [(n.target, n.args) for n in gm.graph.nodes]
         gm = collapse_high_rank_permutes(
-            gm, CompilationSettings(collapse_high_rank_permutes=True)
+            gm, CompilationSettings(collapse_high_rank_expands=True)
         )
         self.assertEqual([(n.target, n.args) for n in gm.graph.nodes], before)
 
@@ -1435,6 +1473,7 @@ class TestCollapseHighRankPermutes(TestCase):
                     mod,
                     (x,),
                     torch_executed_ops={f"torch.ops.aten.{op}.default"},
+                    collapse_high_rank_expands=True,
                 )
                 self.assertEqual(list(parts), ["_run_on_acc_0"])
 
@@ -1459,6 +1498,7 @@ class TestCollapseHighRankPermutes(TestCase):
                     CacheRepeated(),
                     inputs,
                     dynamic_shapes=({}, {1: length}),
+                    collapse_high_rank_expands=True,
                 )
             ),
             ["_run_on_acc_0"],

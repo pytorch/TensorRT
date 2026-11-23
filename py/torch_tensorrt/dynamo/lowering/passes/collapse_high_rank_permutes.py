@@ -32,34 +32,32 @@ def collapse_high_rank_permutes(
     Window and patch layouts (neighborhood attention, the Qwen2-VL image patches)
     reshape a tensor to more than 8 dimensions, permute it, and reshape it back.
     TensorRT tensors have at most 8 dimensions, so each such chain ran in PyTorch and
-    split the graph. A chain with static shapes is rewritten as reshapes and permutes
-    of at most 8 dimensions that compute the same values (see ``_steps``). An
-    unsqueeze, expand, reshape chain past 8 dims whose expand grows only the new
-    dimension, as in newer Qwen2-VL image patches, is rewritten on 3 dims (see
-    ``_rewrite_repeat``). All chains of one kind are left as they are when
-    ``torch_executed_ops`` lists one of their ops (the permute; the unsqueeze or the
-    expand; a clone; a reshape). So is a chain in a module that
-    ``torch_executed_modules`` keeps in PyTorch.
+    split the graph. With ``collapse_high_rank_permutes``, a chain with static shapes
+    is rewritten as reshapes and permutes of at most 8 dimensions that compute the
+    same values (see ``_steps``). With ``collapse_high_rank_expands``, an unsqueeze,
+    expand, reshape chain past 8 dims whose expand repeats only the new dimension, as
+    in newer Qwen2-VL image patches, is rewritten on 3 dims (see ``_rewrite_expand``).
+    All chains of one kind are left as they are when ``torch_executed_ops`` lists one
+    of their ops (the permute; the unsqueeze or the expand; a clone; a reshape). So is
+    a chain in a module that ``torch_executed_modules`` keeps in PyTorch.
     """
-    if not settings.collapse_high_rank_permutes:
-        return gm
-    # Repeats first, and the last one first: each rewrite can leave a reshape as the
-    # only reader of the expand or permute before it.
-    repeats = sum(
-        _rewrite_repeat(gm, node, settings)
+    expands = permutes = 0
+    if settings.collapse_high_rank_expands:
+        # The last one first: each rewrite can leave a reshape as the only reader of
+        # the expand or permute before it.
         for node in reversed(
             _chains(gm, settings, aten.unsqueeze.default, aten.expand.default)
-        )
-    )
-    rewritten = sum(
-        _rewrite(gm, node) for node in _chains(gm, settings, aten.permute.default)
-    )
-    if rewritten or repeats:
+        ):
+            expands += _rewrite_expand(gm, node, settings)
+    if settings.collapse_high_rank_permutes:
+        for node in _chains(gm, settings, aten.permute.default):
+            permutes += _rewrite(gm, node)
+    if permutes or expands:
         gm = clean_up_graph_after_modifications(gm)
-    if rewritten:
-        logger.debug(f"Rewrote {rewritten} permute(s) of more than 8 dims")
-    if repeats:
-        logger.debug(f"Rewrote {repeats} expand(s) of more than 8 dims")
+    if permutes:
+        logger.debug(f"Rewrote {permutes} permute(s) of more than 8 dims")
+    if expands:
+        logger.debug(f"Rewrote {expands} expand(s) of more than 8 dims")
     return gm
 
 
@@ -133,8 +131,6 @@ def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
     sizes, clones = _static_sizes(head), _reshaped_clones(permute)
     if sizes is None or clones is None:
         return False
-    val = head.meta["val"]
-
     dims = [d % len(sizes) for d in cast(List[int], permute.args[1])]
     (shape, dims), *rest = _steps(sizes, dims)
     head.args = (head.args[0], shape)
@@ -157,16 +153,16 @@ def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
         )
     # The head's input may get its value only after all passes, so the head starts
     # from its own old value.
-    _set_vals([head, *added, *clones], val)
+    _set_vals([head, *added, *clones], head.meta["val"])
     return True
 
 
-def _rewrite_repeat(
+def _rewrite_expand(
     gm: torch.fx.GraphModule,
     unsqueeze: torch.fx.Node,
     settings: CompilationSettings,
 ) -> bool:
-    """Run ``unsqueeze(d)``, an expand of dim d alone, and reshapes on 3 dims.
+    """Run ``unsqueeze(d)`` and an expand of dim d alone on 3 dims.
 
     In row-major order the result repeats each block of the dims from d on, so
     reshaping the input to (A, 1, B) and expanding that to (A, k, B) gives the same
@@ -205,7 +201,7 @@ def _rewrite_repeat(
     reshape.meta.update(unsqueeze.meta)
     expand.args = (reshape, [outer, out[dim], inner])
     _set_vals([reshape, expand, *clones], unsqueeze.meta["val"])
-    # Erase it now, so a repeat or permute before it sees only reshapes reading it.
+    # Erase it now, so an expand or permute before it sees only reshapes reading it.
     gm.graph.erase_node(unsqueeze)
     return True
 
