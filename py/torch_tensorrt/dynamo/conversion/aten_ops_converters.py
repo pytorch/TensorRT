@@ -4273,13 +4273,31 @@ def aten_ops_adaptive_avg_poolNd(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input, output_size = args[0], args[1]
+    spatial_rank = len(output_size)
+    # The pooling windows need static spatial sizes. TensorRT can still see -1 for a size
+    # the graph knows, such as a crop with a dynamic start.
+    val = ctx.current_node.args[0].meta.get("val")
+    if (
+        any(size == -1 for size in input.shape[-spatial_rank:])
+        and val is not None
+        and all(isinstance(size, int) for size in val.shape[-spatial_rank:])
+    ):
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - spatial_rank) + list(val.shape[-spatial_rank:]),
+        )
     return impl.pool.adaptive_avg_poolNd(
         ctx,
         target,
         source_ir=SourceIR.ATEN,
         name=name,
-        input=args[0],
-        output_size=args[1],
+        input=input,
+        output_size=output_size,
     )
 
 

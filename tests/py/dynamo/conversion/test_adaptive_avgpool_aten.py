@@ -1,9 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import unittest
+
 import torch
+import torch_tensorrt
 from parameterized import parameterized
-from torch.testing._internal.common_utils import run_tests
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -347,6 +350,41 @@ class TestAdaptiveAvgPoolConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(adaptive_pool3d(), input_specs)
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestAdaptiveAvgPoolEndToEnd(TestCase):
+    @parameterized.expand(
+        [
+            ("2d", torch.nn.functional.adaptive_avg_pool2d, 2),
+            ("3d", torch.nn.functional.adaptive_avg_pool3d, 3),
+        ]
+    )
+    def test_static_crop_of_a_dynamic_input(self, _, pool, spatial_rank):
+        # The crop is 8 wide, but its start depends on the input size, so TensorRT cannot
+        # infer the crop size.
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                for dim in range(2, x.dim()):
+                    x = x.narrow(dim, x.shape[dim] - 8, 8)
+                return pool(x, 2)
+
+        model = Model().eval().cuda()
+        trt_mod = torch_tensorrt.compile(
+            model,
+            ir="dynamo",
+            inputs=[
+                Input(
+                    min_shape=(1, 2) + (9,) * spatial_rank,
+                    opt_shape=(1, 2) + (12,) * spatial_rank,
+                    max_shape=(1, 2) + (20,) * spatial_rank,
+                )
+            ],
+            min_block_size=1,
+        )
+        for size in (9, 12, 20):
+            x = torch.randn((1, 2) + (size,) * spatial_rank).cuda()
+            torch.testing.assert_close(trt_mod(x), model(x))
 
 
 if __name__ == "__main__":
