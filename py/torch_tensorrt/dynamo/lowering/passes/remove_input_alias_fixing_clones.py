@@ -24,12 +24,12 @@ def remove_input_alias_fixing_clones(
     pass and reproduces the condition below to predict whether a mutated buffer's
     write will reach the converter reading a direct network input. Loosening the
     condition -- or deleting the pass, as the TODO above invites -- invalidates that
-    prediction, and a mis-prediction is not a lost optimization: the write is filed
-    copy-back, its value re-attached as a graph output, the engine aliases the buffer
-    anyway, and the compiled module raises on every call. Keep the two in step, or
-    update the classifier in the same change. ``compile()`` cross-checks the
-    prediction against the built engine either way, so the failure surfaces as an
-    error rather than as a broken module.
+    prediction. Keep the two in step, or update the classifier in the same change.
+    ``compile()`` cross-checks the prediction against the built engine, so a
+    mis-prediction surfaces as an error rather than as a broken module.
+
+    The clone of a buffer filed copy-back stays: it holds the buffer's old value,
+    and the compiled module writes the new value into the buffer before it returns.
     """
     modified_graph = False
 
@@ -39,6 +39,7 @@ def remove_input_alias_fixing_clones(
         # needs to be undone
         if (
             node.op == "placeholder"
+            and not node.meta.get("_copyback_buffer")
             and len(node.users) == 1
             and list(node.users)[0].target == torch.ops.aten.clone.default
         ):

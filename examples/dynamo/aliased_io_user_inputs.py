@@ -31,9 +31,13 @@ Constraints (from the TensorRT operator):
 * Write dimension must be ``2`` (the sequence axis).
 * ``write_start + update_len <= max_seq``.
 
-If the constraints aren't met the converter silently falls back to a
-regular scatter and aliasing isn't established (correctness is still
-preserved, but no in-place benefit).
+Lowering also checks the call: the cache has to be a contiguous CUDA tensor
+that is not float64, written once, and read again after the write, and
+nothing may read its old contents.
+
+If a condition isn't met, the write still reaches the cache: the engine
+returns the updated cache and a ``copy_`` in PyTorch stores it after the
+engine runs. The result is the same, but without the in-place benefit.
 """
 
 # %%

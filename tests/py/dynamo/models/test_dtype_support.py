@@ -764,19 +764,22 @@ class TestUInt8Support(TestCase):
             out = out[0]
         torch.testing.assert_close(out, Cache(False).cuda()(update))
 
-        # A write on the KV cache dim runs in PyTorch, so the engine cannot alias the
-        # buffer, and a copy-back would leave it stale on direct calls.
+        # IKVCacheUpdateLayer takes no uint8 cache, so a write on the KV cache dim is
+        # copied back like any other buffer write.
         update = torch.randint(0, 256, (1, 2, 2, 4), dtype=torch.uint8, device="cuda")
-        with self.assertRaisesRegex(
-            RuntimeError, "write-back would be silently dropped"
-        ):
-            torch_tensorrt.dynamo.compile(
-                torch.export.export(Cache(True).cuda(), (update,)),
-                arg_inputs=[update],
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-            )
+        model = Cache(True).cuda()
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (update,)),
+            arg_inputs=[update],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        out = trt_mod(update)
+        if isinstance(out, tuple):
+            out = out[0]
+        torch.testing.assert_close(out, model(update))
+        torch.testing.assert_close(trt_mod.cache, model.cache)
 
         # The engine returns the widened permute twice: as the buffer write and as
         # the clone of the buffer.

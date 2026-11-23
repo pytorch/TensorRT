@@ -46,22 +46,24 @@ is why the classifier routes a cache write to engine aliasing instead, and why a
 model that unexpectedly lands in copy-back comes out slow rather than wrong.
 ``gm.meta['_copyback_mutation_buffers']`` lists which buffers are paying it.
 
-What copy-back does *not* do: update the buffer in process. The value re-attached as
-a graph output is only carried to whatever serializes the module, which declares it a
-BUFFER_MUTATION for the ExecuTorch runtime to apply after the delegate returns. Nothing
-between ``compile()`` and that runtime writes it anywhere, so a compiled module called
-directly from PyTorch leaves its buffer at the value it was compiled with. The
-re-attached value is therefore hidden from the compiled module's return
-(:func:`hide_copyback_outputs`) rather than handed back as an extra output that would
-read like a mutation the caller can rely on.
+Where the copy happens depends on who runs the module. A serialized program declares
+the re-attached value a BUFFER_MUTATION, which the ExecuTorch runtime applies after
+the delegate returns. A compiled module called directly from PyTorch applies it itself
+at the end of ``forward`` (:func:`hide_copyback_outputs`), and does not return the
+value. It returns the model's own outputs as a flat tuple, so a model with one
+output gives a 1-tuple. So does any module whose buffers were lifted, with or
+without copy-back.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+import operator
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
 
 import torch
+from torch.fx.experimental.symbolic_shapes import statically_known_true, sym_eq
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
@@ -108,15 +110,13 @@ def _effective_cache_input(cache_node: torch.fx.Node) -> Optional[torch.fx.Node]
     is the shape ``clone -> scatter -> copy_`` leaves behind once lifting has erased
     the ``copy_``. The converter then does see a direct network input and does emit
     the KV layer, so this has to predict what the converter will be handed rather
-    than what is in the graph now. Getting it wrong in that direction is worse than
-    a lost write-back: the write is filed copy-back, its value is re-attached as a
-    trailing graph output, and the engine aliases the cache anyway -- so the runtime
-    truncates that output as an engine side effect while the outer graph still reads
-    it, and every call raises ``IndexError``.
+    than what is in the graph now.
 
-    The pass's own condition is reproduced exactly, sole user and all: a placeholder
-    with another reader keeps its clone, the converter sees a ``call_function``, and
-    nothing aliases.
+    This follows the pass's condition for a buffer that is not filed copy-back, sole
+    user and all: a placeholder with another reader keeps its clone, the converter
+    sees a ``call_function``, and nothing aliases. The pass also keeps the clone of a
+    buffer that lifting files copy-back, so a write this does not predict KV keeps its
+    clone and is not aliased either.
 
     Predicting the peel is not free. A cloned cache write is classified KV, so if no
     engine goes on to claim it -- at the *default* ``min_block_size=5`` a small
@@ -159,12 +159,13 @@ def _kv_write_will_alias(
     whatever the converter goes on to do with it: it lowers most ineligible writes
     to a non-aliasing concatenation or scatter, returns the source in the input's
     dtype for a full overwrite, and raises for the rest (a ``slice_scatter`` with
-    dynamic bounds or a bad ``dim``, an ``index_copy`` its fallback cannot express).
-    The first two both have a write-back to preserve -- for a full overwrite the
-    source *is* the buffer's new contents -- and the ones that raise never get as far
-    as needing one. One more never reaches a converter: a ``slice_scatter`` written
-    on a dynamic dim, which its validator runs in PyTorch, and which needs the
-    copy-back like any other.
+    dynamic bounds or a bad ``dim``). The first two both have a write-back to
+    preserve -- for a full overwrite the source *is* the buffer's new contents -- and
+    the ones that raise never get as far as needing one. Some never reach a
+    converter: a ``slice_scatter`` written on a dynamic dim, and an ``index_copy``
+    the scatter converter refuses (int8, or float64 without ``truncate_double``)
+    when the KV path does not take it. Their validators run them in PyTorch, and
+    they need the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -224,11 +225,126 @@ def _kv_write_will_alias(
         # OK is the only status that resolves all three bounds to Python ints.
         assert start is not None and end is not None and step is not None
         eligible, _reason = _kv_eligible(
-            tuple(cache_shape), dim, start, end - start, step
+            tuple(cache_shape),
+            dim,
+            start,
+            end - start,
+            step,
+            cache_input.meta["val"].dtype,
         )
         return bool(eligible)
 
     return False
+
+
+def _in_place_write(
+    value: torch.fx.Node,
+    cache: torch.fx.Node,
+    settings: Optional[CompilationSettings],
+    *,
+    write_back: Optional[torch.fx.Node] = None,
+    stored: Iterable[torch.fx.Node] = (),
+) -> Optional[torch.fx.Node]:
+    """The write that produces ``value``, if an engine can apply it to ``cache``'s
+    memory in place; otherwise ``None``.
+
+    ``write_back`` is the ``copy_`` that stores ``value`` into ``cache``, when it is
+    still in the graph. ``stored`` are the new values of the written buffers, which
+    forward stores after the graph, so each counts as read.
+
+    The KV layer updates only a network input, so the write has to be a single
+    eligible write of ``cache`` itself. Nothing else may read the old contents:
+    TensorRT orders the write only after the layers it depends on, and may compute
+    an op that only moves data, such as a copy, a cast to the same type or a
+    reshape, from the cache again after the write. Readers of the new contents run
+    after the write.
+    """
+    write = _cache_write_of(value, cache)
+    if not (
+        write is not None
+        and isinstance(write.args[0], torch.fx.Node)
+        and _effective_cache_input(write.args[0]) is cache
+        and _kv_write_will_alias(write, tuple(cache.meta["val"].shape), settings)
+    ):
+        return None
+    stored = set(stored)
+    stop = {write, value, write_back}
+    # The write may read the cache through the clone lowering peels off.
+    sources = {cache, write.args[0]}
+    if sources & stored:
+        return None
+    for source in sources:
+        for user in source.users:
+            if user in sources or user in stop or not _uses_data_of(user, source):
+                continue
+            # A view whose result is only copied into, as a slice assignment does,
+            # reads nothing.
+            if (
+                user.op == "output"
+                or user in stored
+                or (
+                    user.op == "call_function"
+                    and any(_uses_data_of(u, user) for u in user.users)
+                )
+            ):
+                return None
+    # _kv_write_will_alias already ruled out an excluded write.
+    if _write_op_is_torch_executed(value, settings):
+        return None
+    return write
+
+
+def _uses_data_of(user: torch.fx.Node, node: torch.fx.Node) -> bool:
+    """Whether ``user`` reads the values of ``node``, rather than only its shape:
+    a metadata check or export's guards do not, and neither does ``copy(dst, src)``
+    of its ``dst``, whose result holds the values of ``src``."""
+    if user.target in (torch.ops.aten._assert_tensor_metadata.default, "_guards_fn"):
+        return False
+    return not (
+        user.target is torch.ops.aten.copy.default
+        and user.args[0] is node
+        and user.args[1:2] != (node,)
+    )
+
+
+def _cache_write_of(
+    value: torch.fx.Node, cache: torch.fx.Node
+) -> Optional[torch.fx.Node]:
+    """The ``index_copy`` or ``slice_scatter`` that produces ``value``, if any.
+
+    ``cache.copy_(write)`` in the model reaches here as ``copy(cache, write)``,
+    which converts to the write itself when the two match in shape and dtype.
+    """
+    if (
+        value.target is torch.ops.aten.copy.default
+        and value.args[0] is cache
+        and isinstance(value.args[1], torch.fx.Node)
+    ):
+        va, vb = value.meta.get("val"), value.args[1].meta.get("val")
+        # A comparison not known to hold is False rather than a guard, which would
+        # specialize the engine to the traced sizes or fail on a data-dependent size.
+        if (
+            isinstance(va, torch.Tensor)
+            and isinstance(vb, torch.Tensor)
+            and va.dtype == vb.dtype
+            and statically_known_true(sym_eq(va.shape, vb.shape))
+        ):
+            value = value.args[1]
+    if value.target in (
+        torch.ops.aten.index_copy.default,
+        torch.ops.aten.slice_scatter.default,
+    ):
+        return value
+    return None
+
+
+def _engine_takes_its_memory(tensor: torch.Tensor) -> bool:
+    """Whether an engine is handed this tensor's own memory.
+
+    A non-contiguous tensor reaches it as a contiguous copy, and a float64 one as a
+    float32 copy (TensorRT has no float64), so the write would land in the copy.
+    """
+    return bool(tensor.is_contiguous()) and tensor.dtype != torch.float64
 
 
 def aliased_input_bindings(aliased_io_maps: Iterable[Any]) -> Set[str]:
@@ -314,7 +430,7 @@ def assert_predicted_kv_aliased(
                     "rejected the op"
                 )
         raise RuntimeError(
-            "lift_mutated_buffers classified these buffer writes as KV-cache "
+            "lift_mutated_buffers classified these writes as KV-cache "
             "(engine-aliased) and dropped their copy_, but the compiled engine "
             f"did not alias them (absent from aliased_io): {missing}. Their "
             "write-back would be silently dropped. The classification runs before "
@@ -332,72 +448,65 @@ def assert_predicted_kv_aliased(
             "outputs, but the compiled engine aliased them in place anyway (present "
             f"in aliased_io): {unexpected}. The classification runs before lowering, "
             "so a lowering pass rewrote the write into a form the converter could "
-            "alias after all -- remove_input_alias_fixing_clones erasing a clone of "
-            "the cache is the known case."
+            "alias after all."
         )
 
 
-def assert_no_kv_alias_markers_survived(
-    gm: torch.fx.GraphModule, marked_writes: Iterable[str]
-) -> None:
-    """Check that lowering carried each ``_trt_no_kv_alias`` marker through to
-    conversion.
+def write_back_writes_left_in_pytorch(
+    gm: torch.fx.GraphModule, caller_bindings: Iterable[str]
+) -> List[str]:
+    """Give back its write-back ``copy_`` to each write into one of the caller's
+    tensors named in ``caller_bindings`` that was predicted in place but runs in
+    PyTorch, because no engine was built or the partitioner left it next to one,
+    and return their names.
 
-    The marker is the only thing stopping the converter from aliasing a write that
-    :func:`lift_mutated_buffers` deliberately filed copy-back, and it travels on
-    ``node.meta`` through every pass in ``post_lowering``. A pass that rebuilds the
-    node without its ``meta`` would drop it silently and the module would raise on
-    every call, so the markers are read back here, where the fault can still be named.
-
-    Called with the lowered graph and ``gm.meta['_no_kv_alias_writes']`` as recorded
-    before lowering, and the two sets must match exactly. They diverge three ways: a
-    recorded name keeps its node but loses the marker, so a pass rebuilt the node
-    without its meta; an unrecorded node gains a marker while every recorded one keeps
-    its own, so a pass copied the meta; or a recorded name goes missing and an
-    unrecorded node gains a marker, so a pass replaced the node and the meta travelled
-    with it. The third is the one the passes in ``post_lowering`` actually produce,
-    because each carries a node's meta onto that node's own replacement.
+    Every write-back left to PyTorch then writes through a detached alias of the
+    caller's tensor. It stores state, as the model's own write under
+    ``torch.no_grad()`` may, and autograd refuses an in-place write into a leaf
+    that needs a gradient.
     """
-    expected = set(marked_writes)
-    by_name = {node.name: node for node in gm.graph.nodes}
-    lost = sorted(
-        name
-        for name in expected
-        if name not in by_name or not by_name[name].meta.get("_trt_no_kv_alias")
-    )
-    gained = sorted(
-        name
-        for name, node in by_name.items()
-        if name not in expected and node.meta.get("_trt_no_kv_alias")
-    )
-    if not lost and not gained:
-        return
-    if lost and gained:
-        detail = (
-            f"{lost} are gone and {gained} carry the marker instead, so a pass "
-            "replaced the node and the meta travelled with it"
-        )
-    elif lost:
-        detail = (
-            f"the marker is gone from {lost} and no other node carries it, so a pass "
-            "rebuilt the node without its meta"
-        )
-    else:
-        detail = (
-            f"{gained} carry the marker but were never marked, so a pass copied the "
-            "meta onto another node"
-        )
-    # What raising here prevents: a marker rebuilt away lets the converter alias a
-    # write whose new value is also a graph output, and the module raises on every
-    # call; a marker copied onto a node the classifier chose to alias makes the
-    # converter refuse that aliasing, which the predicted-KV cross-check then reports
-    # as a partitioning failure that never happened; and a marker that travelled with
-    # a replacement cannot be shown from here to have landed on the write the
-    # classifier meant.
-    raise RuntimeError(
-        "lift_mutated_buffers set node.meta['_trt_no_kv_alias'] markers before "
-        f"lowering that no longer match the lowered graph: {detail}."
-    )
+    if not isinstance(gm, torch.fx.GraphModule):
+        return []
+    names = set(caller_bindings)
+    restored: List[str] = []
+    # A part left to PyTorch names its inputs after the values it is called with.
+    parts = [gm] + [
+        sub for _, sub in gm.named_children() if isinstance(sub, torch.fx.GraphModule)
+    ]
+    for part in parts:
+        graph = part.graph
+        for node in list(graph.nodes):
+            # A part's input carries the meta of the value it receives, mark and all.
+            if node.op != "call_function" or not node.meta.get("_trt_kv_alias"):
+                continue
+            cache = node.args[0]
+            if not isinstance(cache, torch.fx.Node):
+                continue
+            cache = _effective_cache_input(cache)
+            if cache is None or cache.name not in names:
+                continue
+            with graph.inserting_after(node):
+                copy_node = graph.call_function(
+                    torch.ops.aten.copy_.default, (cache, node)
+                )
+            copy_node.meta["_trt_write_back"] = True
+            del node.meta["_trt_kv_alias"]
+            restored.append(cache.name)
+        write_backs = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.meta.get("_trt_write_back")
+        ]
+        for copy_node in write_backs:
+            cache = copy_node.args[0]
+            with graph.inserting_before(copy_node):
+                alias = graph.call_function(torch.ops.aten.detach.default, (cache,))
+            if "val" in cache.meta:
+                alias.meta["val"] = cache.meta["val"]
+            copy_node.args = (alias, *copy_node.args[1:])
+        if write_backs:
+            part.recompile()
+    return restored
 
 
 def erase_export_guards(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -426,6 +535,9 @@ def erase_export_guards(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 def lift_mutated_buffers(
     gm: torch.fx.GraphModule,
     settings: Optional[CompilationSettings] = None,
+    *,
+    lift_buffers: bool = True,
+    host_inputs_copied: bool = True,
 ) -> Tuple[torch.fx.GraphModule, List[Tuple[str, str, torch.Tensor]]]:
     """Lift each mutated buffer from a ``get_attr`` to a ``placeholder``.
 
@@ -448,28 +560,37 @@ def lift_mutated_buffers(
     Side effects: the trailing ``copy_`` of each mutated buffer is erased. A write
     the converter will lower to an ``IKVCacheUpdateLayer`` with in-place aliased
     I/O (an eligible ``slice_scatter`` / ``index_copy``, per
-    :func:`_kv_write_will_alias`) relies on that engine aliasing for its
-    write-back, so nothing further is added. Every other mutation -- a non-KV
-    buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility, whether
-    the converter then lowers it to a non-aliasing concatenation or scatter,
-    returns the source, or raises -- has no engine aliasing, so its new value is
-    re-appended as a graph output ("copy-back") and its buffer name recorded, in
-    output order, in ``gm.meta['_copyback_mutation_buffers']`` -- the
+    :func:`_kv_write_will_alias`) and whose old contents nothing else reads relies
+    on that engine aliasing for its write-back, so nothing further is added, and
+    the write gets ``node.meta['_trt_kv_alias']``: the converters alias only a
+    marked write. Every
+    other mutation, and one whose result nothing else reads, has no engine
+    aliasing, so its new value is re-appended as a graph output ("copy-back") and
+    its buffer name recorded, in output order, in
+    ``gm.meta['_copyback_mutation_buffers']`` -- the
     downstream exporters (``create_trt_exp_program`` /
     ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
     outputs as BUFFER_MUTATIONs. Copy-back is correct but not free; see the module
     docstring for what each such buffer costs per call.
 
-    One aliasable write is routed to copy-back anyway: one whose result nothing else
-    consumes. Erasing its ``copy_`` leaves it dead, and dead-code elimination takes it
-    before any engine can alias it. Copy-back makes it live again, so it needs the
-    converter to leave it alone -- ``node.meta['_trt_no_kv_alias']`` on the write node
-    says so, and :func:`assert_no_kv_alias_markers_survived` re-reads the markers after
-    lowering.
+    A caller's tensor that the model writes in place, a ``copy_`` into a placeholder,
+    is classified by :func:`_in_place_write`, which also checks that nothing else
+    reads its old contents. Its ``copy_`` stays: it is what stores the write
+    when the engine does not, so a write that is not done in place, such as
+    ``x.add_(1)``, gets ``node.meta['_trt_write_back']``, which keeps it when
+    nothing reads it. A plugin's write keeps the plugin converter's rule.
 
-    That marker goes on the write *node* while the classification is per *buffer*, so
-    one value node written back into two buffers would put the two in conflict: the
-    node marked on one buffer's behalf while the other buffer's write is predicted KV.
+    With ``lift_buffers=False`` the buffers stay ``get_attr`` constants of the
+    engine and only the caller's tensors are classified. That is for the entry
+    points whose result has no buffer state to update.
+
+    The PyTorch runtimes give an engine a CUDA copy of a host tensor, so a caller's
+    tensor traced on the host is not written in place. With
+    ``host_inputs_copied=False``, for a serialized engine whose caller binds the
+    memory itself, the example's device does not matter.
+
+    The markers go on the write *nodes* while the classification is per *buffer*, so
+    one value node written back into two buffers would put the two in conflict.
     ``torch.export`` rejects that shape with ``SpecViolationError`` before the
     classifier sees it, so it is a constraint on what can arrive here rather than a
     case to guard against.
@@ -479,6 +600,8 @@ def lift_mutated_buffers(
     mutation_pairs: List[Tuple[torch.fx.Node, torch.fx.Node]] = (
         []
     )  # (copy_node, get_attr_node)
+    # (copy_node, placeholder) for a caller's tensor the model writes.
+    input_writes: List[Tuple[torch.fx.Node, torch.fx.Node]] = []
     for node in gm.graph.nodes:
         if node.op != "call_function":
             continue
@@ -488,9 +611,17 @@ def lift_mutated_buffers(
             continue
         target = node.args[0]
         if isinstance(target, torch.fx.Node) and target.op == "get_attr":
-            mutation_pairs.append((node, target))
+            if lift_buffers:
+                mutation_pairs.append((node, target))
+        elif (
+            isinstance(target, torch.fx.Node)
+            and target.op == "placeholder"
+            and len(node.args) > 1
+            and isinstance(node.args[1], torch.fx.Node)
+        ):
+            input_writes.append((node, target))
 
-    if not mutation_pairs:
+    if not mutation_pairs and not input_writes:
         return gm, []
 
     # Find the position to insert new placeholders (after the last existing placeholder).
@@ -515,6 +646,8 @@ def lift_mutated_buffers(
     # index_put has no aliasing converter, so it always falls to copy-back too.
     # (new_value_node, buffer_name, input_binding_name)
     copyback: List[Tuple[torch.fx.Node, str, str]] = []
+    # The values the erased copy_ nodes store, which the caller's tensors see as read.
+    stored: List[torch.fx.Node] = []
     # Input-binding names of writes predicted to alias (KV). compile() asserts each
     # actually appears in the engine's aliased_io, and that no copy-back binding
     # does, turning either misprediction into a loud error instead of a silently
@@ -522,11 +655,8 @@ def lift_mutated_buffers(
     # (buf_*) is the stable key: it survives the buffer renaming inline does later,
     # and it is exactly what aliased_io records on the input side.
     predicted_kv_bindings: set[str] = set()
-    # Names of the write nodes marked _trt_no_kv_alias below. Read back after
-    # lowering by :func:`assert_no_kv_alias_markers_survived`.
-    no_kv_alias_writes: List[str] = []
 
-    for copy_node, get_attr_node in mutation_pairs:
+    for index, (copy_node, get_attr_node) in enumerate(mutation_pairs):
         buffer_name = get_attr_node.target
         # A get_attr target is fully qualified, so a buffer owned by a submodule
         # arrives as "layers.0.self_attn.kv_cache.k_cache". getattr does not walk a
@@ -595,31 +725,76 @@ def lift_mutated_buffers(
         new_value = copy_node.args[1] if len(copy_node.args) > 1 else None
         gm.graph.erase_node(copy_node)
         if isinstance(new_value, torch.fx.Node):
-            will_alias = _kv_write_will_alias(
-                new_value, tuple(buffer_tensor.shape), settings
+            stored.append(new_value)
+            # A value nothing else reads is dead once its copy_ is gone, and dead-code
+            # elimination would take it before any engine saw it. Copy-back keeps it.
+            # The buffers written later read this one's old contents too.
+            later = [c.args[1] for c, _ in mutation_pairs[index + 1 :] if c.args[1:]]
+            write = (
+                _in_place_write(
+                    new_value, replacement, settings, stored=[*stored, *later]
+                )
+                if new_value.users and _engine_takes_its_memory(buffer_tensor)
+                else None
             )
-            if will_alias and not new_value.users:
-                # The copy_ was this write's only consumer, so it is now dead and
-                # dead-code elimination will take it before any engine sees it --
-                # leaving the prediction unfulfilled and the write-back lost. Copy-back
-                # revives it, because the value is re-attached as a graph output, but
-                # then the converter would alias a buffer that is also copy-back and
-                # the module would raise on every call. Marking the write forbids the
-                # aliasing, which is what makes the copy-back route available at all.
-                # Both eligibility checks read the marker: impl.slice_scatter off
-                # ctx.current_node, aten_ops_converters._index_copy_kv_eligible off
-                # the node it is handed.
-                new_value.meta["_trt_no_kv_alias"] = True
-                no_kv_alias_writes.append(new_value.name)
-                will_alias = False
-            if will_alias:
+            if write is not None:
                 predicted_kv_bindings.add(replacement.name)
+                write.meta["_trt_kv_alias"] = True
             else:
                 copyback.append((new_value, buffer_name, replacement.name))
+                # A clone of this buffer holds its old value past the point where
+                # forward writes the new one, so lowering must keep it.
+                replacement.meta["_copyback_buffer"] = True
 
         # Erase the now-unused get_attr.
         if not get_attr_node.users:
             gm.graph.erase_node(get_attr_node)
+
+    from torch_tensorrt.dynamo.conversion.plugins._auto_functionalized_converter import (
+        _WRAPPER_TARGETS,
+    )
+
+    # Unread, a kept write-back copy_ would be dropped as dead code; the mark keeps it.
+    for copy_node, cache in input_writes:
+        new_value = copy_node.args[1]
+        val = cache.meta.get("val")
+        write = (
+            _in_place_write(
+                new_value, cache, settings, write_back=copy_node, stored=stored
+            )
+            if isinstance(val, torch.Tensor)
+            and (val.is_cuda or not host_inputs_copied)
+            and _engine_takes_its_memory(val)
+            and len(new_value.users) > 1
+            else None
+        )
+        if write is not None:
+            predicted_kv_bindings.add(cache.name)
+            write.meta["_trt_kv_alias"] = True
+            continue
+        write = _cache_write_of(new_value, cache)
+        # A plugin's write follows the plugin converter's own rule.
+        if (
+            new_value.target is operator.getitem
+            and getattr(new_value.args[0], "target", None) in _WRAPPER_TARGETS
+        ):
+            continue
+        copy_node.meta["_trt_write_back"] = True
+        # The partitioner orders the copy_ only after the value it stores, and forward
+        # writes a buffer stored from the cache after the graph, so the other readers
+        # of the old contents read a copy taken before it.
+        if cache in stored or any(
+            _uses_data_of(user, cache)
+            for user in set(cache.users) - {copy_node, write, new_value}
+        ):
+            last = [n for n in gm.graph.nodes if n.op == "placeholder"][-1]
+            with gm.graph.inserting_after(last):
+                old = gm.graph.call_function(torch.ops.aten.clone.default, (cache,))
+            old.meta["val"] = cache.meta.get("val")
+            cache.replace_all_uses_with(
+                old, delete_user_cb=lambda user: user not in (copy_node, old)
+            )
+            copyback = [(old if v is cache else v, b, n) for v, b, n in copyback]
 
     # Re-attach non-KV mutation new-values as graph outputs so they survive
     # compilation (otherwise, with the copy_ gone, they are dead and eliminated).
@@ -641,7 +816,6 @@ def lift_mutated_buffers(
         gm.meta["_copyback_mutation_buffers"] = copyback_buffers
         gm.meta["_copyback_bindings"] = copyback_bindings
         gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
-        gm.meta["_no_kv_alias_writes"] = no_kv_alias_writes
         return gm, []
 
     # ExportedProgram.module() produces a GraphModule whose forward is
@@ -668,7 +842,6 @@ def lift_mutated_buffers(
     new_gm.meta["_copyback_mutation_buffers"] = copyback_buffers
     new_gm.meta["_copyback_bindings"] = copyback_bindings
     new_gm.meta["_predicted_kv_bindings"] = sorted(predicted_kv_bindings)
-    new_gm.meta["_no_kv_alias_writes"] = no_kv_alias_writes
 
     logger.debug(
         "Lifted %d mutated buffer(s) to placeholders: %s; copy-back buffers: %s",
@@ -681,49 +854,313 @@ def lift_mutated_buffers(
 
 
 class _HiddenCopybackOutputs(torch.fx.graph.CodeGen):  # type: ignore[misc]
-    """Generate a ``forward`` that stops short of the trailing copy-back values.
+    """Generate a ``forward`` that writes the trailing copy-back values into their
+    buffers instead of returning them.
 
-    The values stay on the graph's output node; only the generated ``forward`` stops
-    early. Everything that reads the graph rather than calling the module still sees
-    them -- the exporters, dead-code elimination, and the ``torch.fx.Interpreter``
-    that a *non-strict* ``torch.export`` runs a GraphModule through, so a retrace
-    keeps them too. Non-strict is what both retrace paths get: ``_compile.save``
-    passes ``strict=False`` and ``dynamo._exporter.export`` takes the default, which
-    is ``False``. A caller who exports the compiled module themselves with
-    ``strict=True`` gets the module called rather than interpreted, and the hidden
-    values do not reach the program. ``_TorchTensorRTModule.forward`` does the same
-    with the aliased outputs the interpreter appends: the engine produces them, the
-    caller never sees them.
+    The values stay on the graph's output node, so everything that reads the graph
+    rather than calling the module still sees them: the exporters, dead-code
+    elimination, and the ``torch.fx.Interpreter`` a non-strict ``torch.export`` runs.
+    ``torch_tensorrt.save`` declares each one a BUFFER_MUTATION; a plain non-strict
+    ``torch.export.export`` returns them as extra user outputs.
     """
 
-    def __init__(self, num_hidden: int) -> None:
+    def __init__(
+        self,
+        buffers: Sequence[str],
+        copied: Sequence[bool],
+        helper: str,
+        returned_copied: Sequence[bool] = (),
+    ) -> None:
         super().__init__()
-        self.num_hidden = num_hidden
+        self.buffers = list(buffers)
+        self.copied = list(copied)
+        self.returned_copied = list(returned_copied)
+        # The generated code names nothing else from outside: an input may be called
+        # anything, even getattr.
+        self.helper = helper
+
+    def additional_globals(self) -> List[Tuple[str, Any]]:
+        return [(self.helper, write_copyback_buffers)]
 
     def generate_output(self, output_args: Any, *args: Any, **kwargs: Any) -> str:
-        if self.num_hidden and isinstance(output_args, (list, tuple)):
-            output_args = output_args[: len(output_args) - self.num_hidden]
+        write_back = ""
+        if self.buffers and isinstance(output_args, (list, tuple)):
+            split = len(output_args) - len(self.buffers)
+            repr_fn = kwargs.get("repr_fn") or repr
+            # A flagged returned value is copied, under its own name, before the
+            # writes.
+            rebound = list(
+                dict.fromkeys(
+                    repr_fn(value)
+                    for value, copied in zip(output_args[:split], self.returned_copied)
+                    if copied
+                )
+            )
+            names = "".join(f"{name!r}, " for name in self.buffers)
+            values = "".join(
+                f"{repr_fn(value)}"
+                f"{'.clone()' if copied and repr_fn(value) not in rebound else ''}, "
+                for value, copied in zip(output_args[split:], self.copied)
+            )
+            write_back = "".join(f"{name} = {name}.clone()\n" for name in rebound)
+            write_back += f"{self.helper}(self, ({names}), ({values}))\n"
+            output_args = output_args[:split]
             # descs, when the caller passes it, is one entry per untruncated output.
             kwargs.pop("descs", None)
-        return str(super().generate_output(output_args, *args, **kwargs))
+        return write_back + str(super().generate_output(output_args, *args, **kwargs))
 
 
-def hide_copyback_outputs(gm: torch.fx.GraphModule, num_hidden: int) -> None:
-    """Drop the last ``num_hidden`` graph outputs from what ``gm`` returns.
+class _BufferProxyTracer(torch.fx.Tracer):  # type: ignore[misc]
+    """``torch.load`` rebuilds a pickled GraphModule by tracing its ``forward``.
+    Buffers read as proxies, so a written value computed from them, such as a
+    step counter, is recorded rather than run once at load."""
+
+    proxy_buffer_attributes = True
+
+
+def write_copyback_buffers(
+    module: torch.nn.Module, names: Sequence[str], values: Sequence[torch.Tensor]
+) -> None:
+    """Copy each value into ``module``'s buffer named at its position.
+
+    ``torch.load`` rebuilds a pickled module by tracing its ``forward``, which
+    records these copies as graph nodes, so the rebuilt module writes its buffers
+    and an export of it declares the writes. A value that comes from neither the
+    inputs nor the buffers, as from ``torch.rand``, would run only once, at load,
+    so that raises.
+    """
+    # The buffers hold state, not a differentiable output, so a value with
+    # autograd history must not attach that history to them.
+    with torch.no_grad():
+        for name, value in zip(names, values):
+            buffer = getattr(module, name)
+            if isinstance(buffer, torch.fx.Proxy) and not isinstance(
+                value, torch.fx.Proxy
+            ):
+                raise RuntimeError(
+                    f"Cannot rebuild the write into buffer '{name}' by tracing this "
+                    "module: its value depends on no input or buffer (for example "
+                    "torch.rand), so the rebuilt module would not write it. Save it "
+                    "with torch_tensorrt.save instead of pickling it."
+                )
+            # Tracing, by torch.jit.trace or torch.load, does not record no_grad, so
+            # the detach is spelled out. The ATen op records a node that graph
+            # cleanup keeps, as it does any op that writes its input.
+            torch.ops.aten.copy_.default(buffer, value.detach())
+
+
+def _may_share_a_buffer(
+    gm: torch.fx.GraphModule,
+    value: torch.fx.Node,
+    buffers: Set[str],
+) -> bool:
+    """Whether ``value`` can be one of ``buffers``, or a view of one, when it is read.
+
+    The walk follows what can hand back its input's memory: an ATen op whose schema
+    returns an alias, an item of a tuple, and the matching output of a submodule left
+    to PyTorch, into whose graph it goes. It stops at an engine and at an ATen op
+    that returns new memory. Anything else, such as a Python function or an opaque
+    submodule, is followed through all its inputs, so its value may be copied when
+    it did not need to be.
+    """
+    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+    # Each entry is a node, its module, and the calls that entered that module.
+    pending: List[Tuple[Any, Any, Tuple[Any, ...]]] = [(value, gm, ())]
+    seen = set()
+
+    def enter(sub: Any, outputs: Any, frames: Tuple[Any, ...]) -> None:
+        torch.fx.node.map_arg(outputs, lambda n: pending.append((n, sub, frames)))
+
+    while pending:
+        node, module, frames = pending.pop()
+        if not isinstance(node, torch.fx.Node) or (node, module, frames) in seen:
+            continue
+        seen.add((node, module, frames))
+        if node.op == "placeholder":
+            if frames:
+                outer, call = frames[-1]
+                inputs = [n for n in module.graph.nodes if n.op == "placeholder"]
+                index = inputs.index(node)
+                if index < len(call.args):
+                    pending.append((call.args[index], outer, frames[:-1]))
+        elif node.op == "get_attr":
+            # A partition reaches a written buffer only through a placeholder, since
+            # buffers are lifted before partitioning.
+            if not frames and node.target in buffers:
+                return True
+        elif node.op == "call_module":
+            sub = module.get_submodule(node.target)
+            if isinstance(sub, TorchTensorRTModule):
+                continue
+            if isinstance(sub, torch.fx.GraphModule):
+                out = next(iter(sub.graph.find_nodes(op="output")))
+                enter(sub, out.args[0], frames + ((module, node),))
+            else:
+                pending.extend((n, module, frames) for n in node.all_input_nodes)
+        elif node.op == "call_function" and node.target is operator.getitem:
+            base, index = node.args[0], node.args[1]
+            sub = (
+                module.get_submodule(base.target)
+                if isinstance(base, torch.fx.Node) and base.op == "call_module"
+                else None
+            )
+            if isinstance(sub, torch.fx.GraphModule) and not isinstance(
+                sub, TorchTensorRTModule
+            ):
+                out = next(iter(sub.graph.find_nodes(op="output"))).args[0]
+                if isinstance(out, (tuple, list)) and isinstance(index, int):
+                    enter(sub, out[index], frames + ((module, base),))
+                    continue
+            pending.append((base, module, frames))
+        elif node.op == "call_function" and isinstance(
+            node.target, torch._ops.OpOverload
+        ):
+            if any(r.alias_info is not None for r in node.target._schema.returns):
+                pending.extend((n, module, frames) for n in node.all_input_nodes)
+        else:
+            pending.extend((n, module, frames) for n in node.all_input_nodes)
+    return False
+
+
+def lifted_buffer_attrs(
+    names: Iterable[str], model_names: Iterable[str] = ()
+) -> Dict[str, str]:
+    """The attribute each lifted buffer, by its name in the model, is registered
+    under on the compiled module.
+
+    ``register_buffer`` takes no ``.``, so a nested name is flattened, and a
+    flattened name that another lifted buffer or a top-level name of the model
+    (``model_names``, the model's state names) already uses gets a suffix, in sorted
+    order. A flat name stays as it is, so ``state_dict`` keys do not change. The
+    attributes follow from the model's names alone, so they are found again on a
+    module that was saved and loaded.
+    """
+    names = set(names)
+    attrs = {name: name for name in names if "." not in name}
+    taken = set(attrs.values()) | {name.split(".")[0] for name in model_names}
+    for name in sorted(names - set(attrs)):
+        attr = base = "lifted_buf_" + name.replace(".", "_")
+        suffix = 0
+        while attr in taken:
+            suffix += 1
+            attr = f"{base}_{suffix}"
+        taken.add(attr)
+        attrs[name] = attr
+    return attrs
+
+
+def copy_into_lifted_buffers(
+    module: torch.nn.Module, state: Dict[str, torch.Tensor], lifted: Iterable[str]
+) -> None:
+    """Copy each value in ``state``, the model's state keyed by its names, into the
+    buffer of the compiled ``module`` that holds it. ``lifted`` names the buffers
+    the model writes, the ones compile() registered on the module."""
+    for name, attr in lifted_buffer_attrs(lifted, state).items():
+        buffer = module._buffers.get(attr)
+        value = state.get(name)
+        if buffer is not None and value is not None and buffer.shape == value.shape:
+            buffer.copy_(value)
+
+
+@contextlib.contextmanager
+def buffers_restored(module: torch.nn.Module) -> Iterator[None]:
+    """Put ``module``'s buffers back as they were when the block exits.
+
+    Calling a compiled module advances the buffers it writes, so code that runs it
+    only to trace it or to check its output would otherwise leave it a call ahead.
+    The copies are kept on the CPU, so a large cache does not need twice the device
+    memory. Only a buffer whose bytes changed is written back: one the block never
+    wrote can be read-only. An expanded buffer is never written back: it cannot be
+    written, and only a write to the buffer it expands can change it. A sparse or
+    quantized buffer has no byte view, and a meta buffer has no data, so they are
+    left alone.
+    """
+    saved = {
+        name: buffer.detach().to("cpu", copy=True)
+        for name, buffer in module.named_buffers()
+        if buffer.layout == torch.strided
+        and not buffer.is_quantized
+        and not buffer.is_meta
+    }
+    try:
+        yield
+    finally:
+        # Inference mode accepts the write whether or not a buffer was made in it.
+        with torch.inference_mode():
+            for name, buffer in module.named_buffers():
+                old = saved.get(name)
+                if old is None or any(
+                    n > 1 and st == 0 for n, st in zip(buffer.shape, buffer.stride())
+                ):
+                    continue
+                if not torch.equal(_bytes(buffer), _bytes(old)):
+                    buffer.copy_(old)
+
+
+def _bytes(tensor: torch.Tensor) -> torch.Tensor:
+    # Bytes rather than values, so a NaN compares equal to itself. A conjugate or
+    # negative view, a strided or an expanded tensor cannot be viewed as bytes as it is.
+    return (
+        tensor.detach()
+        .resolve_conj()
+        .resolve_neg()
+        .to("cpu")
+        .contiguous()
+        .reshape(-1)
+        .view(torch.uint8)
+    )
+
+
+def hide_copyback_outputs(gm: torch.fx.GraphModule, buffers: Sequence[str]) -> None:
+    """Make ``gm``'s ``forward`` copy its last ``len(buffers)`` graph outputs into
+    those buffers, in order, and return the outputs before them.
 
     They remain outputs of the graph, so the exporters still find them and declare
-    them BUFFER_MUTATIONs; see the module docstring for why they are not the
-    caller's to see.
+    them BUFFER_MUTATIONs. Every value is read before any buffer is written: a value
+    that can share memory with one of the buffers, as when one buffer's new contents
+    are another's old ones or a view of its own, is copied first. So is a returned
+    value that can share a buffer written with other contents.
     """
-    if num_hidden <= 0:
+    if not buffers:
         return
-    gm.graph.set_codegen(_HiddenCopybackOutputs(num_hidden))
+    output_node = next(n for n in gm.graph.nodes if n.op == "output")
+    names = set(buffers)
+    copied = [
+        isinstance(value, torch.fx.Node) and _may_share_a_buffer(gm, value, names)
+        for value in output_node.args[0]
+    ]
+    split = len(copied) - len(buffers)
+    # Export writes a buffer's new value and then reads the outputs that alias it
+    # from the buffer, so a returned view of a buffer written with a view of itself
+    # is read after the writes. A view of a buffer that gets other contents is read
+    # before them.
+    overwritten = {
+        name
+        for name, value in zip(buffers, output_node.args[0][split:])
+        if not (
+            isinstance(value, torch.fx.Node) and _may_share_a_buffer(gm, value, {name})
+        )
+    }
+    returned = [
+        flag and _may_share_a_buffer(gm, value, overwritten)
+        for value, flag in zip(output_node.args[0][:split], copied[:split])
+    ]
+    used = {node.name for node in gm.graph.nodes}
+    helper = "write_copyback_buffers"
+    while helper in used:
+        helper += "_"
+    gm.graph.set_codegen(
+        _HiddenCopybackOutputs(buffers, copied[split:], helper, returned)
+    )
+    gm.graph._tracer_cls = gm._tracer_cls = _BufferProxyTracer
     gm.recompile()
 
 
 def inline_lifted_buffers_into_gm(
     gm: torch.fx.GraphModule,
     lifted_buffers: List[Tuple[str, str, torch.Tensor]],
+    model_names: Iterable[str] = (),
 ) -> torch.fx.GraphModule:
     """Inline lifted buffers as ``get_attr`` reads on the compiled GraphModule.
 
@@ -753,29 +1190,24 @@ def inline_lifted_buffers_into_gm(
     placeholder_to_buf: Dict[str, str] = {
         ph_name: buf_name for ph_name, buf_name, _ in lifted_buffers
     }
-    # Register buffers as module state, mapping each original buffer name to the
-    # attribute name it is registered under. ``nn.Module.register_buffer``
-    # rejects names containing "." and ``get_attr`` on a dotted target would
-    # traverse submodules that no longer exist on this flattened GraphModule
-    # (e.g. HF's ``model.layers.0.k_cache``). Flat names keep their original
-    # name to preserve ``state_dict`` keys; nested names are sanitized to a
-    # unique flat attribute. Clone so the gm owns its own storage.
-    buf_to_attr: Dict[str, str] = {}
+    # Clone so the gm owns its own storage.
+    tensors: Dict[str, torch.Tensor] = {}
     for _ph_name, buf_name, tensor in lifted_buffers:
-        if buf_name in buf_to_attr:
+        tensors.setdefault(buf_name, tensor)
+    buf_to_attr = lifted_buffer_attrs(tensors, model_names)
+    for buf_name, tensor in tensors.items():
+        attr_name = buf_to_attr[buf_name]
+        if hasattr(gm, attr_name):
+            if "." in buf_name:
+                raise RuntimeError(
+                    f"Cannot register buffer '{buf_name}' as '{attr_name}': the "
+                    "compiled module already has an attribute of that name."
+                )
             continue
-        if "." in buf_name:
-            attr_name = "lifted_buf_" + buf_name.replace(".", "_")
-            base = attr_name
-            suffix = 0
-            while hasattr(gm, attr_name):
-                suffix += 1
-                attr_name = f"{base}_{suffix}"
-        else:
-            attr_name = buf_name
-        if not hasattr(gm, attr_name):
+        # forward writes copy-back buffers in place, which an inference tensor
+        # refuses outside inference mode.
+        with torch.inference_mode(False):
             gm.register_buffer(attr_name, tensor.clone())
-        buf_to_attr[buf_name] = attr_name
 
     # Copy-back mutation targets were recorded (in gm.meta) under the buffers'
     # original names; nested ones were just flattened to lifted_buf_* above. Remap

@@ -313,6 +313,8 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream owned_pool_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> cudagraph_input_staging_buffers = {};
+  // Addresses of the aliased inputs the current CUDA graph was recorded with.
+  std::vector<void*> cudagraph_aliased_input_addresses = {};
   std::vector<at::Tensor> cudagraph_output_staging_buffers = {};
 
   // Per-call formatted input buffers. In standard mode these are bound
@@ -326,6 +328,8 @@ struct TRTEngine : torch::CustomClassHolder {
     // here so the per-call input-setup loop avoids an aliased_input_binding_names
     // lookup on every input, every execution.
     bool is_aliased_input;
+    // True when TensorRT updates this input in place as a KV cache.
+    bool is_kv_cache_input;
   };
   std::vector<InputBindingInfo> input_binding_infos = {};
   std::vector<at::Tensor> active_input_tensors = {};

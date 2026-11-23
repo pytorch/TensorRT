@@ -1568,12 +1568,16 @@ def _index_copy_kv_eligible(
     Returns True only for the narrow case our IKVCacheUpdateLayer
     emitter can handle without a graph break:
 
+    * ``lift_mutated_buffers`` classified the write in place and marked it
+      ``node.meta['_trt_kv_alias']``. Only checked without ``input_node``.
     * Input is an FX placeholder (i.e. a network input — required for
       aliasing).
     * Input has rank 4 and fully static shape [b, d, s_max, h].
     * dim argument is exactly 2.
     * Source tensor has rank 4 with shape[2] == 1 (single-position
       write; matches HF's per-step StaticCache.update call).
+    * The cache is float32, float16 or bfloat16, the types
+      IKVCacheUpdateLayer accepts.
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
       to larger batches when needed).
 
@@ -1586,10 +1590,11 @@ def _index_copy_kv_eligible(
     lowering/_buffer_lifting.py runs before that and passes the node lowering
     will leave behind, which is not always node.args[0].
     """
-    # That same classifier marks a write it filed copy-back rather than KV, and its
-    # value is a graph output by now. Aliasing it as well would hand the runtime an
-    # output it keeps to itself while the graph still reads it.
-    if node.meta.get("_trt_no_kv_alias"):
+    # The layer changes its input. Only the classifier knows that a write is meant
+    # to, so the partitioner takes only the writes it marked; a functional
+    # index_copy leaves its input alone. The classifier passes input_node while it
+    # decides.
+    if input_node is None and not node.meta.get("_trt_kv_alias"):
         return False
     if len(node.args) < 4:
         return False
@@ -1601,6 +1606,8 @@ def _index_copy_kv_eligible(
         return False
     input_val = input_node.meta.get("val")
     if input_val is None:
+        return False
+    if input_val.dtype not in impl.slice_scatter.KV_CACHE_DTYPES:
         return False
     input_shape = tuple(input_val.shape)
     if len(input_shape) != 4:
@@ -1655,8 +1662,30 @@ def aten_ops_index_copy_kv(
     )
 
 
+def _index_copy_fallback_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """TensorRT treats an int8 scatter as quantized and fails the engine build. A
+    float64 write needs ``truncate_double``, as the other converters require, or
+    the engine expects float32 and refuses the caller's tensor."""
+    input_node = node.args[0] if node.args else None
+    input_val = input_node.meta.get("val") if isinstance(input_node, Node) else None
+    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.int8:
+        _LOGGER.debug("index_copy with an int8 input, falling back")
+        return False
+    if (
+        isinstance(input_val, torch.Tensor)
+        and input_val.dtype == torch.float64
+        and not (settings is not None and settings.truncate_double)
+    ):
+        _LOGGER.debug("index_copy of float64 needs truncate_double, falling back")
+        return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_copy.default,
+    capability_validator=_index_copy_fallback_validator,
     supports_dynamic_shapes=False,
 )
 @enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})

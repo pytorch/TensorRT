@@ -31,7 +31,9 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 from torch.utils._sympy.numbers import int_oo
+from torch.utils._sympy.value_ranges import ValueRanges, bound_sympy
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -486,16 +488,66 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
+def recorded_lower(
+    symbol: sympy.Symbol, range_constraints: Dict[sympy.Expr, Any]
+) -> Any:
+    """The smallest value of ``symbol`` the program allows, from its
+    ``range_constraints``. Export records 2 for the root ``b`` of a derived size such
+    as ``2 * b`` also when ``b`` starts at 0 or 1. The derived size keeps its own
+    record, which tells how low ``b`` goes."""
+    lower = range_constraints[symbol].lower
+    derived = [
+        (expr, value_range)
+        for expr, value_range in range_constraints.items()
+        if expr != symbol and expr.free_symbols == {symbol}
+    ]
+    if lower == 2 and derived:
+        for value in (0, 1):
+            if all(r.lower <= e.subs(symbol, value) <= r.upper for e, r in derived):
+                return value
+    return lower
+
+
+def _profile_symbol_range(
+    symbol: sympy.Symbol,
+    shape_env: Any,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]],
+    range_constraints: Optional[Dict[sympy.Expr, ValueRanges]] = None,
+) -> ValueRanges:
+    """The range of ``symbol`` for working out a size computed from it.
+
+    The lower bound is the program's (:func:`recorded_lower`), not the ShapeEnv's 2,
+    so ``t + 1`` from ``Dim("t", min=0)`` starts at 1. A recorded minimum is lowered
+    only from 2 to 1, by an Input spec that starts at 1. Without a record, 2 becomes
+    1, as for a plain ``Dim``.
+    """
+    var_range = shape_env.var_to_range.get(symbol) or shape_env.bound_sympy(symbol)
+    lower, upper = var_range.lower, var_range.upper
+    if range_constraints and symbol in range_constraints:
+        lower = recorded_lower(symbol, range_constraints)
+    elif lower == 2:
+        lower = 1
+    if user_symbol_bounds and symbol in user_symbol_bounds:
+        user_min, user_max = user_symbol_bounds[symbol]
+        # A spec's 1 fits a recorded 2, as _build_user_symbol_bounds accepts it.
+        lower = 1 if lower == 2 and user_min == 1 else max(lower, user_min)
+        upper = user_max if upper in (int_oo, sympy.oo) else min(upper, user_max)
+    return ValueRanges(lower, upper)
+
+
 def extract_var_range_info(
     symbolic_integer: torch.SymInt,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    range_constraints: Optional[Dict[sympy.Expr, ValueRanges]] = None,
 ) -> Dict[str, Optional[int]]:
     """Return ``{min, max, opt}`` for a symbolic integer.
 
-    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
-    when the exporter's upper is unbounded; finite exporter bounds always win.
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) bounds a symbol and a
+    size computed from it, below and above, inside the exporter's range, and fills
+    an unbounded upper.
     The lower is intersected with the exporter's so the 0/1 specialization
-    survives even if the user passes ``min_shape=0``.
+    survives even if the user passes ``min_shape=0``. ``range_constraints``, the
+    exported program's, give the recorded range of a computed size.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -504,7 +556,42 @@ def extract_var_range_info(
     # In the case of expr which has symbolic computation, bound_sympy evaluates them.
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
-    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
+    if expr.is_symbol or expr.is_number:
+        var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
+            expr
+        )
+    else:
+        # The ShapeEnv's 2 for s would start 2 * s at 4 and ignore an Input spec
+        # of s. Never below 1 unless the ShapeEnv allows it.
+        env_range = shape_env.bound_sympy(expr)
+        var_range = bound_sympy(
+            expr,
+            {
+                s: _profile_symbol_range(
+                    s, shape_env, user_symbol_bounds, range_constraints
+                )
+                for s in expr.free_symbols
+            },
+        )
+        lower = max(var_range.lower, min(env_range.lower, 1))
+        upper = var_range.upper
+        recorded = (range_constraints or {}).get(expr)
+        if recorded is not None:
+            # Export records the range of a size like T + 1 itself, from the Dim
+            # that makes it, so its smallest value holds where the ShapeEnv moved
+            # T's. An Input spec of its symbols can still raise it.
+            user_lower = 0
+            if user_symbol_bounds and expr.free_symbols & user_symbol_bounds.keys():
+                user_lower = bound_sympy(
+                    expr,
+                    {
+                        s: ValueRanges(*user_symbol_bounds.get(s, (0, int_oo)))
+                        for s in expr.free_symbols
+                    },
+                ).lower
+            lower = max(recorded.lower, user_lower, 1)
+            upper = min(upper, recorded.upper)
+        var_range = ValueRanges(lower, upper)
     # PyTorch commit adb73cc: var_to_val->backed_var_to_val, unbacked_var_to_val->real_tensor_prop_unbacked_vals
     var_to_val_map = getattr(shape_env, "backed_var_to_val", None) or getattr(
         shape_env, "var_to_val", None
@@ -547,7 +634,8 @@ def extract_var_range_info(
     min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
-    min_val = 1 if min_val == 2 else min_val
+    if expr.is_symbol:
+        min_val = 1 if min_val == 2 else min_val
 
     # Apply user bounds whenever present. ``_build_user_symbol_bounds`` already
     # rejects user ranges that exceed the exporter, so the only cases reaching
@@ -567,7 +655,27 @@ def extract_var_range_info(
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
     if isinstance(var_val, (sympy.core.numbers.Integer, int)):
-        min_max_opt["opt"] = int(var_val)
+        # An Input spec can rule out the traced size, and opt has to stay inside
+        # the profile. A computed size takes its opt from each of its symbols' traced
+        # value moved into that symbol's range, so related engine inputs (n, 2 * n,
+        # n + m) get optima that agree with each other.
+        if not (expr.is_symbol or expr.is_number):
+            roots = {}
+            for s in expr.free_symbols:
+                value = var_to_val_map.get(s)
+                if not isinstance(value, (sympy.core.numbers.Integer, int)):
+                    break
+                symbol_range = _profile_symbol_range(
+                    s, shape_env, user_symbol_bounds, range_constraints
+                )
+                low = _bound_to_int_or_none(symbol_range.lower)
+                high = _bound_to_int_or_none(symbol_range.upper)
+                value = int(value) if low is None else max(int(value), low)
+                roots[s] = value if high is None else min(value, high)
+            else:
+                var_val = expr.xreplace(roots)
+        opt = max(int(var_val), min_val)
+        min_max_opt["opt"] = opt if max_val is None else min(opt, max_val)
 
     return min_max_opt
 
@@ -887,20 +995,146 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
     return nested_decorator
 
 
+def _copy_inputs(inputs: Any) -> Any:
+    """Copy the tensors in ``inputs`` so that inputs sharing memory still share it.
+
+    Inputs whose bytes overlap are copied once, over the bytes they use, and each
+    tensor becomes a view of its copy. The copies are new tensors, so inputs with
+    autograd history and Parameters copy like any other tensor.
+    """
+
+    def by_storage(t: torch.Tensor) -> bool:
+        # A sparse or wrapper subclass tensor has no storage to copy, and a quantized
+        # one loses its scale when rebuilt from its storage, so these are cloned.
+        return (
+            t.layout == torch.strided
+            and not t.is_quantized
+            and not is_traceable_wrapper_subclass(t)
+        )
+
+    def start(t: torch.Tensor) -> int:
+        address = t.untyped_storage().data_ptr() + t.storage_offset() * t.element_size()
+        return int(address)
+
+    tensors = [
+        t
+        for t in torch.utils._pytree.tree_leaves(inputs)
+        if isinstance(t, torch.Tensor) and t.numel() > 0 and by_storage(t)
+    ]
+    # Spans are addresses, not offsets, because two storages can hold the same
+    # memory, as after torch.from_dlpack of a view.
+    groups: List[List[Any]] = []
+    for t in sorted(tensors, key=lambda t: (str(t.device), start(t))):
+        lo = start(t)
+        span = 1 + sum((n - 1) * s for n, s in zip(t.shape, t.stride()))
+        hi = lo + span * t.element_size()
+        if groups and groups[-1][0] == t.device and lo < groups[-1][2]:
+            groups[-1][2] = max(groups[-1][2], hi)
+            groups[-1][3].append(t)
+        else:
+            groups.append([t.device, lo, hi, [t]])
+    # Each tensor's copy and the address its first byte stands for.
+    copies: Dict[int, Tuple[torch.UntypedStorage, int]] = {}
+    for device, lo, hi, members in groups:
+        holders = [
+            m.untyped_storage()
+            for m in members
+            if m.untyped_storage().data_ptr() <= lo
+            and m.untyped_storage().data_ptr() + m.untyped_storage().nbytes() >= hi
+        ]
+        # Without a storage that holds the whole group, its tensors are cloned.
+        if not holders:
+            continue
+        storage = holders[0]
+        # Starting at a multiple of 16 bytes keeps every element size's offset whole.
+        first = (lo - storage.data_ptr()) // 16 * 16
+        whole = torch.empty(0, dtype=torch.uint8, device=device)
+        whole.set_(storage, 0, (storage.nbytes(),), (1,))
+        copy = whole[first : hi - storage.data_ptr()].clone().untyped_storage()
+        for m in members:
+            copies[id(m)] = (copy, storage.data_ptr() + first)
+
+    def copy_one(t: torch.Tensor) -> torch.Tensor:
+        if id(t) not in copies:
+            return t.detach().clone()
+        copy, first = copies[id(t)]
+        view = torch.empty(0, dtype=t.dtype, device=t.device)
+        view = view.set_(
+            copy, (start(t) - first) // t.element_size(), t.size(), t.stride()
+        )
+        # The storage holds the values before a conjugate or negative view's flag.
+        if t.is_conj():
+            view = view.conj()
+        if t.is_neg():
+            view = torch._neg_view(view)
+        return view
+
+    return torch.utils._pytree.tree_map_only(torch.Tensor, copy_one, inputs)
+
+
 def check_module_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
     arg_inputs: Any,
     kwarg_inputs: Any = None,
 ) -> bool:
+    # Each module gets its own copy of the inputs: a module that writes an input,
+    # such as a caller's cache, must not change the caller's tensor or what the
+    # other module sees.
+    old_args = _copy_inputs(arg_inputs)
+    new_args, new_kwargs = _copy_inputs((arg_inputs, kwarg_inputs))
     old_outputs, new_outputs = (
-        refitted_module(*arg_inputs),
-        new_module(*arg_inputs, **kwarg_inputs),
+        refitted_module(*old_args),
+        new_module(*new_args, **new_kwargs),
     )
-    if type(old_outputs) != type(new_outputs):
-        logger.warning("The output types are different. Output check is skipped.")
-        return True
-    return check_output_equal(old_outputs, new_outputs)
+
+    # A compiled module can return a tuple where the model returns one tensor or a
+    # dictionary, so the outputs are compared flattened.
+    # Dictionary keys must match when both outputs have them, on a leaf's path and
+    # for each dictionary, also one whose entries hold no leaf. A leaf that is not a
+    # tensor, such as a size, is compared as it is.
+    def leaves(outputs: Any) -> List[Tuple[List[Any], Any]]:
+        try:
+            flat = torch.utils._pytree.tree_flatten_with_path(outputs)[0]
+        except ValueError:
+            # A type registered without key paths, as diffusers registers its
+            # outputs, flattens without them.
+            return [([], leaf) for leaf in torch.utils._pytree.tree_leaves(outputs)]
+        return [
+            (
+                [k.key for k in path if isinstance(k, torch.utils._pytree.MappingKey)],
+                leaf,
+            )
+            for path, leaf in flat
+        ]
+
+    def key_sets(outputs: Any) -> Dict[Any, int]:
+        found: Dict[Any, int] = {}
+        pending = [outputs]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, dict):
+                found[frozenset(value)] = found.get(frozenset(value), 0) + 1
+                pending.extend(value.values())
+            elif isinstance(value, (list, tuple)):
+                pending.extend(value)
+        return found
+
+    def equal(old: Any, new: Any) -> bool:
+        if isinstance(old, torch.Tensor) and isinstance(new, torch.Tensor):
+            return old.dtype == new.dtype and check_output_equal(old, new)
+        if isinstance(old, torch.Tensor) or isinstance(new, torch.Tensor):
+            return False
+        return type(old) == type(new) and bool(old == new)
+
+    old_dicts, new_dicts = key_sets(old_outputs), key_sets(new_outputs)
+    if old_dicts and new_dicts and old_dicts != new_dicts:
+        return False
+    old_leaves, new_leaves = leaves(old_outputs), leaves(new_outputs)
+    return len(old_leaves) == len(new_leaves) and all(
+        (not old_keys or not new_keys or old_keys == new_keys) and equal(old, new)
+        for (old_keys, old), (new_keys, new) in zip(old_leaves, new_leaves)
+    )
 
 
 def check_output_equal(

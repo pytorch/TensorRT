@@ -1156,5 +1156,25 @@ class TestCollapseHighRankPermutes(TestCase):
         )
 
 
+class TestFakeTensorUpdater(TestCase):
+    def test_a_node_without_a_fake_value_gets_one(self):
+        """The updater refills a node that reaches it without ``meta['val']``, with
+        either form PyTorch keeps its processed hashes in."""
+        from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import (
+            FakeTensorUpdater,
+        )
+
+        class AddOne(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        gm = torch.fx.symbolic_trace(AddOne())
+        mode = FakeTensorMode()
+        x, add = [n for n in gm.graph.nodes if n.op in ("placeholder", "call_function")]
+        x.meta["val"] = mode.from_tensor(torch.ones(2, 3))
+        FakeTensorUpdater(gm).incremental_update(mode)
+        self.assertEqual(add.meta["val"].shape, (2, 3))
+
+
 if __name__ == "__main__":
     run_tests()

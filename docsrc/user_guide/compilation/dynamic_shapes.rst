@@ -78,6 +78,51 @@ Here's a simple example that exports a matmul layer with some restrictions on dy
     # Run inference
     trt_gm(*inputs)
 
+Setting the opt shape for a program you exported yourself
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TensorRT tunes an engine for one size in each dynamic range, the opt size. When you pass an ``nn.Module``,
+``torch_tensorrt.compile`` exports it with an example of ``opt_shape`` (unless the ``Input`` carries its own
+``torch_tensor``), so the engine is tuned for ``opt_shape``. A program you exported yourself already has an example,
+and both ``torch_tensorrt.compile`` and ``torch_tensorrt.dynamo.compile`` tune the engine for the size of that
+example. A plain ``Input(min_shape, opt_shape, max_shape)`` does not change that, except that an example outside the
+``Input`` range is moved to the nearest bound of the range. When TensorRT gets part of the graph, Torch-TensorRT logs
+a warning if ``opt_shape`` differs from that size in a dynamic dimension of the export that no profile covers.
+
+To tune for another size, do one of these:
+
+- Export with an example of the size you want to tune for. This does not work for a size of 1, because
+  ``torch.export`` treats a size-1 example as a fixed size.
+- Pass the input as a single optimization profile. If other inputs have several profiles, give it the same number
+  of entries. The ``opt_shape`` of the profile is used:
+
+.. code-block:: python
+
+    layers = [torch.nn.Linear(64, 64), torch.nn.ReLU(), torch.nn.Linear(64, 64), torch.nn.ReLU(), torch.nn.Linear(64, 64)]
+    model = torch.nn.Sequential(*layers).eval().cuda()
+    rows = torch.export.Dim("rows", min=1, max=1024)
+    ep = torch.export.export(model, (torch.randn(512, 64).cuda(),), dynamic_shapes=({0: rows},))
+    inputs = [
+        torch_tensorrt.Input(
+            profiles=[{"min_shape": (1, 64), "opt_shape": (1, 64), "max_shape": (1024, 64)}],
+            dtype=torch.float32,
+        )
+    ]
+    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs)  # tuned for 1 row
+
+Two limits apply to the profile:
+
+- The export example must be inside the profile's ``min_shape`` and ``max_shape``. Otherwise a call with the
+  size of the example cannot run.
+- The profile applies only to dimensions that the export made dynamic, such as ``rows``. A dimension that
+  is exported only as an expression, such as ``2 * rows`` from a derived ``Dim``, follows ``rows``: its range is
+  the exported program's, narrowed by plain ``Input`` specs of ``rows`` or of that dimension, and its opt comes
+  from the example, unless another input with ``profiles`` has ``rows`` itself as a dimension.
+
+More than one entry in ``profiles`` gives each TensorRT engine several profiles. A call outside profile 0 must pick
+one with ``optimization_profile``, and a size that no profile covers cannot run. See
+:ref:`multi_optimization_profiles_tutorial`.
+
 Sharing a Dynamic Dimension Across Multiple Inputs
 ---------------------------------------------------
 

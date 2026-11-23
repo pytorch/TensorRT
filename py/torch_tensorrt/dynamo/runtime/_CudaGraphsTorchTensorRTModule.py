@@ -61,7 +61,14 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     ):
         super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
-        self.inputs = partitioning.construct_submodule_inputs(compiled_module)
+        # The warm-up calls use these inputs, which have to fit the Input specs the
+        # module was compiled with.
+        self.inputs = partitioning.construct_submodule_inputs(
+            compiled_module,
+            user_symbol_bounds=getattr(compiled_module, "meta", {}).get(
+                "_user_symbol_bounds"
+            ),
+        )
         self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []

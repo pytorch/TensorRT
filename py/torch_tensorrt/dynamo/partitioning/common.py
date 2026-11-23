@@ -164,6 +164,7 @@ def construct_dynamic_input(
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
     example_tensors: bool = True,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
 ) -> Input:
     """
     Constructs a torch_tensorrt.Input based on a symbolic input
@@ -177,6 +178,8 @@ def construct_dynamic_input(
             :func:`extract_var_range_info` to fill unbounded exporter uppers.
         example_tensors: Whether the Input carries a random example tensor (see
             :func:`construct_submodule_inputs`).
+        range_constraints: The exported program's, for the recorded range of a
+            computed size (see :func:`extract_var_range_info`).
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
     """
@@ -187,7 +190,9 @@ def construct_dynamic_input(
     for d, dim in enumerate(input_shape):
         if isinstance(dim, torch.SymInt):
             min_max_opt = extract_var_range_info(
-                dim, user_symbol_bounds=user_symbol_bounds
+                dim,
+                user_symbol_bounds=user_symbol_bounds,
+                range_constraints=range_constraints,
             )
             unwrapped_min_max_opt: Dict[str, int] = {}
             if "min" not in min_max_opt or min_max_opt["min"] is None:
@@ -200,9 +205,18 @@ def construct_dynamic_input(
                 unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
-                fallback_max = max(unwrapped_min_max_opt["min"], 1) * (2**12)
+                fallback_min = unwrapped_min_max_opt["min"]
+                expr = dim.node.expr
+                if not (expr.is_symbol or expr.is_number):
+                    # A computed size starts lower than the shape system says, but
+                    # keeps the maximum it got from the shape system's minimum, so
+                    # its engine profile does not shrink.
+                    env_min = dim.node.shape_env.bound_sympy(expr).lower
+                    if env_min.is_finite:
+                        fallback_min = 1 if int(env_min) == 2 else int(env_min)
+                fallback_max = max(fallback_min, 1) * (2**12)
                 logger.warning(
-                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: max(min({unwrapped_min_max_opt['min']}), 1) * 2^12 = {fallback_max}). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
+                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: {fallback_max} = 2^12 * {max(fallback_min, 1)}). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
                 unwrapped_min_max_opt["max"] = fallback_max
             else:
@@ -290,12 +304,13 @@ def get_input(
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
     example_tensors: bool = True,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
 ) -> Input:
     """
     Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs.
 
-    ``user_symbol_bounds`` and ``example_tensors`` are forwarded to
-    :func:`construct_dynamic_input`.
+    ``user_symbol_bounds``, ``example_tensors`` and ``range_constraints`` are
+    forwarded to :func:`construct_dynamic_input`.
     """
     if dtype in COMPLEX_TO_REAL_DTYPE:
         real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
@@ -318,6 +333,7 @@ def get_input(
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=example_tensors,
+            range_constraints=range_constraints,
         )
     else:
         return Input(
@@ -335,6 +351,7 @@ def construct_submodule_inputs(
     num_profiles: int = 0,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
     example_tensors: bool = True,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
 ) -> Sequence[Input]:
     """
     Construct torch_tensorrt Inputs based on the module inputs.
@@ -356,6 +373,7 @@ def construct_submodule_inputs(
             inputs of a part can take hundreds of GiB of host memory, so compile
             and refit pass False. Shape tensors keep their example either way
             (see :func:`_example_kwargs`).
+        range_constraints: The exported program's; forwarded to :func:`get_input`.
     Returns:
         Sequence of torch_tensorrt.Input's representing inputs to given module
     """
@@ -379,6 +397,7 @@ def construct_submodule_inputs(
                                 num_profiles=num_profiles,
                                 user_symbol_bounds=user_symbol_bounds,
                                 example_tensors=example_tensors,
+                                range_constraints=range_constraints,
                             )
                         )
                     elif isinstance(input_meta, torch.SymInt):
@@ -393,6 +412,7 @@ def construct_submodule_inputs(
                                 num_profiles=num_profiles,
                                 user_symbol_bounds=user_symbol_bounds,
                                 example_tensors=example_tensors,
+                                range_constraints=range_constraints,
                             )
                         )
                     elif isinstance(input_meta, torch.SymFloat):
@@ -406,6 +426,7 @@ def construct_submodule_inputs(
                                 is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
                                 user_symbol_bounds=user_symbol_bounds,
                                 example_tensors=example_tensors,
+                                range_constraints=range_constraints,
                             )
                         )
                     else:
@@ -423,6 +444,7 @@ def construct_submodule_inputs(
                             name=input.name,
                             user_symbol_bounds=user_symbol_bounds,
                             example_tensors=example_tensors,
+                            range_constraints=range_constraints,
                         )
                     )
                 else:
@@ -451,7 +473,7 @@ def build_profile_source_bounds(
     inherit the same profiles (by index) via symbolic substitution.
 
     Args:
-        module: Top-level (partitioned) GraphModule whose placeholders carry the
+        module: Top-level GraphModule whose placeholders carry the
             export symbolic shapes.
         top_level_inputs: Ordered top-level Inputs (arg inputs followed by kwarg
             inputs), aligned with the module placeholders.
