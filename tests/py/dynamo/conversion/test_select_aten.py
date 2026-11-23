@@ -4,6 +4,7 @@
 import operator
 import sys
 import unittest
+from unittest import mock
 
 import tensorrt as trt
 import torch
@@ -320,6 +321,19 @@ class TestSelectIndexForm(TestCase):
         self.assertEqual(
             tuple(gathers[0].get_input(1).shape), (1,) if one_element else ()
         )
+
+    def test_each_graph_keeps_its_own_decisions(self):
+        # One conversion context also converts the nodes of other graphs.
+        ctx = ConversionContext(None)
+        cases = ("concatenated_with_its_slices", "scattered_back")
+        selects = [_index_form_graph(case) for case in cases]
+        find = impl.select._selects_meeting_their_data
+        with mock.patch.object(
+            impl.select, "_selects_meeting_their_data", wraps=find
+        ) as spy:
+            for node in selects * 2:
+                self.assertTrue(impl.select._meets_its_data(ctx, node))
+        self.assertEqual(spy.call_count, len(cases))
 
 
 class WriteBack(nn.Module):
