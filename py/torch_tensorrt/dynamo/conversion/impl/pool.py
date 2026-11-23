@@ -77,9 +77,6 @@ def max_poolNd(
     dilation: Union[int, Sequence[int]] = 1,
     ceil_mode: bool = False,
 ) -> TRTTensor:
-    if has_dynamic_shape(input.shape):
-        assert input.shape[1] != -1, "Channel dim can't be dynamic for pooling."
-
     if dilation != 1:
         raise RuntimeError("dilation is not yet supported!")
 

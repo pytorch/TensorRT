@@ -352,6 +352,23 @@ class TestPoolConverter(DispatchTestCase):
             enable_passes=True,
         )
 
+    def test_max_pool2d_dynamic_channels(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.max_pool2d.default(x, (3, 3), (2, 2), (1, 1))
+
+        input_specs = [
+            Input(
+                min_shape=(1, 2, 8, 8),
+                opt_shape=(1, 3, 8, 8),
+                max_shape=(1, 5, 8, 8),
+                dtype=torch.float,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, use_dynamo_tracer=True
+        )
+
 
 if __name__ == "__main__":
     run_tests()
