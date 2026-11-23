@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import contextlib
 import gc
 import importlib
 import inspect
@@ -77,6 +78,7 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
     from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_for_save,
         offload_engines_to_disk,
     )
     from torch_tensorrt.dynamo.utils import get_torch_inputs
@@ -732,6 +734,7 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "use_cuda_graphs": None,
     "zero_copy_kv": False,
     "external_engine_data": None,
+    "engine_offload_dir": None,
 }
 
 
@@ -843,8 +846,8 @@ def save(
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
-                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
-                ``external_engine_data=`` are
+                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=``,
+                ``external_engine_data=`` and ``engine_offload_dir=`` are
                 only used with ``output_format="executorch"``; otherwise they are
                 ignored with a warning. A ``CompileSpec("target_device", ...)`` in
                 ``compile_specs=`` only labels the delegate's inputs and outputs; each
@@ -902,6 +905,18 @@ def save(
                 has a CUDA backend part needs its own directory and
                 ``external_engine_data="aoti_cuda_blob"`` instead. See
                 :func:`torch_tensorrt.executorch.export`.
+                ``engine_offload_dir=`` (default ``None``, Linux only) takes a folder (``~`` is
+                expanded), created if missing but not its parents. Each TensorRT engine is written to a file in a
+                private ``torch_tensorrt_engines_*`` directory inside it and streamed into the
+                program from there. Each engine still passes through host memory once while it
+                is written to its file, but the save no longer keeps a copy of every engine.
+                The folder needs room for every engine at once and should be on a disk. Who can
+                write to it is not checked: anyone who can write there can replace an engine
+                file before the save copies it, even with a link to another file you can read,
+                so use a folder only you can write to. The
+                private directory is removed when the save returns or raises, and the folder and
+                its other files stay; a process killed during the save can leave the directory
+                behind. With ``None``, each engine is copied in memory.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -946,6 +961,7 @@ def save(
     ]
     executorch_zero_copy_kv = executorch_options["zero_copy_kv"]
     executorch_external_engine_data = executorch_options["external_engine_data"]
+    executorch_engine_offload_dir = executorch_options["engine_offload_dir"]
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -1161,6 +1177,11 @@ def save(
             "zero_copy_kv= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_engine_offload_dir is not None and output_format != "executorch":
+        logger.warning(
+            "engine_offload_dir= is only used with output_format='executorch' and "
+            f"will be ignored for output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -1259,6 +1280,7 @@ def save(
                     use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
                     external_engine_data=executorch_external_engine_data,
+                    engine_offload_dir=executorch_engine_offload_dir,
                 )
             else:
                 raise RuntimeError(
@@ -1388,6 +1410,7 @@ def save(
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
                         external_engine_data=executorch_external_engine_data,
+                        engine_offload_dir=executorch_engine_offload_dir,
                     )
                 else:
                     raise RuntimeError(
@@ -1518,6 +1541,7 @@ def save(
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
                         external_engine_data=executorch_external_engine_data,
+                        engine_offload_dir=executorch_engine_offload_dir,
                     )
                 else:
                     raise RuntimeError(
@@ -1535,6 +1559,7 @@ def compile_and_save(
     arg_inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     save_options: Optional[Dict[str, Any]] = None,
+    engine_offload_dir: Optional[Union[str, os.PathLike[str]]] = None,
     **kwargs: Any,
 ) -> None:
     """Compile an ExportedProgram with TensorRT and save it, keeping each engine on disk instead of in
@@ -1555,10 +1580,10 @@ def compile_and_save(
     The other formats save each engine from a loaded one, so their engines are loaded once all of them
     are built, and their save needs as much memory as after ``compile``.
 
-    The files go to Torch-TensorRT's cache directory, ``torch_tensorrt_<user>/offloaded_engines`` in the
-    system temporary directory (``TMPDIR``), and are deleted when the call returns. It needs room for
-    every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take the memory this
-    saves. Linux only, since Windows can't delete a file while it is memory-mapped.
+    The files go to a private directory, made in ``engine_offload_dir`` or by default in the system
+    temporary directory (``TMPDIR``). Only that directory is removed, when the call returns or raises. It
+    needs room for every engine at once, and must be on a disk: on a RAM-backed ``tmpfs`` the files take
+    the memory this saves. Linux only, since Windows can't delete a file while it is memory-mapped.
 
     Arguments:
         exported_program (torch.export.ExportedProgram): The program to compile
@@ -1572,6 +1597,13 @@ def compile_and_save(
         kwarg_inputs (dict[str, Any]): The program's keyword inputs, passed on like ``arg_inputs``
         save_options (dict[str, Any]): Keyword arguments for :func:`torch_tensorrt.save`, such as
             ``external_engine_data`` or ``retrace``
+        engine_offload_dir (Union[str, os.PathLike]): The folder for the engine files (``~`` is expanded),
+            created if missing, but not its parents, and checked before the first build. The files go to
+            a private ``torch_tensorrt_engines_*`` directory inside it, removed when the call returns or
+            raises; a process killed during the call can leave it behind. The folder and anything else
+            in it stay. Who can write to it is not checked: anyone who can write there can replace an
+            engine file before the program copies it, even with a link to another file you can read,
+            so use a folder only you can write to.
         **kwargs: Compilation settings for :func:`torch_tensorrt.dynamo.compile`
     """
     if output_format not in ("exported_program", "aot_inductor", "executorch"):
@@ -1584,12 +1616,20 @@ def compile_and_save(
             "use torch_tensorrt.dynamo.compile and torch_tensorrt.save instead."
         )
     save_kwargs = dict(save_options or {})
+    # The engines are in files from their builds on, so a folder given for the save is the folder for
+    # the whole call. Left in save_options, the save would open a second block that hides the first.
+    save_folder = save_kwargs.pop("engine_offload_dir", None)
+    if save_folder is not None and engine_offload_dir is not None:
+        raise ValueError(
+            "Pass engine_offload_dir to compile_and_save or in save_options, not both."
+        )
+    folder = engine_offload_dir or save_folder
     if output_format != "executorch":
         # These saves re-export the compiled module, so they need its inputs too.
         save_kwargs.setdefault("arg_inputs", arg_inputs)
         save_kwargs.setdefault("kwarg_inputs", kwarg_inputs)
 
-    with offload_engines_to_disk():
+    with offload_engines_to_disk(folder):
         trt_gm = dynamo_compile(
             exported_program, arg_inputs=arg_inputs, kwarg_inputs=kwarg_inputs, **kwargs
         )
@@ -1686,10 +1726,27 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
-    try:
-        _lower_and_write_executorch(exp_program, file_path, **kwargs)
-    finally:
-        _release_lowering_caches(exp_program)
+    engine_offload_dir = kwargs.pop("engine_offload_dir", None)
+    # With a folder, each engine goes to a file there and is streamed into the program, so the
+    # save does not keep a copy of every engine. The program must be written before the block
+    # ends, since the files are deleted then.
+    if engine_offload_dir and platform.system() == "Windows":
+        logger.warning(
+            "engine_offload_dir= is ignored on Windows, which can't delete a mapped "
+            "file; each engine is copied in memory."
+        )
+        engine_offload_dir = None
+    keep_engines_in_files = (
+        offload_engines_for_save(engine_offload_dir)
+        if engine_offload_dir
+        else contextlib.nullcontext()
+    )
+    with keep_engines_in_files:
+        # Inside the block, so the engines' mappings are dropped before their files are removed.
+        try:
+            _lower_and_write_executorch(exp_program, file_path, **kwargs)
+        finally:
+            _release_lowering_caches(exp_program)
 
 
 def _lower_and_write_executorch(
