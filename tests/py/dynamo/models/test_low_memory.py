@@ -3,6 +3,7 @@
 
 import inspect
 import logging
+import mmap
 import os
 
 import pytest
@@ -11,6 +12,7 @@ import torch_tensorrt
 from safetensors.torch import save_file
 from torch_tensorrt.dynamo import _low_memory, low_memory
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion import _conversion
 from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
 from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
@@ -222,6 +224,54 @@ def test_compile_with_the_block_settings(tmp_path, monkeypatch):
     exported = torch.export.export(plain, (x,))
     torch_tensorrt.dynamo.compile(exported, inputs=[x.cuda()], min_block_size=1)
     assert plain.proj.weight.untyped_storage().nbytes() > 0
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_mapped_weights_are_dropped_before_the_engine_is_serialized(
+    tmp_path, monkeypatch
+):
+    class _Wide(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            # Larger than a page: pages of a smaller weight are never dropped.
+            self.proj = torch.nn.Linear(1024, 1024)
+
+        def forward(self, x):
+            return self.proj(x)
+
+    save_weights_for_mapping(_Wide().eval(), tmp_path / "w.safetensors")
+    released, dropped_at_serialize = [], []
+    real = torch_tensorrt.dynamo._weight_release.release_mapped_storage
+
+    def spy(storage):
+        released.append(real(storage))
+        return released[-1]
+
+    serialize = _conversion.trt.ICudaEngine.serialize
+
+    def record_serialize(engine):
+        dropped_at_serialize.append(list(released))
+        return serialize(engine)
+
+    monkeypatch.setattr(
+        torch_tensorrt.dynamo._weight_release, "release_mapped_storage", spy
+    )
+    monkeypatch.setattr(_conversion.trt.ICudaEngine, "serialize", record_serialize)
+    x = torch.randn(3, 1024)
+    with low_memory(_Wide, tmp_path / "w.safetensors") as low_mem:
+        exported = torch.export.export(low_mem.model.eval(), (x,))
+        torch_tensorrt.compile(
+            exported,
+            ir="dynamo",
+            inputs=[x.cuda()],
+            min_block_size=1,
+            **low_mem.compile_settings,
+        )
+    (dropped,) = dropped_at_serialize
+    assert dropped and None not in dropped
+    if hasattr(mmap, "MADV_DONTNEED"):  # Windows can't drop pages
+        assert sum(dropped) > 0
 
 
 @pytest.mark.unit
