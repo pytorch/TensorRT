@@ -10,6 +10,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
+from torch.fx.passes.splitter_base import Subgraph
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.utils._pytree import tree_flatten
 from torch_tensorrt._utils import trt_rtx_targets_turing
@@ -27,6 +28,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
 from torch_tensorrt.dynamo.partitioning.common import (
     get_node_module_types,
     node_in_torch_executed_module,
+    recompute_input_only_nodes,
 )
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
@@ -154,6 +156,19 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
             del partitions[id]
 
         return [partitions[k] for k in sorted(partitions.keys())]
+
+    def fuse_partitions(
+        self, partitions: List[Partition], prefix: str = "fused_"
+    ) -> GraphModule:
+        """Fuse the partitions once each has recomputed the input-only values it reads, as the adjacency
+        partitioner's subgraphs do (`recompute_input_only_nodes`)."""
+        subgraphs = recompute_input_only_nodes(
+            self.graph_module,
+            [Subgraph(is_acc=True, nodes=list(p.nodes)) for p in partitions],
+        )
+        return super().fuse_partitions(
+            [Partition(id=i, nodes=s.nodes) for i, s in enumerate(subgraphs)], prefix
+        )
 
     def partition_and_fuse(self) -> GraphModule:
         partitions = self.propose_partitions()

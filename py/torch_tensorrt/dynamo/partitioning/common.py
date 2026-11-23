@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -18,6 +19,7 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+from torch.fx.passes.splitter_base import Subgraph
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
@@ -36,6 +38,15 @@ logger = logging.getLogger(__name__)
 # Built at the top level from ``Input.profiles`` and the export symbols, then
 # propagated to submodule inputs by substituting into their SymInt expressions.
 ProfileSourceBounds = List[Dict[str, Dict[str, int]]]
+
+# Ops that communicate with the other ranks are never recomputed: a copy in each engine that reads one would
+# make a rank's number of collectives depend on how its graph was split. PyTorch's own check,
+# `torch._functorch.partitioners.is_not_collective`, knows only the `_c10d_functional` namespace.
+COLLECTIVE_OP_PREFIXES = (
+    "_c10d_functional.",
+    "c10d_functional.",
+    "tensorrt.fused_nccl_",
+)
 
 
 def _build_submodule_profiles(
@@ -579,3 +590,153 @@ def get_graph_converter_support_overview(
     op_support.print_support_overview(print_node_support=True)
 
     return number_of_supported_nodes, total_functional_nodes, op_support
+
+
+def recompute_input_only_nodes(
+    module: torch.fx.GraphModule, subgraphs: List[Subgraph]
+) -> List[Subgraph]:
+    """Recompute, in each TensorRT subgraph, the weightless values it reads that depend only on graph inputs.
+
+    A model computes the values that depend only on its inputs (an attention mask, rotary cos/sin) before
+    its first layer, so they land in the first TensorRT engine and reach every later one as inputs,
+    whatever split made it: an operator that runs in PyTorch (the adjacency and global partitioners) or
+    the size of an engine (the resource partitioner). Each later TensorRT subgraph that reads such a value
+    gets its own copy of the chain that computes it instead. That removes the engine input, which can be
+    large (a 4096-token float mask is 64 MiB, read by every layer), and keeps TensorRT's fused attention
+    on sm_110 (11.0 to 11.4) building: a layer fed both the mask and cos/sin as inputs needs 0x39174 bytes
+    of shared memory, 0x38c00 max.
+
+    This is the rematerialization AOTAutograd's min-cut partitioner does between the forward and backward
+    graphs [1], at each engine boundary:
+
+    - Where a chain starts. The min-cut cuts between the graph inputs and the values a boundary needs where
+      the fewest bytes cross [2]. Here the cut is at the nodes that read a graph input, which cross as
+      they are: that keeps each input a single reader, as GPU-resident ExecuTorch programs
+      (`skip_h2d_for_method_inputs`) require, and what they make (padding views, position sums) is the
+      small data a mask or cos/sin is expanded from.
+    - What a chain may contain. As in `should_ban_recomputation` [3], no op that is impure (random, in
+      place, an assert) or a collective; also no op that runs in PyTorch, since TensorRT couldn't build
+      its copy, and no weight. A weight is told by where it comes from, not its size: a parameter, or a
+      constant that constant folding built from one (`w.T`, `w.to(dtype)`). Any other constant is copied
+      into each engine that recomputes from it: a buffer (rotary's `inv_freq`), a tensor constant, or a
+      value constant folding built without reading a parameter (an attention mask's causal part). One of
+      those that is large (an old GPT-2-style max_positions^2 causal buffer) is copied all the same.
+    - What a chain costs. As in the min-cut, recomputing a weightless chain is taken to be cheap. PyTorch's
+      op classes [4] don't describe these graphs: lowering keeps `aten.matmul`, which isn't among the
+      compute-intensive ops (`mm`, `bmm`, ...), and the recomputable allowlist leaves out `matmul` and
+      `cat`, which Hugging Face rotary embeddings build cos/sin with.
+
+    A value passed in as a graph input (a mask the caller builds) still arrives as one.
+
+    [1] https://dev-discuss.pytorch.org/t/min-cut-optimal-recomputation-i-e-activation-checkpointing-with-aotautograd/467
+    [2] https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2491
+    [3] https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2585
+    [4] https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L3224
+
+    Args:
+        module: The graph the subgraphs' nodes are in; the copies are inserted into it.
+        subgraphs: Its TensorRT (`is_acc`) and PyTorch subgraphs, best in graph order: from the last one
+            back, every chain is then copied from original nodes.
+
+    Returns:
+        The subgraphs with the copies in them, without those left empty.
+    """
+    from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+        FOLDED_WITHOUT_PARAMETERS_META,
+    )
+
+    graph = module.graph
+    on_trt = {n for s in subgraphs if s.is_acc for n in s.nodes}
+    # Whether each node is weightless, built by TensorRT, and computed from the graph inputs alone. One
+    # pass in graph order, which puts a node's inputs before it: chains can be thousands of nodes deep,
+    # too deep to walk recursively.
+    input_only: Dict[torch.fx.Node, bool] = {}
+    for node in graph.nodes:
+        if node.op == "placeholder":
+            input_only[node] = True
+        elif node.op == "get_attr":
+            constant = operator.attrgetter(str(node.target))(module)
+            input_only[node] = isinstance(constant, torch.Tensor) and (
+                not isinstance(constant, torch.nn.Parameter)
+                or bool(node.meta.get(FOLDED_WITHOUT_PARAMETERS_META))
+            )
+        else:
+            input_only[node] = (
+                node in on_trt
+                and node.op == "call_function"
+                and not node.is_impure()  # random, in place, or an assert
+                and not str(node.target).startswith(COLLECTIVE_OP_PREFIXES)
+                and all(input_only[i] for i in node._input_nodes)
+            )
+
+    def reads_graph_input(node: torch.fx.Node) -> bool:
+        """Whether the node reads a graph input, so later subgraphs are passed its value rather than
+        recomputing it: each input keeps a single reader."""
+        # A getitem goes with its producer: copied alone, it would make the producer's engine
+        # output a tuple.
+        producer = node.args[0] if node.target is operator.getitem else None
+        reads = (
+            producer._input_nodes
+            if isinstance(producer, torch.fx.Node)
+            else node._input_nodes
+        )
+        return any(i.op == "placeholder" for i in reads)
+
+    where = {n: i for i, s in enumerate(subgraphs) for n in s.nodes}
+    order = {
+        n: k for k, n in enumerate(graph.nodes)
+    }  # subgraph lists aren't in graph order
+    values: List[torch.fx.Node] = []
+    copied: List[torch.fx.Node] = []
+    for j in reversed(range(len(subgraphs))):
+        subgraph = subgraphs[j]
+        if not subgraph.is_acc:  # PyTorch reads the values as they are
+            continue
+        copies: Dict[torch.fx.Node, torch.fx.Node] = {}
+
+        def needs_copy(node: torch.fx.Node) -> bool:
+            """Whether subgraph j needs its own copy of the node rather than reading the node itself: a
+            node of another subgraph that doesn't read a graph input. That includes a constant in another
+            global partition, which `fuse_as_graphmodule` would make an engine input; a constant in no
+            subgraph is copied into each submodule that reads it by the split itself."""
+            return where.get(node, j) != j and not reads_graph_input(node)
+
+        def copy_chain(node: torch.fx.Node, before: torch.fx.Node) -> torch.fx.Node:
+            """Copy the chain that computes `node` into subgraph j, ahead of `before`."""
+            chain, stack = set(), [node]
+            while stack:  # not recursive, for the same reason as `input_only`
+                n = stack.pop()
+                if n not in chain and n not in copies and needs_copy(n):
+                    chain.add(n)
+                    stack.extend(n._input_nodes)
+            chain_in_order = sorted(chain, key=order.__getitem__)
+            for n in chain_in_order:
+                with graph.inserting_before(before):
+                    copies[n] = graph.node_copy(n, lambda i: copies.get(i, i))
+                # Input-only like its original, so the cleanup erases it if left unread.
+                input_only[copies[n]] = True
+            position = subgraph.nodes.index(before)
+            subgraph.nodes[position:position] = [copies[n] for n in chain_in_order]
+            copied.extend(chain_in_order)
+            return copies.get(node, node)
+
+        for user in sorted(subgraph.nodes, key=order.__getitem__):
+            for node in list(user._input_nodes):
+                if input_only[node] and needs_copy(node):
+                    user.replace_input_with(node, copy_chain(node, user))
+                    values.append(node)
+    for subgraph in subgraphs:  # the originals and copies nothing reads any more
+        for node in reversed(list(subgraph.nodes)):
+            if (
+                not node.users
+                and node.op in ("call_function", "get_attr")
+                and input_only.get(node)
+            ):
+                subgraph.nodes.remove(node)
+                graph.erase_node(node)
+    if values:
+        logger.info(
+            f"Recomputed {len(set(values))} input-only values, {len(copied)} nodes in all, in the "
+            "TensorRT subgraphs that read them instead of passing them between engines."
+        )
+    return [s for s in subgraphs if s.nodes]

@@ -34,6 +34,7 @@ from torch_tensorrt.dynamo.partitioning._global_partitioner import (
 from torch_tensorrt.dynamo.partitioning.common import (
     get_node_module_types,
     node_in_torch_executed_module,
+    recompute_input_only_nodes,
 )
 from torch_tensorrt.dynamo.utils import to_torch_device
 
@@ -416,6 +417,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         # Remove segments smaller than the block size (with exceptions)
         subgraphs = self.remove_small_acc_subgraphs(subgraphs)
+        subgraphs = recompute_input_only_nodes(self.module, subgraphs)
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
