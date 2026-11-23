@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import unittest
+from contextlib import nullcontext
 
 import torch
 import torch_tensorrt
@@ -105,6 +106,46 @@ class TestSafeMode(TestCase):
             DECIMALS_OF_AGREEMENT,
             msg=f"Safe Mode C++ TRT outputs don't match with the original model.",
         )
+        torch._dynamo.reset()
+
+    def test_safe_mode_runs_on_the_engine_device(self):
+        """An engine built on cuda:0 and called while cuda:1 is current must still
+        run on cuda:0, and must leave the caller's current device alone."""
+        model = (
+            torch.nn.Sequential(
+                torch.nn.Linear(256, 256), torch.nn.GELU(), torch.nn.Linear(256, 256)
+            )
+            .eval()
+            .to("cuda:0")
+        )
+        x = torch.randn(8, 256, device="cuda:0")
+        with torch.cuda.device(0):
+            trt_model = torch_tensorrt.compile(
+                model, ir="dynamo", inputs=[x], min_block_size=1
+            )
+            with torch.no_grad():
+                ref = model(x)
+
+        for cudagraphs in (False, True):
+            with self.subTest(cudagraphs=cudagraphs):
+                with torch_tensorrt.runtime.set_multi_device_safe_mode(True):
+                    with (
+                        torch_tensorrt.runtime.enable_cudagraphs(trt_model)
+                        if cudagraphs
+                        else nullcontext(trt_model)
+                    ) as runner:
+                        torch.cuda.reset_peak_memory_stats(1)
+                        allocated_on_caller = torch.cuda.memory_allocated(1)
+                        with torch.cuda.device(1):
+                            out = runner(x)
+                            self.assertEqual(torch.cuda.current_device(), 1)
+                if not cudagraphs:
+                    # Nothing of this call belongs on the caller's GPU, inputs included.
+                    self.assertEqual(
+                        torch.cuda.max_memory_allocated(1), allocated_on_caller
+                    )
+                self.assertEqual(out.device, torch.device("cuda:0"))
+                torch.testing.assert_close(out, ref, rtol=1e-2, atol=1e-2)
         torch._dynamo.reset()
 
 

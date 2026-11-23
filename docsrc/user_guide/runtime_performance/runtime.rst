@@ -58,7 +58,8 @@ doubles as a context manager.
 TensorRT requires that each engine be associated with the CUDA context in the active thread from which it is invoked.
 Therefore, if the device were to change in the active thread, which may be the case when invoking
 engines on multiple GPUs from the same Python process, safe mode will cause Torch-TensorRT to display
-an alert and switch GPUs accordingly. If safe mode is not enabled, there could be a mismatch in the engine
+an alert and run the engine on the GPU it was loaded on. Inputs are moved to that GPU, outputs are returned
+on it, and the caller's current device is restored after the call. If safe mode is not enabled, there could be a mismatch in the engine
 device and CUDA context device, which could lead the program to crash.
 
 One technique for managing multiple TRT engines on different GPUs while not sacrificing performance for

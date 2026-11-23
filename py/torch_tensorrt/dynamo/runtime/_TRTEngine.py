@@ -65,7 +65,6 @@ from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._runtime_config import RuntimeSettings, TRTRuntimeConfig
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
-    _select_rt_device,
     multi_gpu_device_check,
 )
 
@@ -1571,6 +1570,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             self.setup_nccl_comm()
             logger.info(f"NCCL setup complete, comm={self._nccl_comm}")
 
+        engine_device_guard: ContextManager[Any] = nullcontext()
         if torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE:
             curr_device_id = torch.cuda.current_device()
             curr_device_properties = torch.cuda.get_device_properties(curr_device_id)
@@ -1580,29 +1580,28 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 curr_device_properties,
                 self.target_device_properties,
             ):
-                device_id, _ = _select_rt_device(
-                    curr_device_id,
-                    self.target_device_id,
-                    self.target_device_properties,
-                )
-                device = torch.device(device_id)
-                torch.cuda.set_device(device_id)
-                contiguous_inputs = [tensor.to(device) for tensor in contiguous_inputs]
-                logger.warning(f"Moved all input Tensors to cuda:{device_id}")
+                # The engine and its execution context live on the target device, so run
+                # there for this call only and leave the caller's current device alone.
+                engine_device_guard = torch.cuda.device(self.target_device_id)
+                contiguous_inputs = [
+                    tensor.to(self._target_device) for tensor in contiguous_inputs
+                ]
+                logger.warning(f"Moved all input Tensors to {self._target_device}")
 
-        if self.requires_output_allocator or self.use_output_allocator_outputs:
-            logger.debug("Using the dynamic allocator runtime mode.")
-            return self._execute_output_allocator(contiguous_inputs)
+        with engine_device_guard:
+            if self.requires_output_allocator or self.use_output_allocator_outputs:
+                logger.debug("Using the dynamic allocator runtime mode.")
+                return self._execute_output_allocator(contiguous_inputs)
 
-        effective_cudagraphs = (
-            torch_tensorrt.runtime.get_cudagraphs_mode()
-            and not self._rtx_native_cudagraphs
-        )
-        logger.debug(
-            f"Using the standard execution runtime mode with cudagraphs={effective_cudagraphs}"
-            + (" (RTX native)" if self._rtx_native_cudagraphs else "")
-        )
-        return self._execute_standard(contiguous_inputs)
+            effective_cudagraphs = (
+                torch_tensorrt.runtime.get_cudagraphs_mode()
+                and not self._rtx_native_cudagraphs
+            )
+            logger.debug(
+                f"Using the standard execution runtime mode with cudagraphs={effective_cudagraphs}"
+                + (" (RTX native)" if self._rtx_native_cudagraphs else "")
+            )
+            return self._execute_standard(contiguous_inputs)
 
 
 register_opaque_type(EngineSerializer, typ="reference")
