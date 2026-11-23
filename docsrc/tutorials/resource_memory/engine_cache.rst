@@ -141,20 +141,38 @@ these compilation results so that kernels and execution graphs are not recompile
 on subsequent runs. This is analogous to the timing cache but operates at inference
 time rather than build time.
 
-The runtime cache is automatically created when using TensorRT-RTX and can be
-persisted to disk via ``runtime_cache_path``:
+The runtime cache is a runtime setting rather than a compilation setting, so it is
+not passed to ``compile()``. It is created automatically when using TensorRT-RTX and
+can be persisted to disk by setting ``runtime_cache`` on
+:class:`~torch_tensorrt.runtime.RuntimeSettings` and applying it with
+:func:`~torch_tensorrt.runtime.apply_runtime_settings`, or for a scoped, shareable
+cache by using the :func:`~torch_tensorrt.runtime.runtime_cache` context manager:
 
 .. code-block:: python
+
+    from torch_tensorrt.runtime import (
+        RuntimeSettings,
+        apply_runtime_settings,
+        runtime_cache,
+    )
 
     trt_gm = torch_tensorrt.dynamo.compile(
         exported_program,
         arg_inputs=inputs,
-        runtime_cache_path="/data/trt_cache/runtime_cache.bin",
-        use_python_runtime=True,
     )
 
-The default path is
-``/tmp/torch_tensorrt_engine_cache/runtime_cache.bin``.
+    apply_runtime_settings(
+        trt_gm, RuntimeSettings(runtime_cache="/data/trt_cache/runtime_cache.bin")
+    )
+
+    # or, scoped to a with-block (loaded on enter, saved on exit):
+    with runtime_cache(trt_gm, "/data/trt_cache/runtime_cache.bin"):
+        out = trt_gm(*inputs)
+
+The default path is a per-user temporary file,
+``<tempdir>/torch_tensorrt_<user>/runtime_cache.bin``
+(``torch_tensorrt.dynamo._defaults.RUNTIME_CACHE_PATH``). See
+:doc:`/user_guide/runtime_performance/runtime_settings` for the full API.
 
 The cache is saved to disk when the module is destroyed (garbage collected) and
 loaded on subsequent compilations with the same path. File locking is used to
