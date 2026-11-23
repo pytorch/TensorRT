@@ -426,12 +426,13 @@ Graph Partitioning
        (TensorRT's limit) as reshapes and permutes of at most 8 dimensions that give
        the same values. Window and patch layouts, such as neighborhood attention and
        the Qwen2-VL image patches, build such chains. It also rewrites an unsqueeze,
-       expand, reshape chain over more than 8 dimensions whose expand grows only the
-       new dimension, as in the Qwen2-VL image patches of newer transformers
-       releases, as a reshape and an expand on 3 dimensions. Left in PyTorch, each
-       one splits the graph, and the partitioner can then hand many large tensors
-       across one engine boundary. Only static shapes are rewritten. Fewer, larger engines can
-       need much more time and memory to build and to run, so measure it.
+       expand, reshape chain over more than 8 dimensions into a reshape and an expand
+       on 3 dimensions, when the expand grows only the new dimension. Newer
+       transformers releases build the Qwen2-VL image patches this way. Left in
+       PyTorch, each one splits the graph, and the partitioner can then hand many
+       large tensors across one engine boundary. Only static shapes are rewritten.
+       Fewer, larger engines can need much more time and memory to build and to run,
+       so measure it.
    * - ``convert_antialiased_resize``
      - ``False``
      - Run antialiased bilinear and bicubic resize (``F.interpolate`` with

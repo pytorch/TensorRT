@@ -27,7 +27,7 @@ Step = Tuple[List[int], List[int]]
 def collapse_high_rank_permutes(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
-    """Run a reshape, permute, reshape chain over more than 8 dims on at most 8.
+    """Run reshape, permute or unsqueeze, expand chains past 8 dims on at most 8.
 
     Window and patch layouts (neighborhood attention, the Qwen2-VL image patches)
     reshape a tensor to more than 8 dimensions, permute it, and reshape it back.
@@ -102,7 +102,10 @@ def _static_sizes(node: torch.fx.Node) -> Optional[List[int]]:
 
 
 def _reshaped_clones(node: torch.fx.Node) -> Optional[List[torch.fx.Node]]:
-    """The clones of ``node`` if only reshapes read ``node`` and them, else None."""
+    """The clones of ``node``.
+
+    None if anything besides these clones and reshapes reads ``node`` or a clone.
+    """
     clones = [user for user in node.users if user.target == aten.clone.default]
     for n in [node, *clones]:
         if any(u not in clones and u.target not in _RESHAPES for u in n.users):
@@ -202,7 +205,7 @@ def _rewrite_repeat(
     reshape.meta.update(unsqueeze.meta)
     expand.args = (reshape, [outer, out[dim], inner])
     _set_vals([reshape, expand, *clones], unsqueeze.meta["val"])
-    # A repeat before this one checks that only reshapes read it.
+    # Erase it now, so a repeat or permute before it sees only reshapes reading it.
     gm.graph.erase_node(unsqueeze)
     return True
 
