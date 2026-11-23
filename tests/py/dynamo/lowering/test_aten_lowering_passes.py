@@ -1262,7 +1262,11 @@ class TestCollapseHighRankPermutes(TestCase):
                 compiled = torch.compile(
                     mod,
                     backend="torch_tensorrt",
-                    options={"collapse_high_rank_permutes": True, "min_block_size": 1},
+                    options={
+                        "collapse_high_rank_permutes": True,
+                        "min_block_size": 1,
+                        "pass_through_build_failures": True,
+                    },
                 )
                 with self.assertLogs(logger, level="DEBUG") as logs, torch.no_grad():
                     torch.testing.assert_close(compiled(x), mod(x))
