@@ -257,11 +257,12 @@ def test_build_user_symbol_bounds_accepts_01_specialization(caplog):
 
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+    with caplog.at_level(logging.DEBUG, logger="torch_tensorrt.dynamo._compiler"):
         bounds, _ = _build_user_symbol_bounds(
             ep.module(), [input_min1], {}, ep.graph_signature
         )
 
+    assert any("0/1 specialization" in r.message for r in caplog.records)
     msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
     assert not msgs, msgs
     _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
