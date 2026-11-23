@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     args_bounds_check,
     enforce_tensor_types,
+    extend_attr_to_tuple,
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
@@ -4165,6 +4166,16 @@ def aten_ops_cdist_forward(
     )
 
 
+_POOL_SPATIAL_RANK = {
+    torch.ops.aten.avg_pool1d.default: 1,
+    torch.ops.aten.avg_pool2d.default: 2,
+    torch.ops.aten.avg_pool3d.default: 3,
+    torch.ops.aten.max_pool1d.default: 1,
+    torch.ops.aten.max_pool2d.default: 2,
+    torch.ops.aten.max_pool3d.default: 3,
+}
+
+
 def avg_pool_param_validator(
     pool_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -4215,7 +4226,7 @@ def aten_ops_avg_pool(
         source_ir=SourceIR.ATEN,
         name=name,
         input=args[0],
-        kernel_size=args[1],
+        kernel_size=extend_attr_to_tuple(args[1], _POOL_SPATIAL_RANK[target]),
         stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         ceil_mode=args_bounds_check(args, 4, replacement=False),
@@ -4472,7 +4483,7 @@ def aten_ops_max_pool(
         source_ir=SourceIR.ATEN,
         name=name,
         input=args[0],
-        kernel_size=args[1],
+        kernel_size=extend_attr_to_tuple(args[1], _POOL_SPATIAL_RANK[target]),
         stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         dilation=args_bounds_check(args, 4, replacement=1),

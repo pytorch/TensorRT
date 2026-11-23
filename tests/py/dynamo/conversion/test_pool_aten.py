@@ -352,6 +352,29 @@ class TestPoolConverter(DispatchTestCase):
             enable_passes=True,
         )
 
+    # PyTorch uses a kernel size of one element for every pooled dimension.
+    @parameterized.expand(
+        [
+            (
+                "avg2d",
+                lambda x: torch.ops.aten.avg_pool2d.default(x, (3,), (2,), (1,)),
+                (1, 3, 8, 8),
+            ),
+            (
+                "max3d",
+                lambda x: torch.ops.aten.max_pool3d.default(x, (3,), (2,), (1,)),
+                (1, 2, 8, 8, 8),
+            ),
+        ]
+    )
+    def test_pool_one_kernel_size(self, _, pool, shape):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return pool(x)
+
+        inputs = [torch.randn(*shape)]
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
+
     def test_max_pool2d_dynamic_channels(self):
         class TestModule(torch.nn.Module):
             def forward(self, x):
