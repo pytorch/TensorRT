@@ -972,7 +972,8 @@ cudaError_t copy_to_row_major(void* dst, const exec_aten::Tensor& src, cudaStrea
   return cudaSuccess;
 }
 
-// What execute() needs to know about a buffer, from one cuPointerGetAttributes per buffer.
+// What execute() needs to know about a buffer, from one cuPointerGetAttributes per buffer, or two for a buffer on
+// another GPU asked from a thread with no current context.
 struct BufferPlacement {
   // Device or managed memory.
   bool cuda_accessible = false;
@@ -981,8 +982,10 @@ struct BufferPlacement {
 };
 
 // Asks the driver for only these 4 attributes, which costs less than a cudaPointerGetAttributes and gives the same
-// answers. Plain host memory is not an error here: it reads as memory type 0.
-BufferPlacement placement_of(const void* ptr, int engine_device) {
+// answers, except on a thread with no current context: there a peer-mapped buffer on another GPU gets an address from
+// the engine's context and is accepted, where cudaPointerGetAttributes gives none. Plain host memory is not an error
+// here: it reads as memory type 0.
+BufferPlacement placement_of(const void* ptr, int engine_device, CUcontext engine_context) {
   static const auto get_attributes =
       driver_entry_point<PFN_cuPointerGetAttributes_v7000>("cuPointerGetAttributes", 7000);
   BufferPlacement placement;
@@ -1009,7 +1012,22 @@ BufferPlacement placement_of(const void* ptr, int engine_device) {
   // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
   // once it is. Managed memory is never refused.
   if (type == CU_MEMORYTYPE_DEVICE && managed == 0 && device != engine_device && device_pointer == 0) {
-    placement.foreign_device = device;
+    // The driver gives no address while no context is current, as on a thread that has made no CUDA call yet. So
+    // that case asks again from the engine's context, which is where a mapping to the other card is enabled.
+    static const auto get_current = driver_entry_point<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+    CUcontext current = nullptr;
+    if (engine_context != nullptr && get_current != nullptr && get_current(&current) == CUDA_SUCCESS &&
+        current == nullptr) {
+      ContextScope scope(engine_context, true);
+      CUpointer_attribute attribute = CU_POINTER_ATTRIBUTE_DEVICE_POINTER;
+      void* value = &device_pointer;
+      if (!scope.ok() || get_attributes(1, &attribute, &value, reinterpret_cast<CUdeviceptr>(ptr)) != CUDA_SUCCESS) {
+        device_pointer = 0;
+      }
+    }
+    if (device_pointer == 0) {
+      placement.foreign_device = device;
+    }
   }
   return placement;
 }
@@ -2260,7 +2278,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
-    input_placements[i] = placement_of(et_in.const_data_ptr(), engine->device_id);
+    input_placements[i] = placement_of(et_in.const_data_ptr(), engine->device_id, engine->context);
     const int input_device = input_placements[i].foreign_device;
     if (input_device >= 0) {
       ET_LOG(
@@ -2590,7 +2608,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       // The ordinary output path asks this and the aliased one did not, so a buffer on a card
       // this engine cannot reach was copied into rather than refused.
-      const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;
+      const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;
       if (foreign_alias_device >= 0) {
         ET_LOG(
             Error,
@@ -2623,7 +2641,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidProgram;
     }
     // Asked separately, because an output address comes from the caller rather than the engine.
-    const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id);
+    const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id, engine->context);
     const int output_device = output_placement.foreign_device;
     if (output_device >= 0) {
       ET_LOG(

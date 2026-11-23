@@ -1089,7 +1089,7 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     # The aliased branch returns before reaching the ordinary output check, so it needs its own. It
     # went without one, and a buffer on a card the engine cannot reach was copied into.
     assert (
-        "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;"
+        "const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;"
         in execute
     ), "an aliased output is no longer checked, and its branch skips the ordinary check"
     # Each answer has to end the call. A device read into a variable that nothing acts on refuses
@@ -1242,7 +1242,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
             "drop-input-query": "input_placements[i] = placement_of(",
             "drop-output-query": "const BufferPlacement output_placement = placement_of(",
             "drop-output-check": "const int output_device = output_placement.foreign_device;",
-            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;",
+            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;",
             "drop-helper": "BufferPlacement placement_of(",
             "drop-managed-exemption": "managed == 0 && ",
             "drop-managed-access": " || managed != 0",
