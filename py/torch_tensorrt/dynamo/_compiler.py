@@ -1277,7 +1277,7 @@ def _build_user_symbol_bounds(
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
-) -> Dict[sympy.Symbol, Tuple[int, int]]:
+) -> Tuple[Dict[sympy.Symbol, Tuple[int, int]], List[str]]:
     """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
     fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
 
@@ -1287,10 +1287,14 @@ def _build_user_symbol_bounds(
     log only); the ``user_min=1, exp_min=2`` case is a debug log -- it's
     PyTorch's 0/1 specialization artifact, not a user error.
 
-    Warns once when a plain ``Input.opt_shape`` differs from the export example
-    in a dynamic dimension of the export that no ``Input.profiles`` covers and
-    whose example is inside the ``Input`` range, since the engine opt is the
-    example there.
+    Also returns, for :func:`_warn_ignored_opt_shapes`, the dims where the
+    engine opt is the export example and not a plain ``Input.opt_shape``. A dim
+    is listed when all of these hold:
+
+    - it is a dynamic dimension of the export,
+    - no ``Input.profiles`` covers it,
+    - ``opt_shape`` differs from the export example there,
+    - the export example is inside the ``Input`` range.
     """
     # ep.module() strips lifted params/buffers from the graph, so all_placeholders
     # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
@@ -1472,6 +1476,10 @@ def _build_user_symbol_bounds(
                 exp_max,
             )
 
+    return user_symbol_bounds, ignored_opts
+
+
+def _warn_ignored_opt_shapes(ignored_opts: List[str]) -> None:
     if ignored_opts:
         logger.warning(
             "The engine is tuned for the size of the export example, not for "
@@ -1481,8 +1489,6 @@ def _build_user_symbol_bounds(
             "or export the program with an example of that size.",
             ", ".join(ignored_opts),
         )
-
-    return user_symbol_bounds
 
 
 def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
@@ -1554,12 +1560,12 @@ def compile_module(
     # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
     # graph_signature is None on the torch.compile path, which has no ExportedProgram.
-    user_symbol_bounds = (
+    user_symbol_bounds, ignored_opts = (
         _build_user_symbol_bounds(
             gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
         )
         if graph_signature is not None
-        else {}
+        else ({}, [])
     )
 
     # Configure user compilation settings to converters.
@@ -1728,6 +1734,7 @@ def compile_module(
             "require_full_compilation + full operator support: "
             "skipping partitioner, converting whole graph"
         )
+        _warn_ignored_opt_shapes(ignored_opts)
         dryrun_tracker.analysis_report = partition_analysis(
             gm, gm, op_support, settings, whole_graph=True
         )
@@ -1894,6 +1901,9 @@ def compile_module(
         if "_run_on_acc" not in node.name:
             continue
         submodule_node_dict[node.name] = node
+    # The warning is about the engine, so only a graph with a TensorRT part gets it.
+    if submodule_node_dict:
+        _warn_ignored_opt_shapes(ignored_opts)
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
 
