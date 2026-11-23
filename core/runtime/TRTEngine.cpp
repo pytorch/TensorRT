@@ -690,6 +690,12 @@ void TRTEngine::reset_captured_graph() {
 }
 
 void TRTEngine::setup_input_binding_infos() {
+  std::unordered_set<std::string> kv_cache_inputs;
+  for (const auto& kv : aliased_io) {
+    if (kv.second.kind == AliasKind::kKVCacheUpdate) {
+      kv_cache_inputs.insert(kv.second.input_binding_name);
+    }
+  }
   input_binding_infos.clear();
   input_binding_infos.reserve(in_binding_names.size());
   for (const auto& name : in_binding_names) {
@@ -697,7 +703,8 @@ void TRTEngine::setup_input_binding_infos() {
         {name,
          util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(name.c_str())),
          cuda_engine->isShapeInferenceIO(name.c_str()),
-         aliased_input_binding_names.find(name) != aliased_input_binding_names.end()});
+         aliased_input_binding_names.find(name) != aliased_input_binding_names.end(),
+         kv_cache_inputs.find(name) != kv_cache_inputs.end()});
   }
 }
 

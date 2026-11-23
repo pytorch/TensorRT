@@ -27,6 +27,7 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import _has_side_effect
 from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
@@ -344,8 +345,8 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     Inline a submodule within the parent graph (gm). All `call_module` nodes
     should be replaced by their nodes in the submodule.
     """
-    # Clean the graph
-    gm.graph.eliminate_dead_code()
+    # A part left to PyTorch can be unused and still store a caller's tensor.
+    gm.graph.eliminate_dead_code(is_impure_node=_has_side_effect)
     gm.graph.lint()
 
     for gm_node in gm.graph.nodes:

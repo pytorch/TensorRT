@@ -10,6 +10,7 @@ import torch
 from torch.fx.node import _get_qualified_name
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import _has_side_effect
 from torch_tensorrt.dynamo.utils import get_output_metadata
 
 logger = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ def _repair_64bit_input(
 
     module_node.replace_input_with(node_64bit, node_32bit)
 
-    gm.graph.eliminate_dead_code()
+    gm.graph.eliminate_dead_code(is_impure_node=_has_side_effect)
     gm.graph.lint()
     gm.recompile()
 
@@ -190,7 +191,7 @@ def _repair_64bit_outputs(
                 delete_user_cb=lambda user: user != cast_node_64bit,
             )
 
-    gm.graph.eliminate_dead_code()
+    gm.graph.eliminate_dead_code(is_impure_node=_has_side_effect)
     gm.graph.lint()
     gm.recompile()
 
