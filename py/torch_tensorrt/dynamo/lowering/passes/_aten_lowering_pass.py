@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 from torch_tensorrt.dynamo.tools.weight_mapping import raise_if_mapped_files_changed
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .annotate_sort_num_keys import annotate_sort_num_keys, attribute_shapes
 from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
 from .collapse_high_rank_permutes import collapse_high_rank_permutes
 from .complex_decomposition_adapter import (
@@ -197,6 +198,8 @@ def post_lowering(
     )
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
+    passes_input = gm
+    shapes_before = attribute_shapes(gm)
     # Batch DCE/lint/recompile across passes: each pass may still call
     # clean_up_graph_after_modifications, but only the final flush pays for it.
     set_defer_graph_cleanup(True)
@@ -207,6 +210,14 @@ def post_lowering(
         set_defer_graph_cleanup(False)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
+    # After every pass, including registered ones: the sort converter trusts this range for
+    # correctness, so it reads only shapes the refresh just updated. The refresh updates the
+    # module it was made for, not a new one that a pass returned.
+    annotate_sort_num_keys(
+        gm,
+        shapes_updated=fake_mode is not None and gm is passes_input,
+        shapes_before=shapes_before,
+    )
 
     # A branch shared by several cond nodes is lowered once.
     for branch in dict.fromkeys(iter_cond_subgraphs(gm)):
