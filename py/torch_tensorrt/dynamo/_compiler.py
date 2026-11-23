@@ -96,6 +96,7 @@ from torch_tensorrt.dynamo.utils import (
     parse_graph_io,
     pin_torch_executed_state,
     prepare_inputs,
+    recorded_lower,
     release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -507,6 +508,7 @@ def cross_compile_for_windows(
         trt_kwarg_inputs,
         settings,
         graph_signature=exported_program.graph_signature,
+        range_constraints=exported_program.range_constraints,
     )
     restored = (
         []
@@ -1046,6 +1048,7 @@ def compile(
         settings,
         engine_cache,
         graph_signature=exported_program.graph_signature,
+        range_constraints=exported_program.range_constraints,
     )
     if _copyback_mutation_buffers:
         trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
@@ -1277,6 +1280,7 @@ def _build_user_symbol_bounds(
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
 ) -> Tuple[Dict[sympy.Symbol, Tuple[int, int]], List[str]]:
     """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
     fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
@@ -1284,17 +1288,18 @@ def _build_user_symbol_bounds(
     Validates against finite exporter bounds: ``user_max > exp_max`` and
     ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
     a strict subset narrows the engine profile to the user's bounds (info
-    log only); the ``user_min=1, exp_min=2`` case is a debug log -- it's
-    PyTorch's 0/1 specialization artifact, not a user error.
+    log only); the ``user_min=1, exp_min=2`` case warns, because the profile of
+    that input still starts at 1. The spec of a size ``a * s + c`` also bounds
+    ``s``. Exporter bounds come from ``range_constraints`` when given, because the
+    ``ShapeEnv`` reports ``Dim(min=1)`` as 2 (0/1 specialization).
 
     Also returns, for :func:`_warn_ignored_opt_shapes`, the dims where the
-    engine opt is the export example and not a plain ``Input.opt_shape``. A dim
-    is listed when all of these hold:
+    engine opt, the export example moved inside the ``Input`` ranges, is not a
+    plain ``Input.opt_shape``. A dim is listed when all of these hold:
 
     - it is a dynamic dimension of the export,
     - no ``Input.profiles`` covers it,
-    - ``opt_shape`` differs from the export example there,
-    - the export example is inside the ``Input`` range.
+    - ``opt_shape`` differs from the engine opt there.
     """
     # ep.module() strips lifted params/buffers from the graph, so all_placeholders
     # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
@@ -1327,7 +1332,8 @@ def _build_user_symbol_bounds(
         for dim in node.meta["val"].size()
         if isinstance(dim, torch.SymInt) and isinstance(dim.node.expr, sympy.Symbol)
     }
-    ignored_opts: List[str] = []
+    opt_checks: List[Tuple[str, int, torch.SymInt, int]] = []
+    derived_bounds: List[Tuple[sympy.Symbol, int, int, str]] = []
 
     for node, inp in zip(placeholders, flat_inputs):
         if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
@@ -1360,8 +1366,25 @@ def _build_user_symbol_bounds(
                 continue
             expr = dim.node.expr
             # Composite exprs (e.g. ``2*s0``) are recomputed by
-            # ``ShapeEnv.bound_sympy``; overriding them directly would lie.
+            # ``ShapeEnv.bound_sympy``; overriding them directly would lie. The
+            # spec of ``a * s + c`` bounds ``s`` instead, unless the input has
+            # profiles, which apply only to the export's own dynamic dims.
             if not isinstance(expr, sympy.Symbol):
+                if not inp.profiles and len(expr.free_symbols) == 1:
+                    (symbol,) = expr.free_symbols
+                    poly = sympy.Poly(expr, symbol)
+                    coeffs = poly.all_coeffs()
+                    if poly.degree() == 1 and all(c.is_integer for c in coeffs):
+                        a, c = (int(v) for v in coeffs)
+                        if a > 0:
+                            derived_bounds.append(
+                                (
+                                    symbol,
+                                    -((c - int(min_shape[d])) // a),
+                                    (int(max_shape[d]) - c) // a,
+                                    f"Input '{node.target}' dim {d} ({expr})",
+                                )
+                            )
                 logger.debug(
                     "Input '%s' dim %d is a composite symbolic expression (%s) "
                     "bounded by another dynamic dimension; its range will be "
@@ -1373,18 +1396,7 @@ def _build_user_symbol_bounds(
                 continue
             # Input accepts a short opt_shape, and the engine ignores it here, so skip the check.
             if expr not in profiled_symbols and d < len(inp.shape["opt_shape"]):
-                user_opt = int(inp.shape["opt_shape"][d])
-                example_opt = extract_var_range_info(dim).get("opt")
-                # An example outside the Input range fails the build later with its own error.
-                if (
-                    example_opt is not None
-                    and user_opt != example_opt
-                    and min_shape[d] <= example_opt <= max_shape[d]
-                ):
-                    ignored_opts.append(
-                        f"'{node.target}' dim {d} (opt_shape {user_opt}, "
-                        f"export example {example_opt})"
-                    )
+                opt_checks.append((node.target, d, dim, int(inp.shape["opt_shape"][d])))
             if expr in user_symbol_bounds:
                 continue
             user_min = int(min_shape[d])
@@ -1405,20 +1417,38 @@ def _build_user_symbol_bounds(
             # Validate the user's Input range against it here -- at compile
             # time -- before they hit that opaque runtime error on a shape
             # they explicitly declared in Input.min_shape / Input.max_shape.
-            shape_env = getattr(dim.node, "shape_env", None)
-            if shape_env is None:
-                continue
-            exp_range = shape_env.var_to_range.get(expr)
+            exp_range = (range_constraints or {}).get(expr)
+            if exp_range is None:
+                shape_env = getattr(dim.node, "shape_env", None)
+                if shape_env is None:
+                    continue
+                exp_range = shape_env.var_to_range.get(expr)
             if exp_range is None:
                 continue
             exp_lower = exp_range.lower
             exp_upper = exp_range.upper
+            # A spec that pins the dim to 1 is allowed against a recorded 2, and
+            # warns like min_shape=1 below.
+            if (
+                isinstance(exp_lower, (int, sympy.Integer))
+                and user_max < exp_lower
+                and not (user_max == 1 and exp_lower == 2)
+            ):
+                raise ValueError(
+                    f"Dynamic dimension '{expr}': Input.max_shape ({user_max}) is "
+                    f"below the exported program's min ({int(exp_lower)}), so no "
+                    f"size fits both. Set Input.max_shape >= {int(exp_lower)}."
+                )
             exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
             if exp_max_unbounded:
                 # Dim.DYNAMIC: user fills the gap (intended use).
                 continue
             try:
-                exp_min = int(exp_lower)
+                # range_constraints can start at 0, but extract_var_range_info
+                # starts every engine profile at 1 or more, so Input.min_shape=0
+                # is still rejected.
+                exp_lowest = int(exp_lower)
+                exp_min = max(exp_lowest, 1)
                 exp_max = int(exp_upper)
             except (TypeError, ValueError):
                 continue
@@ -1428,7 +1458,7 @@ def _build_user_symbol_bounds(
             mismatch = (
                 f"Dynamic dimension '{expr}': "
                 f"Input range [{user_min}, {user_max}] vs "
-                f"exported program range [{exp_min}, {exp_max}]."
+                f"exported program range [{exp_lowest}, {exp_max}]."
             )
 
             if user_max > exp_max:
@@ -1436,23 +1466,30 @@ def _build_user_symbol_bounds(
                     f"{mismatch} Input.max_shape ({user_max}) exceeds the "
                     f"exported program's max ({exp_max}). The program was "
                     f"exported with this dimension bounded to "
-                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"[{exp_lowest}, {exp_max}], so the compiled TensorRT engine "
                     f"cannot accept shapes above {exp_max}. Either re-export "
                     f"with Dim('{expr}', max={user_max}) or set "
                     f"Input.max_shape <= {exp_max}."
                 )
 
             if user_min < exp_min:
-                # 1->2 is the 0/1 specialization artifact, not a user error.
+                # extract_var_range_info starts the profile of a symbol whose
+                # exporter min is 2 at 1; warn, do not raise.
                 if user_min == 1 and exp_min == 2:
-                    # extract_var_range_info maps the min of 2 back to 1.
-                    logger.debug(
+                    logger.warning(
                         "%s Input.min_shape=1 but the exported program's min "
-                        "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
-                        "recorded as min=2). The engine keeps min 1.",
+                        "is 2. The program was not exported for a size of 1, "
+                        "so a call with that size can fail.",
                         mismatch,
                     )
                     continue
+                if exp_lowest <= user_min:
+                    raise ValueError(
+                        f"{mismatch} Input.min_shape ({user_min}) is below 1. "
+                        f"The program accepts it, but Torch-TensorRT starts "
+                        f"every engine profile at 1 or more, so set "
+                        f"Input.min_shape >= 1."
+                    )
                 raise ValueError(
                     f"{mismatch} Input.min_shape ({user_min}) is below the "
                     f"exported program's min ({exp_min}). The program was "
@@ -1472,8 +1509,35 @@ def _build_user_symbol_bounds(
                 mismatch,
                 user_min,
                 user_max,
-                exp_min,
+                exp_lowest,
                 exp_max,
+            )
+
+    for symbol, low, high, where in derived_bounds:
+        if symbol in user_symbol_bounds:
+            user_min, user_max = user_symbol_bounds[symbol]
+            low, high = max(low, user_min), min(high, user_max)
+        exported = (range_constraints or {}).get(symbol)
+        if exported is not None:
+            lowest = recorded_lower(symbol, range_constraints or {})
+            low = max(low, 1 if lowest == 2 else lowest)
+            high = min(high, exported.upper)
+        if low > high:
+            raise ValueError(
+                f"{where}: no value of {symbol} fits the exported program and the "
+                f"Input specs of the inputs sized from it."
+            )
+        user_symbol_bounds[symbol] = (low, high)
+
+    # The engine opt is the export example moved inside the final ranges.
+    ignored_opts: List[str] = []
+    for name, d, dim, user_opt in opt_checks:
+        engine_opt = extract_var_range_info(
+            dim, user_symbol_bounds, range_constraints
+        ).get("opt")
+        if engine_opt is not None and engine_opt != user_opt:
+            ignored_opts.append(
+                f"'{name}' dim {d} (opt_shape {user_opt}, engine opt {engine_opt})"
             )
 
     return user_symbol_bounds, ignored_opts
@@ -1482,8 +1546,9 @@ def _build_user_symbol_bounds(
 def _warn_ignored_opt_shapes(ignored_opts: List[str]) -> None:
     if ignored_opts:
         logger.warning(
-            "The engine is tuned for the size of the export example, not for "
-            "Input.opt_shape, on %s. To tune it for another size, pass "
+            "The engine is tuned for the size of the export example, moved inside "
+            "the Input range, not for Input.opt_shape, on %s. To tune it for "
+            "another size, pass "
             "Input(profiles=[{'min_shape': ..., 'opt_shape': ..., 'max_shape': ...}]) "
             "with one entry (or as many entries as the profiles of the other inputs), "
             "or export the program with an example of that size.",
@@ -1523,6 +1588,7 @@ def compile_module(
     engine_cache: Optional[BaseEngineCache] = None,
     *,
     graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -1562,7 +1628,11 @@ def compile_module(
     # graph_signature is None on the torch.compile path, which has no ExportedProgram.
     user_symbol_bounds, ignored_opts = (
         _build_user_symbol_bounds(
-            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+            gm,
+            sample_arg_inputs,
+            sample_kwarg_inputs,
+            graph_signature,
+            range_constraints,
         )
         if graph_signature is not None
         else ({}, [])
@@ -1744,6 +1814,7 @@ def compile_module(
                 profile_source_bounds=profile_source_bounds,
                 num_profiles=num_profiles,
                 user_symbol_bounds=user_symbol_bounds,
+                range_constraints=range_constraints,
             )
             record_partition_inputs("_run_on_acc_0", convert_inputs)
             dryrun_tracker.tensorrt_graph_count = 1
@@ -1769,6 +1840,7 @@ def compile_module(
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
+            range_constraints=range_constraints,
         )
         read: Set[int] = set()
         if weight_releaser is not None:
@@ -2001,6 +2073,7 @@ def compile_module(
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
+            range_constraints=range_constraints,
         )
         record_partition_inputs(name, submodule_inputs)
 
@@ -2144,6 +2217,9 @@ def compile_module(
     dryrun_stats_display(dryrun_tracker, False if is_analyzing() else settings.dryrun)
 
     restore_reshape(partitioned_module)
+    if user_symbol_bounds:
+        # Whole-module CUDA graphs warm the module up with inputs inside these bounds.
+        partitioned_module.meta["_user_symbol_bounds"] = user_symbol_bounds
     return partitioned_module
 
 

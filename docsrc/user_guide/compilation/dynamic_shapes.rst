@@ -85,9 +85,9 @@ TensorRT tunes an engine for one size in each dynamic range, the opt size. When 
 ``torch_tensorrt.compile`` exports it with an example of ``opt_shape`` (unless the ``Input`` carries its own
 ``torch_tensor``), so the engine is tuned for ``opt_shape``. A program you exported yourself already has an example,
 and both ``torch_tensorrt.compile`` and ``torch_tensorrt.dynamo.compile`` tune the engine for the size of that
-example. A plain ``Input(min_shape, opt_shape, max_shape)`` does not change that. When TensorRT gets part of the
-graph, Torch-TensorRT logs a warning if ``opt_shape`` and the example differ in a dynamic dimension of the export
-that no profile covers.
+example. A plain ``Input(min_shape, opt_shape, max_shape)`` does not change that, except that an example outside the
+``Input`` range is moved to the nearest bound of the range. When TensorRT gets part of the graph, Torch-TensorRT logs
+a warning if ``opt_shape`` differs from that size in a dynamic dimension of the export that no profile covers.
 
 To tune for another size, do one of these:
 
@@ -115,8 +115,9 @@ Two limits apply to the profile:
 - The export example must be inside the profile's ``min_shape`` and ``max_shape``. Otherwise a call with the
   size of the example cannot run.
 - The profile applies only to dimensions that the export made dynamic, such as ``rows``. A dimension that
-  is exported only as an expression, such as ``2 * rows`` from a derived ``Dim``, takes its range and opt from the
-  exported program, unless another input with ``profiles`` has ``rows`` itself as a dimension.
+  is exported only as an expression, such as ``2 * rows`` from a derived ``Dim``, follows ``rows``: its range is
+  the exported program's, narrowed by plain ``Input`` specs of ``rows`` or of that dimension, and its opt comes
+  from the example, unless another input with ``profiles`` has ``rows`` itself as a dimension.
 
 More than one entry in ``profiles`` gives each TensorRT engine several profiles. A call outside profile 0 must pick
 one with ``optimization_profile``, and a size that no profile covers cannot run. See

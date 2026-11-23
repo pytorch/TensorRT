@@ -33,6 +33,7 @@ from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 from torch.utils._sympy.numbers import int_oo
+from torch.utils._sympy.value_ranges import ValueRanges, bound_sympy
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -487,16 +488,66 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
+def recorded_lower(
+    symbol: sympy.Symbol, range_constraints: Dict[sympy.Expr, Any]
+) -> Any:
+    """The smallest value of ``symbol`` the program allows, from its
+    ``range_constraints``. Export records 2 for the root ``b`` of a derived size such
+    as ``2 * b`` also when ``b`` starts at 0 or 1. The derived size keeps its own
+    record, which tells how low ``b`` goes."""
+    lower = range_constraints[symbol].lower
+    derived = [
+        (expr, value_range)
+        for expr, value_range in range_constraints.items()
+        if expr != symbol and expr.free_symbols == {symbol}
+    ]
+    if lower == 2 and derived:
+        for value in (0, 1):
+            if all(r.lower <= e.subs(symbol, value) <= r.upper for e, r in derived):
+                return value
+    return lower
+
+
+def _profile_symbol_range(
+    symbol: sympy.Symbol,
+    shape_env: Any,
+    user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]],
+    range_constraints: Optional[Dict[sympy.Expr, ValueRanges]] = None,
+) -> ValueRanges:
+    """The range of ``symbol`` for working out a size computed from it.
+
+    The lower bound is the program's (:func:`recorded_lower`), not the ShapeEnv's 2,
+    so ``t + 1`` from ``Dim("t", min=0)`` starts at 1. A recorded minimum is lowered
+    only from 2 to 1, by an Input spec that starts at 1. Without a record, 2 becomes
+    1, as for a plain ``Dim``.
+    """
+    var_range = shape_env.var_to_range.get(symbol) or shape_env.bound_sympy(symbol)
+    lower, upper = var_range.lower, var_range.upper
+    if range_constraints and symbol in range_constraints:
+        lower = recorded_lower(symbol, range_constraints)
+    elif lower == 2:
+        lower = 1
+    if user_symbol_bounds and symbol in user_symbol_bounds:
+        user_min, user_max = user_symbol_bounds[symbol]
+        # A spec's 1 fits a recorded 2, as _build_user_symbol_bounds accepts it.
+        lower = 1 if lower == 2 and user_min == 1 else max(lower, user_min)
+        upper = user_max if upper in (int_oo, sympy.oo) else min(upper, user_max)
+    return ValueRanges(lower, upper)
+
+
 def extract_var_range_info(
     symbolic_integer: torch.SymInt,
     user_symbol_bounds: Optional[Dict[sympy.Symbol, Tuple[int, int]]] = None,
+    range_constraints: Optional[Dict[sympy.Expr, ValueRanges]] = None,
 ) -> Dict[str, Optional[int]]:
     """Return ``{min, max, opt}`` for a symbolic integer.
 
-    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) is consulted only
-    when the exporter's upper is unbounded; finite exporter bounds always win.
+    ``user_symbol_bounds`` (read-only ``{sym: (min, max)}``) bounds a symbol and a
+    size computed from it, below and above, inside the exporter's range, and fills
+    an unbounded upper.
     The lower is intersected with the exporter's so the 0/1 specialization
-    survives even if the user passes ``min_shape=0``.
+    survives even if the user passes ``min_shape=0``. ``range_constraints``, the
+    exported program's, give the recorded range of a computed size.
     """
     node = symbolic_integer.node
     expr = node.expr
@@ -505,7 +556,42 @@ def extract_var_range_info(
     # In the case of expr which has symbolic computation, bound_sympy evaluates them.
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
-    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
+    if expr.is_symbol or expr.is_number:
+        var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(
+            expr
+        )
+    else:
+        # The ShapeEnv's 2 for s would start 2 * s at 4 and ignore an Input spec
+        # of s. Never below 1 unless the ShapeEnv allows it.
+        env_range = shape_env.bound_sympy(expr)
+        var_range = bound_sympy(
+            expr,
+            {
+                s: _profile_symbol_range(
+                    s, shape_env, user_symbol_bounds, range_constraints
+                )
+                for s in expr.free_symbols
+            },
+        )
+        lower = max(var_range.lower, min(env_range.lower, 1))
+        upper = var_range.upper
+        recorded = (range_constraints or {}).get(expr)
+        if recorded is not None:
+            # Export records the range of a size like T + 1 itself, from the Dim
+            # that makes it, so its smallest value holds where the ShapeEnv moved
+            # T's. An Input spec of its symbols can still raise it.
+            user_lower = 0
+            if user_symbol_bounds and expr.free_symbols & user_symbol_bounds.keys():
+                user_lower = bound_sympy(
+                    expr,
+                    {
+                        s: ValueRanges(*user_symbol_bounds.get(s, (0, int_oo)))
+                        for s in expr.free_symbols
+                    },
+                ).lower
+            lower = max(recorded.lower, user_lower, 1)
+            upper = min(upper, recorded.upper)
+        var_range = ValueRanges(lower, upper)
     # PyTorch commit adb73cc: var_to_val->backed_var_to_val, unbacked_var_to_val->real_tensor_prop_unbacked_vals
     var_to_val_map = getattr(shape_env, "backed_var_to_val", None) or getattr(
         shape_env, "var_to_val", None
@@ -548,7 +634,8 @@ def extract_var_range_info(
     min_val = min_val_opt if min_val_opt is not None else 1
 
     # Torchdynamo 0/1 specialization outlier
-    min_val = 1 if min_val == 2 else min_val
+    if expr.is_symbol:
+        min_val = 1 if min_val == 2 else min_val
 
     # Apply user bounds whenever present. ``_build_user_symbol_bounds`` already
     # rejects user ranges that exceed the exporter, so the only cases reaching
@@ -568,7 +655,27 @@ def extract_var_range_info(
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
     if isinstance(var_val, (sympy.core.numbers.Integer, int)):
-        min_max_opt["opt"] = int(var_val)
+        # An Input spec can rule out the traced size, and opt has to stay inside
+        # the profile. A computed size takes its opt from each of its symbols' traced
+        # value moved into that symbol's range, so related engine inputs (n, 2 * n,
+        # n + m) get optima that agree with each other.
+        if not (expr.is_symbol or expr.is_number):
+            roots = {}
+            for s in expr.free_symbols:
+                value = var_to_val_map.get(s)
+                if not isinstance(value, (sympy.core.numbers.Integer, int)):
+                    break
+                symbol_range = _profile_symbol_range(
+                    s, shape_env, user_symbol_bounds, range_constraints
+                )
+                low = _bound_to_int_or_none(symbol_range.lower)
+                high = _bound_to_int_or_none(symbol_range.upper)
+                value = int(value) if low is None else max(int(value), low)
+                roots[s] = value if high is None else min(value, high)
+            else:
+                var_val = expr.xreplace(roots)
+        opt = max(int(var_val), min_val)
+        min_max_opt["opt"] = opt if max_val is None else min(opt, max_val)
 
     return min_max_opt
 

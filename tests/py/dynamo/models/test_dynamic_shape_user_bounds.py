@@ -236,16 +236,20 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
 
 
 @pytest.mark.unit
-def test_build_user_symbol_bounds_accepts_01_specialization(caplog):
-    """``user_min=1, exp_min=2`` is the 0/1 specialization artifact. The engine
-    keeps min 1, so neither raise nor warn."""
+@pytest.mark.parametrize("exported_min, warns", [(1, False), (2, True)])
+def test_compile_warns_only_when_input_min_1_is_below_the_exported_min(
+    caplog, exported_min, warns
+):
+    """``Dim(min=1)`` matches ``Input.min_shape=1`` even though the ShapeEnv
+    reports its lower bound as 2. ``Dim(min=2)`` still warns that the program was
+    not exported for a size of 1, without promising the engine takes it."""
 
     model = _SmallLinear().eval().cuda()
     sample = torch.randn(4, 8, device="cuda")
     ep = torch.export.export(
         model,
         (sample,),
-        dynamic_shapes=({0: torch.export.Dim("batch", min=1, max=8)},),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=exported_min, max=8)},),
         strict=False,
     )
     input_min1 = Input(
@@ -257,16 +261,67 @@ def test_build_user_symbol_bounds_accepts_01_specialization(caplog):
 
     import logging
 
-    with caplog.at_level(logging.DEBUG, logger="torch_tensorrt.dynamo._compiler"):
-        bounds, _ = _build_user_symbol_bounds(
-            ep.module(), [input_min1], {}, ep.graph_signature
-        )
+    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+        trt_module = torchtrt.dynamo.compile(ep, inputs=[input_min1], min_block_size=1)
 
-    assert any("0/1 specialization" in r.message for r in caplog.records)
-    msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
-    assert not msgs, msgs
-    _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
-    assert extract_var_range_info(sym_dim, user_symbol_bounds=bounds)["min"] == 1
+    warnings = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any("exported program's min is 2" in m for m in warnings) == warns
+    assert any("not exported for a size of 1" in m for m in warnings) == warns
+    one_row = torch.randn(1, 8, device="cuda")
+    torch.testing.assert_close(
+        trt_module(one_row), model(one_row), rtol=1e-3, atol=1e-3
+    )
+
+
+@pytest.mark.unit
+def test_an_input_spec_can_pin_a_dim_dynamic_to_1():
+    """Export records 2 as the smallest size of a ``Dim.DYNAMIC``, only because of
+    how it treats 0 and 1, so a spec that pins the dim to 1 still fits."""
+
+    class Double(torch.nn.Module):
+        def forward(self, x):
+            return (x * 2).relu()
+
+    dims = {0: torch.export.Dim.DYNAMIC, 1: torch.export.Dim.DYNAMIC}
+    ep = torch.export.export(
+        Double(), (torch.randn(3, 8).cuda(),), dynamic_shapes=(dims,)
+    )
+    spec = Input(min_shape=(1, 1), opt_shape=(1, 8), max_shape=(1, 16))
+    trt_module = torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
+    x = torch.randn(1, 4).cuda()
+    torch.testing.assert_close(trt_module(x), Double()(x))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "exported_min, exported_max, rows, message",
+    [
+        (0, 8, (0, 4, 8), "starts every engine profile at 1"),
+        (3, None, (1, 1, 2), "so no size fits both"),
+    ],
+    ids=["min_0", "max_below_the_minimum"],
+)
+def test_compile_refuses_an_input_spec_no_engine_profile_fits(
+    exported_min, exported_max, rows, message
+):
+    """``range_constraints`` record ``Dim(min=0)`` as 0, but every engine profile
+    starts at 1 or more. A ``max_shape`` below the program's minimum fits no size,
+    also when the program sets no max. Both get a clear error at compile time
+    instead of a failure later."""
+
+    model = _SmallLinear().eval().cuda()
+    ep = torch.export.export(
+        model,
+        (torch.randn(4, 8, device="cuda"),),
+        dynamic_shapes=(
+            {0: torch.export.Dim("batch", min=exported_min, max=exported_max)},
+        ),
+        strict=False,
+    )
+    low, opt, high = rows
+    spec = Input(min_shape=(low, 8), opt_shape=(opt, 8), max_shape=(high, 8))
+    with pytest.raises(ValueError, match=message):
+        torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
 
 
 @pytest.mark.unit
@@ -431,7 +486,8 @@ def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
 def test_build_user_symbol_bounds_reports_opt_that_is_not_the_export_example():
     """A plain Input's opt_shape does not reach the engine of an exported
     program, so a different opt_shape is reported. A profile's opt does reach
-    it, also for a plain Input on the same dimension."""
+    it, also for a plain Input on the same dimension. The engine opt is the
+    example moved inside the Input ranges, which is what the report compares."""
 
     class SumBoth(torch.nn.Module):
         def forward(self, x, y):
@@ -458,13 +514,33 @@ def test_build_user_symbol_bounds_reports_opt_that_is_not_the_export_example():
     def reported(ep, inputs):
         return _build_user_symbol_bounds(ep.module(), inputs, {}, ep.graph_signature)[1]
 
-    x_dim = "'x' dim 0 (opt_shape 4, export example 16)"
-    y_dim = "'y' dim 0 (opt_shape 4, export example 16)"
+    x_dim = "'x' dim 0 (opt_shape 4, engine opt 16)"
+    y_dim = "'y' dim 0 (opt_shape 4, engine opt 16)"
     assert reported(shared, [plain, plain]) == [x_dim, y_dim]
     assert not reported(shared, [plain, profiled])
     assert reported(separate, [profiled, plain]) == [y_dim]
-    # An example outside the Input range fails the build with its own error.
-    assert reported(separate, [plain, below_example]) == [x_dim]
+    # An example outside the Input range moves to the nearest bound.
+    assert reported(separate, [plain, below_example]) == [
+        x_dim,
+        "'y' dim 0 (opt_shape 4, engine opt 8)",
+    ]
+    # The spec of y = 2 * n moves n's example of 4 to 5, which is x's opt_shape.
+    n = torch.export.Dim("n", min=1, max=8)
+    derived = torch.export.export(
+        SumBoth(),
+        (torch.randn(4, 8), torch.randn(8, 8)),
+        dynamic_shapes=({0: n}, {0: 2 * n}),
+        strict=False,
+    )
+    x_spec = Input(min_shape=(1, 8), opt_shape=(5, 8), max_shape=(8, 8))
+    y_spec = Input(min_shape=(10, 8), opt_shape=(10, 8), max_shape=(16, 8))
+    assert not _build_user_symbol_bounds(
+        derived.module(),
+        [x_spec, y_spec],
+        {},
+        derived.graph_signature,
+        derived.range_constraints,
+    )[1]
 
 
 @pytest.mark.unit
@@ -494,7 +570,7 @@ def test_opt_warning_only_when_tensorrt_gets_part_of_the_graph(caplog):
 
     msgs = opt_warnings(1)
     assert len(msgs) == 1, msgs
-    assert "'x' dim 0 (opt_shape 4, export example 16)" in msgs[0], msgs
+    assert "'x' dim 0 (opt_shape 4, engine opt 16)" in msgs[0], msgs
     assert "profiles=" in msgs[0] and "export the program" in msgs[0], msgs
     assert not opt_warnings(100)
     # dryrun partitions even below min_block_size, and gets no TensorRT part here.
@@ -795,6 +871,250 @@ def test_construct_dynamic_input_preserves_zero_minimum():
     assert input_spec.shape["min_shape"] == (0, 1)
     assert input_spec.shape["opt_shape"] == (2, 1)
     assert input_spec.shape["max_shape"] == (4, 1)
+
+
+@pytest.mark.unit
+def test_sizes_computed_from_the_same_symbols_get_optima_that_agree():
+    """The engine takes ``x``, ``y`` and ``cat((x, y))``, and the spec of ``x`` rules
+    out the traced size. Every optimum must come from one value of ``n`` and ``m``
+    inside the specs, or TensorRT refuses the profile."""
+
+    class M(torch.nn.Module):
+        def forward(self, x, y):
+            z = torch.cat((x, y))
+            return (z[x.shape[0] :] * 2 + y).relu()
+
+    ep = torch.export.export(
+        M(),
+        (torch.ones(4, 3).cuda(), torch.ones(5, 3).cuda()),
+        dynamic_shapes=(
+            {0: torch.export.Dim("n", min=1, max=8)},
+            {0: torch.export.Dim("m", min=1, max=8)},
+        ),
+    )
+    trt = torchtrt.dynamo.compile(
+        ep,
+        inputs=[
+            Input(min_shape=(5, 3), opt_shape=(6, 3), max_shape=(8, 3)),
+            Input(min_shape=(1, 3), opt_shape=(5, 3), max_shape=(8, 3)),
+        ],
+        min_block_size=1,
+        torch_executed_ops={torch.ops.aten.cat.default},
+    )
+    for rows in ((5, 5), (6, 2), (8, 8)):
+        args = [torch.randn(r, 3).cuda() for r in rows]
+        torch.testing.assert_close(trt(*args), M()(*args))
+
+
+class _Head(torch.nn.Module):
+    def forward(self, x):
+        return x[: x.shape[0] // 2 + 1].relu()
+
+
+class _Rows(torch.nn.Module):
+    def forward(self, x):
+        return x.relu() + 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "model, b_min, spec, accepted, refused",
+    [
+        (_Head, 1, None, (2, 4, 16), ()),
+        (_Head, 2, None, (4, 16), (2,)),
+        (_Rows, 1, None, (2,), (1,)),
+        (_Rows, 1, (4, 6, 8), (4, 8), (2, 10)),
+    ],
+    ids=["b_plus_1", "b_plus_1_from_min_2", "2b", "2b_with_spec"],
+)
+def test_the_profile_of_a_derived_dim(model, b_min, spec, accepted, refused):
+    """``x`` has ``2 * b`` rows and only ``relu`` runs in TensorRT, on ``b + 1`` rows
+    or on all of ``x``. Export records 2 as the smallest ``b`` even for
+    ``Dim("b", min=1)``, which started ``b + 1`` at 3 and ``2 * b`` at 4. A
+    ``Dim("b", min=2)`` and an ``Input`` spec of ``x`` still bound the profile, and
+    ``2 * b`` does not start at 1 as a plain ``Dim`` does."""
+
+    b = torch.export.Dim("b", min=b_min, max=8)
+    x = torch.randn(8, 4).cuda()
+    ep = torch.export.export(model(), (x,), dynamic_shapes=({0: 2 * b},))
+    in_pytorch = {
+        node.target
+        for node in ep.graph.nodes
+        if node.op == "call_function" and node.target != torch.ops.aten.relu.default
+    }
+    inputs = [x]
+    if spec is not None:
+        low, opt, high = spec
+        inputs = [Input(min_shape=(low, 4), opt_shape=(opt, 4), max_shape=(high, 4))]
+    trt = torchtrt.dynamo.compile(
+        ep, inputs=inputs, min_block_size=1, torch_executed_ops=in_pytorch
+    )
+    for rows in accepted:
+        y = torch.randn(rows, 4).cuda()
+        torch.testing.assert_close(trt(y), model()(y))
+    for rows in refused:
+        with pytest.raises(RuntimeError):
+            trt(torch.randn(rows, 4).cuda())
+
+
+@pytest.mark.unit
+def test_whole_module_cuda_graphs_warm_up_inside_the_input_spec():
+    """The warm-up calls used the traced size, which the ``Input`` spec rules out,
+    and the engine profile of a size computed from it refused them."""
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("tail", torch.ones(2, 4).cuda())
+
+        def forward(self, x):
+            return torch.cat((x, self.tail), 0).relu() * 2
+
+    model = M()
+    rows = torch.export.Dim("rows", min=1, max=9)
+    ep = torch.export.export(
+        model, (torch.ones(4, 4).cuda(),), dynamic_shapes=({0: rows},)
+    )
+    trt = torchtrt.dynamo.compile(
+        ep,
+        inputs=[Input(min_shape=(7, 4), opt_shape=(8, 4), max_shape=(9, 4))],
+        min_block_size=1,
+        torch_executed_ops={torch.ops.aten.cat.default},
+    )
+    x = torch.randn(8, 4).cuda()
+    try:
+        with torchtrt.runtime.enable_cudagraphs(trt) as graphed:
+            out = graphed(x)
+    finally:
+        torchtrt.runtime.set_cudagraphs_mode(False)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    torch.testing.assert_close(out, model(x))
+
+
+@pytest.mark.unit
+def test_input_specs_bound_a_derived_dim_that_export_records():
+    """Export records ``2 * n`` from 2 with no largest size, but the ``Input`` specs
+    start ``n`` at 8 and end it past the fallback of 4096. The profile of ``2 * n``
+    follows them, so ``cat((x, x))`` and ``y`` agree at every profile point."""
+
+    class M(torch.nn.Module):
+        def forward(self, x, y):
+            return torch.cat((x, x)) + y
+
+    n = torch.export.Dim("n", min=1)
+    x, y = torch.randn(10, 3).cuda(), torch.randn(20, 3).cuda()
+    ep = torch.export.export(M(), (x, y), dynamic_shapes=({0: n}, {0: 2 * n}))
+    trt = torchtrt.dynamo.compile(
+        ep,
+        inputs=[
+            Input(min_shape=(8, 3), opt_shape=(10, 3), max_shape=(20000, 3)),
+            Input(min_shape=(16, 3), opt_shape=(20, 3), max_shape=(40000, 3)),
+        ],
+        min_block_size=1,
+    )
+    for rows in (8, 20000):
+        x, y = torch.randn(rows, 3).cuda(), torch.randn(2 * rows, 3).cuda()
+        torch.testing.assert_close(trt(x, y), M()(x, y))
+
+
+@pytest.mark.unit
+def test_an_input_with_profiles_does_not_bound_the_root_of_its_derived_dim():
+    """Profiles apply to the export's own dynamic dims, so the profiles of ``y``,
+    whose size is ``2 * n``, leave ``n`` to the plain spec of ``x``."""
+
+    class M(torch.nn.Module):
+        def forward(self, x, y):
+            return torch.cat((x, x)) + y
+
+    n = torch.export.Dim("n", min=1, max=64)
+    ep = torch.export.export(
+        M(), (torch.randn(2, 3), torch.randn(4, 3)), dynamic_shapes=({0: n}, {0: 2 * n})
+    )
+    x_spec = Input(min_shape=(1, 3), opt_shape=(2, 3), max_shape=(64, 3))
+    profile = {"min_shape": (2, 3), "opt_shape": (4, 3), "max_shape": (8, 3)}
+    y_spec = Input(profiles=[profile], dtype=torch.float32)
+    bounds, _ = _build_user_symbol_bounds(
+        ep.module(), [x_spec, y_spec], {}, ep.graph_signature, ep.range_constraints
+    )
+    assert list(bounds.values()) == [(1, 64)]
+
+
+@pytest.mark.unit
+def test_a_size_computed_from_a_dim_with_minimum_0():
+    """``t + 1`` made in PyTorch from ``Dim("t", min=0)`` is 1 when ``t`` is 0. The
+    shape system moves the minimum of ``t`` to 2, which started the profile at 3. The
+    fallback largest size still comes from that 3: 3 * 4096."""
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            return torch.cat((x, torch.ones(1, 8, device=x.device))).relu().sum()
+
+    ep = torch.export.export(
+        M(),
+        (torch.ones(4, 8).cuda(),),
+        dynamic_shapes=({0: torch.export.Dim("t", min=0)},),
+    )
+    trt = torchtrt.dynamo.compile(
+        ep,
+        inputs=[torch.ones(4, 8).cuda()],
+        min_block_size=1,
+        torch_executed_ops={"torch.ops.aten.cat.default"},
+    )
+    for t in (0, 1, 8000):
+        x = torch.ones(t, 8).cuda()
+        torch.testing.assert_close(trt(x), M()(x))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("bounded", [False, True], ids=["dynamic", "min_2"])
+def test_a_dim_pinned_to_1_reaches_an_engine_through_a_computed_size(bounded):
+    """The spec pins ``rows`` to 1, which fits export's recorded 2, and ``cat`` in
+    PyTorch hands the engine ``2 * rows`` rows, whose profile starts from that 1."""
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            return torch.cat((x, x)).relu() * 2
+
+    rows = (
+        torch.export.Dim("rows", min=2, max=8) if bounded else torch.export.Dim.DYNAMIC
+    )
+    ep = torch.export.export(
+        M(), (torch.randn(4, 8).cuda(),), dynamic_shapes=({0: rows},)
+    )
+    trt = torchtrt.dynamo.compile(
+        ep,
+        inputs=[Input(min_shape=(1, 8), opt_shape=(1, 8), max_shape=(1, 8))],
+        min_block_size=1,
+        torch_executed_ops={"torch.ops.aten.cat.default"},
+    )
+    x = torch.randn(1, 8).cuda()
+    torch.testing.assert_close(trt(x), M()(x))
+
+
+@pytest.mark.unit
+def test_a_spec_of_a_computed_size_outside_the_exported_range_is_refused():
+    """``2 * b`` rows from 20 to 40 need ``b`` from 10, past the exported 8."""
+    b = torch.export.Dim("b", min=1, max=8)
+    ep = torch.export.export(
+        _Rows(), (torch.randn(8, 4).cuda(),), dynamic_shapes=({0: 2 * b},)
+    )
+    spec = Input(min_shape=(20, 4), opt_shape=(24, 4), max_shape=(40, 4))
+    with pytest.raises(ValueError, match="no value of"):
+        torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
+
+
+@pytest.mark.unit
+def test_a_spec_error_names_the_exported_range_once():
+    """The message gives the program's range, ``[0, 8]``, in both places."""
+    ep = torch.export.export(
+        _Rows(),
+        (torch.randn(4, 4).cuda(),),
+        dynamic_shapes=({0: torch.export.Dim("t", min=0, max=8)},),
+    )
+    spec = Input(min_shape=(1, 4), opt_shape=(4, 4), max_shape=(10, 4))
+    with pytest.raises(ValueError, match="exceeds") as error:
+        torchtrt.dynamo.compile(ep, inputs=[spec], min_block_size=1)
+    assert "[0, 8]" in str(error.value) and "[1, 8]" not in str(error.value)
 
 
 if __name__ == "__main__":
