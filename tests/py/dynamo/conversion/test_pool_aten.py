@@ -392,6 +392,29 @@ class TestPoolConverter(DispatchTestCase):
             TestModule(), input_specs, use_dynamo_tracer=True
         )
 
+    # A symbolic trace keeps stride=(), which means a stride equal to the kernel size.
+    @parameterized.expand(
+        [
+            (
+                "avg",
+                lambda x: torch.ops.aten.avg_pool2d.default(x, (3, 3), (), (1, 1)),
+            ),
+            (
+                "max",
+                lambda x: torch.ops.aten.max_pool2d.default(x, (3, 3), (), (1, 1)),
+            ),
+        ]
+    )
+    def test_pool2d_empty_stride(self, _, pool):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return pool(x)
+
+        inputs = [torch.randn(1, 3, 8, 8)]
+        self.run_test(
+            TestModule(), inputs, use_dynamo_tracer=False, propagate_shapes=True
+        )
+
 
 if __name__ == "__main__":
     run_tests()

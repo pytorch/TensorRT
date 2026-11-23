@@ -43,7 +43,7 @@ def avg_poolNd(
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride == []:
+    if not stride:
         stride = kernel_size
     else:
         stride = extend_attr_to_tuple(stride, dim)
@@ -87,7 +87,7 @@ def max_poolNd(
 
     kernel_size = extend_attr_to_tuple(kernel_size, dim)
 
-    if stride == []:
+    if not stride:
         stride = kernel_size
     else:
         stride = extend_attr_to_tuple(stride, dim)
