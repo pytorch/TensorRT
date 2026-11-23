@@ -8,17 +8,16 @@ gated by a validator (declared in ``aten_ops_converters.py``) and there
 are two registered converters for the same op:
 
 * ``aten_ops_index_copy_kv`` — HIGH priority, validator-gated. Fires only
-  when the input is a 4-D static cache, ``dim=2``, and the source has
-  ``shape[2] == 1`` (single-position write — the common
+  when the input is a 4-D static floating-point cache, ``dim=2``, and the
+  source has ``shape[2] == 1`` (single-position write, the common
   streaming-decoder pattern). Emits ``IKVCacheUpdateLayer`` whose output
   is aliased to the cache input.
 
-* ``aten_ops_index_copy_fallback`` — STANDARD priority, always fires.
-  Implements the general semantics via scatter (equivalent to what the
-  torch decomposition would produce).
-
-Since both converters live in TRT, no graph break is introduced for
-non-KV cases; they just take a less-efficient TRT path.
+* ``aten_ops_index_copy_fallback``: STANDARD priority. Fires for every
+  other case, except an int8 write and a float64 write without
+  ``truncate_double``, which TensorRT's scatter cannot serve. Implements the
+  general semantics via scatter (equivalent to what the torch decomposition
+  would produce).
 
 The two functions here implement the bodies. Registration with the
 validator lives next to the other aten converters for discoverability.

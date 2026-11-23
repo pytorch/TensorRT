@@ -1576,6 +1576,8 @@ def _index_copy_kv_eligible(
     * dim argument is exactly 2.
     * Source tensor has rank 4 with shape[2] == 1 (single-position
       write; matches HF's per-step StaticCache.update call).
+    * The cache is float32, float16 or bfloat16, the types
+      IKVCacheUpdateLayer accepts.
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
       to larger batches when needed).
 
@@ -1604,6 +1606,8 @@ def _index_copy_kv_eligible(
         return False
     input_val = input_node.meta.get("val")
     if input_val is None:
+        return False
+    if input_val.dtype not in impl.slice_scatter.KV_CACHE_DTYPES:
         return False
     input_shape = tuple(input_val.shape)
     if len(input_shape) != 4:
@@ -1658,8 +1662,30 @@ def aten_ops_index_copy_kv(
     )
 
 
+def _index_copy_fallback_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """TensorRT treats an int8 scatter as quantized and fails the engine build. A
+    float64 write needs ``truncate_double``, as the other converters require, or
+    the engine expects float32 and refuses the caller's tensor."""
+    input_node = node.args[0] if node.args else None
+    input_val = input_node.meta.get("val") if isinstance(input_node, Node) else None
+    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.int8:
+        _LOGGER.debug("index_copy with an int8 input, falling back")
+        return False
+    if (
+        isinstance(input_val, torch.Tensor)
+        and input_val.dtype == torch.float64
+        and not (settings is not None and settings.truncate_double)
+    ):
+        _LOGGER.debug("index_copy of float64 needs truncate_double, falling back")
+        return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_copy.default,
+    capability_validator=_index_copy_fallback_validator,
     supports_dynamic_shapes=False,
 )
 @enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})

@@ -32,6 +32,7 @@ import tensorrt as trt
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Node, Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import (
@@ -52,17 +53,24 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 logger = logging.getLogger(__name__)
 
 
+# The cache types IKVCacheUpdateLayer accepts.
+KV_CACHE_DTYPES = (torch.float32, torch.float16, torch.bfloat16)
+
+
 def _kv_eligible(
     cache_shape: Tuple[int, ...],
     dim: int,
     start: int,
     update_len: int,
     step: int,
+    dtype: torch.dtype,
 ) -> Tuple[bool, str]:
     """Apply IKVCacheUpdateLayer's invariants.
 
     Returns (eligible, reason). The reason is non-empty in both cases for logs.
     """
+    if dtype not in KV_CACHE_DTYPES:
+        return False, f"cache dtype is {dtype}; KVCacheUpdate takes {KV_CACHE_DTYPES}"
     if any(not isinstance(s, int) or s < 0 for s in cache_shape):
         return False, f"cache shape is dynamic ({cache_shape}); s_max must be static"
     if len(cache_shape) != 4:
@@ -113,7 +121,7 @@ def resolve_slice_scatter_write(
     of:
 
     * ``OK`` — the bounds are concrete, and the caller goes on to
-      ``_kv_eligible(cache_shape, dim, start, end - start, step)``.
+      ``_kv_eligible(cache_shape, dim, start, end - start, step, dtype)``.
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
       the converter returns ``src`` in the input's dtype, reshaped to the input's
       static sizes where TensorRT sees it as dynamic, and emits no KV layer.
@@ -261,7 +269,14 @@ def try_emit_kv_cache_update(
     its output is recorded as aliased to the cache input.
     """
     cache_shape = tuple(cache.shape)
-    eligible, reason = _kv_eligible(cache_shape, dim, start, update_len, step)
+    eligible, reason = _kv_eligible(
+        cache_shape,
+        dim,
+        start,
+        update_len,
+        step,
+        _enums.dtype._from(cache.dtype).to(torch.dtype),
+    )
     if not eligible:
         logger.debug("slice_scatter: KV fast path skipped — %s", reason)
         return None

@@ -159,12 +159,13 @@ def _kv_write_will_alias(
     whatever the converter goes on to do with it: it lowers most ineligible writes
     to a non-aliasing concatenation or scatter, returns the source in the input's
     dtype for a full overwrite, and raises for the rest (a ``slice_scatter`` with
-    dynamic bounds or a bad ``dim``, an ``index_copy`` its fallback cannot express).
-    The first two both have a write-back to preserve -- for a full overwrite the
-    source *is* the buffer's new contents -- and the ones that raise never get as far
-    as needing one. One more never reaches a converter: a ``slice_scatter`` written
-    on a dynamic dim, which its validator runs in PyTorch, and which needs the
-    copy-back like any other.
+    dynamic bounds or a bad ``dim``). The first two both have a write-back to
+    preserve -- for a full overwrite the source *is* the buffer's new contents -- and
+    the ones that raise never get as far as needing one. Some never reach a
+    converter: a ``slice_scatter`` written on a dynamic dim, and an ``index_copy``
+    the scatter converter refuses (int8, or float64 without ``truncate_double``)
+    when the KV path does not take it. Their validators run them in PyTorch, and
+    they need the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -224,7 +225,12 @@ def _kv_write_will_alias(
         # OK is the only status that resolves all three bounds to Python ints.
         assert start is not None and end is not None and step is not None
         eligible, _reason = _kv_eligible(
-            tuple(cache_shape), dim, start, end - start, step
+            tuple(cache_shape),
+            dim,
+            start,
+            end - start,
+            step,
+            cache_input.meta["val"].dtype,
         )
         return bool(eligible)
 

@@ -125,6 +125,25 @@ class TestIndexCopyFallback(TestCase):
         eager = torch.ops.aten.index_copy.default(x.clone(), 1, index, update)
         self.assertTrue(torch.allclose(out, eager))
 
+    def test_int8_and_float64_writes_stay_in_pytorch(self):
+        """TensorRT treats an int8 scatter as quantized and fails the engine build,
+        and without ``truncate_double`` a float64 engine expects float32."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, index, update):
+                return torch.ops.aten.index_copy.default(cache, 2, index, update)
+
+        for dtype in (torch.int8, torch.float64):
+            with self.subTest(dtype=dtype):
+                cache = torch.zeros(1, 4, 16, 8, dtype=dtype, device="cuda")
+                index = torch.tensor([9, 2], device="cuda")
+                update = torch.full((1, 4, 2, 8), 3, dtype=dtype, device="cuda")
+                compiled = _compile(M().cuda(), (cache, index, update))
+                torch.testing.assert_close(
+                    compiled(cache.clone(), index, update),
+                    M()(cache.clone(), index, update),
+                )
+
     def test_dim_other_than_two_uses_fallback(self):
         class M(torch.nn.Module):
             def forward(self, cache, index, update):
@@ -205,6 +224,50 @@ class TestIndexCopyFallback(TestCase):
         out = compiled(x.clone(), index, update)
         eager = torch.ops.aten.index_copy.default(x.clone(), -1, index, update)
         torch.testing.assert_close(out, eager)
+
+    def test_caches_the_kv_layer_cannot_take_use_the_fallback(self):
+        """The KV layer takes float32, float16 and bfloat16 caches only, so a
+        one-token write into an integer cache, a buffer or the caller's, takes the
+        fallback and keeps its write-back. So does a float64 buffer: with
+        ``truncate_double`` the layer would update a float32 copy. A float64 caller
+        cache already keeps its write-back without this."""
+
+        class M(torch.nn.Module):
+            def __init__(self, dtype):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8, dtype=dtype))
+                self.register_buffer("other", torch.zeros(1, 4, 16, 8, dtype=dtype))
+
+            def forward(self, given, x, input_pos):
+                given.index_copy_(2, input_pos, x)
+                self.cache.index_copy_(2, input_pos, x)
+                self.other[:, :, 5:6, :] = x
+                return self.cache.sum(2) + self.other.sum(2) + given.sum(2)
+
+        for dtype, options in (
+            (torch.int32, {}),
+            (torch.int64, {}),
+            (torch.float64, {"truncate_double": True}),
+        ):
+            with self.subTest(dtype=dtype):
+
+                def step(i):
+                    x = torch.full((1, 4, 1, 8), i + 1, device="cuda").to(dtype)
+                    return x, torch.tensor([2 + i], device="cuda")
+
+                given = torch.zeros(1, 4, 16, 8, dtype=dtype, device="cuda")
+                expected, eager = given.clone(), M(dtype).cuda()
+                compiled = _compile(
+                    M(dtype).cuda(), (given.clone(),) + step(0), **options
+                )
+                for i in range(3):
+                    out = compiled(given, *step(i))
+                    out = out[0] if isinstance(out, tuple) else out
+                    want = eager(expected, *step(i))
+                    torch.testing.assert_close(out, want, check_dtype=False)
+                    torch.testing.assert_close(given, expected)
+                    torch.testing.assert_close(compiled.cache, eager.cache)
+                    torch.testing.assert_close(compiled.other, eager.other)
 
 
 class TestCallerTensorsKeepWhatEagerDoes(_CudaGraphsOff):
