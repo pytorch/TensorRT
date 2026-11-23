@@ -535,7 +535,9 @@ class LoadedEngine {
       if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
         return Error::MemoryAllocationFailed;
       }
-      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
+      // A pageable copy can return before it lands, and the legacy stream does not order non-blocking streams.
+      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess ||
+          cudaStreamSynchronize(cudaStreamLegacy) != cudaSuccess) {
         return Error::Internal;
       }
     }
@@ -557,7 +559,8 @@ class LoadedEngine {
       return true;
     }
     const std::vector<float> host(elems(), value);
-    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess;
+    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess &&
+        cudaStreamSynchronize(cudaStreamLegacy) == cudaSuccess;
   }
 
   // Runs one inference on `stream`. Returns without waiting for the enqueue,
@@ -3394,8 +3397,7 @@ TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTh
     for (int i = 0; i < kConcurrentRunsPerThread; ++i) {
       // Rewritten every iteration, so a run whose enqueue never reached the engine
       // leaves the sentinel behind rather than the previous iteration's output.
-      // Finish the default-stream fill before inference on a non-blocking stream.
-      if (!engine.fill_output(kSentinel) || cudaStreamSynchronize(nullptr) != cudaSuccess) {
+      if (!engine.fill_output(kSentinel)) {
         failures.fetch_add(1);
       }
       submit_together(i);
