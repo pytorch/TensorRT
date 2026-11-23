@@ -19,6 +19,7 @@ from torch.export.graph_signature import InputKind
 from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
+from torch.utils._sympy.value_ranges import ValueRanges, bound_sympy
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -69,12 +70,12 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
-    assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
     erase_export_guards,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
+    write_back_writes_left_in_pytorch,
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     reset_folded_constructors,
@@ -89,12 +90,14 @@ from torch_tensorrt.dynamo.runtime._offloaded_engines import (
 from torch_tensorrt.dynamo.tools.weight_mapping import has_mapped_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    extract_var_range_info,
     get_cpu_memory_usage,
     get_flat_args_with_check,
     get_output_metadata,
     parse_graph_io,
     pin_torch_executed_state,
     prepare_inputs,
+    recorded_lower,
     release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -469,7 +472,13 @@ def cross_compile_for_windows(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    _mark_writes_that_can_be_empty(gm, exported_program.range_constraints, settings)
     logger.debug("Input graph: " + str(gm.graph))
+
+    # Buffers stay engine constants here, but a write into a caller's tensor is
+    # classified as in compile().
+    gm, _ = lift_mutated_buffers(gm, settings, lift_buffers=False)
+    predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
@@ -501,6 +510,22 @@ def cross_compile_for_windows(
         trt_kwarg_inputs,
         settings,
         graph_signature=exported_program.graph_signature,
+        range_constraints=exported_program.range_constraints,
+    )
+    restored = (
+        []
+        if settings.dryrun
+        else write_back_writes_left_in_pytorch(trt_gm, predicted_kv_bindings)
+    )
+    assert_predicted_kv_aliased(
+        aliased_input_bindings(
+            # With full support compile_module returns the engine module itself.
+            getattr(sub, "aliased_io", None)
+            for sub in trt_gm.modules()
+        ),
+        [b for b in predicted_kv_bindings if b not in restored],
+        settings,
+        engines_built=not settings.dryrun,
     )
     return trt_gm
 
@@ -969,6 +994,7 @@ def compile(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    _mark_writes_that_can_be_empty(gm, exported_program.range_constraints, settings)
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
@@ -981,7 +1007,6 @@ def compile(
     _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
     _copyback_bindings = gm.meta.get("_copyback_bindings", [])
     _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
-    _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -1002,12 +1027,6 @@ def compile(
     stage_end(Stage.LOWERING)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    # The marker is what keeps a re-routed write out of the engine's aliased_io, and
-    # it rides on node.meta through every pass above. Read it back before conversion
-    # so a pass that dropped it is named here rather than surfacing as a module that
-    # raises on every call.
-    assert_no_kv_alias_markers_survived(gm, _no_kv_alias_writes)
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
@@ -1032,9 +1051,20 @@ def compile(
         settings,
         engine_cache,
         graph_signature=exported_program.graph_signature,
+        range_constraints=exported_program.range_constraints,
     )
     if _copyback_mutation_buffers:
         trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
+    # A graph too small for an engine runs in PyTorch, which stores a caller's
+    # tensor only through its copy_. Buffers keep the error below.
+    restored = (
+        []
+        if settings.dryrun
+        else write_back_writes_left_in_pytorch(
+            trt_gm, set(_predicted_kv_bindings) - {p for p, _, _ in lifted_buffers}
+        )
+    )
+    _predicted_kv_bindings = [b for b in _predicted_kv_bindings if b not in restored]
     # Ground-truth check on both directions of the classification: every write lift
     # called KV (engine-aliased, so its copy_ was dropped) must appear in a compiled
     # engine's aliased_io or its write-back is silently lost, and no write lift
@@ -1043,7 +1073,9 @@ def compile(
     # dryrun returns before conversion, so there is no ground truth to check against.
     assert_predicted_kv_aliased(
         aliased_input_bindings(
-            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+            # With full support compile_module returns the engine module itself.
+            getattr(sub, "aliased_io", None)
+            for sub in trt_gm.modules()
         ),
         _predicted_kv_bindings,
         settings,
@@ -1057,14 +1089,76 @@ def compile(
         # engine via get_attr nodes in the fx graph. This shape is naturally
         # serializable by torch_tensorrt.save / torch.export (no external
         # Python wrapper that would be lost on a round-trip).
-        trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
+        trt_gm = inline_lifted_buffers_into_gm(
+            trt_gm,
+            lifted_buffers,
+            [*exported_program.state_dict, *exported_program.constants],
+        )
     # A copy-back value stays on the output node, where the exporters read it and
-    # where dead-code elimination cannot reach it, but nothing between here and the
-    # ExecuTorch runtime writes it into the buffer. Returning it would report a
-    # mutation the caller cannot act on, so the compiled module keeps the arity of
-    # the model it was compiled from.
-    hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
+    # where dead-code elimination cannot reach it. Called from PyTorch, the module
+    # writes it into the buffer itself and returns only the model's outputs. Read
+    # after inlining, which renames nested buffers.
+    if _copyback_mutation_buffers:
+        hide_copyback_outputs(trt_gm, trt_gm.meta["_copyback_mutation_buffers"])
     return trt_gm
+
+
+def _mark_writes_that_can_be_empty(
+    gm: torch.fx.GraphModule,
+    range_constraints: Dict[sympy.Symbol, Any],
+    settings: CompilationSettings,
+) -> None:
+    """Mark each ``index_copy`` whose sizes can be 0 to run in PyTorch.
+
+    The write's converter cannot take a size of 0. The program's
+    ``range_constraints`` decide which sizes can be 0. With the whole graph in one
+    engine the write has nowhere else to run.
+    """
+    if settings.require_full_compilation:
+        return
+
+    def can_be_zero(node: Any) -> bool:
+        val = node.meta.get("val") if isinstance(node, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        for size in val.shape:
+            if not isinstance(size, torch.SymInt):
+                continue
+            expr = size.node.expr
+            if expr in range_constraints:
+                lower = recorded_lower(expr, range_constraints)
+            elif expr.free_symbols <= range_constraints.keys():
+                # The roots' smallest values, which export can record too high for
+                # a size like 6 * s whose own range it does not record.
+                bounds = {
+                    s: ValueRanges(
+                        recorded_lower(s, range_constraints), range_constraints[s].upper
+                    )
+                    for s in expr.free_symbols
+                }
+                lower = bound_sympy(expr, bounds).lower
+            else:
+                continue
+            if lower <= 0:
+                return True
+        return False
+
+    for module in gm.modules():
+        if not isinstance(module, torch.fx.GraphModule):
+            continue
+        for node in module.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.index_copy.default
+        ):
+            # The cache itself is static on the KV path, so only the index and the
+            # source can make a write empty.
+            if len(node.args) >= 4 and any(can_be_zero(node.args[i]) for i in (2, 3)):
+                node.meta["_trt_write_can_be_empty"] = True
+                logger.warning(
+                    "%s can write 0 rows, which the KV cache layer cannot do, so it "
+                    "runs in PyTorch. For a KV cache write, export its sizes with "
+                    "min=1 to let the engine write it in place.",
+                    node.name,
+                )
 
 
 def _insert_complex_io_adapters(
@@ -1211,20 +1305,62 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _flatten_inputs_like_placeholders(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Any],
+    sample_kwarg_inputs: Optional[dict[Any, Any]],
+    placeholder_names: Sequence[str],
+) -> List[Any]:
+    """Flatten the user inputs into the order of the graph placeholders."""
+    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
+    # Without it, match kwargs by placeholder name and take the args in order:
+    # the arg/kwarg split can differ from export time (flatten_up_to then
+    # raises), and lifted mutated buffers drop _in_spec and come after the
+    # kwarg placeholders while their Inputs are appended to the args. Export
+    # can rename an argument (X becomes x), so a kwarg named after no
+    # placeholder follows the args, by position as before.
+    in_spec = getattr(gm, "_in_spec", None)
+    try:
+        if in_spec is None:
+            raise AttributeError("_in_spec not found on graph module")
+        return list(
+            in_spec.flatten_up_to((tuple(sample_arg_inputs), sample_kwarg_inputs))
+        )
+    except (ValueError, AttributeError):
+        kwargs = sample_kwarg_inputs or {}
+        unnamed = [v for k, v in kwargs.items() if k not in placeholder_names]
+        args = iter(torch.utils._pytree.tree_leaves([*sample_arg_inputs, *unnamed]))
+        return [
+            kwargs[name] if name in kwargs else next(args, None)
+            for name in placeholder_names
+        ]
+
+
 def _build_user_symbol_bounds(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: dict[Any, Any],
     graph_signature: torch.export.graph_signature.ExportGraphSignature,
-) -> Dict[sympy.Symbol, Tuple[int, int]]:
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
+) -> Tuple[Dict[sympy.Symbol, Tuple[int, int]], List[str]]:
     """Map ``sympy.Symbol -> (min, max)`` from dynamic ``Input``s, used to
     fill ``Dim.DYNAMIC`` upper bounds without mutating ``ShapeEnv``.
 
     Validates against finite exporter bounds: ``user_max > exp_max`` and
     ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
     a strict subset narrows the engine profile to the user's bounds (info
-    log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
-    0/1 specialization artifact, not a user error.
+    log only); the ``user_min=1, exp_min=2`` case warns, because the profile of
+    that input still starts at 1. The spec of a size ``a * s + c`` also bounds
+    ``s``. Exporter bounds come from ``range_constraints`` when given, because the
+    ``ShapeEnv`` reports ``Dim(min=1)`` as 2 (0/1 specialization).
+
+    Also returns, for :func:`_warn_ignored_opt_shapes`, the dims where the
+    engine opt, the export example moved inside the ``Input`` ranges, is not a
+    plain ``Input.opt_shape``. A dim is listed when all of these hold:
+
+    - it is a dynamic dimension of the export,
+    - no ``Input.profiles`` covers it,
+    - ``opt_shape`` differs from the engine opt there.
     """
     # ep.module() strips lifted params/buffers from the graph, so all_placeholders
     # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
@@ -1242,24 +1378,23 @@ def _build_user_symbol_bounds(
         if name in placeholder_by_name
     ]
 
-    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
-    # Fall back to name-based kwarg lookup when the arg/kwarg split differs
-    # from export time (which would cause flatten_up_to to raise an arity error).
-    in_spec = getattr(gm, "_in_spec", None)
-    try:
-        if in_spec is None:
-            raise AttributeError("_in_spec not found on graph module")
-        flat_inputs = in_spec.flatten_up_to(
-            (tuple(sample_arg_inputs), sample_kwarg_inputs)
-        )
-    except (ValueError, AttributeError):
-        flat_inputs = list(sample_arg_inputs)
-        if isinstance(sample_kwarg_inputs, dict):
-            for name in user_input_names[len(sample_arg_inputs) :]:
-                if name in sample_kwarg_inputs:
-                    flat_inputs.append(sample_kwarg_inputs[name])
+    flat_inputs = _flatten_inputs_like_placeholders(
+        gm, sample_arg_inputs, sample_kwarg_inputs, user_input_names
+    )
 
     user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+    # The profiles set the opt of these symbols, so they get no opt warning.
+    profiled_symbols = {
+        dim.node.expr
+        for node, inp in zip(placeholders, flat_inputs)
+        if isinstance(inp, Input)
+        and inp.profiles
+        and isinstance(node.meta.get("val"), torch.Tensor)
+        for dim in node.meta["val"].size()
+        if isinstance(dim, torch.SymInt) and isinstance(dim.node.expr, sympy.Symbol)
+    }
+    opt_checks: List[Tuple[str, int, torch.SymInt, int]] = []
+    derived_bounds: List[Tuple[sympy.Symbol, int, int, str]] = []
 
     for node, inp in zip(placeholders, flat_inputs):
         if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
@@ -1292,8 +1427,25 @@ def _build_user_symbol_bounds(
                 continue
             expr = dim.node.expr
             # Composite exprs (e.g. ``2*s0``) are recomputed by
-            # ``ShapeEnv.bound_sympy``; overriding them directly would lie.
+            # ``ShapeEnv.bound_sympy``; overriding them directly would lie. The
+            # spec of ``a * s + c`` bounds ``s`` instead, unless the input has
+            # profiles, which apply only to the export's own dynamic dims.
             if not isinstance(expr, sympy.Symbol):
+                if not inp.profiles and len(expr.free_symbols) == 1:
+                    (symbol,) = expr.free_symbols
+                    poly = sympy.Poly(expr, symbol)
+                    coeffs = poly.all_coeffs()
+                    if poly.degree() == 1 and all(c.is_integer for c in coeffs):
+                        a, c = (int(v) for v in coeffs)
+                        if a > 0:
+                            derived_bounds.append(
+                                (
+                                    symbol,
+                                    -((c - int(min_shape[d])) // a),
+                                    (int(max_shape[d]) - c) // a,
+                                    f"Input '{node.target}' dim {d} ({expr})",
+                                )
+                            )
                 logger.debug(
                     "Input '%s' dim %d is a composite symbolic expression (%s) "
                     "bounded by another dynamic dimension; its range will be "
@@ -1303,6 +1455,9 @@ def _build_user_symbol_bounds(
                     expr,
                 )
                 continue
+            # Input accepts a short opt_shape, and the engine ignores it here, so skip the check.
+            if expr not in profiled_symbols and d < len(inp.shape["opt_shape"]):
+                opt_checks.append((node.target, d, dim, int(inp.shape["opt_shape"][d])))
             if expr in user_symbol_bounds:
                 continue
             user_min = int(min_shape[d])
@@ -1323,20 +1478,38 @@ def _build_user_symbol_bounds(
             # Validate the user's Input range against it here -- at compile
             # time -- before they hit that opaque runtime error on a shape
             # they explicitly declared in Input.min_shape / Input.max_shape.
-            shape_env = getattr(dim.node, "shape_env", None)
-            if shape_env is None:
-                continue
-            exp_range = shape_env.var_to_range.get(expr)
+            exp_range = (range_constraints or {}).get(expr)
+            if exp_range is None:
+                shape_env = getattr(dim.node, "shape_env", None)
+                if shape_env is None:
+                    continue
+                exp_range = shape_env.var_to_range.get(expr)
             if exp_range is None:
                 continue
             exp_lower = exp_range.lower
             exp_upper = exp_range.upper
+            # A spec that pins the dim to 1 is allowed against a recorded 2, and
+            # warns like min_shape=1 below.
+            if (
+                isinstance(exp_lower, (int, sympy.Integer))
+                and user_max < exp_lower
+                and not (user_max == 1 and exp_lower == 2)
+            ):
+                raise ValueError(
+                    f"Dynamic dimension '{expr}': Input.max_shape ({user_max}) is "
+                    f"below the exported program's min ({int(exp_lower)}), so no "
+                    f"size fits both. Set Input.max_shape >= {int(exp_lower)}."
+                )
             exp_max_unbounded = exp_upper is int_oo or exp_upper == sympy.oo
             if exp_max_unbounded:
                 # Dim.DYNAMIC: user fills the gap (intended use).
                 continue
             try:
-                exp_min = int(exp_lower)
+                # range_constraints can start at 0, but extract_var_range_info
+                # starts every engine profile at 1 or more, so Input.min_shape=0
+                # is still rejected.
+                exp_lowest = int(exp_lower)
+                exp_min = max(exp_lowest, 1)
                 exp_max = int(exp_upper)
             except (TypeError, ValueError):
                 continue
@@ -1346,7 +1519,7 @@ def _build_user_symbol_bounds(
             mismatch = (
                 f"Dynamic dimension '{expr}': "
                 f"Input range [{user_min}, {user_max}] vs "
-                f"exported program range [{exp_min}, {exp_max}]."
+                f"exported program range [{exp_lowest}, {exp_max}]."
             )
 
             if user_max > exp_max:
@@ -1354,23 +1527,30 @@ def _build_user_symbol_bounds(
                     f"{mismatch} Input.max_shape ({user_max}) exceeds the "
                     f"exported program's max ({exp_max}). The program was "
                     f"exported with this dimension bounded to "
-                    f"[{exp_min}, {exp_max}], so the compiled TensorRT engine "
+                    f"[{exp_lowest}, {exp_max}], so the compiled TensorRT engine "
                     f"cannot accept shapes above {exp_max}. Either re-export "
                     f"with Dim('{expr}', max={user_max}) or set "
                     f"Input.max_shape <= {exp_max}."
                 )
 
             if user_min < exp_min:
-                # 1->2 is the 0/1 specialization artifact, not a user error.
+                # extract_var_range_info starts the profile of a symbol whose
+                # exporter min is 2 at 1; warn, do not raise.
                 if user_min == 1 and exp_min == 2:
                     logger.warning(
                         "%s Input.min_shape=1 but the exported program's min "
-                        "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
-                        "recorded as min=2). The compiled engine's min will "
-                        "be 2.",
+                        "is 2. The program was not exported for a size of 1, "
+                        "so a call with that size can fail.",
                         mismatch,
                     )
                     continue
+                if exp_lowest <= user_min:
+                    raise ValueError(
+                        f"{mismatch} Input.min_shape ({user_min}) is below 1. "
+                        f"The program accepts it, but Torch-TensorRT starts "
+                        f"every engine profile at 1 or more, so set "
+                        f"Input.min_shape >= 1."
+                    )
                 raise ValueError(
                     f"{mismatch} Input.min_shape ({user_min}) is below the "
                     f"exported program's min ({exp_min}). The program was "
@@ -1390,11 +1570,51 @@ def _build_user_symbol_bounds(
                 mismatch,
                 user_min,
                 user_max,
-                exp_min,
+                exp_lowest,
                 exp_max,
             )
 
-    return user_symbol_bounds
+    for symbol, low, high, where in derived_bounds:
+        if symbol in user_symbol_bounds:
+            user_min, user_max = user_symbol_bounds[symbol]
+            low, high = max(low, user_min), min(high, user_max)
+        exported = (range_constraints or {}).get(symbol)
+        if exported is not None:
+            lowest = recorded_lower(symbol, range_constraints or {})
+            low = max(low, 1 if lowest == 2 else lowest)
+            high = min(high, exported.upper)
+        if low > high:
+            raise ValueError(
+                f"{where}: no value of {symbol} fits the exported program and the "
+                f"Input specs of the inputs sized from it."
+            )
+        user_symbol_bounds[symbol] = (low, high)
+
+    # The engine opt is the export example moved inside the final ranges.
+    ignored_opts: List[str] = []
+    for name, d, dim, user_opt in opt_checks:
+        engine_opt = extract_var_range_info(
+            dim, user_symbol_bounds, range_constraints
+        ).get("opt")
+        if engine_opt is not None and engine_opt != user_opt:
+            ignored_opts.append(
+                f"'{name}' dim {d} (opt_shape {user_opt}, engine opt {engine_opt})"
+            )
+
+    return user_symbol_bounds, ignored_opts
+
+
+def _warn_ignored_opt_shapes(ignored_opts: List[str]) -> None:
+    if ignored_opts:
+        logger.warning(
+            "The engine is tuned for the size of the export example, moved inside "
+            "the Input range, not for Input.opt_shape, on %s. To tune it for "
+            "another size, pass "
+            "Input(profiles=[{'min_shape': ..., 'opt_shape': ..., 'max_shape': ...}]) "
+            "with one entry (or as many entries as the profiles of the other inputs), "
+            "or export the program with an example of that size.",
+            ", ".join(ignored_opts),
+        )
 
 
 def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
@@ -1429,6 +1649,7 @@ def compile_module(
     engine_cache: Optional[BaseEngineCache] = None,
     *,
     graph_signature: Optional[torch.export.graph_signature.ExportGraphSignature] = None,
+    range_constraints: Optional[Dict[sympy.Expr, Any]] = None,
     _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
@@ -1466,16 +1687,37 @@ def compile_module(
     # Forwarded to the partitioner to fill Dim.DYNAMIC upper bounds.
     # Read-only w.r.t. ShapeEnv so range_constraints survive save/re-export.
     # graph_signature is None on the torch.compile path, which has no ExportedProgram.
-    user_symbol_bounds = (
+    user_symbol_bounds, ignored_opts = (
         _build_user_symbol_bounds(
-            gm, sample_arg_inputs, sample_kwarg_inputs, graph_signature
+            gm,
+            sample_arg_inputs,
+            sample_kwarg_inputs,
+            graph_signature,
+            range_constraints,
         )
         if graph_signature is not None
-        else {}
+        else ({}, [])
     )
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
+
+    # Each of these writes needs a copy_ in PyTorch after the engine runs.
+    written_back = [
+        str(n.args[0]) for n in gm.graph.nodes if n.meta.get("_trt_write_back")
+    ]
+    if settings.require_full_compilation and written_back and not settings.dryrun:
+        raise AssertionError(
+            "require_full_compilation=True was specified, but the engine cannot "
+            f"update input(s) {written_back} in place, so PyTorch has to store the "
+            "write after the engine runs. An engine updates an input in place only "
+            "when the input is a contiguous tensor on the GPU that is not float64, "
+            "the model writes it once, its KV cache layer takes the write, the model "
+            "reads the written input afterwards, and nothing else reads its old "
+            "contents. Compile without "
+            "require_full_compilation, or return the updated tensor instead of "
+            "writing the input."
+        )
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops, op_support = (
@@ -1582,29 +1824,58 @@ def compile_module(
         and not defer_engine_setup_to_load()
     )
 
+    # Multi-profile propagation: build the map from export source
+    # symbols to per-profile bounds once, from the top-level inputs, then reuse
+    # it to attach the same profiles (by index) to the inputs of every engine,
+    # on the whole-graph path and on the partitioned path.
+    top_level_inputs = _flatten_inputs_like_placeholders(
+        gm,
+        sample_arg_inputs,
+        sample_kwarg_inputs,
+        [n.name for n in gm.graph.nodes if n.op == "placeholder"],
+    )
+    num_profiles = validate_optimization_profiles(top_level_inputs)
+    profile_source_bounds = None
+    if num_profiles:
+        logger.info(
+            f"Building engine(s) with {num_profiles} "
+            "optimization profiles (selected by index)"
+        )
+        profile_source_bounds = partitioning.build_profile_source_bounds(
+            gm, top_level_inputs, num_profiles
+        )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
     # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     # Graphs with non-tensor inputs (Flux `return_dict`) also partition, since those inputs
-    # cannot be engine bindings.
+    # cannot be engine bindings, and so do graphs with lifted buffers, which compile inlines
+    # into the partitioned GraphModule.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
         and not defer_engine_setup_to_load()
         and _placeholders_are_engine_bindings(gm)
+        and not any(
+            "_lifted_buffer" in n.meta for n in gm.graph.find_nodes(op="placeholder")
+        )
     ):
         logger.info(
             "require_full_compilation + full operator support: "
             "skipping partitioner, converting whole graph"
         )
+        _warn_ignored_opt_shapes(ignored_opts)
         dryrun_tracker.analysis_report = partition_analysis(
             gm, gm, op_support, settings, whole_graph=True
         )
         if settings.dryrun:
             convert_inputs = partitioning.construct_submodule_inputs(
                 gm,
+                profile_source_bounds=profile_source_bounds,
+                num_profiles=num_profiles,
                 user_symbol_bounds=user_symbol_bounds,
+                range_constraints=range_constraints,
             )
             record_partition_inputs("_run_on_acc_0", convert_inputs)
             dryrun_tracker.tensorrt_graph_count = 1
@@ -1626,8 +1897,11 @@ def compile_module(
         # are not TRT bindings.
         convert_inputs = partitioning.construct_submodule_inputs(
             gm,
+            profile_source_bounds=profile_source_bounds,
+            num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
+            range_constraints=range_constraints,
         )
         read: Set[int] = set()
         if weight_releaser is not None:
@@ -1760,25 +2034,11 @@ def compile_module(
         if "_run_on_acc" not in node.name:
             continue
         submodule_node_dict[node.name] = node
+    # The warning is about the engine, so only a graph with a TensorRT part gets it.
+    if submodule_node_dict:
+        _warn_ignored_opt_shapes(ignored_opts)
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
-
-    # Multi-profile propagation: build the map from export source
-    # symbols to per-profile bounds once, from the top-level inputs, then reuse
-    # it to attach the same profiles (by index) to every TRT submodule's inputs.
-    top_level_inputs: List[Input] = list(sample_arg_inputs)
-    if isinstance(sample_kwarg_inputs, dict):
-        top_level_inputs.extend(sample_kwarg_inputs.values())
-    num_profiles = validate_optimization_profiles(top_level_inputs)
-    profile_source_bounds = None
-    if num_profiles:
-        logger.info(
-            f"Building engine(s) with {num_profiles} "
-            "optimization profiles (selected by index)"
-        )
-        profile_source_bounds = partitioning.build_profile_source_bounds(
-            partitioned_module, top_level_inputs, num_profiles
-        )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -1874,6 +2134,7 @@ def compile_module(
             num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
+            range_constraints=range_constraints,
         )
         record_partition_inputs(name, submodule_inputs)
 
@@ -2017,6 +2278,9 @@ def compile_module(
     dryrun_stats_display(dryrun_tracker, False if is_analyzing() else settings.dryrun)
 
     restore_reshape(partitioned_module)
+    if user_symbol_bounds:
+        # Whole-module CUDA graphs warm the module up with inputs inside these bounds.
+        partitioned_module.meta["_user_symbol_bounds"] = user_symbol_bounds
     return partitioned_module
 
 
@@ -2575,6 +2839,7 @@ def convert_exported_program_to_serialized_trt_engine(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    # One engine holds the whole graph, so no index_copy is marked to run in PyTorch.
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
@@ -2583,12 +2848,26 @@ def convert_exported_program_to_serialized_trt_engine(
     # module-held caches). The caller is responsible for threading the
     # resulting bindings at runtime — they are appended after the user inputs
     # in the order returned here.
-    lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
-    predicted_kv_bindings: List[str] = []
+    # Without it, the buffers stay engine constants, and a write into a caller's
+    # tensor is still classified: the engine updates the tensor in place when it can.
+    gm, lifted_buffers = lift_mutated_buffers(
+        gm, settings, lift_buffers=lift_mutable_buffers, host_inputs_copied=False
+    )
+    # Read before lowering: `gm` is replaced below and the meta does not follow it.
+    predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+    # A write the engine cannot apply in place needs PyTorch to store it, and the
+    # bytes returned here run without PyTorch.
+    written_inputs = [
+        n.args[0].name for n in gm.graph.nodes if n.meta.get("_trt_write_back")
+    ]
+    if written_inputs:
+        raise RuntimeError(
+            "convert_exported_program_to_serialized_trt_engine cannot update input(s) "
+            f"{written_inputs} in place, so the engine would leave them unchanged. "
+            "Use torch_tensorrt.dynamo.compile, which stores the write, or return the "
+            "updated tensor instead of writing the input."
+        )
     if lift_mutable_buffers:
-        gm, lifted_buffers = lift_mutated_buffers(gm, settings)
-        # Read before lowering: `gm` is replaced below and the meta does not follow it.
-        predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
         # A write the engine cannot alias in place is classified as copy-back: its
         # new value is appended as an extra engine output, and whatever loads the
         # serialized program copies that output into the buffer afterwards. This
@@ -2704,6 +2983,10 @@ def convert_exported_program_to_serialized_trt_engine(
         )
         raise RuntimeError(f"While interpreting the module got an error: {e}") from e
 
+    if flat_input_names is not None:
+        placeholders = [n.name for n in gm.graph.nodes if n.op == "placeholder"]
+        renamed = dict(zip(placeholders, flat_input_names))
+        predicted_kv_bindings = [renamed.get(b, b) for b in predicted_kv_bindings]
     assert_predicted_kv_aliased(
         aliased_input_bindings([interpreter_result.aliased_io]),
         predicted_kv_bindings,

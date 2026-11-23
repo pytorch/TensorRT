@@ -51,8 +51,8 @@ class MyModel(nn.Module):
 
 model = MyModel().eval().cuda()
 
-# Define example input with batch size 2
-example_input = torch.randn(2, 3, 224, 224).cuda()
+# The engine is tuned for the size of the export example, so use the opt batch size, 8
+example_input = torch.randn(8, 3, 224, 224).cuda()
 
 # Define dynamic batch dimension using torch.export.Dim
 # This allows batch sizes from 1 to 32

@@ -28,8 +28,10 @@ These tests verify:
 """
 
 import inspect
+import io
 import sys
 import unittest
+import warnings
 from unittest import mock
 
 import torch
@@ -38,8 +40,8 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
-    assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
+    buffers_restored,
     erase_export_guards,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
@@ -52,6 +54,12 @@ def _ep_module_decomposed(model, args):
     ep = export(model, tuple(args))
     ep = ep.run_decompositions({})
     return ep.module()
+
+
+def _ep_module_on_cuda(model, args):
+    """``_ep_module_decomposed`` for a model whose buffers live on the GPU, as an
+    engine needs them to update one in place."""
+    return _ep_module_decomposed(model.cuda(), tuple(a.cuda() for a in args))
 
 
 class TestLiftMutatedBuffers(TestCase):
@@ -390,6 +398,38 @@ class TestCopyBackClassification(TestCase):
         new_gm, lifted = lift_mutated_buffers(gm)
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
+
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+    def test_index_copy_not_known_to_be_consecutive_is_copyback(self):
+        """``IKVCacheUpdateLayer`` takes only a start, so several positions are
+        copied back unless the graph builds them as one run of int32 or int64
+        values."""
+
+        class M(torch.nn.Module):
+            def __init__(self, index):
+                super().__init__()
+                self.index = index
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8))
+
+            def forward(self, x, positions):
+                self.cache.index_copy_(2, self.index(x, positions), x)
+                return self.cache.sum()
+
+        def arange(x, *args, **kwargs):
+            return torch.arange(*args, device=x.device, **kwargs)
+
+        cases = {
+            "caller's positions": (lambda x, p: p, [3, 4, 5]),
+            "int8": (lambda x, p: p + arange(x, 3, dtype=torch.int8), [2]),
+            "step 2": (lambda x, p: p + arange(x, 0, 6, 2), [2]),
+            "several starts": (lambda x, p: p + arange(x, 3), [2, 5, 9]),
+        }
+        for name, (index, positions) in cases.items():
+            with self.subTest(case=name):
+                args = (torch.ones(1, 4, 3, 8), torch.tensor(positions))
+                new_gm, _ = lift_mutated_buffers(_ep_module_on_cuda(M(index), args))
+                self.assertIn("cache", new_gm.meta["_copyback_mutation_buffers"])
+                self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
 
     def test_non_kv_mutation_recorded_for_copyback(self):
         """A non-KV in-place mutation is recorded for copy-back by buffer name."""
@@ -830,6 +870,7 @@ class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
         node = graph.call_function(
             torch.ops.aten.index_copy.default, args=(clone, 2, index, src)
         )
+        node.meta["_trt_kv_alias"] = True
         self.assertFalse(_index_copy_kv_eligible(node))
         self.assertTrue(_index_copy_kv_eligible(node, input_node=buffer))
 
@@ -1050,14 +1091,64 @@ class TestPredictedKvAssertion(TestCase):
         self.assertNotIn("min_block_size", message)
 
 
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+class TestInPlaceRule(TestCase):
+    """A caller's tensor is updated in place only when nothing else can see it change
+    too early or too late. Otherwise its write-back ``copy_`` stays."""
+
+    _args = (torch.ones(1, 4, 1, 8), torch.tensor([3]))
+
+    def test_an_input_write_not_done_in_place_is_written_back(self):
+        """Its ``copy_`` stays to store the write: with another reader of the old
+        contents, on the host (the engine gets a per-call copy), not contiguous, or
+        not read again (the engine updates the cache only as part of a value it
+        computes)."""
+
+        class Reader(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                old = cache[:, :, 3:4, :] * 2
+                cache.index_copy_(2, pos, x)
+                return cache.sum() + old.sum()
+
+        class Writer(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                cache.index_copy_(2, pos, x)
+                return cache.sum()
+
+        class Unread(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                cache.index_copy_(2, pos, x)
+                return x + 1
+
+        cache = torch.zeros(1, 4, 16, 8)
+        strided = torch.zeros(1, 16, 4, 8).transpose(1, 2)
+        for name, model, first, to_cuda in (
+            ("another reader", Reader(), cache, True),
+            ("host", Writer(), cache, False),
+            ("not contiguous", Writer(), strided, True),
+            ("not read again", Unread(), cache, True),
+        ):
+            with self.subTest(name):
+                args = (first,) + self._args
+                to_gm = _ep_module_on_cuda if to_cuda else _ep_module_decomposed
+                gm, _ = lift_mutated_buffers(to_gm(model, args))
+                self.assertEqual(gm.meta["_predicted_kv_bindings"], [])
+                (copy,) = [
+                    n
+                    for n in gm.graph.nodes
+                    if n.target is torch.ops.aten.copy_.default
+                ]
+                self.assertTrue(copy.meta.get("_trt_write_back"))
+
+
 class TestDeadKvWriteRouting(TestCase):
     """A KV write nothing else consumes is routed to copy-back instead of aliased.
 
     Erasing its ``copy_`` leaves such a write dead, so it is eliminated before any
     engine can alias it and the prediction can never be fulfilled. Copy-back makes it
     live again by re-attaching its value as a graph output, which is only safe because
-    ``_trt_no_kv_alias`` stops the converter aliasing the same buffer as well: a
-    buffer that is both raises on every call.
+    the converter aliases only writes marked ``_trt_kv_alias``: a buffer that is both
+    raises on every call.
     """
 
     @staticmethod
@@ -1096,26 +1187,16 @@ class TestDeadKvWriteRouting(TestCase):
         self.assertEqual(gm.meta["_copyback_mutation_buffers"], ["cache"])
         self.assertEqual(gm.meta["_predicted_kv_bindings"], [])
 
-    def test_the_rerouted_write_is_marked(self):
-        gm, _lifted = lift_mutated_buffers(self._dead_write_gm())
-        marked = gm.meta["_no_kv_alias_writes"]
-        self.assertEqual(len(marked), 1)
-        node = next(n for n in gm.graph.nodes if n.name == marked[0])
-        self.assertIs(node.target, torch.ops.aten.slice_scatter.default)
-        self.assertTrue(node.meta["_trt_no_kv_alias"])
-
-    def test_a_live_kv_write_is_not_marked(self):
-        """Only a write the classifier re-routed is marked. Marking a live KV write
-        would cost it its aliasing and hand it copy-back's per-call full-cache copy,
-        which is the cost the fast path exists to avoid."""
+    def test_a_live_kv_write_is_marked_in_place(self):
         gm, _lifted = lift_mutated_buffers(self._live_index_copy_gm())
-        self.assertEqual(gm.meta["_no_kv_alias_writes"], [])
+        (node,) = [
+            n for n in gm.graph.nodes if n.target is torch.ops.aten.index_copy.default
+        ]
+        self.assertTrue(node.meta.get("_trt_kv_alias"))
         self.assertEqual(gm.meta["_predicted_kv_bindings"], ["buf_cache"])
 
-    def test_a_non_kv_write_is_not_marked(self):
-        """Nothing would alias it anyway, so the marker would say nothing. Keeping it
-        to writes the converter really would have aliased is what leaves
-        ``assert_predicted_kv_aliased``'s copy-back direction something to catch."""
+    def test_a_non_kv_write_is_copied_back(self):
+        """Main does the same; this guards it next to the new mark."""
 
         class M(torch.nn.Module):
             def __init__(self):
@@ -1128,12 +1209,11 @@ class TestDeadKvWriteRouting(TestCase):
 
         gm, _lifted = lift_mutated_buffers(_ep_module_decomposed(M(), (torch.ones(4),)))
         self.assertEqual(gm.meta["_copyback_mutation_buffers"], ["state"])
-        self.assertEqual(gm.meta["_no_kv_alias_writes"], [])
 
-    def test_the_marker_blocks_index_copy_eligibility(self):
+    def test_index_copy_takes_only_a_marked_write(self):
         """``index_copy`` applies its own eligibility check rather than
-        ``slice_scatter``'s, so the marker has to be honoured in both places or the
-        decode write aliases while its value is also a copy-back output."""
+        ``slice_scatter``'s, so both have to read the mark, or a write left to
+        copy-back aliases while its value is also a copy-back output."""
         from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
             _index_copy_kv_eligible,
         )
@@ -1143,74 +1223,16 @@ class TestDeadKvWriteRouting(TestCase):
             n for n in gm.graph.nodes if n.target is torch.ops.aten.index_copy.default
         )
         self.assertTrue(_index_copy_kv_eligible(node))
-        node.meta["_trt_no_kv_alias"] = True
+        del node.meta["_trt_kv_alias"]
         self.assertFalse(_index_copy_kv_eligible(node))
-
-
-class TestNoKvAliasMarkerSurvival(TestCase):
-    """``assert_no_kv_alias_markers_survived`` re-reads the markers after lowering.
-
-    The marker is the only thing keeping a copy-back write out of ``aliased_io``, and
-    it rides on ``node.meta`` through every pass in ``post_lowering``. A pass that
-    rebuilt the node without its meta would drop it silently, so it is checked where
-    the cause can still be named rather than left to surface as a module that raises.
-    """
-
-    @staticmethod
-    def _marked_gm():
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-        write = graph.call_function(torch.ops.aten.mul.Tensor, (x, 2.0))
-        write.meta["_trt_no_kv_alias"] = True
-        graph.output((write,))
-        return torch.fx.GraphModule(torch.nn.Module(), graph), write.name
-
-    def test_surviving_marker_passes(self):
-        gm, name = self._marked_gm()
-        assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_stripped_marker_raises(self):
-        gm, name = self._marked_gm()
-        next(n for n in gm.graph.nodes if n.name == name).meta.pop("_trt_no_kv_alias")
-        with self.assertRaisesRegex(RuntimeError, "no other node carries it"):
-            assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_replacement_carrying_the_marker_raises(self):
-        """The reachable shape. Every pass in ``post_lowering`` that carries a node's
-        meta onto a replacement erases the original in the same block, so the recorded
-        name goes missing *and* an unrecorded node gains the marker. Reporting only
-        the missing half would say the meta was dropped when it was in fact carried,
-        and predict aliasing when the marker's presence prevents it."""
-        gm, name = self._marked_gm()
-        with self.assertRaisesRegex(RuntimeError, "carry the marker instead"):
-            assert_no_kv_alias_markers_survived(gm, [name + "_original"])
-
-    def test_marker_on_an_unmarked_node_raises(self):
-        """A marker on a node that was never marked, with every recorded marker still
-        in place: a pass copied the meta rather than moving it. The converter then
-        refuses to alias a write the classifier chose to alias, which the predicted-KV
-        cross-check reports as a partitioning failure -- the wrong cause."""
-        gm, name = self._marked_gm()
-        other = next(n for n in gm.graph.nodes if n.op == "placeholder")
-        other.meta["_trt_no_kv_alias"] = True
-        with self.assertRaisesRegex(RuntimeError, "were never marked"):
-            assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_marker_appearing_where_none_was_recorded_raises(self):
-        """The empty-expected case is checked too. Nothing recorded before lowering and
-        a marker present after it is the copied-meta fault with no recorded marker to
-        compare against; returning early on an empty set would skip it in the case
-        that occurs most, since most graphs mark nothing."""
-        gm, _name = self._marked_gm()
-        with self.assertRaisesRegex(RuntimeError, "were never marked"):
-            assert_no_kv_alias_markers_survived(gm, [])
 
 
 class TestHiddenCopybackOutputs(TestCase):
     """``hide_copyback_outputs`` splits what the graph returns from what ``forward``
-    returns: the trailing copy-back values stay on the output node so the exporters
-    keep finding them and dead-code elimination cannot reach them, while the caller
-    sees the arity of the model that was compiled."""
+    does: the trailing copy-back values stay on the output node so the exporters
+    keep finding them and dead-code elimination cannot reach them, while ``forward``
+    writes them into their buffers and returns the arity of the model that was
+    compiled."""
 
     @staticmethod
     def _two_output_gm():
@@ -1218,14 +1240,17 @@ class TestHiddenCopybackOutputs(TestCase):
         x = graph.placeholder("x")
         doubled = graph.call_function(torch.mul, args=(x, 2))
         graph.output((x, doubled))
-        return torch.fx.GraphModule(torch.nn.Module(), graph)
+        gm = torch.fx.GraphModule(torch.nn.Module(), graph)
+        gm.register_buffer("state", torch.zeros(3))
+        return gm
 
-    def test_hidden_output_leaves_the_graph_untouched(self):
+    def test_hidden_output_is_written_into_its_buffer(self):
         gm = self._two_output_gm()
-        hide_copyback_outputs(gm, 1)
+        hide_copyback_outputs(gm, ["state"])
 
         x = torch.arange(3, dtype=torch.float32)
         self.assertEqual(gm(x), (x,))
+        self.assertEqual(gm.state, x * 2)
         output_node = next(n for n in gm.graph.nodes if n.op == "output")
         self.assertEqual(len(output_node.args[0]), 2)
         # Nothing is dead, so eliminate_dead_code cannot take the hidden value.
@@ -1234,24 +1259,117 @@ class TestHiddenCopybackOutputs(TestCase):
 
     def test_hiding_nothing_is_a_no_op(self):
         gm = self._two_output_gm()
-        hide_copyback_outputs(gm, 0)
+        hide_copyback_outputs(gm, [])
         x = torch.arange(3, dtype=torch.float32)
         self.assertEqual(len(gm(x)), 2)
 
+    def test_inputs_named_like_a_builtin_or_the_write_back_helper(self):
+        """``forward`` takes the inputs under the model's own names, so it calls the
+        helper by a name no input has and names nothing else from outside."""
+
+        class M(torch.nn.Module):
+            def forward(self, getattr, write_copyback_buffers):
+                return getattr, getattr * write_copyback_buffers
+
+        x, y = torch.arange(3.0), torch.full((3,), 2.0)
+        gm = torch.export.export(M(), (x, y)).module()
+        gm.register_buffer("state", torch.zeros(3))
+        hide_copyback_outputs(gm, ["state"])
+
+        self.assertEqual(gm(x, y), (x,))
+        self.assertEqual(gm.state, x * y)
+
     def test_graph_consumers_still_see_the_hidden_value(self):
-        """Only the call boundary is narrowed. A non-strict ``torch.export`` runs a
-        GraphModule through ``fx.Interpreter``, which reads the output node, so a
-        retrace carries the copy-back value into the program even though the module
-        stopped returning it -- and the exporter downstream has something to
-        reclassify. Both retrace paths are non-strict; a caller who exports the
-        compiled module with ``strict=True`` gets the module called instead and loses
-        the hidden values."""
+        """Only ``forward`` changes. A non-strict ``torch.export`` runs a GraphModule
+        through ``fx.Interpreter``, which reads the output node, so a retrace carries
+        the copy-back value into the program for the exporter to reclassify."""
         gm = self._two_output_gm()
-        hide_copyback_outputs(gm, 1)
+        hide_copyback_outputs(gm, ["state"])
 
         x = torch.arange(3, dtype=torch.float32)
         self.assertEqual(len(gm(x)), 1)
         self.assertEqual(len(torch.fx.Interpreter(gm).run(x)), 2)
+
+
+class TestBuffersRestored(TestCase):
+    def test_buffers_are_put_back_and_the_rest_left_alone(self):
+        """A strided or conjugate buffer cannot be viewed as bytes as it is. An
+        expanded view of a written buffer comes back with it and cannot be written
+        itself. A sparse or quantized buffer has no byte view, and a meta buffer has no
+        data, so they are left alone."""
+        module = torch.nn.Module()
+        base = torch.zeros(1)
+        module.register_buffer("expanded", base.expand(4))
+        module.register_buffer("state", base)
+        module.register_buffer("strided", torch.arange(16.0)[::2])
+        module.register_buffer("conjugate", torch.tensor([2 + 3j, 4 + 5j]).conj())
+        module.register_buffer("csr", torch.eye(4).to_sparse_csr())
+        quantized = torch.quantize_per_tensor(torch.eye(4), 0.1, 0, torch.qint8)
+        module.register_buffer("quantized", quantized)
+        module.register_buffer("meta", torch.empty(4, device="meta"))
+        with buffers_restored(module):
+            module.state.add_(1)
+            module.strided.mul_(3)
+        self.assertEqual(module.state, torch.zeros(1))
+        self.assertEqual(module.expanded, torch.zeros(4))
+        self.assertEqual(module.strided, torch.arange(16.0)[::2])
+        self.assertEqual(module.conjugate, torch.tensor([2 - 3j, 4 - 5j]))
+        self.assertEqual(module.csr.to_dense(), torch.eye(4))
+        self.assertEqual(module.quantized.dequantize(), quantized.dequantize())
+
+    def test_torchscript_save_puts_back_buffers_only_for_a_module_that_writes(self):
+        """A module that writes no buffer is traced as it is, with no copy of its
+        buffers. One that writes them is put back, also after a pickle round trip.
+        Either way the trace runs in the caller's grad mode."""
+        import tempfile
+
+        import torch_tensorrt
+        from torch_tensorrt import _compile
+
+        traced = []
+
+        def trace(module, args, example_kwarg_inputs=None, check_trace=True):
+            traced.append((torch.is_grad_enabled(), check_trace))
+            module(*args)
+            return module
+
+        def save(module, f, _extra_files=None):
+            pass
+
+        x = torch.arange(3.0)
+        plain = torch.fx.symbolic_trace(torch.nn.Linear(3, 3))
+        plain.register_buffer("unused", torch.zeros(3))
+        writes = TestHiddenCopybackOutputs._two_output_gm()
+        hide_copyback_outputs(writes, ["state"])
+        writes.meta["_copyback_mutation_buffers"] = ["state"]
+        # torch.load drops meta, and its rebuilt forward writes the buffer.
+        data = io.BytesIO()
+        torch.save(writes, data)
+        data.seek(0)
+        loaded = torch.load(data, weights_only=False)
+        with (
+            mock.patch.object(torch.jit, "trace", trace, create=True),
+            mock.patch.object(torch.jit, "save", save, create=True),
+            mock.patch.object(
+                _compile, "buffers_restored", wraps=buffers_restored
+            ) as restored,
+            tempfile.TemporaryDirectory() as tmp,
+        ):
+            torch_tensorrt.save(
+                plain, f"{tmp}/a.ts", output_format="torchscript", arg_inputs=[x]
+            )
+            self.assertEqual(restored.call_count, 0)
+            torch_tensorrt.save(
+                writes, f"{tmp}/b.ts", output_format="torchscript", arg_inputs=[x]
+            )
+            self.assertEqual(restored.call_count, 1)
+            torch_tensorrt.save(
+                loaded, f"{tmp}/c.ts", output_format="torchscript", arg_inputs=[x]
+            )
+            self.assertEqual(restored.call_count, 2)
+        self.assertEqual(traced, [(True, True), (True, False), (True, False)])
+        self.assertEqual(writes.state, torch.zeros(3))
+        self.assertEqual(loaded.state, torch.zeros(3))
 
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
@@ -1356,12 +1474,12 @@ class TestCompileSeam(TestCase):
         with self.assertRaisesRegex(RuntimeError, "did not alias them"):
             self._compile(model, args, min_block_size=5)
 
-    def test_compile_hides_the_copyback_value_from_the_return(self):
-        """A copy-back value is carried on the graph output for the exporters, and
-        nothing between ``compile()`` and the ExecuTorch runtime writes it into the
-        buffer. Returning it would report an in-process mutation that did not
-        happen, so the compiled module keeps the arity of the model it came from
-        while the graph keeps the value."""
+    def test_compile_writes_the_copyback_value_into_the_buffer(self):
+        """Called from PyTorch, the compiled module writes the copy-back value into
+        the buffer, and returns the model's outputs while the graph keeps the value.
+        ``add`` returns new memory, in an engine or in PyTorch, so it needs no copy
+        before the write. A module compiled in inference mode still writes outside
+        it."""
 
         class M(torch.nn.Module):
             def __init__(self):
@@ -1373,25 +1491,529 @@ class TestCompileSeam(TestCase):
                 return self.state.sum()
 
         x = torch.arange(8, dtype=torch.float32).cuda()
+        add = {"torch.ops.aten.add.Tensor"}
+        for ops, inference in ((set(), False), (add, False), (set(), True)):
+            with self.subTest(torch_executed_ops=ops, inference_mode=inference):
+                model = M().cuda().eval()
+                with torch.inference_mode(inference):
+                    trt_gm = self._compile(
+                        model, (x,), min_block_size=1, torch_executed_ops=ops
+                    )
+                self.assertEqual(
+                    trt_gm.meta.get("_copyback_mutation_buffers"), ["state"]
+                )
+                self.assertNotIn(".clone()", trt_gm.code)
+                for step in range(3):
+                    xi = x * (step + 1)
+                    eager = model(xi)
+                    out = trt_gm(xi)
+                    self.assertEqual(len(out), 1)
+                    torch.testing.assert_close(out[0], eager)
+                    torch.testing.assert_close(trt_gm.state, model.state)
+
+                # Still on the output node, where the exporters read it and
+                # dead-code elimination cannot reach it.
+                output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
+                self.assertEqual(len(output_node.args[0]), 2)
+
+    def test_compile_keeps_a_clone_of_a_copyback_buffer(self):
+        """The clone holds the old value past the write-back, so lowering keeps it."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.ones(8).cuda())
+
+            def forward(self, x):
+                old = self.state.clone()
+                self.state.copy_(x * 2)
+                return old
+
+        import tempfile
+
+        import torch_tensorrt
+
         model = M().cuda().eval()
-        trt_gm = self._compile(model, (x,), min_block_size=1)
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        trt_gm = self._compile(M().cuda().eval(), (x,), min_block_size=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            # The saved program has no generated forward to copy the old value.
+            torch_tensorrt.save(
+                trt_gm, f"{tmp}/m.ep", output_format="exported_program", arg_inputs=[x]
+            )
+            saved = torch.export.load(f"{tmp}/m.ep").module()
+        saved_model = M().cuda().eval()
+        for step in range(3):
+            xi = x + step
+            out = trt_gm(xi)
+            torch.testing.assert_close(out[0], model(xi))
+            torch.testing.assert_close(trt_gm.state, model.state)
+            torch.testing.assert_close(saved(xi)[0], saved_model(xi))
 
+    def test_nested_buffers_whose_flat_names_collide(self):
+        """``a.b_c`` and ``a_b.c`` both flatten to ``lifted_buf_a_b_c``, a buffer the
+        model reads and the global partitioner keeps. Each gets its own name, which
+        refit's output check finds again from the model's names alone, also after a
+        pickle round trip."""
+        from torch_tensorrt.dynamo import refit_module_weights
+
+        class Holder(torch.nn.Module):
+            def __init__(self, name, value):
+                super().__init__()
+                self.register_buffer(name, torch.full((8,), value).cuda())
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.arange(1.0, 9.0).cuda())
+                self.a = Holder("b_c", 1.0)
+                self.a_b = Holder("c", 2.0)
+                self.register_buffer("lifted_buf_a_b_c", torch.full((8,), 5.0).cuda())
+
+            def forward(self, x):
+                self.a.b_c.add_(x * self.weight)
+                self.a_b.c.add_(x)
+                return (self.a.b_c + self.a_b.c + self.lifted_buf_a_b_c,)
+
+        args = (torch.ones(8).cuda(),)
+        ep = torch.export.export(M(), args, strict=False)
+        trt_gm = self._compile(
+            M(),
+            args,
+            min_block_size=1,
+            immutable_weights=False,
+            use_fast_partitioner=False,
+        )
+        eager = M()
+        for _ in range(2):
+            torch.testing.assert_close(trt_gm(*args)[0], eager(*args)[0])
+        data = io.BytesIO()
+        torch.save(trt_gm, data)
+        data.seek(0)
+        modules = {"compiled": trt_gm, "pickled": torch.load(data, weights_only=False)}
+        for kind, module in modules.items():
+            with self.subTest(module=kind):
+                with self.assertLogs(
+                    "torch_tensorrt.dynamo._refit", level="INFO"
+                ) as logs:
+                    refit_module_weights(
+                        module,
+                        ep,
+                        arg_inputs=list(args),
+                        in_place=True,
+                        verify_output=True,
+                    )
+                self.assertTrue(
+                    any("Refitting Succeed" in line for line in logs.output)
+                )
+
+    def test_views_of_a_buffer_made_in_pytorch_are_read_before_its_write(self):
+        """A copy-back value can be a view of the buffer the same call writes, made
+        by a part that runs in PyTorch and returned as one of its outputs. It has to
+        be read before the write, also when the model returns a view of it."""
+
+        class M(torch.nn.Module):
+            def __init__(self, two, returns_view=False):
+                super().__init__()
+                self.two = two
+                self.returns_view = returns_view
+                self.register_buffer("b", torch.arange(9.0).reshape(3, 3).cuda())
+                self.register_buffer("a", torch.zeros(3, 3).cuda())
+                self.register_buffer("c", torch.zeros(3, 3).cuda())
+
+            def forward(self, x):
+                self.a.copy_(self.b.t())
+                if self.two:
+                    self.c.copy_(self.b.permute(1, 0))
+                self.b.copy_(self.b * 0 + x)
+                return self.a.t() if self.returns_view else x + 1
+
+        x = torch.full((3, 3), 7.0).cuda()
+        for two in (False, True):
+            for fast in (True, False):
+                with self.subTest(two=two, use_fast_partitioner=fast):
+                    eager = M(two, returns_view=not two).eval()
+                    trt_gm = self._compile(
+                        M(two, returns_view=not two).eval(),
+                        (x,),
+                        min_block_size=1,
+                        use_fast_partitioner=fast,
+                        torch_executed_ops={"torch.ops.aten.permute.default"},
+                    )
+                    for step in range(2):
+                        xi = x + step
+                        out = trt_gm(xi)[0]
+                        torch.testing.assert_close(out, eager(xi).clone())
+                        for name in ("a", "b", "c") if two else ("a", "b"):
+                            torch.testing.assert_close(
+                                getattr(trt_gm, name), getattr(eager, name)
+                            )
+
+    def test_a_returned_buffer_is_read_after_its_write(self):
+        """A buffer replaced by a view of itself and returned is the new buffer in
+        eager, so the module returns it after the write."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.arange(9.0).reshape(3, 3).cuda())
+
+            def forward(self, x):
+                self.state = self.state.t()
+                return self.state + 0 * x, self.state
+
+        eager = M().eval()
+        trt_gm = self._compile(
+            M().eval(),
+            (torch.zeros(3, 3).cuda(),),
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.permute.default"},
+        )
+        for step in range(2):
+            x = torch.full((3, 3), float(step)).cuda()
+            expected = [t.clone() for t in eager(x)]
+            for got, want in zip(trt_gm(x), expected):
+                torch.testing.assert_close(got, want)
+
+    @unittest.skipIf(
+        not hasattr(torch.jit, "trace"),
+        "needs a PyTorch build with TorchScript (torch.jit.trace)",
+    )
+    def test_torchscript_save_leaves_the_buffers_alone(self):
+        """Tracing calls the module, so the save puts the buffers back, and the write
+        is detached, so a buffer gets no gradient history that would fail a deep copy
+        and the loaded module's next call."""
+        import copy
+        import tempfile
+
+        import torch_tensorrt
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.full((8,), 2.0).cuda())
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x * self.weight)
+                return self.state * 3
+
+        args = (torch.ones(8).cuda(),)
+        # At the default min_block_size the write runs in PyTorch.
+        trt_gm = self._compile(M().eval(), args)
         self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers"), ["state"])
-        eager = model(x.clone())
-        out = trt_gm(x)
-        self.assertEqual(len(out), 1)
-        self.assertEqual(out[0].shape, eager.shape)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = f"{tmp}/model.ts"
+            # The trace check would call the module again and see the buffer move.
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", torch.jit.TracerWarning)
+                torch_tensorrt.save(
+                    trt_gm, path, output_format="torchscript", arg_inputs=list(args)
+                )
+            loaded = torch.jit.load(path)
+        self.assertEqual(trt_gm.state, torch.zeros(8).cuda())
+        self.assertEqual(
+            (trt_gm.state.is_leaf, trt_gm.state.requires_grad), (True, False)
+        )
+        copy.deepcopy(trt_gm)
+        for expected in (6.0, 12.0):
+            out = loaded(*args)
+            out = out[0] if isinstance(out, (tuple, list)) else out
+            torch.testing.assert_close(out.detach(), torch.full((8,), expected).cuda())
+            # The loaded module keeps writing its buffer, without the weight's history.
+            self.assertFalse(loaded.state.requires_grad)
 
-        # Still on the output node, where the exporters read it and dead-code
-        # elimination cannot reach it.
-        output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
-        self.assertEqual(len(output_node.args[0]), 2)
+    def test_output_check_copies_conjugate_negative_and_sparse_inputs(self):
+        """A conjugate or negative view keeps its value in the copy, and a sparse
+        input, which has no storage to copy, is copied too. A quantized input keeps
+        its scale."""
+        from torch_tensorrt.dynamo.utils import _copy_inputs
+
+        sparse = torch.eye(3).to_sparse()
+        quantized = torch.quantize_per_tensor(torch.randn(4, 4), 0.1, 0, torch.qint8)
+        inputs = [
+            torch.tensor([1 + 2j, 3 - 4j]).conj(),
+            torch._neg_view(torch.tensor([1.0, -2.0])),
+            sparse,
+            quantized,
+        ]
+        copies = _copy_inputs(inputs)
+        for original, copy in zip(inputs[:2], copies[:2]):
+            self.assertEqual(copy, original)
+        self.assertEqual(copies[2].to_dense(), sparse.to_dense())
+        self.assertIsNot(copies[2], sparse)
+        self.assertEqual(copies[3].dequantize(), quantized.dequantize())
+
+    def test_refit_output_check_compares_flattened_outputs(self):
+        """A compiled module can return a flat tuple where the model returns a tensor
+        or a dictionary. Equal leaves pass; a different value, size, count,
+        dictionary key (also of an entry without leaves), type or dtype fails."""
+        from torch_tensorrt.dynamo.utils import check_module_output
+
+        def same(x):
+            return x * 2, x.shape[0], 1.5, True, None
+
+        x = torch.ones(8).cuda()
+        for new, old, match in (
+            (lambda x: x, lambda x: (x,), True),
+            (lambda x: x, lambda x: (x + 1,), False),
+            (same, same, True),
+            (same, lambda x: (x * 2, 9, 1.5, True, None), False),
+            (lambda x: (x, x), lambda x: (x,), False),
+            (lambda x: {"a": x}, lambda x: {"b": x}, False),
+            (lambda x: {"a": [], "t": x}, lambda x: {"b": [], "t": x}, False),
+            (lambda x: {"t": x}, lambda x: {"t": x, "extra": []}, False),
+            (lambda x: {"value": x * 2}, lambda x: (x * 3,), False),
+            (lambda x: (x, x), lambda x: (x, 2), False),
+            (lambda x: (x, x), lambda x: (x, x.half()), False),
+            (lambda x: (x, 1), lambda x: (x, True), False),
+            (lambda x: (x, 1.0), lambda x: (x, 1), False),
+        ):
+            self.assertEqual(check_module_output(new, old, (x,), {}), match)
+
+    def test_refit_output_check_takes_outputs_registered_without_key_paths(self):
+        """diffusers registers its output types without key paths, which
+        tree_flatten_with_path refuses, so their leaves are compared without keys.
+        Their keys still have to match."""
+        from torch_tensorrt.dynamo.utils import check_module_output
+
+        class Output(dict):
+            pass
+
+        torch.utils._pytree.register_pytree_node(
+            Output,
+            lambda d: (list(d.values()), list(d.keys())),
+            lambda values, keys: Output(zip(keys, values)),
+        )
+        x = torch.ones(8).cuda()
+        self.assertTrue(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: (x * 2,), (x,), {}
+            )
+        )
+        self.assertFalse(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: (x * 3,), (x,), {}
+            )
+        )
+        self.assertFalse(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: Output(other=x * 2), (x,), {}
+            )
+        )
+
+    def test_refit_output_check_copies_the_inputs(self):
+        """Each module gets its own copy, so a write leaves the caller's tensor alone.
+        Inputs that share memory share it in the copy too, also through two storages
+        from DLPack, so a module that skips a write fails. An input with autograd history copies like any other, and a
+        small view of a large tensor copies only the bytes it uses."""
+        from torch_tensorrt.dynamo.utils import _copy_inputs, check_module_output
+
+        def writes(a, b):
+            a.add_(1)
+            return b.clone()
+
+        def skips(a, b):
+            return b.clone()
+
+        a = torch.zeros(8).cuda()
+        c = torch.zeros(8, dtype=torch.complex64).cuda()
+        p = torch.nn.Parameter(torch.zeros(8).cuda(), requires_grad=False)
+        q = torch.nn.Parameter(p.data, requires_grad=False)
+        for args in (
+            (a, a),
+            (a, a[1:3]),
+            (p, p[1:3]),
+            (p, q),
+            (c, c.conj()),
+            (a, torch._neg_view(a)),
+            (a, torch.from_dlpack(a[1:3])),
+        ):
+            self.assertTrue(check_module_output(writes, writes, args, {}))
+            self.assertFalse(check_module_output(writes, skips, args, {}))
+        torch.testing.assert_close(a, torch.zeros(8).cuda())
+        torch.testing.assert_close(p.data, torch.zeros(8).cuda())
+
+        x = torch.ones(4, device="cuda", requires_grad=True) * 2
+        self.assertTrue(check_module_output(torch.sin, torch.sin, (x,), {}))
+        big = torch.arange(1 << 20, dtype=torch.float32, device="cuda")
+        (copied,) = _copy_inputs((big[8:12],))
+        torch.testing.assert_close(copied, big[8:12])
+        self.assertLessEqual(copied.untyped_storage().nbytes(), 64)
+
+    def test_a_write_back_keeps_a_cache_without_autograd_history(self):
+        """A model can write its cache under ``no_grad`` from a value that has
+        autograd history. The cache keeps no history, as in eager, so the module
+        still runs after a pickle round trip."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 1, 16, 2).cuda())
+
+            def forward(self, x, index):
+                with torch.no_grad():
+                    self.cache.index_copy_(2, index, x)
+                return self.cache.sum()
+
+        import torch_tensorrt
+
+        def first(out):
+            return out[0] if isinstance(out, (tuple, list)) else out
+
+        model = M()
+        eager = M()
+        x = torch.ones(1, 1, 3, 2, device="cuda", requires_grad=True)
+        index = torch.tensor([1, 3, 5], device="cuda")
+        t = torch.export.Dim("t", min=1, max=4)
+        ep = export(model, (x, index), dynamic_shapes=({2: t}, {0: t}))
+        compiled = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=[x, index],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        for step in range(2):
+            xi = x * (step + 2)
+            torch.testing.assert_close(first(compiled(xi, index)), eager(xi, index))
+            torch.testing.assert_close(compiled.cache, eager.cache)
+        self.assertFalse(compiled.cache.requires_grad)
+        stream = io.BytesIO()
+        torch.save(compiled, stream)
+        stream.seek(0)
+        loaded = torch.load(stream, weights_only=False)
+        torch.testing.assert_close(first(loaded(x, index)), eager(x, index))
+
+    def test_refit_of_a_pickled_module_keeps_writing_its_buffer(self):
+        """torch.load rebuilds the buffer write as a copy_ node, which refit's graph
+        cleanup keeps, so the refitted module goes on writing its buffer."""
+        from torch_tensorrt.dynamo import refit_module_weights
+
+        class M(torch.nn.Module):
+            def __init__(self, scale=1.0):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.arange(1.0, 9.0).cuda() * scale)
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x * self.weight)
+                return (self.state * 3,)
+
+        args = (torch.ones(8).cuda(),)
+        data = io.BytesIO()
+        torch.save(
+            self._compile(M(), args, immutable_weights=False, min_block_size=1), data
+        )
+        data.seek(0)
+        loaded = torch.load(data, weights_only=False)
+        new = torch.export.export(M(2.0), args, strict=False)
+        refit_module_weights(
+            loaded, new, arg_inputs=list(args), in_place=True, verify_output=True
+        )
+        eager = M(2.0)
+        for _ in range(2):
+            torch.testing.assert_close(loaded(*args)[0], eager(*args)[0])
+        torch.testing.assert_close(loaded.state, eager.state)
+
+    def test_refit_keeps_the_written_buffer(self):
+        """Refit lifts the written buffer and partitions as compile did, with either
+        partitioner. With full compilation, compile keeps the graph around the engine
+        and refit keeps an engine below ``min_block_size``, so it refits in place. The
+        module keeps the state it reached and runs with the new weights, and the new
+        program comes out of the output check unchanged and without autograd history."""
+        from torch_tensorrt.dynamo import refit_module_weights
+
+        class M(torch.nn.Module):
+            def __init__(self, scale=1.0):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.arange(1.0, 9.0).cuda() * scale)
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x * self.weight)
+                return (self.state * 3,)
+
+        args = (torch.ones(8).cuda(),)
+        split = {
+            "min_block_size": 1,
+            "torch_executed_ops": {"torch.ops.aten.add.Tensor"},
+        }
+        for settings in (
+            split,
+            {**split, "use_fast_partitioner": False},
+            {"min_block_size": 5, "require_full_compilation": True},
+        ):
+            with self.subTest(**settings):
+                trt_gm = self._compile(M(), args, immutable_weights=False, **settings)
+                trt_gm(*args)
+                trt_gm(*args)
+                before = trt_gm.state.clone()
+                new = torch.export.export(M(2.0), args, strict=False)
+                with self.assertLogs(
+                    "torch_tensorrt.dynamo._refit", level="INFO"
+                ) as logs:
+                    refitted = refit_module_weights(
+                        trt_gm,
+                        new,
+                        arg_inputs=list(args),
+                        in_place=True,
+                        verify_output=True,
+                    )
+                self.assertTrue(
+                    any("Refitting Succeed" in line for line in logs.output)
+                )
+                self.assertIs(refitted, trt_gm)
+                torch.testing.assert_close(refitted.state, before)
+                (out,) = refitted(*args)
+                weight = torch.arange(1.0, 9.0).cuda() * 2
+                torch.testing.assert_close(out, (before + args[0] * weight) * 3)
+                state = new.state_dict["state"]
+                torch.testing.assert_close(state, torch.zeros(8).cuda())
+                self.assertEqual((state.requires_grad, state.is_leaf), (False, True))
+
+    def test_refit_that_converts_nothing_returns_a_module_that_writes(self):
+        """A new model with too few operators for an engine comes back from refit to
+        run in PyTorch. It still reads and writes its lifted buffer."""
+        from torch_tensorrt.dynamo import refit_module_weights
+
+        class Big(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return (self.state * 2 + 1) * 3 - 1
+
+        class Small(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state * 2
+
+        args = (torch.ones(8).cuda(),)
+        trt_gm = self._compile(Big(), args, min_block_size=4, immutable_weights=False)
+        refitted = refit_module_weights(
+            trt_gm,
+            torch.export.export(Small(), args, strict=False),
+            arg_inputs=list(args),
+        )
+        eager = Small()
+        for _ in range(3):
+            out = refitted(*args)
+            self.assertEqual(len(out), 1)
+            torch.testing.assert_close(out[0], eager(*args))
 
     def test_compile_hides_copyback_beside_an_engine_aliased_kv_buffer(self):
         """One module holding both kinds of mutated buffer at once.
 
-        ``hide_copyback_outputs`` truncates the last *N* values of the return, so it
-        is right only while the copy-back values really are the trailing ones. Two
+        ``hide_copyback_outputs`` writes the last *N* values into the buffers and drops
+        them from the return, so it is right only while the copy-back values really
+        are the trailing ones. Two
         mechanisms append outputs: lift appends the copy-back values last, and the
         interpreter appends an aliased output per KV write inside each submodule.
         The second is truncated at the submodule boundary and must never reach the
@@ -1432,14 +2054,9 @@ class TestCompileSeam(TestCase):
         )
         self.assertEqual(aliased, {"buf_k"})
 
-        out = trt_gm(*args)
-        self.assertEqual(len(out), 1)
-        self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
-        # Aliased, so the engine wrote the cache in place.
-        self.assertTrue(torch.allclose(trt_gm.k.cpu(), expected_k.cpu(), atol=1e-3))
-
         # The graph keeps exactly one more value than the return, and it is the
-        # copy-back buffer's new contents rather than a KV output.
+        # copy-back buffer's new contents rather than a KV output. Run before
+        # forward, which writes that buffer.
         output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
         self.assertEqual(len(output_node.args[0]), 2)
         outs = torch.fx.Interpreter(trt_gm).run(*args)
@@ -1447,6 +2064,40 @@ class TestCompileSeam(TestCase):
         self.assertTrue(
             torch.allclose(outs[-1].float().cpu(), expected_state.cpu(), atol=1e-3)
         )
+
+        out = trt_gm(*args)
+        self.assertEqual(len(out), 1)
+        self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
+        # Aliased, so the engine wrote the cache in place.
+        self.assertTrue(torch.allclose(trt_gm.k.cpu(), expected_k.cpu(), atol=1e-3))
+
+    def test_full_compilation_writes_a_kv_buffer_in_place(self):
+        """With ``require_full_compilation`` the graph still partitions when it has a
+        lifted buffer, since compile inlines the buffer into the partitioned module."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("k", torch.zeros(1, 4, 16, 8).cuda())
+
+            def forward(self, x):
+                self.k[:, :, 3:4, :] = x
+                return self.k.sum(2)
+
+        x = torch.randn(1, 4, 1, 8).cuda()
+        eager = M()
+        trt_gm = self._compile(
+            M(), (x,), min_block_size=1, require_full_compilation=True
+        )
+        aliased = aliased_input_bindings(
+            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+        )
+        self.assertEqual(aliased, {"buf_k"})
+        for scale in (1.0, -2.0):
+            out = trt_gm(x * scale)
+            out = out[0] if isinstance(out, (tuple, list)) else out
+            torch.testing.assert_close(out, eager(x * scale), atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(trt_gm.k, eager.k, atol=1e-3, rtol=1e-3)
 
     def test_saved_program_declares_the_hidden_copyback_mutation(self):
         """Hiding the value from the return must not hide it from the exporter: the
@@ -1494,6 +2145,122 @@ class TestCompileSeam(TestCase):
                 )
                 # And the module the caller still holds returns what it did before.
                 self.assertEqual(len(trt_gm(x)), 1, f"retrace={retrace}")
+
+    def test_a_pickled_module_keeps_writing_its_buffer(self):
+        """``torch.load`` drops ``meta`` and rebuilds ``forward`` by tracing it, which
+        records the write as graph nodes. So the loaded module writes its buffer, and
+        an export of it declares the write once decomposed, as an export of the model
+        does."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+                self.register_buffer("calls", torch.zeros(1).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                self.calls.add_(1)
+                return self.state * 2, x + self.calls
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        # With an engine, and at the default min_block_size in PyTorch, where the
+        # counter's new value is computed from its buffer alone.
+        for settings in ({"min_block_size": 1}, {}):
+            with self.subTest(**settings):
+                data = io.BytesIO()
+                torch.save(self._compile(M().cuda().eval(), (x,), **settings), data)
+                data.seek(0)
+                loaded = torch.load(data, weights_only=False)
+                eager = M().cuda().eval()
+                for _ in range(2):
+                    torch.testing.assert_close(loaded(x), eager(x))
+                torch.testing.assert_close(loaded.state, eager.state)
+                torch.testing.assert_close(loaded.calls, eager.calls)
+                program = torch.export.export(loaded, (x,), strict=False)
+                # An engine call is an effect, so the program also returns a token.
+                kinds = [
+                    (spec.kind.name, spec.target)
+                    for spec in program.run_decompositions().graph_signature.output_specs
+                    if spec.kind.name != "TOKEN"
+                ]
+                self.assertEqual(
+                    kinds,
+                    [("BUFFER_MUTATION", "state"), ("BUFFER_MUTATION", "calls")]
+                    + [("USER_OUTPUT", None)] * 2,
+                )
+
+    def test_pickling_refuses_a_write_it_cannot_rebuild(self):
+        """A value made from nothing, as by ``torch.rand``, leaves the trace nothing to
+        record, so ``torch.load`` raises rather than return a module that stops
+        writing that buffer."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(3).cuda())
+                self.register_buffer("noise", torch.zeros(3).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                self.noise.copy_(torch.rand(3, device="cuda"))
+                return self.state * 2
+
+        x = torch.ones(3).cuda()
+        # At the default min_block_size the writes run in PyTorch.
+        trt_gm = self._compile(M().cuda().eval(), (x,))
+        self.assertEqual(
+            trt_gm.meta.get("_copyback_mutation_buffers"), ["state", "noise"]
+        )
+        data = io.BytesIO()
+        torch.save(trt_gm, data)
+        data.seek(0)
+        with self.assertRaisesRegex(RuntimeError, "Cannot rebuild the write"):
+            torch.load(data, weights_only=False)
+
+        # An export that holds the module, rather than tracing it symbolically,
+        # records both writes.
+        class Holder(torch.nn.Module):
+            def __init__(self, inner):
+                super().__init__()
+                self.inner = inner
+
+            def forward(self, x):
+                return self.inner(x)
+
+        program = torch.export.export(Holder(trt_gm), (x,), strict=False)
+        mutated = program.run_decompositions().graph_signature.buffers_to_mutate
+        self.assertEqual(set(mutated.values()), {"inner.state", "inner.noise"})
+
+    def test_aot_inductor_package_writes_the_copyback_buffer(self):
+        """The save declares the copy-back value a buffer mutation, which AOT Inductor
+        applies, so the package returns the model's outputs and writes its buffer."""
+        import tempfile
+
+        import torch_tensorrt
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("state", torch.zeros(8).cuda())
+
+            def forward(self, x):
+                self.state.add_(x)
+                return self.state * 2
+
+        x = torch.arange(8, dtype=torch.float32).cuda()
+        trt_gm = self._compile(M().cuda().eval(), (x,), min_block_size=1)
+        eager = M().cuda().eval()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = f"{tmp}/m.pt2"
+            torch_tensorrt.save(
+                trt_gm, path, output_format="aot_inductor", arg_inputs=[x]
+            )
+            package = torch._inductor.aoti_load_package(path)
+            for _ in range(3):
+                out = package(x)
+                self.assertEqual(len(out), 1)
+                torch.testing.assert_close(out[0], eager(x))
 
     def test_retracing_exporter_sees_the_hidden_copyback_value(self):
         """``dynamo._exporter.export`` without the legacy exporter re-traces, and it
@@ -1599,14 +2366,19 @@ class TestCompileSeam(TestCase):
     def test_compile_raises_when_a_copyback_write_is_aliased(self):
         """The backstop for the next divergence between what the classifier predicts
         and what the converter emits, whatever that turns out to be. Standing in for
-        it by making the classifier file everything copy-back: the engine aliases the
-        cache anyway, and the compile has to say so rather than hand back a module
-        that raises ``IndexError`` on every call."""
+        it by making the classifier file everything copy-back while the write keeps
+        its in-place mark: the engine aliases the cache anyway, and the compile has
+        to say so rather than hand back a module that raises ``IndexError`` on every
+        call."""
         from torch_tensorrt.dynamo.lowering import _buffer_lifting
 
-        model, args = self._cloned_cache_model()
+        def copy_back_but_keep_the_mark(value, *args, **kwargs):
+            value.meta["_trt_kv_alias"] = True
+            return False
+
+        model, args = self._kv_model(batch=1)
         with mock.patch.object(
-            _buffer_lifting, "_kv_write_will_alias", lambda *a, **k: False
+            _buffer_lifting, "_kv_write_will_alias", copy_back_but_keep_the_mark
         ):
             with self.assertRaisesRegex(RuntimeError, "aliased them in place anyway"):
                 self._compile(model, args, min_block_size=1)
@@ -1740,53 +2512,6 @@ class TestCompileSeam(TestCase):
                 (spec.kind.name, spec.target)
                 for spec in loaded.graph_signature.output_specs
             ],
-        )
-
-    def test_compile_reads_the_markers_back_after_lowering(self):
-        """``compile()`` must call ``assert_no_kv_alias_markers_survived`` on the
-        *lowered* graph with the names lift recorded. Nothing else observes that
-        call: every pass in ``post_lowering`` carries the marks today, so dropping
-        the read-back changes no result until the day a pass stops carrying one,
-        which is exactly when it is needed.
-
-        Where the call sits is the whole of its value -- run above ``post_lowering``
-        it would only ever see the graph the marks were just written into, and could
-        not fail -- so the position is pinned as well as the call. It is pinned by
-        order rather than by comparing graphs: ``post_lowering`` rewrites the module
-        in place and returns the same object, so the graph handed to the read-back is
-        the same object either way and only *when* the call happens distinguishes
-        them."""
-        from torch_tensorrt.dynamo import _compiler as C
-
-        model, args = self._dead_slice_scatter_model()
-        events = []
-        original = C.assert_no_kv_alias_markers_survived
-        original_lowering = C.post_lowering
-
-        def _spy_lowering(gm, *a, **kw):
-            lowered = original_lowering(gm, *a, **kw)
-            events.append(("lowered", None))
-            return lowered
-
-        def _spy(gm, marked):
-            marked = list(marked)
-            events.append(("read_back", marked))
-            return original(gm, marked)
-
-        with mock.patch.object(C, "post_lowering", _spy_lowering):
-            with mock.patch.object(C, "assert_no_kv_alias_markers_survived", _spy):
-                self._compile(model, args, min_block_size=1)
-
-        reads = [e for e in events if e[0] == "read_back"]
-        self.assertEqual(len(reads), 1)
-        self.assertEqual(len(reads[0][1]), 1)
-
-        kinds = [kind for kind, _payload in events]
-        self.assertIn(
-            "lowered",
-            kinds[: kinds.index("read_back")],
-            "the read-back ran before lowering, so it can only ever see the graph "
-            "the markers were just written into",
         )
 
     def test_compile_does_not_cross_check_a_dryrun(self):

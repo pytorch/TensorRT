@@ -8,17 +8,24 @@ gated by a validator (declared in ``aten_ops_converters.py``) and there
 are two registered converters for the same op:
 
 * ``aten_ops_index_copy_kv`` — HIGH priority, validator-gated. Fires only
-  when the input is a 4-D static cache, ``dim=2``, and the source has
-  ``shape[2] == 1`` (single-position write — the common
-  streaming-decoder pattern). Emits ``IKVCacheUpdateLayer`` whose output
-  is aliased to the cache input.
+  for a write that ``lift_mutated_buffers`` marked to update in place, when
+  the input is a 4-D static floating-point cache, ``dim=2``, and the source
+  has ``shape[2] == 1`` (single-position write, the common
+  streaming-decoder pattern) or is written at consecutive positions
+  ``start + arange(n)`` (a prefill chunk, ``n`` possibly dynamic). Emits
+  ``IKVCacheUpdateLayer`` whose output is aliased to the cache input.
 
-* ``aten_ops_index_copy_fallback`` — STANDARD priority, always fires.
-  Implements the general semantics via scatter (equivalent to what the
-  torch decomposition would produce).
+* ``aten_ops_index_copy_fallback``: STANDARD priority. Fires for every
+  other static case, except an int8 write and a float64 write without
+  ``truncate_double``, which TensorRT's scatter cannot serve. Implements the
+  general semantics via scatter (equivalent to what the torch decomposition
+  would produce). Under ``assume_dynamic_shape_support`` it also takes a
+  dynamic input, but a write with a dynamic index or source stays in PyTorch,
+  because the scatter it builds needs their sizes.
 
-Since both converters live in TRT, no graph break is introduced for
-non-KV cases; they just take a less-efficient TRT path.
+A KV write whose size can be 0, as for ``Dim("T", max=8)``, runs in PyTorch
+(see ``_mark_writes_that_can_be_empty``). Export ``Dim("T", min=1, max=8)`` to
+keep the write in the engine.
 
 The two functions here implement the bodies. Registration with the
 validator lives next to the other aten converters for discoverability.
@@ -37,6 +44,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl import select
 from torch_tensorrt.dynamo.conversion.impl.shuffle import reshape
@@ -59,13 +67,17 @@ def index_copy_kv(
 ) -> TRTTensor:
     """KV-cache fast path. Caller (the validator) has already verified
     that this case is KV-eligible — 4-D static cache, dim=2, source
-    rank=4 with seq dim of size 1.
+    rank=4 whose seq dim is either 1 or written at consecutive positions.
 
-    ``index`` is the position tensor: shape ``[s_update]``. For the
-    eligible case (s_update == 1) this is a single value that we use
-    directly as the write start. KVCacheUpdate's ``writeIndices`` arg
-    expects shape ``[batch]``, so we broadcast/repeat the single index
-    value across the batch dimension.
+    ``index`` is the position tensor: shape ``[s_update]``. Several positions
+    are consecutive and ascending (``lift_mutated_buffers`` proved it), so the
+    first is the write start. Positions are not checked against the cache:
+    TensorRT drops an update past its end without an error, and wraps a negative
+    position down to minus the cache length, where PyTorch raises; one below that
+    is dropped. The layer takes positions as int32, so they must fit in 32 bits.
+    KVCacheUpdate's ``writeIndices`` arg expects shape
+    ``[batch]``, so we broadcast/repeat the single index value across the
+    batch dimension.
     """
     cache_shape = tuple(input.shape)
     batch = cache_shape[0]
@@ -82,6 +94,10 @@ def index_copy_kv(
     # where this is well-defined; for now we restrict to batch == 1 (see
     # the validator).
     write_indices = index
+    if src.shape[2] != 1:
+        start_layer = ctx.net.add_slice(index, start=(0,), shape=(1,), stride=(1,))
+        set_layer_name(start_layer, target, name + "_write_start", source_ir)
+        write_indices = start_layer.get_output(0)
 
     # When batch > 1, we'd need to broadcast `index` (shape [1]) to
     # [batch]. The validator currently keeps us in the batch==1 case.
@@ -96,8 +112,8 @@ def index_copy_kv(
 
     out = emit_kv_cache_update_layer(ctx, name, input, src, write_indices)
     if out is None:
-        # KV emission failed (e.g. input not a direct network input);
-        # fall through to scatter so correctness is preserved.
+        # KV emission failed (e.g. input not a direct network input). The
+        # scatter writes a static source correctly and refuses a dynamic one.
         return index_copy_fallback(ctx, target, source_ir, name, input, dim, index, src)
     return out
 
@@ -116,7 +132,8 @@ def index_copy_fallback(
     positions in ``index`` along ``dim``. Equivalent to the standard
     torch decomposition: build a broadcast index tensor of the same
     shape as ``src`` with ``index`` placed along ``dim`` and call
-    ``scatter``.
+    ``scatter``. Positions are not checked: a negative position counts from the
+    end and one past the end is dropped, where PyTorch raises.
     """
     rank = len(input.shape)
     # A 0-d input and source are one element each, which scatter takes as they are.

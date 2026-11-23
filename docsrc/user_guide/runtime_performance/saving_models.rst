@@ -388,6 +388,26 @@ With ``save()``, one flag does it:
 
     torch_tensorrt.save(trt_gm, "decode.pte", output_format="executorch", zero_copy_kv=True)
 
+One method can serve both prefill and decode. Keep the cache in a module buffer, write the new
+tokens at ``input_pos + torch.arange(T)`` and export ``T`` as a dynamic dimension. The engine then
+writes 1 token or a whole chunk in place, at a runtime offset. The cache needs batch size 1 and a
+float32, float16 or bfloat16 type; any other cache is copied back. Read the cache only after the
+write. If anything else reads it first, even to compute the new tokens, the write is not done in
+place: the cache is copied back, and ``zero_copy_kv=True`` cannot remove that copy. The positions
+are not checked, and they must fit in 32 bits. TensorRT drops the part of a chunk past the end of
+the cache, without an error. A negative position down to minus the cache length wraps to the end of
+the cache, where PyTorch raises, and one below that is dropped.
+Export ``T`` as ``Dim("T", min=1, max=...)``. ``Dim`` starts at 0 by default, and the in-place
+write cannot take 0 tokens, so a write that can be empty runs in PyTorch and the cache is copied
+back. A call with no new tokens then works only if no engine takes ``T`` as an input, because an
+engine profile for a ``Dim`` starts at 1. With ``require_full_compilation=True`` the write stays
+in the engine instead, and a call with no new tokens fails. The write looks like this:
+
+.. code-block:: python
+
+    idx = input_pos + torch.arange(k.shape[2], device=k.device)
+    self.k_cache.index_copy_(2, idx, k)
+
 With ``export()``, it takes two more calls, one at each end of the Edge program:
 
 .. code-block:: python

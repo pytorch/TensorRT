@@ -4,6 +4,8 @@
 from inspect import signature
 from typing import TYPE_CHECKING, Any
 
+import torch
+
 # Keep this or otherwise torch throws an import error later
 import torch._inductor.fx_passes.reinplace  # noqa: F401
 from torch._inductor.fx_utils import FakeTensorUpdater as _torch_FakeTensorUpdater
@@ -31,9 +33,18 @@ class FakeTensorUpdater(_torch_FakeTensorUpdater):  # type: ignore[misc]
         # ordinary fake-tensor propagation.
         for node in gm.graph.nodes:
             if node.op == "call_function" and "val" not in node.meta:
-                self.processed_hashes.discard(self.hash_node(node))
+                # Newer PyTorch keys the hashes by node; older keeps a set of them.
+                if isinstance(self.processed_hashes, dict):
+                    self.processed_hashes.pop(node, None)
+                else:
+                    self.processed_hashes.discard(self.hash_node(node))
 
     def incremental_update(self, fake_mode: "FakeTensorMode") -> Any:
-        """Wrap incremental_update to accept fake_mode as an argument."""
-        with V.set_fake_mode(fake_mode):
+        """Wrap incremental_update to accept fake_mode as an argument.
+
+        Without autograd: propagation reruns a caller cache's write-back ``copy_``,
+        which autograd refuses when the written value needs a gradient, and the
+        compiled graph only does inference.
+        """
+        with V.set_fake_mode(fake_mode), torch.no_grad():
             return super().incremental_update()

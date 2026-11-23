@@ -32,6 +32,7 @@ import tensorrt as trt
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Node, Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import (
@@ -52,17 +53,24 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 logger = logging.getLogger(__name__)
 
 
+# The cache types IKVCacheUpdateLayer accepts.
+KV_CACHE_DTYPES = (torch.float32, torch.float16, torch.bfloat16)
+
+
 def _kv_eligible(
     cache_shape: Tuple[int, ...],
     dim: int,
     start: int,
     update_len: int,
     step: int,
+    dtype: torch.dtype,
 ) -> Tuple[bool, str]:
     """Apply IKVCacheUpdateLayer's invariants.
 
     Returns (eligible, reason). The reason is non-empty in both cases for logs.
     """
+    if dtype not in KV_CACHE_DTYPES:
+        return False, f"cache dtype is {dtype}; KVCacheUpdate takes {KV_CACHE_DTYPES}"
     if any(not isinstance(s, int) or s < 0 for s in cache_shape):
         return False, f"cache shape is dynamic ({cache_shape}); s_max must be static"
     if len(cache_shape) != 4:
@@ -113,7 +121,7 @@ def resolve_slice_scatter_write(
     of:
 
     * ``OK`` — the bounds are concrete, and the caller goes on to
-      ``_kv_eligible(cache_shape, dim, start, end - start, step)``.
+      ``_kv_eligible(cache_shape, dim, start, end - start, step, dtype)``.
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
       the converter returns ``src`` in the input's dtype, reshaped to the input's
       static sizes where TensorRT sees it as dynamic, and emits no KV layer.
@@ -218,6 +226,20 @@ def emit_kv_cache_update_layer(
         logger.debug("KV cache update: skipped — input is not a direct network input")
         return None
 
+    # The layer checks the update's head count and size against the cache at build
+    # time, and TensorRT may not resolve them, as for view(1, T, -1, D) of a value
+    # made from two inputs that share T.
+    cache_shape = tuple(cache.shape)
+    if any(src.shape[i] != cache_shape[i] for i in (0, 1, 3)):
+        shuffle = ctx.net.add_shuffle(src)
+        shuffle.reshape_dims = trt.Dims(
+            (cache_shape[0], cache_shape[1], DYNAMIC_DIM, cache_shape[3])
+        )
+        set_layer_name(
+            shuffle, "kv_cache_update", name + "_update_shape", SourceIR.ATEN
+        )
+        src = shuffle.get_output(0)
+
     layer = ctx.net.add_kv_cache_update(
         cache, src, write_indices, trt.KVCacheMode.LINEAR
     )
@@ -261,7 +283,14 @@ def try_emit_kv_cache_update(
     its output is recorded as aliased to the cache input.
     """
     cache_shape = tuple(cache.shape)
-    eligible, reason = _kv_eligible(cache_shape, dim, start, update_len, step)
+    eligible, reason = _kv_eligible(
+        cache_shape,
+        dim,
+        start,
+        update_len,
+        step,
+        _enums.dtype._from(cache.dtype).to(torch.dtype),
+    )
     if not eligible:
         logger.debug("slice_scatter: KV fast path skipped — %s", reason)
         return None
@@ -436,15 +465,15 @@ def slice_scatter(
 
     update_len = end - start
 
-    # KV fast path, unless the write carries _trt_no_kv_alias: the classifier already
-    # filed it copy-back and re-attached its value as a graph output, and a buffer
-    # that is both copy-back and engine-aliased raises on every call. The layer also
-    # updates its cache in place, so the write must be on a graph input, as for
-    # index_copy: a converter like clone hands back its input as is, and writing
-    # through that would change the caller's tensor.
+    # KV fast path. The layer updates its cache in place, so it takes only a write
+    # the classifier marked _trt_kv_alias, which is how it says the write is meant
+    # to change the cache, and only on a graph input, as for index_copy: a converter
+    # like clone hands back its input as is, and writing through that would change
+    # the caller's tensor.
     node = ctx.current_node
-    kv_forbidden = node is not None and (
-        node.meta.get("_trt_no_kv_alias")
+    kv_forbidden = (
+        node is None
+        or not node.meta.get("_trt_kv_alias")
         or not (isinstance(node.args[0], Node) and node.args[0].op == "placeholder")
     )
     kv_out = (

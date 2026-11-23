@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <numeric>
+#include <optional>
+
 #include "ATen/cuda/CUDAEvent.h"
 #include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
@@ -66,13 +69,28 @@ RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_de
   return new_target_device_opt.value();
 }
 
-bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+bool _validate_shapes(
+    std::vector<at::Tensor> inputs,
+    c10::intrusive_ptr<TRTEngine> compiled_engine,
+    bool key_shape_values) {
   // Validate whether the current input shapes to the engine has changed
 
   // Populate the shape key for the inputs
   // x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
   std::stringstream new_shape_key_ss;
-  for (auto input : inputs) {
+  const auto& infos = compiled_engine->input_binding_infos;
+  for (size_t idx = 0; idx < inputs.size(); idx++) {
+    const auto& input = inputs[idx];
+    // A shape tensor's values set shapes too, so a recorded CUDA graph or a pre-allocated output
+    // is made again when they change. They are read, at the cost of a host copy, only for those two.
+    if (key_shape_values && idx < infos.size() && infos[idx].is_shape_tensor) {
+      auto values = input.contiguous().to(at::kCPU).to(at::kLong);
+      new_shape_key_ss << "[";
+      for (int64_t k = 0; k < values.numel(); k++) {
+        new_shape_key_ss << values.data_ptr<int64_t>()[k] << ",";
+      }
+      new_shape_key_ss << "]";
+    }
     new_shape_key_ss << "(";
     auto sizes = input.sizes();
     auto rank = input.sizes().size();
@@ -167,11 +185,10 @@ void setup_input_tensors(
       // aliased output binding. Cudagraphs normally clone inputs into a
       // persistent buffer so addresses are stable across replays; for an
       // aliased input we deliberately bind to the user's tensor instead, so
-      // the engine writes through to the user's storage. The user is already
-      // required to pass stable input addresses under cudagraphs, so the
-      // aliasing contract is compatible. Membership is precomputed at engine
-      // construction (InputBindingInfo::is_aliased_input) to avoid rescanning
-      // aliased_io on every input, every execution.
+      // the engine writes through to the user's storage. A new address records
+      // the graph again (see run_standard_execution). Membership is precomputed
+      // at engine construction (InputBindingInfo::is_aliased_input) to avoid
+      // rescanning aliased_io on every input, every execution.
       const bool is_aliased_input = binding.is_aliased_input;
 
       if (need_cudagraphs_record && !is_aliased_input) {
@@ -290,7 +307,144 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
   }
 }
 
+std::pair<uintptr_t, uintptr_t> extent(const at::Tensor& t) {
+  auto lo = reinterpret_cast<uintptr_t>(t.data_ptr());
+  if (t.is_contiguous()) {
+    return {lo, lo + t.nbytes()};
+  }
+  int64_t span = 1;
+  for (int64_t d = 0; d < t.dim(); d++) {
+    span += (t.size(d) - 1) * t.stride(d);
+  }
+  return {lo, lo + span * t.element_size()};
+}
+
+// dims holds the (stride, size) of each dimension above size 1, largest stride first.
+struct Layout {
+  uintptr_t lo;
+  uintptr_t hi;
+  int64_t size;
+  std::vector<std::pair<int64_t, int64_t>> dims;
+};
+
+// Decided from sizes, strides and addresses alone, so it needs no device work. Interleaved
+// views such as kv[..., 0] and kv[..., 1] share no element. Other layouts whose bytes
+// overlap count as sharing. The Python runtime's _layouts_share decides the same way.
+bool layouts_share(const Layout& a, const Layout& b) {
+  if (a.hi <= b.lo || b.hi <= a.lo) {
+    return false;
+  }
+  if (a.size != b.size || a.dims != b.dims) {
+    return true;
+  }
+  const auto signed_distance = static_cast<int64_t>(b.lo - a.lo);
+  if (signed_distance % a.size != 0) {
+    return true;
+  }
+  const auto& dims = a.dims;
+  const int64_t distance = signed_distance / a.size;
+  // A shared element means distance = sum(c * stride) with |c| < n, so distance is a
+  // multiple of the strides' common divisor. When each stride exceeds the span of the
+  // smaller ones, only the two counts around distance / stride can work at each dimension.
+  int64_t divisor = 0;
+  for (const auto& [s, n] : dims) {
+    divisor = std::gcd(divisor, s);
+  }
+  if (divisor != 0 && distance % divisor != 0) {
+    return false;
+  }
+  std::vector<int64_t> after(dims.size(), 0);
+  for (size_t k = dims.size(); k-- > 1;) {
+    after[k - 1] = after[k] + (dims[k].second - 1) * dims[k].first;
+  }
+  for (size_t k = 0; k < dims.size(); k++) {
+    if (dims[k].first <= after[k]) {
+      return true;
+    }
+  }
+  std::vector<std::pair<int64_t, size_t>> pending{{distance, 0}};
+  while (!pending.empty()) {
+    const auto [d, k] = pending.back();
+    pending.pop_back();
+    if (k == dims.size()) {
+      if (d == 0) {
+        return true;
+      }
+      continue;
+    }
+    const auto [s, n] = dims[k];
+    const int64_t below = d >= 0 ? d / s : -((-d + s - 1) / s);
+    for (const int64_t c : {below, below + 1}) {
+      if (std::abs(c) < n && std::abs(d - c * s) <= after[k]) {
+        pending.emplace_back(d - c * s, k + 1);
+      }
+    }
+  }
+  return false;
+}
+
+// TensorRT reads an input in a KV cache's memory before or after it writes the cache, in an
+// order the model does not set. A plugin's updated input may share elements only with an input
+// of the same address and layout: x.add_(y) with x and y the same tensor reads both before it
+// writes. Two updated inputs may do so only when neither is bound through a copy, since a copy
+// takes the shared element's update and one is lost.
+void refuse_inputs_that_share_memory(
+    const std::vector<at::Tensor>& caller_inputs,
+    const c10::intrusive_ptr<TRTEngine>& compiled_engine) {
+  const auto& infos = compiled_engine->input_binding_infos;
+  // (device, first byte, one past the last byte, input index)
+  std::vector<std::tuple<int64_t, uintptr_t, uintptr_t, size_t>> live;
+  for (size_t i = 0; i < caller_inputs.size() && i < infos.size(); i++) {
+    const auto& t = caller_inputs[i];
+    if (!infos[i].is_shape_tensor && t.defined() && t.numel() > 0) {
+      const auto [lo, hi] = extent(t);
+      const auto device = static_cast<int64_t>(t.device().type()) * 1024 + t.device().index();
+      live.emplace_back(device, lo, hi, i);
+    }
+  }
+  std::sort(live.begin(), live.end());
+  std::vector<std::optional<Layout>> layouts(caller_inputs.size());
+  auto layout = [&](size_t i) -> const Layout& {
+    if (!layouts[i]) {
+      const auto& t = caller_inputs[i];
+      const auto [lo, hi] = extent(t);
+      Layout l{lo, hi, static_cast<int64_t>(t.element_size()), {}};
+      for (int64_t d = 0; d < t.dim(); d++) {
+        if (t.size(d) > 1) {
+          l.dims.emplace_back(t.stride(d), t.size(d));
+        }
+      }
+      std::sort(l.dims.rbegin(), l.dims.rend());
+      layouts[i] = std::move(l);
+    }
+    return *layouts[i];
+  };
+  auto copied = [](const at::Tensor& t) { return !(t.is_cuda() && t.is_contiguous()); };
+  auto same_layout = [](const Layout& a, const Layout& b) {
+    return a.lo == b.lo && a.hi == b.hi && a.size == b.size && a.dims == b.dims;
+  };
+  for (size_t k = 0; k < live.size(); k++) {
+    const auto& [device, lo, hi, i] = live[k];
+    for (size_t m = k + 1; m < live.size() && std::get<0>(live[m]) == device && std::get<1>(live[m]) < hi; m++) {
+      const auto j = std::get<3>(live[m]);
+      const bool kv = infos[i].is_kv_cache_input || infos[j].is_kv_cache_input;
+      const bool refused = kv ||
+          ((infos[i].is_aliased_input || infos[j].is_aliased_input) &&
+           (!same_layout(layout(i), layout(j)) ||
+            (infos[i].is_aliased_input && infos[j].is_aliased_input &&
+             (copied(caller_inputs[i]) || copied(caller_inputs[j])))));
+      TORCHTRT_CHECK(
+          !refused || !layouts_share(layout(i), layout(j)),
+          "Inputs '" << infos[std::min(i, j)].name << "' and '" << infos[std::max(i, j)].name << "' of engine "
+                     << compiled_engine->name << " share memory, and the engine updates "
+                     << (kv ? "a KV cache" : "one of them") << " in place. Pass tensors that do not share memory.");
+    }
+  }
+}
+
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  const auto caller_inputs = compiled_engine->aliased_io.empty() ? std::vector<at::Tensor>() : inputs;
+  refuse_inputs_that_share_memory(caller_inputs, compiled_engine);
   // All inputs are expected to be on CUDA. Warn and move any that are not. A host-resident
   // shape-tensor input is an exception: TensorRT reads it from host memory, so it is left where it
   // is rather than moved to the device only for setup_input_tensors to copy it back. A shape tensor
@@ -356,6 +510,18 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   auto run_standard_execution = [&]() {
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
+    // A recorded graph keeps each input's address, so the update of an input bound through a
+    // copy would go to a copy freed after the call.
+    const auto& infos = compiled_engine->input_binding_infos;
+    for (size_t i = 0; cudagraphs_enabled && i < caller_inputs.size() && i < infos.size(); i++) {
+      const auto& t = caller_inputs[i];
+      TORCHTRT_CHECK(
+          !infos[i].is_aliased_input || !t.defined() || t.numel() == 0 || (t.is_cuda() && t.is_contiguous()),
+          "Input '" << infos[i].name << "' of engine " << compiled_engine->name << " is updated in place but is "
+                    << (t.is_cuda() ? "not contiguous" : "on the host")
+                    << ", so it would be bound through a copy, which CUDA graphs cannot update. "
+                    << "Pass a contiguous CUDA tensor, or run without CUDA graphs.");
+    }
     // effective_cudagraphs controls the manual at::cuda::CUDAGraph path below. For TRT-RTX
     // the runtime owns capture/replay inside enqueueV3 whenever it has a cuda_graph_strategy
     // set or subgraph cudagraphs are enabled.  The `uses_internal_capture` API below lets the caller
@@ -400,9 +566,28 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // context_changed (consumed by set_runtime_states regardless of order), and
     // shape_changed is already true here, so the cudagraph record/reset below
     // still fires. Only auto-selection runs per call; manual pins are eager.
-    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    bool shape_changed =
+        _validate_shapes(inputs, compiled_engine, effective_cudagraphs || compiled_engine->use_pre_allocated_outputs);
     if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
       compiled_engine->auto_select_profile(inputs);
+    }
+    if (effective_cudagraphs && !compiled_engine->aliased_io.empty()) {
+      // A recorded graph writes each aliased input at its recorded address.
+      std::vector<void*> addresses;
+      for (size_t i = 0; i < inputs.size() && i < infos.size(); i++) {
+        if (infos[i].is_aliased_input) {
+          addresses.push_back(inputs[i].data_ptr());
+        }
+      }
+      if (addresses != compiled_engine->cudagraph_aliased_input_addresses) {
+        if (!compiled_engine->cudagraph_aliased_input_addresses.empty()) {
+          LOG_DEBUG(
+              "Engine " << compiled_engine->name
+                        << " records its CUDA graph again: an input it updates in place has a new address");
+        }
+        compiled_engine->cudagraph_aliased_input_addresses = std::move(addresses);
+        compiled_engine->runtime_states.context_changed = true;
+      }
     }
 
     // Whether cudagraphs needs to record the graph on this pass
@@ -604,6 +789,16 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       trt_exec_complete.record(compiled_engine->engine_stream);
       trt_exec_complete.block(compiled_engine->caller_stream);
     }
+    // An input bound through a copy gets the copy's update, as it does when bound as is. The
+    // write stores state, as a write under no_grad does.
+    for (size_t i = 0; i < caller_inputs.size() && i < infos.size(); i++) {
+      const auto& caller = caller_inputs[i];
+      auto bound = bound_inputs_by_name.find(infos[i].name);
+      if (infos[i].is_aliased_input && bound != bound_inputs_by_name.end() && caller.numel() > 0 &&
+          (caller.device() != bound->second.device() || caller.data_ptr() != bound->second.data_ptr())) {
+        caller.detach().copy_(bound->second);
+      }
+    }
 
     if (effective_cudagraphs) {
       // If in CUDAGraph mode, copy persistent staging outputs to returned tensors on the caller stream.
@@ -649,7 +844,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // shape is unchanged: the previously selected profile still fits, so it
     // stays active. When the shape did change, auto_select_profile keeps the
     // active profile if it still fits (no-op) or switches otherwise.
-    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    bool shape_changed = _validate_shapes(inputs, compiled_engine, false);
     if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
       compiled_engine->auto_select_profile(inputs);
     }
