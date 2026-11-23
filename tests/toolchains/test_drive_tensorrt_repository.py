@@ -89,6 +89,8 @@ class TensorRTSelectionTest(unittest.TestCase):
                     if "@tensorrt_sbsa//:nvinfer" in s.get(normal, [])
                 )
                 self.assertIn("@tensorrt_driveos//:nvinfer", trt[":driveos"])
+                if "@tensorrt_sbsa//:nvinferplugin" in trt[normal]:
+                    self.assertIn("@tensorrt_driveos//:nvinferplugin", trt[":driveos"])
                 self.assertNotIn("@tensorrt_sbsa//:nvinfer", trt[":driveos"])
                 self.assertNotIn(
                     "driveos", (REPO / "third_party/tensorrt/archive/BUILD").read_text()

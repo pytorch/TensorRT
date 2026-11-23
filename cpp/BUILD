@@ -446,6 +446,7 @@ cc_library(
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
             "@tensorrt_driveos//:nvinfer",
+            "@tensorrt_driveos//:nvinferplugin",
         ],
         "//conditions:default": [],
     }) + select({
