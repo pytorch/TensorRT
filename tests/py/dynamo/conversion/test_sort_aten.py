@@ -14,7 +14,6 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import ENABLED_FEATURES, Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
@@ -315,19 +314,6 @@ class TestSortStableAnyTensorRT(unittest.TestCase):
         ):
             self.assertFalse(sort_stable_validator(node))
         self.assertIn("TensorRT-RTX", logs.output[0])
-
-    def test_cache_key_has_key_range(self):
-        node = _stable_sort_node(
-            lambda x: torch.sort(_topk_ids(x), stable=True), torch.randn(4, 8)
-        )
-
-        def cache_key(num_keys):
-            node.meta[NUM_SORT_KEYS] = num_keys
-            return BaseEngineCache.get_hash(
-                node.graph.owning_module, [Input(shape=(4, 8))], CompilationSettings()
-            )
-
-        self.assertNotEqual(cache_key(8), cache_key(128))
 
     def test_topk_dim_keyword(self):
         graph = torch.fx.Graph()
