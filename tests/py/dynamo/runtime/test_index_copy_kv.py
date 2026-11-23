@@ -20,6 +20,7 @@ results without aliasing.
 """
 
 import contextlib
+import random
 import tempfile
 from unittest import mock
 
@@ -973,6 +974,512 @@ class TestEntryPointsWithoutLiftingKeepTheWrite(_CudaGraphsOff):
             if n.target is torch.ops.aten.index_copy.default
         ]
         self.assertTrue(write.meta.get("_trt_kv_alias"))
+
+
+def _python_runtime():
+    """The Python runtime runs the engine when the C++ runtime library is not
+    installed, which is the only way to select it."""
+    from torch_tensorrt.dynamo.runtime import _TorchTensorRTModule as runtime
+
+    without_cpp = runtime.ENABLED_FEATURES._replace(torch_tensorrt_runtime=False)
+    return mock.patch.object(runtime, "ENABLED_FEATURES", without_cpp)
+
+
+def _python_engine_op():
+    """The C++ op is loaded here, so the Python engine is called as its own op
+    calls it, which returns a copy of an output in an input's memory."""
+
+    def python_op(input_tensors, engine):
+        outputs = engine.execute(input_tensors)
+        outputs = [outputs] if isinstance(outputs, torch.Tensor) else list(outputs)
+        inputs = {tensor.untyped_storage()._cdata for tensor in input_tensors}
+        return [
+            output.clone() if output.untyped_storage()._cdata in inputs else output
+            for output in outputs
+        ]
+
+    return mock.patch.object(torch.ops.tensorrt, "execute_engine", python_op)
+
+
+class TestCallerCacheTheEngineGetsACopyOf(_CudaGraphsOff):
+    """A caller's cache with other strides, or on the host, reaches the engine as a
+    copy. The runtime stores the copy's update, in both engine runtimes."""
+
+    @staticmethod
+    def _step(n):
+        g = torch.Generator().manual_seed(n)
+        x = torch.randn(1, 4, 1, 8, generator=g).cuda()
+        return x, torch.tensor([2 + n], device="cuda")
+
+    class _SumWriter(torch.nn.Module):
+        def forward(self, cache, x, pos):
+            cache.index_copy_(2, pos, x)
+            return cache.sum(2)
+
+    _COPIED = {
+        "other strides": lambda: torch.randn(1, 16, 4, 8, device="cuda").transpose(
+            1, 2
+        ),
+        "host": lambda: torch.randn(1, 4, 16, 8),
+        "negative view": lambda: torch._neg_view(
+            torch.randn(1, 4, 16, 8, device="cuda")
+        ),
+    }
+
+    @staticmethod
+    def _both_runtimes(model, example):
+        modules = {"cpp": (_compile(model, example), contextlib.nullcontext)}
+        with _python_runtime():
+            modules["python"] = (_compile(model, example), _python_engine_op)
+        return modules
+
+    def test_torch_compile_traces_a_module_with_an_updated_input(self):
+        """Dynamo traces the module's forward in one graph, as it did before the
+        runtime checked the caller's caches."""
+        example = (torch.zeros(1, 4, 16, 8, device="cuda"),) + self._step(0)
+        module = _compile(self._SumWriter(), example)
+        torch._dynamo.reset()
+        traced = torch.compile(module, backend="eager", fullgraph=True)
+        cache, expected = torch.zeros(1, 4, 16, 8, device="cuda"), example[0].clone()
+        for n in range(2):
+            x, pos = self._step(n)
+            out = traced(cache, x, pos)
+            out = out[0] if isinstance(out, (tuple, list)) else out
+            torch.testing.assert_close(out, self._SumWriter()(expected, x, pos))
+            torch.testing.assert_close(cache, expected)
+
+    def test_a_cache_the_model_does_not_return(self):
+        """No write-back follows the engine, so the runtime stores the copy. A recorded
+        CUDA graph writes a cache at the address it was recorded with, so it records
+        again for a new cache and refuses a copy, which is gone after the call."""
+        example = (torch.zeros(1, 4, 16, 8, device="cuda"),) + self._step(0)
+        modules = self._both_runtimes(self._SumWriter(), example)
+        for kind, (module, engine_op) in modules.items():
+            self.assertEqual(len(_aliased_io(module)), 1)
+            with engine_op():
+                for name, make in self._COPIED.items():
+                    with self.subTest(runtime=kind, cache=name):
+                        cache = make()
+                        expected = cache.clone()
+                        for n in range(3):
+                            x, pos = self._step(n)
+                            out = module(cache, x, pos)
+                            want = self._SumWriter()(
+                                expected, x.to(expected.device), pos.to(expected.device)
+                            )
+                            torch.testing.assert_close(out.cpu(), want.cpu())
+                            torch.testing.assert_close(cache, expected)
+                with torch_tensorrt.runtime.enable_cudagraphs(module) as graphed:
+                    with self.subTest(runtime=kind, cudagraphs="two caches"):
+                        caches = [
+                            torch.randn(1, 4, 16, 8, device="cuda") for _ in range(2)
+                        ]
+                        expected = [c.clone() for c in caches]
+                        for n in range(4):
+                            x, pos = self._step(n)
+                            out = graphed(caches[n % 2], x, pos)
+                            want = self._SumWriter()(expected[n % 2], x, pos)
+                            torch.testing.assert_close(out, want)
+                            for got, exp in zip(caches, expected):
+                                torch.testing.assert_close(got, exp)
+                    for name, make in self._COPIED.items():
+                        with self.subTest(runtime=kind, cudagraphs=name):
+                            with self.assertRaisesRegex(RuntimeError, "cannot update"):
+                                graphed(make(), *self._step(0))
+                    with self.subTest(runtime=kind, cudagraphs="after a failed call"):
+                        # The next call records again, with the cache recorded last
+                        # or with the one the failed call brought.
+                        cache = torch.randn(1, 4, 16, 8, device="cuda")
+                        targets = [(caches[1], expected[1]), (cache, cache.clone())]
+                        with self.assertRaises((AssertionError, RuntimeError)):
+                            x, pos = self._step(0)
+                            graphed(cache, x.half(), pos)
+                        for n in range(4):
+                            got, want_cache = targets[n % 2]
+                            x, pos = self._step(n)
+                            out = graphed(got, x, pos)
+                            want = self._SumWriter()(want_cache, x, pos)
+                            torch.testing.assert_close(out, want)
+                            torch.testing.assert_close(got, want_cache)
+
+    def test_a_copied_cache_that_needs_a_gradient(self):
+        """The runtime stores the copy's update without autograd, as the model's own
+        write under no_grad does, so a cache that needs a gradient still gets it."""
+        example = (torch.zeros(1, 4, 16, 8, device="cuda"),) + self._step(0)
+        modules = self._both_runtimes(self._SumWriter(), example)
+        caches = {
+            "host": lambda: torch.zeros(1, 4, 16, 8, requires_grad=True),
+            "other strides": lambda: torch.zeros(
+                1, 16, 4, 8, device="cuda", requires_grad=True
+            ).transpose(1, 2),
+        }
+        for kind, (module, engine_op) in modules.items():
+            for name, make in caches.items():
+                with self.subTest(runtime=kind, cache=name), engine_op():
+                    cache = make()
+                    expected = cache.detach().clone()
+                    x, pos = self._step(0)
+                    module(cache, x, pos)
+                    self._SumWriter()(
+                        expected, x.to(expected.device), pos.to(expected.device)
+                    )
+                    torch.testing.assert_close(cache.detach(), expected)
+
+    def test_a_module_made_without_an_alias_map(self):
+        """The alias map is optional when a module is made from a plan, so the module
+        reads the alias the engine takes from its KV cache layer."""
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        example = (torch.zeros(1, 4, 16, 8, device="cuda"),) + self._step(0)
+        for kind, runtime, engine_op in (
+            ("cpp", contextlib.nullcontext, contextlib.nullcontext),
+            ("python", _python_runtime, _python_engine_op),
+        ):
+            with self.subTest(runtime=kind), runtime():
+                compiled = _compile(self._SumWriter(), example)
+                built = next(
+                    m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)
+                )
+                module = TorchTensorRTModule(
+                    bytes(built.serialized_engine),
+                    input_binding_names=list(built.input_binding_names),
+                    output_binding_names=list(built.output_binding_names),
+                    settings=built.settings,
+                    num_user_outputs=built.num_user_outputs,
+                )
+                self.assertEqual(module.aliased_io, {})
+                cache = torch.randn(1, 4, 16, 8)
+                expected = cache.clone()
+                x, pos = self._step(0)
+                by_name = {"cache": cache, "x": x, "pos": pos}
+                with engine_op():
+                    out = module(*(by_name[n] for n in module.input_binding_names))
+                want = self._SumWriter()(expected, x.cpu(), pos.cpu())
+                torch.testing.assert_close(out.cpu(), want)
+                torch.testing.assert_close(cache, expected)
+
+    class _TwoCaches(torch.nn.Module):
+        def forward(self, k, v, x, pos):
+            k.index_copy_(2, pos, x)
+            v.index_copy_(2, pos + 5, x * 2)
+            return k.sum(2) + v.sum(2)
+
+    def test_two_caches(self):
+        """Copies of two caches that share an element would both write it back, so the
+        module and the engine operator a saved program calls refuse such a call."""
+        zeros = torch.zeros(1, 4, 16, 8, device="cuda")
+        example = (zeros, zeros.clone()) + self._step(0)
+        x, pos = self._step(0)
+
+        def interleaved():
+            kv = torch.randn(1, 4, 16, 8, 2, device="cuda")
+            return kv[..., 0], kv[..., 1]
+
+        def packed():
+            kv = torch.randn(1, 16, 2, 4, 8, device="cuda")
+            return kv[:, :, 0].transpose(1, 2), kv[:, :, 1].transpose(1, 2)
+
+        def interleaved_with_other_strides_on_a_size_1_dim():
+            k, v = interleaved()
+            return k, v.as_strided(v.shape, (1,) + v.stride()[1:], v.storage_offset())
+
+        modules = self._both_runtimes(self._TwoCaches(), example)
+        for kind, (module, engine_op) in modules.items():
+            self.assertEqual(len(_aliased_io(module)), 2)
+            engine = next(m for m in module.modules() if getattr(m, "aliased_io", None))
+            with engine_op():
+                for name in ("other strides", "host"):
+                    cache = self._COPIED[name]()
+                    by_name = {"k": cache, "v": cache, "x": x, "pos": pos}
+                    with self.subTest(runtime=kind, caches=name):
+                        with self.assertRaisesRegex(RuntimeError, "share memory"):
+                            module(cache, cache, x, pos)
+                        with self.assertRaisesRegex(RuntimeError, "share memory"):
+                            torch.ops.tensorrt.execute_engine(
+                                [by_name[n] for n in engine.input_binding_names],
+                                engine.engine,
+                            )
+                for make in (
+                    interleaved,
+                    packed,
+                    interleaved_with_other_strides_on_a_size_1_dim,
+                ):
+                    with self.subTest(runtime=kind, caches=make.__name__):
+                        caches = make()
+                        expected = [c.clone() for c in caches]
+                        out = module(*caches, x, pos)
+                        torch.testing.assert_close(
+                            out, self._TwoCaches()(*expected, x, pos)
+                        )
+                        for got, exp in zip(caches, expected):
+                            torch.testing.assert_close(got, exp)
+
+    def test_the_check_costs_little_when_no_cache_is_copied(self):
+        """With contiguous CUDA caches the module adds no check, and the engine
+        compares only inputs whose bytes overlap, with no memory, reading each
+        input's layout once."""
+        from torch_tensorrt.dynamo.runtime import _TRTEngine
+
+        def check(named):
+            _TRTEngine._refuse_inputs_that_share_memory(
+                [(name, t, True, True) for name, t in named]
+            )
+
+        with (
+            mock.patch.object(
+                _TRTEngine, "_layouts_share", wraps=_TRTEngine._layouts_share
+            ) as compares,
+            mock.patch.object(
+                _TRTEngine, "_layout", wraps=_TRTEngine._layout
+            ) as layouts,
+        ):
+            check([(f"c{i}", torch.zeros(4, device="cuda")) for i in range(56)])
+            self.assertEqual(compares.call_count, 0)
+            # 28 layers, each a large buffer holding its key and value interleaved.
+            layers = [torch.zeros(1, 8, 256, 64, 2, device="cuda") for _ in range(28)]
+            torch.cuda.synchronize()
+            torch.cuda.reset_peak_memory_stats()
+            before = torch.cuda.max_memory_allocated()
+            check(
+                [
+                    (f"{n}{i}", kv[..., j])
+                    for i, kv in enumerate(layers)
+                    for j, n in enumerate("kv")
+                ]
+            )
+            self.assertEqual(torch.cuda.max_memory_allocated(), before)
+            self.assertEqual(compares.call_count, 28)
+            # 8 caches interleaved in one buffer: every pair overlaps.
+            one = torch.zeros(1, 8, 256, 64, 8, device="cuda")
+            layouts.reset_mock()
+            check([(f"c{i}", one[..., i]) for i in range(8)])
+            self.assertEqual(layouts.call_count, 8)
+
+        # The Python engine runs the check itself on every call, so only the C++
+        # runtime shows what the module adds.
+        if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            return
+        example = (torch.zeros(1, 4, 16, 8, device="cuda"),) + self._step(0)
+        compiled = _compile(self._SumWriter(), example)
+        with mock.patch.object(
+            _TRTEngine,
+            "_refuse_inputs_that_share_memory",
+            wraps=_TRTEngine._refuse_inputs_that_share_memory,
+        ) as module_checks:
+            compiled(torch.zeros(1, 4, 16, 8, device="cuda"), *self._step(1))
+            self.assertEqual(module_checks.call_count, 0)
+            compiled(torch.zeros(1, 4, 16, 8), *self._step(1))
+            self.assertEqual(module_checks.call_count, 1)
+
+
+class TestInputsInTheMemoryOfAnUpdatedCache(_CudaGraphsOff):
+    """The engine reads its other inputs before or after it updates a KV cache, so an
+    input that shares an element with the cache is refused. The C++ check runs
+    through its engine operator."""
+
+    class _LateReader(torch.nn.Module):
+        def forward(self, cache, reader, x, pos):
+            cache.index_copy_(2, pos, x)
+            return reader * cache.sum()
+
+    def _check(self, calls=contextlib.nullcontext):
+        # Each call makes the same values, for the compiled and the eager model.
+        def values(*shape, seed=0):
+            g = torch.Generator().manual_seed(seed)
+            return torch.randn(*shape, generator=g).cuda()
+
+        def separate():
+            return values(1, 4, 16, 8), values(1, 4, 16, 8, seed=1)
+
+        def even_and_odd_elements():
+            # Only the strides' common divisor tells these apart, since the stride 16
+            # is within the span of the smaller one.
+            both = values(1136)
+            return tuple(
+                both.as_strided((1, 4, 16, 8), (1136, 284, 16, 6), offset)
+                for offset in (0, 1)
+            )
+
+        model = self._LateReader()
+        x, pos = torch.ones(1, 4, 1, 8).cuda(), torch.tensor([3], device="cuda")
+        compiled = _compile(model, [*separate(), x, pos])
+        self.assertEqual(len(_aliased_io(compiled)), 1)
+        with calls():
+            for make in (separate, even_and_odd_elements):
+                with self.subTest(make.__name__):
+                    given, expected = make(), make()
+                    out = compiled(*given, x, pos)
+                    out = out[0] if isinstance(out, (tuple, list)) else out
+                    torch.testing.assert_close(out, model(*expected, x, pos))
+                    torch.testing.assert_close(given[0], expected[0])
+            # A refused call runs nothing, so the cases can share one cache.
+            cache, b = values(1, 4, 16, 8), values(1, 4, 17, 9)
+            for name, inputs in (
+                ("a view", (cache, cache.view_as(cache))),
+                ("a strided view", (cache, cache.view(1, 4, 8, 16).transpose(2, 3))),
+                ("a negative view", (cache, torch._neg_view(cache))),
+                ("a signed stride step away", (b[:, :, :16, 1:], b[:, :, 1:, :8])),
+            ):
+                with self.subTest(name):
+                    with self.assertRaisesRegex(RuntimeError, "share memory"):
+                        compiled(*inputs, x, pos)
+
+    def test_the_python_check_never_misses_a_shared_element(self):
+        """Views of ``arange`` hold their own offsets, so they show which elements two
+        views share."""
+        from torch_tensorrt.dynamo.runtime._TRTEngine import _layout, _layouts_share
+
+        storage = torch.arange(700, dtype=torch.float32)
+
+        def shared(a, b):
+            return bool(set(a.flatten().tolist()) & set(b.flatten().tolist()))
+
+        rng = random.Random(0)
+
+        def layout():
+            sizes = [rng.randint(1, 4) for _ in range(rng.randint(1, 4))]
+            return sizes, [rng.randint(1, 25) for _ in sizes]
+
+        wrong = []
+        for _ in range(5000):
+            a_sizes, a_strides = layout()
+            if rng.random() < 0.6:
+                order = rng.sample(range(len(a_sizes)), len(a_sizes))
+                b_sizes = [a_sizes[d] for d in order]
+                b_strides = [
+                    a_strides[d] if a_sizes[d] > 1 else rng.randint(1, 30)
+                    for d in order
+                ]
+            else:
+                b_sizes, b_strides = layout()
+            a_offset, b_offset = rng.randint(0, 40), rng.randint(0, 40)
+            a = storage.as_strided(a_sizes, a_strides, a_offset)
+            b = storage.as_strided(b_sizes, b_strides, b_offset)
+            if shared(a, b) and not _layouts_share(_layout(a), _layout(b)):
+                wrong.append(
+                    (a_sizes, a_strides, a_offset, b_sizes, b_strides, b_offset)
+                )
+        self.assertEqual(wrong[:5], [])
+
+    def test_the_cpp_runtime(self):
+        self._check()
+
+    def test_the_python_runtime(self):
+        with _python_runtime():
+            self._check(calls=_python_engine_op)
+
+    @staticmethod
+    def _cpp_and_python(builder, network, name, inputs, outputs, aliased_io):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        plan = bytes(
+            builder.build_serialized_network(network, builder.create_builder_config())
+        )
+        module = TorchTensorRTModule(
+            plan,
+            inputs,
+            outputs,
+            name=name,
+            settings=CompilationSettings(device=torch_tensorrt.Device("cuda:0")),
+            aliased_io=aliased_io,
+            num_user_outputs=1,
+        )
+        engine = TRTEngine(module._pack_engine_info())
+        return (("cpp", module), ("python", lambda *args: engine.execute(args)))
+
+    def test_a_plugin_input_may_share_another_input_but_not_a_cache(self):
+        """A plugin's alias is not a KV cache: ``x.add_(y)`` with the same tensor for
+        ``x`` and ``y`` reads both before it writes. Inputs that overlap only in part
+        are refused, as eager refuses them: the engine writes ``x`` while it still
+        reads ``y``. Sharing a cache is refused: the engine updates both in place, so
+        a private copy of the plugin's input would take its update."""
+        import tensorrt as trt
+
+        builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
+        network = builder.create_network(0)
+        added = network.add_elementwise(
+            network.add_input("x", trt.float32, (16,)),
+            network.add_input("y", trt.float32, (16,)),
+            trt.ElementWiseOperation.SUM,
+        ).get_output(0)
+        added.name = "updated_x"
+        network.mark_output(added)
+        runs = self._cpp_and_python(
+            builder,
+            network,
+            "user_alias_add",
+            ["x", "y"],
+            ["updated_x"],
+            {"updated_x": ("x", "user")},
+        )
+        for name, run in runs:
+            with self.subTest(name):
+                x = torch.arange(1.0, 17.0, device="cuda")
+                out = run(x, x)
+                out = out[0] if isinstance(out, (tuple, list)) else out
+                torch.testing.assert_close(out, torch.arange(1.0, 17.0).cuda() * 2)
+                both = torch.arange(1.0, 21.0, device="cuda")
+                with self.assertRaisesRegex(RuntimeError, "share memory"):
+                    run(both[:16], both[4:])
+
+        builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
+        network = builder.create_network(0)
+
+        def total_of(tensor):
+            return network.add_reduce(
+                tensor, trt.ReduceOperation.SUM, 15, True
+            ).get_output(0)
+
+        cache = network.add_input("cache", trt.float32, (1, 4, 16, 8))
+        reader = network.add_input("reader", trt.float32, (1, 4, 16, 8))
+        update = network.add_input("update", trt.float32, (1, 4, 1, 8))
+        pos = network.add_input("pos", trt.int32, (1,))
+        written = network.add_kv_cache_update(
+            cache, update, pos, trt.KVCacheMode.LINEAR
+        ).get_output(0)
+        written.name = "cache_out"
+        doubled = network.add_elementwise(
+            reader, reader, trt.ElementWiseOperation.SUM
+        ).get_output(0)
+        doubled.name = "reader_out"
+        total = network.add_elementwise(
+            total_of(written), total_of(doubled), trt.ElementWiseOperation.SUM
+        ).get_output(0)
+        total.name = "result"
+        for tensor in (total, written, doubled):
+            network.mark_output(tensor)
+        runs = self._cpp_and_python(
+            builder,
+            network,
+            "kv_and_user_alias",
+            ["cache", "reader", "update", "pos"],
+            ["result", "cache_out", "reader_out"],
+            {
+                "cache_out": ("cache", "kv_cache_update"),
+                "reader_out": ("reader", "user"),
+            },
+        )
+        for name, run in runs:
+            for shared in (False, True):
+                with self.subTest(name, shared=shared):
+                    c = torch.full((1, 4, 16, 8), 3.0, device="cuda")
+                    r = c if shared else c.clone()
+                    args = (
+                        c,
+                        r,
+                        torch.full((1, 4, 1, 8), 7.0, device="cuda"),
+                        torch.tensor([2], dtype=torch.int32, device="cuda"),
+                    )
+                    if shared:
+                        with self.assertRaisesRegex(RuntimeError, "share memory"):
+                            run(*args)
+                        continue
+                    out = run(*args)
+                    out = out[0] if isinstance(out, (tuple, list)) else out
+                    torch.testing.assert_close(out, torch.full_like(out, 4736.0))
+                    torch.testing.assert_close(r, torch.full_like(r, 6.0))
 
 
 if __name__ == "__main__":

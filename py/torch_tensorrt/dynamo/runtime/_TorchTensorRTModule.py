@@ -10,6 +10,7 @@ import pickle
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -210,6 +211,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_native_multidevice = requires_native_multidevice
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
+        self._updated_inputs: Dict[str, bool] = {}
         self.num_user_outputs = num_user_outputs
         self.pytorch_plugin_ops: Optional[List[str]] = (
             None if pytorch_plugin_ops is None else list(pytorch_plugin_ops)
@@ -244,6 +246,22 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else:
                 object.__setattr__(result, k, copy.deepcopy(v, memo))
         return result
+
+    def _read_updated_inputs(self) -> Dict[str, bool]:
+        """Each input the engine updates in place, and whether it is a KV cache. Read
+        from the engine, which adds the aliases its KV cache layers declare."""
+        engine = self.get_engine()
+        aliased_io = (
+            deserialize_aliased_io(
+                str(engine.serialize_metadata_only()[ALIASED_IO_IDX])
+            )
+            if ENABLED_FEATURES.torch_tensorrt_runtime
+            else engine.aliased_io
+        )
+        updated: Dict[str, bool] = {}
+        for name, kind in aliased_io.values():
+            updated[name] = updated.get(name, False) or kind == "kv_cache_update"
+        return updated
 
     def _resolve_target_device(self) -> torch.device:
         """Resolve the engine's target CUDA device from compilation settings."""
@@ -500,6 +518,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # The engine re-serializes on demand (see ``_plan_buffer``), so a host copy
             # of the plan, as large as the weights, need not live as long as the module.
             self._serialized_engine = None
+        self._updated_inputs = self._read_updated_inputs()
 
         # Re-apply via the setter: resolves any path-string runtime_cache,
         # dispatches to the engine, and writes back the resolved form.
@@ -612,12 +631,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self.engine = TRTEngine(serialized_engine_info)
             else:
                 self.engine = create_cpp_engine(serialized_engine_info)
+            self._updated_inputs = self._read_updated_inputs()
 
             self.engine.set_output_tensors_as_unowned(
                 metadata["output_tensors_are_unowned"]
             )
         else:
             self.engine = None
+            self._updated_inputs = {}
             self.settings = CompilationSettings()
             self.hardware_compatible = False
 
@@ -728,6 +749,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             set_state(state)
         else:
             self.__dict__.update(state)
+        # A module pickled before this map existed reads it from its engine.
+        if "_updated_inputs" not in self.__dict__:
+            self._updated_inputs = (
+                self._read_updated_inputs() if self.engine is not None else {}
+            )
 
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.get_engine().use_pre_allocated_outputs = enable
@@ -763,9 +789,17 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
         input_tensors: List[torch.Tensor] = []
+        # The operator call materializes a negative or conjugate view, and a host
+        # tensor moves to the device, so the engine sees a copy: an updated input
+        # gets the copy's update, and the sharing check reads the caller's tensors.
+        copied_writes: List[Tuple[torch.Tensor, torch.Tensor]] = []
+        reads_a_copy = False
+        # Dynamo cannot trace is_neg and is_conj, which return a plain bool.
+        aliased = {} if torch.compiler.is_dynamo_compiling() else self._updated_inputs
         input_info = (self.symbolic_shape_expressions or {}).get("inputs", [])
         for index, i in enumerate(inputs):
             if isinstance(i, torch.Tensor):
+                caller = i
                 if not i.is_cuda:
                     logger.warning(
                         "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
@@ -773,6 +807,21 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         "before calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device))."
                     )
                     i = i.cuda()
+                if binding_names[index] in aliased:
+                    if i.is_neg() or i.is_conj():
+                        i = i.resolve_neg().resolve_conj()
+                    if i is not caller:
+                        if torch_tensorrt.runtime.get_cudagraphs_mode():
+                            from torch_tensorrt.dynamo.runtime._TRTEngine import (
+                                _refuse_a_copy_under_cuda_graphs,
+                            )
+
+                            _refuse_a_copy_under_cuda_graphs(
+                                binding_names[index], caller
+                            )
+                        copied_writes.append((caller, i))
+                elif aliased and (i.is_neg() or i.is_conj()):
+                    reads_a_copy = True
                 input_tensors.append(i)
             else:
                 # A scalar produced by a preceding Torch subgraph. Its binding rank is not
@@ -789,9 +838,26 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     scalar_tensor = scalar_tensor.unsqueeze(0)
                 input_tensors.append(scalar_tensor.cuda())
 
+        if copied_writes or reads_a_copy:
+            from torch._subclasses.fake_tensor import is_fake
+            from torch_tensorrt.dynamo.runtime._TRTEngine import (
+                _refuse_inputs_that_share_memory,
+            )
+
+            _refuse_inputs_that_share_memory(
+                [
+                    (name, i, aliased.get(name, False), name in aliased)
+                    for name, i in zip(binding_names, inputs)
+                    # Saving traces forward with fake tensors, which have no memory.
+                    if isinstance(i, torch.Tensor) and not is_fake(i)
+                ]
+            )
         outputs: List[Any] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
+        # The engine's write stores state, as a write under no_grad does.
+        for caller, bound in copied_writes:
+            caller.detach().copy_(bound)
 
         # The interpreter may have appended extra "side-effect" outputs to
         # satisfy the network-output requirement of aliased layers (e.g.
