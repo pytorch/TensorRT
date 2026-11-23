@@ -43,16 +43,17 @@ def collapse_high_rank_permutes(
     """
     if not settings.collapse_high_rank_permutes:
         return gm
-    permutes = _chains(gm, settings, aten.permute.default)
     # Repeats first, and the last one first: each rewrite can leave a reshape as the
     # only reader of the expand or permute before it.
     repeats = sum(
-        _rewrite_repeat(gm, node, permutes, settings)
+        _rewrite_repeat(gm, node, settings)
         for node in reversed(
             _chains(gm, settings, aten.unsqueeze.default, aten.expand.default)
         )
     )
-    rewritten = sum(_rewrite(gm, node) for node in permutes)
+    rewritten = sum(
+        _rewrite(gm, node) for node in _chains(gm, settings, aten.permute.default)
+    )
     if rewritten or repeats:
         gm = clean_up_graph_after_modifications(gm)
     if rewritten:
@@ -109,12 +110,6 @@ def _reshaped_clones(node: torch.fx.Node) -> Optional[List[torch.fx.Node]]:
     return clones
 
 
-def _readers(node: torch.fx.Node) -> List[torch.fx.Node]:
-    """The readers of ``node`` and its clones, once ``_reshaped_clones`` accepted it."""
-    clones = cast(List[torch.fx.Node], _reshaped_clones(node))
-    return [u for n in [node, *clones] for u in n.users if u not in clones]
-
-
 def _set_vals(nodes: List[torch.fx.Node], source: torch.Tensor) -> None:
     """Recompute the values of ``nodes``.
 
@@ -128,23 +123,13 @@ def _set_vals(nodes: List[torch.fx.Node], source: torch.Tensor) -> None:
         node.meta.pop("tensor_meta", None)
 
 
-def _collapsible(permute: torch.fx.Node) -> bool:
-    """Whether ``_rewrite`` can run the chain around ``permute`` on at most 8 dims."""
-    head = permute.all_input_nodes[0]
-    return (
-        head.target in _RESHAPES
-        and len(head.users) == 1
-        and _static_sizes(head) is not None
-        and _reshaped_clones(permute) is not None
-    )
-
-
 def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
-    if not _collapsible(permute):
-        return False
     head = permute.all_input_nodes[0]
-    sizes = cast(List[int], _static_sizes(head))
-    clones = cast(List[torch.fx.Node], _reshaped_clones(permute))
+    if head.target not in _RESHAPES or len(head.users) != 1:
+        return False
+    sizes, clones = _static_sizes(head), _reshaped_clones(permute)
+    if sizes is None or clones is None:
+        return False
     val = head.meta["val"]
 
     dims = [d % len(sizes) for d in cast(List[int], permute.args[1])]
@@ -176,7 +161,6 @@ def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
 def _rewrite_repeat(
     gm: torch.fx.GraphModule,
     unsqueeze: torch.fx.Node,
-    permutes: List[torch.fx.Node],
     settings: CompilationSettings,
 ) -> bool:
     """Run ``unsqueeze(d)``, an expand of dim d alone, and reshapes on 3 dims.
@@ -184,11 +168,10 @@ def _rewrite_repeat(
     In row-major order the result repeats each block of the dims from d on, so
     reshaping the input to (A, 1, B) and expanding that to (A, k, B) gives the same
     values, where A is the size of the dims before d and B the size of the rest.
-    Each reshape that reads the result must come back to at most 8 dims, or start a
-    chain in ``permutes`` that ``_rewrite`` collapses and whose readers come back to at
-    most 8 dims, and ``torch_executed_modules`` must not keep these last readers in
-    PyTorch. Otherwise the graph stays split and the engine would output the expanded
-    tensor instead of the input.
+    Each reshape that reads the result must come back to at most 8 dims, and
+    ``torch_executed_modules`` must not keep the expand, a clone or a reshape of the
+    result in PyTorch. Otherwise the graph stays split right there, and the expanded
+    tensor instead of the input would cross an engine boundary.
     """
     if len(unsqueeze.users) != 1:
         return False
@@ -200,19 +183,12 @@ def _rewrite_repeat(
     clones = _reshaped_clones(expand)
     if shape is None or out is None or clones is None:
         return False
-    for reader in _readers(expand):
-        last = [reader]
-        if _rank(reader) > trt.Dims.MAX_DIMS:
-            permute = cast(torch.fx.Node, next(iter(reader.users), None))
-            if permute not in permutes or not _collapsible(permute):
-                return False
-            last = _readers(permute)
-        if any(
-            _rank(r) > trt.Dims.MAX_DIMS
-            or node_in_torch_executed_module(r, settings.torch_executed_modules)
-            for r in last
-        ):
-            return False
+    readers = [u for n in [expand, *clones] for u in n.users if u not in clones]
+    if any(_rank(r) > trt.Dims.MAX_DIMS for r in readers) or any(
+        node_in_torch_executed_module(n, settings.torch_executed_modules)
+        for n in [expand, *clones, *readers]
+    ):
+        return False
     dim = cast(int, unsqueeze.args[1]) % len(shape)
     sizes = shape[:dim] + shape[dim + 1 :]
     if out[:dim] + out[dim + 1 :] != sizes:

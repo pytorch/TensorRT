@@ -1082,8 +1082,13 @@ class TestCollapseHighRankPermutes(TestCase):
             collapse_high_rank_permutes,
         )
 
-        x = torch.randn(2, 3, 8, 8)
-        gm = torch.export.export(self.ExpandedPatches(), (x,)).graph_module
+        class Cloned(torch.nn.Module):
+            def forward(self, x):
+                y = x.view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
+                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return y.clone().reshape(2, 768)
+
+        gm = torch.export.export(Cloned(), (torch.randn(2, 3, 8, 16),)).graph_module
         gm = collapse_high_rank_permutes(
             gm, CompilationSettings(collapse_high_rank_permutes=True)
         )
@@ -1092,9 +1097,10 @@ class TestCollapseHighRankPermutes(TestCase):
             for n in gm.graph.nodes
             if n.op == "call_function"
         }
-        # 2 * 2 * 2 * 2 * 2 * 3 dims before the new one, 2 * 2 after it.
-        self.assertEqual(shapes[torch.ops.aten._reshape_copy.default], (96, 1, 4))
-        self.assertEqual(shapes[torch.ops.aten.expand.default], (96, 2, 4))
+        # 2 * 3 * 2 * 2 * 2 * 2 dims before the new one, 2 * 4 after it.
+        self.assertEqual(shapes[torch.ops.aten._reshape_copy.default], (96, 1, 8))
+        self.assertEqual(shapes[torch.ops.aten.expand.default], (96, 2, 8))
+        self.assertEqual(shapes[torch.ops.aten.clone.default], (96, 2, 8))
         # Engine layer names come from node names.
         self.assertFalse(any("unsqueeze" in n.name for n in gm.graph.nodes))
 
@@ -1177,41 +1183,43 @@ class TestCollapseHighRankPermutes(TestCase):
                 self.assertEqual(len(unsqueezes), 1)
 
     def test_expanded_reader_left_to_pytorch(self):
-        """A last reader kept in PyTorch would make the engine return the expanded tensor."""
+        """A kept module that holds any node of the chain keeps the repeat.
 
-        def repeated(x):
-            y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
-            return y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+        Otherwise the expanded tensor would cross an engine boundary.
+        """
 
         class Repeat(torch.nn.Module):
             def forward(self, x):
-                return repeated(x)
+                return (x + 1).view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
 
-        class RepeatPermuted(torch.nn.Module):
-            def forward(self, x):
-                y = repeated(x).reshape(2, 3, 2, 2, 2, 2, 2, 2, 2, 2)
-                return y.permute(0, 1, 3, 2, 5, 4, 7, 6, 9, 8)
+        class Expand(torch.nn.Module):
+            def forward(self, y):
+                return y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+
+        class Contiguous(torch.nn.Module):
+            def forward(self, y):
+                return y.contiguous()
 
         class Flatten(torch.nn.Module):
             def forward(self, y):
                 return y.reshape(2, 768)
 
-        class ThenFlatten(torch.nn.Module):
-            def __init__(self, first):
+        class Model(torch.nn.Module):
+            def __init__(self):
                 super().__init__()
-                self.first, self.flatten = first, Flatten()
+                self.repeat, self.expand = Repeat(), Expand()
+                self.contiguous, self.flatten = Contiguous(), Flatten()
 
             def forward(self, x):
-                return self.flatten(self.first(x)) * 2
+                y = self.expand(self.repeat(x))
+                return self.flatten(self.contiguous(y)) * 2
 
-        for first in (Repeat(), RepeatPermuted()):
-            with self.subTest(first=type(first).__name__):
+        for kept in (Repeat, Expand, Contiguous, Flatten):
+            with self.subTest(kept=kept.__name__):
                 parts = self._compile(
-                    ThenFlatten(first),
+                    Model(),
                     (torch.randn(2, 3, 8, 16, device="cuda"),),
-                    torch_executed_modules={
-                        f"{Flatten.__module__}.{Flatten.__qualname__}"
-                    },
+                    torch_executed_modules={f"{kept.__module__}.{kept.__qualname__}"},
                 )
                 targets = [
                     n.target
@@ -1386,75 +1394,25 @@ class TestCollapseHighRankPermutes(TestCase):
         x = torch.randn(2, 3, 8, 8, device="cuda")
         self.assertEqual(list(self._compile(TwoRepeats(), (x,))), ["_run_on_acc_0"])
 
-    def test_expanded_into_permute(self):
-        class RepeatedPatches(torch.nn.Module):
-            def forward(self, x):
-                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
-                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
-                y = y.reshape(2, 3, 2, 2, 2, 2, 2, 2, 2, 2)
-                return y.permute(0, 1, 3, 2, 5, 4, 7, 6, 9, 8).reshape(2, 768) * 2
-
-        x = torch.randn(2, 3, 8, 16, device="cuda")
-        self.assertEqual(
-            list(self._compile(RepeatedPatches(), (x,))),
-            ["_run_on_acc_0"],
-        )
-
     def test_expanded_reader_over_8_dims(self):
-        """Each reader must come back to 8 dims or start a permute chain that is
-        rewritten too. Otherwise the split stays, and the engine would return the
-        expanded tensor instead of its input."""
+        """A reader over 8 dims stays in PyTorch, so the engine would return the
+        expanded tensor. Every reader is checked, not only the first."""
         from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
             collapse_high_rank_permutes,
         )
 
-        def repeated(x):
-            y = x.view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
-            return y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
-
-        # Only the repeat must stay. A permute chain may still be rewritten on its own.
-        def repeat_ops(gm):
-            ops = (torch.ops.aten.unsqueeze.default, torch.ops.aten.expand.default)
-            return [(n.target, n.args) for n in gm.graph.nodes if n.target in ops]
-
-        class Summed(torch.nn.Module):
+        class TwoReaders(torch.nn.Module):
             def forward(self, x):
-                return repeated(x).reshape(3, 2, 2, 2, 2, 2, 2, 2, 4).sum(-1)
+                y = x.view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
+                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return y.reshape(2, 768), y.reshape(3, 2, 2, 2, 2, 2, 2, 2, 4).sum(-1)
 
-        class PermutedSummed(torch.nn.Module):
-            def forward(self, x):
-                y = repeated(x).reshape(2, 3, 2, 2, 2, 2, 2, 2, 2, 2)
-                return y.permute(0, 1, 3, 2, 5, 4, 7, 6, 9, 8).sum(-1)
-
-        class PermutedReshapedSummed(torch.nn.Module):
-            def forward(self, x):
-                y = repeated(x).reshape(2, 3, 2, 2, 2, 2, 2, 2, 2, 2)
-                y = y.permute(0, 1, 3, 2, 5, 4, 7, 6, 9, 8)
-                return y.reshape(2, 3, 2, 2, 2, 2, 2, 2, 4).sum(-1)
-
-        class Permuted(torch.nn.Module):
-            def forward(self, x):
-                y = repeated(x).reshape(2, 3, 2, 2, 2, 2, 2, 2, 2, 2)
-                return y.permute(0, 1, 3, 2, 5, 4, 7, 6, 9, 8).reshape(2, 768)
-
-        # A permute left in PyTorch keeps its chain over 8 dims.
-        permute = {"torch.ops.aten.permute.default"}
-        for mod, excluded in (
-            (Summed(), set()),
-            (PermutedSummed(), set()),
-            (PermutedReshapedSummed(), set()),
-            (Permuted(), permute),
-        ):
-            with self.subTest(mod=type(mod).__name__):
-                gm = torch.export.export(mod, (torch.randn(2, 3, 8, 16),)).graph_module
-                before = repeat_ops(gm)
-                gm = collapse_high_rank_permutes(
-                    gm,
-                    CompilationSettings(
-                        collapse_high_rank_permutes=True, torch_executed_ops=excluded
-                    ),
-                )
-                self.assertEqual(repeat_ops(gm), before)
+        gm = torch.export.export(TwoReaders(), (torch.randn(2, 3, 8, 16),)).graph_module
+        before = [(n.target, n.args) for n in gm.graph.nodes]
+        gm = collapse_high_rank_permutes(
+            gm, CompilationSettings(collapse_high_rank_permutes=True)
+        )
+        self.assertEqual([(n.target, n.args) for n in gm.graph.nodes], before)
 
     def test_other_rewrite_ops_excluded(self):
         class Repeat(torch.nn.Module):
