@@ -5,6 +5,7 @@ import base64
 import copy
 import logging
 import operator
+from collections.abc import Mapping
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
@@ -14,8 +15,10 @@ from torch._export.utils import _detect_fake_mode_from_gm
 from torch._guards import detect_fake_mode
 from torch._library.fake_class_registry import FakeScriptObject
 from torch.export import ExportedProgram, ExportGraphSignature
+from torch.export import _unlift as export_unlift
 from torch.export._trace import _combine_args
 from torch.export.exported_program import (
+    ConstantArgument,
     CustomObjArgument,
     InputKind,
     InputSpec,
@@ -468,6 +471,28 @@ def _order_placeholders_first(gm: torch.fx.GraphModule) -> None:
     gm.graph.lint()
 
 
+def _remove_unlifted_guards(gm: torch.fx.GraphModule) -> None:
+    """Remove only export-generated execution guards before rebuilding an EP."""
+    guard_type = getattr(export_unlift, "GuardsFn", None)
+    if not isinstance(guard_type, type):
+        return
+    targets: Set[str] = set()
+    for node in list(gm.graph.nodes):
+        if node.op != "call_module" or not isinstance(node.target, str):
+            continue
+        if type(gm.get_submodule(node.target)) is guard_type:
+            if node.users:
+                raise ValueError(
+                    "An export-generated guard has an unexpected data user"
+                )
+            targets.add(node.target)
+            gm.graph.erase_node(node)
+    for target in targets:
+        gm.delete_submodule(target)
+    if targets:
+        gm.recompile()
+
+
 def create_trt_exp_program(
     gm: torch.fx.GraphModule,
     *,
@@ -479,6 +504,11 @@ def create_trt_exp_program(
     and constructs an Exported Program object with the new IO node names and state_dict
     """
 
+    # module() attaches execution-only GuardsFn modules on newer PyTorch.
+    # Canonical ExportedProgram graphs cannot contain those call_module nodes.
+    # The rebuilt program recreates input validation from its signature and
+    # range_constraints; do not remove user modules based on their name.
+    _remove_unlifted_guards(gm)
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
     assert output_nodes
@@ -627,7 +657,10 @@ def create_trt_exp_program(
     # Falls back to the other nodes, so a program whose inputs are all ints keeps
     # their ranges.
     fake_mode = _detect_fake_mode_from_gm(gm)
-    range_constraints: Dict[Any, Any] = {}
+    incoming_constraints = getattr(gm, "range_constraints", {})
+    range_constraints: Dict[Any, Any] = (
+        dict(incoming_constraints) if isinstance(incoming_constraints, Mapping) else {}
+    )
     if fake_mode is not None and fake_mode.shape_env is not None:
         has_inputs = (arg_inputs is not None and len(arg_inputs) > 0) or bool(
             kwarg_inputs
@@ -675,6 +708,25 @@ def create_trt_exp_program(
     # Lift parameters/buffers/constants in the graph
     # torch.export serialization expects them to be lifted
     gm, trt_graph_signature, state_dict, constants = lift(gm, trt_graph_signature)
+
+    # Keep tensor-like specs until after lift(), which uses user-input names to
+    # position lifted parameters. ConstantArgument makes user_inputs expose the
+    # constant value instead of its placeholder name.
+    placeholders = {
+        node.name: node for node in gm.graph.nodes if node.op == "placeholder"
+    }
+    for spec in trt_graph_signature.input_specs:
+        if spec.kind != InputKind.USER_INPUT:
+            continue
+        node = placeholders[spec.arg.name]
+        if "val" in node.meta and type(node.meta["val"]) in (
+            int,
+            float,
+            bool,
+            str,
+            type(None),
+        ):
+            spec.arg = ConstantArgument(name=node.name, value=node.meta["val"])
 
     trt_exp_program = ExportedProgram(
         root=gm,

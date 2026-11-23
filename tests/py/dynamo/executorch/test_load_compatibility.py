@@ -264,7 +264,7 @@ def test_native_failures_propagate_without_fallback(
         pytest.fail("ExecuTorch errors must not reach another format's loader")
 
     monkeypatch.setattr(torch.export, "load", unexpected)
-    monkeypatch.setattr(torch.jit, "load", unexpected)
+    monkeypatch.setattr(compiler, "torchscript_api", unexpected)
     target, attribute = {
         "register": (boundary.delegate, "register"),
         "load": (boundary.portable, "_load_for_executorch_from_buffer"),
@@ -394,7 +394,7 @@ def test_standard_dispatch_and_kwargs(
         return expected
 
     monkeypatch.setattr(torch.export, "load", export_load)
-    monkeypatch.setattr(torch.jit, "load", jit_load)
+    monkeypatch.setattr(compiler, "torchscript_api", lambda name: jit_load)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         result = compiler.load(
@@ -429,8 +429,10 @@ def test_standard_formats_round_trip_real_cpu_torch(
             torch.export.export(model, (x,)), path, extra_files={"metadata": "kept"}
         )
     else:
-        torch.jit.save(
-            torch.jit.trace(model, (x,)), path, _extra_files={"metadata": "kept"}
+        compiler.torchscript_api("save")(
+            compiler.torchscript_api("trace")(model, (x,)),
+            path,
+            _extra_files={"metadata": "kept"},
         )
     loaded = compiler.load(path, extra_files=extra_files, **options)
     actual = loaded.module()(x) if format == "export" else loaded(x)

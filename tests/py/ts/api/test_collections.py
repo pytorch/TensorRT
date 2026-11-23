@@ -8,6 +8,7 @@ import unittest
 
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._jit_compat import torchscript_api
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 
@@ -34,7 +35,9 @@ class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
+            torchscript_api("load")(
+                MODULE_DIR + "/standard_tensor_input_scripted.jit.pt"
+            )
             .eval()
             .to("cuda")
         )
@@ -67,7 +70,9 @@ class TestStandardTensorInputLong(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda").to(torch.int32)
         self.model = (
-            torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
+            torchscript_api("load")(
+                MODULE_DIR + "/standard_tensor_input_scripted.jit.pt"
+            )
             .eval()
             .to("cuda")
         )
@@ -101,7 +106,9 @@ class TestStandardTensorInputDomain(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
+            torchscript_api("load")(
+                MODULE_DIR + "/standard_tensor_input_scripted.jit.pt"
+            )
             .eval()
             .to("cuda")
         )
@@ -133,7 +140,7 @@ class TestTupleInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/tuple_input_scripted.jit.pt")
+            torchscript_api("load")(MODULE_DIR + "/tuple_input_scripted.jit.pt")
             .eval()
             .to("cuda")
         )
@@ -165,7 +172,9 @@ class TestListInput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/list_input_scripted.jit.pt").eval().to("cuda")
+            torchscript_api("load")(MODULE_DIR + "/list_input_scripted.jit.pt")
+            .eval()
+            .to("cuda")
         )
 
         compile_spec = {
@@ -195,7 +204,7 @@ class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
+            torchscript_api("load")(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
             .eval()
             .to("cuda")
         )
@@ -222,7 +231,7 @@ class TestTupleInputOutput(unittest.TestCase):
     def test_compile_full_compilation(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
+            torchscript_api("load")(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
             .eval()
             .to("cuda")
         )
@@ -256,7 +265,7 @@ class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt")
+            torchscript_api("load")(MODULE_DIR + "/list_input_output_scripted.jit.pt")
             .eval()
             .to("cuda")
         )
@@ -284,7 +293,7 @@ class TestListInputOutput(unittest.TestCase):
     def test_compile_full_compilation(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt")
+            torchscript_api("load")(MODULE_DIR + "/list_input_output_scripted.jit.pt")
             .eval()
             .to("cuda")
         )
@@ -319,7 +328,9 @@ class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt")
+            torchscript_api("load")(
+                MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt"
+            )
             .eval()
             .to("cuda")
         )
@@ -346,7 +357,9 @@ class TestListInputTupleOutput(unittest.TestCase):
     def test_compile_full_compilation(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.model = (
-            torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt")
+            torchscript_api("load")(
+                MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt"
+            )
             .eval()
             .to("cuda")
         )

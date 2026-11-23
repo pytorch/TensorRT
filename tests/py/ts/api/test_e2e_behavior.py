@@ -7,6 +7,7 @@ from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._jit_compat import torchscript_api
 from utils import same_output_format
 
 try:
@@ -28,7 +29,7 @@ class TestInputTypeDefaultsFP32Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        ts_model = torch.jit.script(self.model)
+        ts_model = torchscript_api("script")(self.model)
         trt_mod = torchtrt.ts.compile(
             ts_model,
             inputs=[torchtrt.Input(self.input.shape)],
@@ -40,7 +41,7 @@ class TestInputTypeDefaultsFP32Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        ts_model = torch.jit.script(self.model)
+        ts_model = torchscript_api("script")(self.model)
         trt_mod = torchtrt.ts.compile(
             ts_model,
             inputs=[self.input.half()],
@@ -53,7 +54,7 @@ class TestInputTypeDefaultsFP32Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        ts_model = torch.jit.script(self.model)
+        ts_model = torchscript_api("script")(self.model)
         input_spec = torchtrt.Input(self.input.shape)
         input_spec.dtype = torchtrt.dtype.half
 
@@ -76,7 +77,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        half_mod = torch.jit.script(self.model)
+        half_mod = torchscript_api("script")(self.model)
         half_mod.half()
 
         trt_mod = torchtrt.ts.compile(
@@ -95,7 +96,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        half_mod = torch.jit.script(self.model)
+        half_mod = torchscript_api("script")(self.model)
         half_mod.half()
 
         trt_mod = torchtrt.ts.compile(
@@ -112,7 +113,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        half_mod = torch.jit.script(self.model)
+        half_mod = torchscript_api("script")(self.model)
         half_mod.half()
 
         trt_mod = torchtrt.ts.compile(
@@ -132,7 +133,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-        half_mod = torch.jit.script(self.model)
+        half_mod = torchscript_api("script")(self.model)
         half_mod.half()
 
         input_spec = torchtrt.Input(self.input.shape)
@@ -162,7 +163,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.input_1 = torch.zeros((5, 5), dtype=torch.float, device="cuda:0")
         self.input_2 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
         self.input_3 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
-        scripted_mod = torch.jit.script(self.model)
+        scripted_mod = torchscript_api("script")(self.model)
 
         inputs = [
             torchtrt.Input((5, 5), dtype=torch.float),
@@ -194,7 +195,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         self.model = Sample().eval().to("cuda")
         self.input_1 = torch.zeros((5, 5), dtype=torch.float, device="cuda:0")
         self.input_2 = torch.ones((5, 5), dtype=torch.float, device="cuda:0")
-        scripted_mod = torch.jit.script(self.model)
+        scripted_mod = torchscript_api("script")(self.model)
 
         inputs = [
             torchtrt.Input((5, 5), dtype=torch.float),
