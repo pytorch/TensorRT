@@ -1057,13 +1057,17 @@ def compile(
         # engine via get_attr nodes in the fx graph. This shape is naturally
         # serializable by torch_tensorrt.save / torch.export (no external
         # Python wrapper that would be lost on a round-trip).
-        trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
+        trt_gm = inline_lifted_buffers_into_gm(
+            trt_gm,
+            lifted_buffers,
+            [*exported_program.state_dict, *exported_program.constants],
+        )
     # A copy-back value stays on the output node, where the exporters read it and
-    # where dead-code elimination cannot reach it, but nothing between here and the
-    # ExecuTorch runtime writes it into the buffer. Returning it would report a
-    # mutation the caller cannot act on, so the compiled module keeps the arity of
-    # the model it was compiled from.
-    hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
+    # where dead-code elimination cannot reach it. Called from PyTorch, the module
+    # writes it into the buffer itself and returns only the model's outputs. Read
+    # after inlining, which renames nested buffers.
+    if _copyback_mutation_buffers:
+        hide_copyback_outputs(trt_gm, trt_gm.meta["_copyback_mutation_buffers"])
     return trt_gm
 
 
@@ -1586,13 +1590,17 @@ def compile_module(
     # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
     # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     # Graphs with non-tensor inputs (Flux `return_dict`) also partition, since those inputs
-    # cannot be engine bindings.
+    # cannot be engine bindings, and so do graphs with lifted buffers, which compile inlines
+    # into the partitioned GraphModule.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
         and not defer_engine_setup_to_load()
         and _placeholders_are_engine_bindings(gm)
+        and not any(
+            "_lifted_buffer" in n.meta for n in gm.graph.find_nodes(op="placeholder")
+        )
     ):
         logger.info(
             "require_full_compilation + full operator support: "
