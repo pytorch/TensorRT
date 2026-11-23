@@ -40,7 +40,6 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
-    assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
     buffers_restored,
     erase_export_guards,
@@ -55,6 +54,12 @@ def _ep_module_decomposed(model, args):
     ep = export(model, tuple(args))
     ep = ep.run_decompositions({})
     return ep.module()
+
+
+def _ep_module_on_cuda(model, args):
+    """``_ep_module_decomposed`` for a model whose buffers live on the GPU, as an
+    engine needs them to update one in place."""
+    return _ep_module_decomposed(model.cuda(), tuple(a.cuda() for a in args))
 
 
 class TestLiftMutatedBuffers(TestCase):
@@ -833,6 +838,7 @@ class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
         node = graph.call_function(
             torch.ops.aten.index_copy.default, args=(clone, 2, index, src)
         )
+        node.meta["_trt_kv_alias"] = True
         self.assertFalse(_index_copy_kv_eligible(node))
         self.assertTrue(_index_copy_kv_eligible(node, input_node=buffer))
 
@@ -1053,14 +1059,64 @@ class TestPredictedKvAssertion(TestCase):
         self.assertNotIn("min_block_size", message)
 
 
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+class TestInPlaceRule(TestCase):
+    """A caller's tensor is updated in place only when nothing else can see it change
+    too early or too late. Otherwise its write-back ``copy_`` stays."""
+
+    _args = (torch.ones(1, 4, 1, 8), torch.tensor([3]))
+
+    def test_an_input_write_not_done_in_place_is_written_back(self):
+        """Its ``copy_`` stays to store the write: with another reader of the old
+        contents, on the host (the engine gets a per-call copy), not contiguous, or
+        not read again (the engine updates the cache only as part of a value it
+        computes)."""
+
+        class Reader(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                old = cache[:, :, 3:4, :] * 2
+                cache.index_copy_(2, pos, x)
+                return cache.sum() + old.sum()
+
+        class Writer(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                cache.index_copy_(2, pos, x)
+                return cache.sum()
+
+        class Unread(torch.nn.Module):
+            def forward(self, cache, x, pos):
+                cache.index_copy_(2, pos, x)
+                return x + 1
+
+        cache = torch.zeros(1, 4, 16, 8)
+        strided = torch.zeros(1, 16, 4, 8).transpose(1, 2)
+        for name, model, first, to_cuda in (
+            ("another reader", Reader(), cache, True),
+            ("host", Writer(), cache, False),
+            ("not contiguous", Writer(), strided, True),
+            ("not read again", Unread(), cache, True),
+        ):
+            with self.subTest(name):
+                args = (first,) + self._args
+                to_gm = _ep_module_on_cuda if to_cuda else _ep_module_decomposed
+                gm, _ = lift_mutated_buffers(to_gm(model, args))
+                self.assertEqual(gm.meta["_predicted_kv_bindings"], [])
+                (copy,) = [
+                    n
+                    for n in gm.graph.nodes
+                    if n.target is torch.ops.aten.copy_.default
+                ]
+                self.assertTrue(copy.meta.get("_trt_write_back"))
+
+
 class TestDeadKvWriteRouting(TestCase):
     """A KV write nothing else consumes is routed to copy-back instead of aliased.
 
     Erasing its ``copy_`` leaves such a write dead, so it is eliminated before any
     engine can alias it and the prediction can never be fulfilled. Copy-back makes it
     live again by re-attaching its value as a graph output, which is only safe because
-    ``_trt_no_kv_alias`` stops the converter aliasing the same buffer as well: a
-    buffer that is both raises on every call.
+    the converter aliases only writes marked ``_trt_kv_alias``: a buffer that is both
+    raises on every call.
     """
 
     @staticmethod
@@ -1099,26 +1155,16 @@ class TestDeadKvWriteRouting(TestCase):
         self.assertEqual(gm.meta["_copyback_mutation_buffers"], ["cache"])
         self.assertEqual(gm.meta["_predicted_kv_bindings"], [])
 
-    def test_the_rerouted_write_is_marked(self):
-        gm, _lifted = lift_mutated_buffers(self._dead_write_gm())
-        marked = gm.meta["_no_kv_alias_writes"]
-        self.assertEqual(len(marked), 1)
-        node = next(n for n in gm.graph.nodes if n.name == marked[0])
-        self.assertIs(node.target, torch.ops.aten.slice_scatter.default)
-        self.assertTrue(node.meta["_trt_no_kv_alias"])
-
-    def test_a_live_kv_write_is_not_marked(self):
-        """Only a write the classifier re-routed is marked. Marking a live KV write
-        would cost it its aliasing and hand it copy-back's per-call full-cache copy,
-        which is the cost the fast path exists to avoid."""
+    def test_a_live_kv_write_is_marked_in_place(self):
         gm, _lifted = lift_mutated_buffers(self._live_index_copy_gm())
-        self.assertEqual(gm.meta["_no_kv_alias_writes"], [])
+        (node,) = [
+            n for n in gm.graph.nodes if n.target is torch.ops.aten.index_copy.default
+        ]
+        self.assertTrue(node.meta.get("_trt_kv_alias"))
         self.assertEqual(gm.meta["_predicted_kv_bindings"], ["buf_cache"])
 
-    def test_a_non_kv_write_is_not_marked(self):
-        """Nothing would alias it anyway, so the marker would say nothing. Keeping it
-        to writes the converter really would have aliased is what leaves
-        ``assert_predicted_kv_aliased``'s copy-back direction something to catch."""
+    def test_a_non_kv_write_is_copied_back(self):
+        """Main does the same; this guards it next to the new mark."""
 
         class M(torch.nn.Module):
             def __init__(self):
@@ -1131,12 +1177,11 @@ class TestDeadKvWriteRouting(TestCase):
 
         gm, _lifted = lift_mutated_buffers(_ep_module_decomposed(M(), (torch.ones(4),)))
         self.assertEqual(gm.meta["_copyback_mutation_buffers"], ["state"])
-        self.assertEqual(gm.meta["_no_kv_alias_writes"], [])
 
-    def test_the_marker_blocks_index_copy_eligibility(self):
+    def test_index_copy_takes_only_a_marked_write(self):
         """``index_copy`` applies its own eligibility check rather than
-        ``slice_scatter``'s, so the marker has to be honoured in both places or the
-        decode write aliases while its value is also a copy-back output."""
+        ``slice_scatter``'s, so both have to read the mark, or a write left to
+        copy-back aliases while its value is also a copy-back output."""
         from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
             _index_copy_kv_eligible,
         )
@@ -1146,67 +1191,8 @@ class TestDeadKvWriteRouting(TestCase):
             n for n in gm.graph.nodes if n.target is torch.ops.aten.index_copy.default
         )
         self.assertTrue(_index_copy_kv_eligible(node))
-        node.meta["_trt_no_kv_alias"] = True
+        del node.meta["_trt_kv_alias"]
         self.assertFalse(_index_copy_kv_eligible(node))
-
-
-class TestNoKvAliasMarkerSurvival(TestCase):
-    """``assert_no_kv_alias_markers_survived`` re-reads the markers after lowering.
-
-    The marker is the only thing keeping a copy-back write out of ``aliased_io``, and
-    it rides on ``node.meta`` through every pass in ``post_lowering``. A pass that
-    rebuilt the node without its meta would drop it silently, so it is checked where
-    the cause can still be named rather than left to surface as a module that raises.
-    """
-
-    @staticmethod
-    def _marked_gm():
-        graph = torch.fx.Graph()
-        x = graph.placeholder("x")
-        write = graph.call_function(torch.ops.aten.mul.Tensor, (x, 2.0))
-        write.meta["_trt_no_kv_alias"] = True
-        graph.output((write,))
-        return torch.fx.GraphModule(torch.nn.Module(), graph), write.name
-
-    def test_surviving_marker_passes(self):
-        gm, name = self._marked_gm()
-        assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_stripped_marker_raises(self):
-        gm, name = self._marked_gm()
-        next(n for n in gm.graph.nodes if n.name == name).meta.pop("_trt_no_kv_alias")
-        with self.assertRaisesRegex(RuntimeError, "no other node carries it"):
-            assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_replacement_carrying_the_marker_raises(self):
-        """The reachable shape. Every pass in ``post_lowering`` that carries a node's
-        meta onto a replacement erases the original in the same block, so the recorded
-        name goes missing *and* an unrecorded node gains the marker. Reporting only
-        the missing half would say the meta was dropped when it was in fact carried,
-        and predict aliasing when the marker's presence prevents it."""
-        gm, name = self._marked_gm()
-        with self.assertRaisesRegex(RuntimeError, "carry the marker instead"):
-            assert_no_kv_alias_markers_survived(gm, [name + "_original"])
-
-    def test_marker_on_an_unmarked_node_raises(self):
-        """A marker on a node that was never marked, with every recorded marker still
-        in place: a pass copied the meta rather than moving it. The converter then
-        refuses to alias a write the classifier chose to alias, which the predicted-KV
-        cross-check reports as a partitioning failure -- the wrong cause."""
-        gm, name = self._marked_gm()
-        other = next(n for n in gm.graph.nodes if n.op == "placeholder")
-        other.meta["_trt_no_kv_alias"] = True
-        with self.assertRaisesRegex(RuntimeError, "were never marked"):
-            assert_no_kv_alias_markers_survived(gm, [name])
-
-    def test_marker_appearing_where_none_was_recorded_raises(self):
-        """The empty-expected case is checked too. Nothing recorded before lowering and
-        a marker present after it is the copied-meta fault with no recorded marker to
-        compare against; returning early on an empty set would skip it in the case
-        that occurs most, since most graphs mark nothing."""
-        gm, _name = self._marked_gm()
-        with self.assertRaisesRegex(RuntimeError, "were never marked"):
-            assert_no_kv_alias_markers_survived(gm, [])
 
 
 class TestHiddenCopybackOutputs(TestCase):
@@ -2348,14 +2334,19 @@ class TestCompileSeam(TestCase):
     def test_compile_raises_when_a_copyback_write_is_aliased(self):
         """The backstop for the next divergence between what the classifier predicts
         and what the converter emits, whatever that turns out to be. Standing in for
-        it by making the classifier file everything copy-back: the engine aliases the
-        cache anyway, and the compile has to say so rather than hand back a module
-        that raises ``IndexError`` on every call."""
+        it by making the classifier file everything copy-back while the write keeps
+        its in-place mark: the engine aliases the cache anyway, and the compile has
+        to say so rather than hand back a module that raises ``IndexError`` on every
+        call."""
         from torch_tensorrt.dynamo.lowering import _buffer_lifting
+
+        def copy_back_but_keep_the_mark(value, *args, **kwargs):
+            value.meta["_trt_kv_alias"] = True
+            return False
 
         model, args = self._kv_model(batch=1)
         with mock.patch.object(
-            _buffer_lifting, "_kv_write_will_alias", lambda *a, **k: False
+            _buffer_lifting, "_kv_write_will_alias", copy_back_but_keep_the_mark
         ):
             with self.assertRaisesRegex(RuntimeError, "aliased them in place anyway"):
                 self._compile(model, args, min_block_size=1)
@@ -2489,53 +2480,6 @@ class TestCompileSeam(TestCase):
                 (spec.kind.name, spec.target)
                 for spec in loaded.graph_signature.output_specs
             ],
-        )
-
-    def test_compile_reads_the_markers_back_after_lowering(self):
-        """``compile()`` must call ``assert_no_kv_alias_markers_survived`` on the
-        *lowered* graph with the names lift recorded. Nothing else observes that
-        call: every pass in ``post_lowering`` carries the marks today, so dropping
-        the read-back changes no result until the day a pass stops carrying one,
-        which is exactly when it is needed.
-
-        Where the call sits is the whole of its value -- run above ``post_lowering``
-        it would only ever see the graph the marks were just written into, and could
-        not fail -- so the position is pinned as well as the call. It is pinned by
-        order rather than by comparing graphs: ``post_lowering`` rewrites the module
-        in place and returns the same object, so the graph handed to the read-back is
-        the same object either way and only *when* the call happens distinguishes
-        them."""
-        from torch_tensorrt.dynamo import _compiler as C
-
-        model, args = self._dead_slice_scatter_model()
-        events = []
-        original = C.assert_no_kv_alias_markers_survived
-        original_lowering = C.post_lowering
-
-        def _spy_lowering(gm, *a, **kw):
-            lowered = original_lowering(gm, *a, **kw)
-            events.append(("lowered", None))
-            return lowered
-
-        def _spy(gm, marked):
-            marked = list(marked)
-            events.append(("read_back", marked))
-            return original(gm, marked)
-
-        with mock.patch.object(C, "post_lowering", _spy_lowering):
-            with mock.patch.object(C, "assert_no_kv_alias_markers_survived", _spy):
-                self._compile(model, args, min_block_size=1)
-
-        reads = [e for e in events if e[0] == "read_back"]
-        self.assertEqual(len(reads), 1)
-        self.assertEqual(len(reads[0][1]), 1)
-
-        kinds = [kind for kind, _payload in events]
-        self.assertIn(
-            "lowered",
-            kinds[: kinds.index("read_back")],
-            "the read-back ran before lowering, so it can only ever see the graph "
-            "the markers were just written into",
         )
 
     def test_compile_does_not_cross_check_a_dryrun(self):
