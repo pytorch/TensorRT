@@ -89,6 +89,7 @@ from torch_tensorrt.dynamo.runtime._offloaded_engines import (
 from torch_tensorrt.dynamo.tools.weight_mapping import has_mapped_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    extract_var_range_info,
     get_cpu_memory_usage,
     get_flat_args_with_check,
     get_output_metadata,
@@ -1211,6 +1212,37 @@ def _insert_complex_io_adapters(
         partitioned_module.recompile()
 
 
+def _flatten_inputs_like_placeholders(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Any],
+    sample_kwarg_inputs: Optional[dict[Any, Any]],
+    placeholder_names: Sequence[str],
+) -> List[Any]:
+    """Flatten the user inputs into the order of the graph placeholders."""
+    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
+    # Without it, match kwargs by placeholder name and take the args in order:
+    # the arg/kwarg split can differ from export time (flatten_up_to then
+    # raises), and lifted mutated buffers drop _in_spec and come after the
+    # kwarg placeholders while their Inputs are appended to the args. Export
+    # can rename an argument (X becomes x), so a kwarg named after no
+    # placeholder follows the args, by position as before.
+    in_spec = getattr(gm, "_in_spec", None)
+    try:
+        if in_spec is None:
+            raise AttributeError("_in_spec not found on graph module")
+        return list(
+            in_spec.flatten_up_to((tuple(sample_arg_inputs), sample_kwarg_inputs))
+        )
+    except (ValueError, AttributeError):
+        kwargs = sample_kwarg_inputs or {}
+        unnamed = [v for k, v in kwargs.items() if k not in placeholder_names]
+        args = iter(torch.utils._pytree.tree_leaves([*sample_arg_inputs, *unnamed]))
+        return [
+            kwargs[name] if name in kwargs else next(args, None)
+            for name in placeholder_names
+        ]
+
+
 def _build_user_symbol_bounds(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
@@ -1223,8 +1255,13 @@ def _build_user_symbol_bounds(
     Validates against finite exporter bounds: ``user_max > exp_max`` and
     ``user_min < exp_min`` raise (TRT would reject those shapes at runtime);
     a strict subset narrows the engine profile to the user's bounds (info
-    log only); the ``user_min=1, exp_min=2`` case warns -- it's PyTorch's
-    0/1 specialization artifact, not a user error.
+    log only); the ``user_min=1, exp_min=2`` case is a debug log -- it's
+    PyTorch's 0/1 specialization artifact, not a user error.
+
+    Warns once when a plain ``Input.opt_shape`` differs from the export example
+    in a dynamic dimension of the export that no ``Input.profiles`` covers and
+    whose example is inside the ``Input`` range, since the engine opt is the
+    example there.
     """
     # ep.module() strips lifted params/buffers from the graph, so all_placeholders
     # only contains USER_INPUT nodes, but graph_signature.input_specs still lists
@@ -1242,24 +1279,22 @@ def _build_user_symbol_bounds(
         if name in placeholder_by_name
     ]
 
-    # Use _in_spec.flatten_up_to to preserve export-time kwarg ordering.
-    # Fall back to name-based kwarg lookup when the arg/kwarg split differs
-    # from export time (which would cause flatten_up_to to raise an arity error).
-    in_spec = getattr(gm, "_in_spec", None)
-    try:
-        if in_spec is None:
-            raise AttributeError("_in_spec not found on graph module")
-        flat_inputs = in_spec.flatten_up_to(
-            (tuple(sample_arg_inputs), sample_kwarg_inputs)
-        )
-    except (ValueError, AttributeError):
-        flat_inputs = list(sample_arg_inputs)
-        if isinstance(sample_kwarg_inputs, dict):
-            for name in user_input_names[len(sample_arg_inputs) :]:
-                if name in sample_kwarg_inputs:
-                    flat_inputs.append(sample_kwarg_inputs[name])
+    flat_inputs = _flatten_inputs_like_placeholders(
+        gm, sample_arg_inputs, sample_kwarg_inputs, user_input_names
+    )
 
     user_symbol_bounds: Dict[sympy.Symbol, Tuple[int, int]] = {}
+    # The profiles set the opt of these symbols, so they get no opt warning.
+    profiled_symbols = {
+        dim.node.expr
+        for node, inp in zip(placeholders, flat_inputs)
+        if isinstance(inp, Input)
+        and inp.profiles
+        and isinstance(node.meta.get("val"), torch.Tensor)
+        for dim in node.meta["val"].size()
+        if isinstance(dim, torch.SymInt) and isinstance(dim.node.expr, sympy.Symbol)
+    }
+    ignored_opts: List[str] = []
 
     for node, inp in zip(placeholders, flat_inputs):
         if not (isinstance(inp, Input) and inp.shape_mode == Input._ShapeMode.DYNAMIC):
@@ -1303,6 +1338,20 @@ def _build_user_symbol_bounds(
                     expr,
                 )
                 continue
+            # Input accepts a short opt_shape, and the engine ignores it here, so skip the check.
+            if expr not in profiled_symbols and d < len(inp.shape["opt_shape"]):
+                user_opt = int(inp.shape["opt_shape"][d])
+                example_opt = extract_var_range_info(dim).get("opt")
+                # An example outside the Input range fails the build later with its own error.
+                if (
+                    example_opt is not None
+                    and user_opt != example_opt
+                    and min_shape[d] <= example_opt <= max_shape[d]
+                ):
+                    ignored_opts.append(
+                        f"'{node.target}' dim {d} (opt_shape {user_opt}, "
+                        f"export example {example_opt})"
+                    )
             if expr in user_symbol_bounds:
                 continue
             user_min = int(min_shape[d])
@@ -1363,11 +1412,11 @@ def _build_user_symbol_bounds(
             if user_min < exp_min:
                 # 1->2 is the 0/1 specialization artifact, not a user error.
                 if user_min == 1 and exp_min == 2:
-                    logger.warning(
+                    # extract_var_range_info maps the min of 2 back to 1.
+                    logger.debug(
                         "%s Input.min_shape=1 but the exported program's min "
                         "is 2 (PyTorch 0/1 specialization -- Dim(min=1) is "
-                        "recorded as min=2). The compiled engine's min will "
-                        "be 2.",
+                        "recorded as min=2). The engine keeps min 1.",
                         mismatch,
                     )
                     continue
@@ -1393,6 +1442,16 @@ def _build_user_symbol_bounds(
                 exp_min,
                 exp_max,
             )
+
+    if ignored_opts:
+        logger.warning(
+            "The engine is tuned for the size of the export example, not for "
+            "Input.opt_shape, on %s. To tune it for another size, pass "
+            "Input(profiles=[{'min_shape': ..., 'opt_shape': ..., 'max_shape': ...}]) "
+            "with one entry (or as many entries as the profiles of the other inputs), "
+            "or export the program with an example of that size.",
+            ", ".join(ignored_opts),
+        )
 
     return user_symbol_bounds
 
@@ -1582,6 +1641,27 @@ def compile_module(
         and not defer_engine_setup_to_load()
     )
 
+    # Multi-profile propagation: build the map from export source
+    # symbols to per-profile bounds once, from the top-level inputs, then reuse
+    # it to attach the same profiles (by index) to the inputs of every engine,
+    # on the whole-graph path and on the partitioned path.
+    top_level_inputs = _flatten_inputs_like_placeholders(
+        gm,
+        sample_arg_inputs,
+        sample_kwarg_inputs,
+        [n.name for n in gm.graph.nodes if n.op == "placeholder"],
+    )
+    num_profiles = validate_optimization_profiles(top_level_inputs)
+    profile_source_bounds = None
+    if num_profiles:
+        logger.info(
+            f"Building engine(s) with {num_profiles} "
+            "optimization profiles (selected by index)"
+        )
+        profile_source_bounds = partitioning.build_profile_source_bounds(
+            gm, top_level_inputs, num_profiles
+        )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
     # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
@@ -1604,6 +1684,8 @@ def compile_module(
         if settings.dryrun:
             convert_inputs = partitioning.construct_submodule_inputs(
                 gm,
+                profile_source_bounds=profile_source_bounds,
+                num_profiles=num_profiles,
                 user_symbol_bounds=user_symbol_bounds,
             )
             record_partition_inputs("_run_on_acc_0", convert_inputs)
@@ -1626,6 +1708,8 @@ def compile_module(
         # are not TRT bindings.
         convert_inputs = partitioning.construct_submodule_inputs(
             gm,
+            profile_source_bounds=profile_source_bounds,
+            num_profiles=num_profiles,
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
@@ -1762,23 +1846,6 @@ def compile_module(
         submodule_node_dict[node.name] = node
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
-
-    # Multi-profile propagation: build the map from export source
-    # symbols to per-profile bounds once, from the top-level inputs, then reuse
-    # it to attach the same profiles (by index) to every TRT submodule's inputs.
-    top_level_inputs: List[Input] = list(sample_arg_inputs)
-    if isinstance(sample_kwarg_inputs, dict):
-        top_level_inputs.extend(sample_kwarg_inputs.values())
-    num_profiles = validate_optimization_profiles(top_level_inputs)
-    profile_source_bounds = None
-    if num_profiles:
-        logger.info(
-            f"Building engine(s) with {num_profiles} "
-            "optimization profiles (selected by index)"
-        )
-        profile_source_bounds = partitioning.build_profile_source_bounds(
-            partitioned_module, top_level_inputs, num_profiles
-        )
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}

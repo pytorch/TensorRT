@@ -451,7 +451,7 @@ def build_profile_source_bounds(
     inherit the same profiles (by index) via symbolic substitution.
 
     Args:
-        module: Top-level (partitioned) GraphModule whose placeholders carry the
+        module: Top-level GraphModule whose placeholders carry the
             export symbolic shapes.
         top_level_inputs: Ordered top-level Inputs (arg inputs followed by kwarg
             inputs), aligned with the module placeholders.
