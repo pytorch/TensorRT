@@ -1387,6 +1387,124 @@ class TestCompileSeam(TestCase):
         output_node = next(n for n in trt_gm.graph.nodes if n.op == "output")
         self.assertEqual(len(output_node.args[0]), 2)
 
+    def test_output_check_copies_conjugate_negative_and_sparse_inputs(self):
+        """A conjugate or negative view keeps its value in the copy, and a sparse
+        input, which has no storage to copy, is copied too. A quantized input keeps
+        its scale."""
+        from torch_tensorrt.dynamo.utils import _copy_inputs
+
+        sparse = torch.eye(3).to_sparse()
+        quantized = torch.quantize_per_tensor(torch.randn(4, 4), 0.1, 0, torch.qint8)
+        inputs = [
+            torch.tensor([1 + 2j, 3 - 4j]).conj(),
+            torch._neg_view(torch.tensor([1.0, -2.0])),
+            sparse,
+            quantized,
+        ]
+        copies = _copy_inputs(inputs)
+        for original, copy in zip(inputs[:2], copies[:2]):
+            self.assertEqual(copy, original)
+        self.assertEqual(copies[2].to_dense(), sparse.to_dense())
+        self.assertIsNot(copies[2], sparse)
+        self.assertEqual(copies[3].dequantize(), quantized.dequantize())
+
+    def test_refit_output_check_compares_flattened_outputs(self):
+        """A compiled module can return a flat tuple where the model returns a tensor
+        or a dictionary. Equal leaves pass; a different value, size, count,
+        dictionary key (also of an entry without leaves), type or dtype fails."""
+        from torch_tensorrt.dynamo.utils import check_module_output
+
+        def same(x):
+            return x * 2, x.shape[0], 1.5, True, None
+
+        x = torch.ones(8).cuda()
+        for new, old, match in (
+            (lambda x: x, lambda x: (x,), True),
+            (lambda x: x, lambda x: (x + 1,), False),
+            (same, same, True),
+            (same, lambda x: (x * 2, 9, 1.5, True, None), False),
+            (lambda x: (x, x), lambda x: (x,), False),
+            (lambda x: {"a": x}, lambda x: {"b": x}, False),
+            (lambda x: {"a": [], "t": x}, lambda x: {"b": [], "t": x}, False),
+            (lambda x: {"t": x}, lambda x: {"t": x, "extra": []}, False),
+            (lambda x: {"value": x * 2}, lambda x: (x * 3,), False),
+            (lambda x: (x, x), lambda x: (x, 2), False),
+            (lambda x: (x, x), lambda x: (x, x.half()), False),
+            (lambda x: (x, 1), lambda x: (x, True), False),
+            (lambda x: (x, 1.0), lambda x: (x, 1), False),
+        ):
+            self.assertEqual(check_module_output(new, old, (x,), {}), match)
+
+    def test_refit_output_check_takes_outputs_registered_without_key_paths(self):
+        """diffusers registers its output types without key paths, which
+        tree_flatten_with_path refuses, so their leaves are compared without keys.
+        Their keys still have to match."""
+        from torch_tensorrt.dynamo.utils import check_module_output
+
+        class Output(dict):
+            pass
+
+        torch.utils._pytree.register_pytree_node(
+            Output,
+            lambda d: (list(d.values()), list(d.keys())),
+            lambda values, keys: Output(zip(keys, values)),
+        )
+        x = torch.ones(8).cuda()
+        self.assertTrue(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: (x * 2,), (x,), {}
+            )
+        )
+        self.assertFalse(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: (x * 3,), (x,), {}
+            )
+        )
+        self.assertFalse(
+            check_module_output(
+                lambda x: Output(sample=x * 2), lambda x: Output(other=x * 2), (x,), {}
+            )
+        )
+
+    def test_refit_output_check_copies_the_inputs(self):
+        """Each module gets its own copy, so a write leaves the caller's tensor alone.
+        Inputs that share memory share it in the copy too, also through two storages
+        from DLPack, so a module that skips a write fails. An input with autograd history copies like any other, and a
+        small view of a large tensor copies only the bytes it uses."""
+        from torch_tensorrt.dynamo.utils import _copy_inputs, check_module_output
+
+        def writes(a, b):
+            a.add_(1)
+            return b.clone()
+
+        def skips(a, b):
+            return b.clone()
+
+        a = torch.zeros(8).cuda()
+        c = torch.zeros(8, dtype=torch.complex64).cuda()
+        p = torch.nn.Parameter(torch.zeros(8).cuda(), requires_grad=False)
+        q = torch.nn.Parameter(p.data, requires_grad=False)
+        for args in (
+            (a, a),
+            (a, a[1:3]),
+            (p, p[1:3]),
+            (p, q),
+            (c, c.conj()),
+            (a, torch._neg_view(a)),
+            (a, torch.from_dlpack(a[1:3])),
+        ):
+            self.assertTrue(check_module_output(writes, writes, args, {}))
+            self.assertFalse(check_module_output(writes, skips, args, {}))
+        torch.testing.assert_close(a, torch.zeros(8).cuda())
+        torch.testing.assert_close(p.data, torch.zeros(8).cuda())
+
+        x = torch.ones(4, device="cuda", requires_grad=True) * 2
+        self.assertTrue(check_module_output(torch.sin, torch.sin, (x,), {}))
+        big = torch.arange(1 << 20, dtype=torch.float32, device="cuda")
+        (copied,) = _copy_inputs((big[8:12],))
+        torch.testing.assert_close(copied, big[8:12])
+        self.assertLessEqual(copied.untyped_storage().nbytes(), 64)
+
     def test_compile_hides_copyback_beside_an_engine_aliased_kv_buffer(self):
         """One module holding both kinds of mutated buffer at once.
 
