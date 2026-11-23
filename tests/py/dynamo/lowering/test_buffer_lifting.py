@@ -399,6 +399,38 @@ class TestCopyBackClassification(TestCase):
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
 
+    @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
+    def test_index_copy_not_known_to_be_consecutive_is_copyback(self):
+        """``IKVCacheUpdateLayer`` takes only a start, so several positions are
+        copied back unless the graph builds them as one run of int32 or int64
+        values."""
+
+        class M(torch.nn.Module):
+            def __init__(self, index):
+                super().__init__()
+                self.index = index
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8))
+
+            def forward(self, x, positions):
+                self.cache.index_copy_(2, self.index(x, positions), x)
+                return self.cache.sum()
+
+        def arange(x, *args, **kwargs):
+            return torch.arange(*args, device=x.device, **kwargs)
+
+        cases = {
+            "caller's positions": (lambda x, p: p, [3, 4, 5]),
+            "int8": (lambda x, p: p + arange(x, 3, dtype=torch.int8), [2]),
+            "step 2": (lambda x, p: p + arange(x, 0, 6, 2), [2]),
+            "several starts": (lambda x, p: p + arange(x, 3), [2, 5, 9]),
+        }
+        for name, (index, positions) in cases.items():
+            with self.subTest(case=name):
+                args = (torch.ones(1, 4, 3, 8), torch.tensor(positions))
+                new_gm, _ = lift_mutated_buffers(_ep_module_on_cuda(M(index), args))
+                self.assertIn("cache", new_gm.meta["_copyback_mutation_buffers"])
+                self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
+
     def test_non_kv_mutation_recorded_for_copyback(self):
         """A non-KV in-place mutation is recorded for copy-back by buffer name."""
 

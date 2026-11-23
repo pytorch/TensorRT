@@ -35,9 +35,11 @@ Lowering also checks the call: the cache has to be a contiguous CUDA tensor
 that is not float64, written once, and read again after the write, and
 nothing may read its old contents.
 
-If a condition isn't met, the write still reaches the cache: the engine
-returns the updated cache and a ``copy_`` in PyTorch stores it after the
-engine runs. The result is the same, but without the in-place benefit.
+If a lowering check fails, the write still reaches the cache: it runs in
+PyTorch, or the engine returns the updated cache and a ``copy_`` in PyTorch
+stores it after the engine runs. The result is the same, but without the
+in-place benefit. Positions are not checked: TensorRT drops the part of a
+write past ``max_seq``, where PyTorch raises.
 """
 
 # %%

@@ -226,6 +226,20 @@ def emit_kv_cache_update_layer(
         logger.debug("KV cache update: skipped — input is not a direct network input")
         return None
 
+    # The layer checks the update's head count and size against the cache at build
+    # time, and TensorRT may not resolve them, as for view(1, T, -1, D) of a value
+    # made from two inputs that share T.
+    cache_shape = tuple(cache.shape)
+    if any(src.shape[i] != cache_shape[i] for i in (0, 1, 3)):
+        shuffle = ctx.net.add_shuffle(src)
+        shuffle.reshape_dims = trt.Dims(
+            (cache_shape[0], cache_shape[1], DYNAMIC_DIM, cache_shape[3])
+        )
+        set_layer_name(
+            shuffle, "kv_cache_update", name + "_update_shape", SourceIR.ATEN
+        )
+        src = shuffle.get_output(0)
+
     layer = ctx.net.add_kv_cache_update(
         cache, src, write_indices, trt.KVCacheMode.LINEAR
     )

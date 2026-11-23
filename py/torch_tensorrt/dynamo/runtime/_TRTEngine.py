@@ -1263,8 +1263,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     # --- tensor binding helpers ---
 
-    def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
-        new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
+    def validate_input_shapes(
+        self, inputs: Sequence[torch.Tensor], key_shape_values: bool = False
+    ) -> bool:
+        # A shape tensor's values set shapes too, so a recorded CUDA graph or a
+        # pre-allocated output is made again when they change. They are read, at the
+        # cost of a host copy, only for those two.
+        new_shape_key = "".join(
+            str(tuple(t.shape)).replace(" ", "")
+            + (str(t.tolist()) if key_shape_values and binding.is_shape_tensor else "")
+            for binding, t in zip(self._input_binding_infos, inputs)
+        )
         if new_shape_key != self.shape_key:
             logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
             self.shape_key = new_shape_key
@@ -1479,7 +1488,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # of order) and shape_changed is already true here. Manual pins are
         # applied eagerly in set_optimization_profile, so only auto needs per-call
         # selection.
-        shape_changed = self.validate_input_shapes(contiguous_inputs)
+        shape_changed = self.validate_input_shapes(
+            contiguous_inputs, effective_cudagraphs or self.use_pre_allocated_outputs
+        )
         if (
             shape_changed
             and self.num_optimization_profiles > 1

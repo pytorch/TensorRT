@@ -294,6 +294,11 @@ def refit_module_weights(
     )
     new_weight_module = remove_alias_from_exported_program(new_weight_module)
     new_gm = new_weight_module.module()
+    from torch_tensorrt.dynamo._compiler import _mark_writes_that_can_be_empty
+
+    _mark_writes_that_can_be_empty(
+        new_gm, new_weight_module.range_constraints, settings
+    )
 
     logger.debug("Input graph: " + str(new_gm.graph))
     # Its buffer writes are classified, and so partitioned, as compile() did.

@@ -69,13 +69,28 @@ RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_de
   return new_target_device_opt.value();
 }
 
-bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+bool _validate_shapes(
+    std::vector<at::Tensor> inputs,
+    c10::intrusive_ptr<TRTEngine> compiled_engine,
+    bool key_shape_values) {
   // Validate whether the current input shapes to the engine has changed
 
   // Populate the shape key for the inputs
   // x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
   std::stringstream new_shape_key_ss;
-  for (auto input : inputs) {
+  const auto& infos = compiled_engine->input_binding_infos;
+  for (size_t idx = 0; idx < inputs.size(); idx++) {
+    const auto& input = inputs[idx];
+    // A shape tensor's values set shapes too, so a recorded CUDA graph or a pre-allocated output
+    // is made again when they change. They are read, at the cost of a host copy, only for those two.
+    if (key_shape_values && idx < infos.size() && infos[idx].is_shape_tensor) {
+      auto values = input.contiguous().to(at::kCPU).to(at::kLong);
+      new_shape_key_ss << "[";
+      for (int64_t k = 0; k < values.numel(); k++) {
+        new_shape_key_ss << values.data_ptr<int64_t>()[k] << ",";
+      }
+      new_shape_key_ss << "]";
+    }
     new_shape_key_ss << "(";
     auto sizes = input.sizes();
     auto rank = input.sizes().size();
@@ -551,7 +566,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // context_changed (consumed by set_runtime_states regardless of order), and
     // shape_changed is already true here, so the cudagraph record/reset below
     // still fires. Only auto-selection runs per call; manual pins are eager.
-    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    bool shape_changed =
+        _validate_shapes(inputs, compiled_engine, effective_cudagraphs || compiled_engine->use_pre_allocated_outputs);
     if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
       compiled_engine->auto_select_profile(inputs);
     }
@@ -828,7 +844,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // shape is unchanged: the previously selected profile still fits, so it
     // stays active. When the shape did change, auto_select_profile keeps the
     // active profile if it still fits (no-op) or switches otherwise.
-    bool shape_changed = _validate_shapes(inputs, compiled_engine);
+    bool shape_changed = _validate_shapes(inputs, compiled_engine, false);
     if (shape_changed && compiled_engine->num_optimization_profiles > 1 && compiled_engine->auto_select_profiles) {
       compiled_engine->auto_select_profile(inputs);
     }

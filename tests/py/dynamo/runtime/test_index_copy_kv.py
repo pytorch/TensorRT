@@ -7,8 +7,9 @@
 Two converters are registered for ``aten.index_copy.default``:
 
 * ``aten_ops_index_copy_kv`` — HIGH priority, validator-gated. Fires for
-  the narrow KV-eligible case (4-D static cache, dim=2, source seq dim
-  size 1, batch=1) and emits ``IKVCacheUpdateLayer`` with aliased I/O.
+  the narrow KV-eligible case (4-D static cache, dim=2, batch=1, source seq
+  dim size 1, or a module buffer written at ``start + arange(n)``) and emits
+  ``IKVCacheUpdateLayer`` with aliased I/O.
 
 * ``aten_ops_index_copy_fallback`` — STANDARD priority. Fires for
   everything else; produces correct results via the scatter path. No
@@ -20,13 +21,14 @@ results without aliasing.
 """
 
 import contextlib
+import copy
 import random
 import tempfile
 from unittest import mock
 
 import torch
 import torch_tensorrt
-from torch.export import export
+from torch.export import Dim, export
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 
@@ -101,6 +103,333 @@ class TestIndexCopyKVFastPath(_CudaGraphsOff):
         out_val = out[0] if isinstance(out, tuple) else out
         self.assertTrue(torch.allclose(out_val, S()(cache, update)))
         self.assertTrue(torch.equal(cache_run, cache))
+
+
+class _ChunkCache(torch.nn.Module):
+    """A module-held cache written at ``input_pos + arange(T)``, then read back."""
+
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("cache", torch.zeros(1, 4, 16, 8))
+
+    def forward(self, x, input_pos):
+        idx = input_pos + torch.arange(x.shape[2], device=x.device)
+        self.cache.index_copy_(2, idx, x)
+        return self.cache.sum(2)
+
+
+class _TokenCountCache(torch.nn.Module):
+    """Writes as many rows of a buffer as ``x`` has tokens."""
+
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("cache", torch.zeros(1, 1, 16, 2))
+        self.register_buffer("values", torch.arange(1.0, 17.0).view(1, 1, 8, 2))
+
+    def forward(self, x, pos):
+        t = x.shape[2]
+        index = pos + torch.arange(t, device=x.device)
+        self.cache.index_copy_(2, index, self.values[:, :, :t, :])
+        return self.cache.sum(2)
+
+
+def _token_count(t):
+    return torch.zeros(1, 1, t, 2, device="cuda"), torch.tensor([0], device="cuda")
+
+
+def _check_calls(compiled, eager, calls, **tolerance):
+    """Compare each call and the whole cache, so a write that lands in the wrong
+    place shows on the call that reads it back."""
+    for args in calls:
+        want = eager(*args)
+        got = compiled(*args)
+        want = want if isinstance(want, tuple) else (want,)
+        got = tuple(got) if isinstance(got, (tuple, list)) else (got,)
+        assert len(got) == len(want), (len(got), len(want))
+        for g, w in zip(got, want):
+            torch.testing.assert_close(g, w, **tolerance)
+        torch.testing.assert_close(compiled.cache, eager.cache, **tolerance)
+
+
+def _chunk(t, pos):
+    return (torch.randn(1, 4, t, 8, device="cuda"), torch.tensor([pos], device="cuda"))
+
+
+def _compile_chunk(model, dim, t=3, **kwargs):
+    args = _chunk(t, 0)
+    ep = export(model, args, dynamic_shapes=({2: dim}, None))
+    return torch_tensorrt.dynamo.compile(
+        ep, inputs=list(args), **{"min_block_size": 1, **kwargs}
+    )
+
+
+_POSITIONS_IN_PYTORCH = {
+    "torch.ops.aten.arange.default",
+    "torch.ops.aten.arange.start",
+    "torch.ops.aten.arange.start_step",
+    "torch.ops.aten.add.Tensor",
+    "torch.ops.aten.sym_size.int",
+}
+
+
+class TestIndexCopyKVBufferWrites(_CudaGraphsOff):
+    """A module buffer written at consecutive positions is updated in place, for any
+    number of tokens, so one engine serves both prefill and decode."""
+
+    def test_dynamic_length_writes_in_place_in_one_engine(self):
+        """Any token count from 1 is written in place, in one engine. With
+        ``require_full_compilation`` a write that can be empty stays in the engine
+        too, since it has nowhere else to go."""
+        full = {"require_full_compilation": True, "min_block_size": 5}
+        for options, dim in (({}, Dim("T", min=1, max=8)), (full, Dim("T", max=8))):
+            with self.subTest(**options):
+                model = _ChunkCache().cuda()
+                eager = copy.deepcopy(model)
+                compiled = _compile_chunk(model, dim, **options)
+                engines = [n for n in compiled.graph.nodes if n.op == "call_module"]
+                self.assertEqual(len(engines), 1, engines)
+                self.assertEqual(len(_aliased_io(compiled)), 1)
+                # Overlapping positions: each call reads back the one before.
+                calls = [_chunk(t, p) for t, p in ((8, 0), (1, 8), (3, 9), (4, 7))]
+                _check_calls(compiled, eager, calls)
+
+    def test_index_built_in_pytorch_still_writes_in_place(self):
+        """The index is proven consecutive before partitioning, so the write still
+        happens in place when the ops that build the index run in PyTorch."""
+        model = _ChunkCache().cuda()
+        eager = copy.deepcopy(model)
+        compiled = _compile(
+            model, _chunk(4, 2), torch_executed_ops={"torch.ops.aten.add.Tensor"}
+        )
+        self.assertEqual(len(_aliased_io(compiled)), 1)
+        _check_calls(compiled, eager, [_chunk(4, p) for p in (2, 4, 11)])
+
+    def test_dynamic_length_update_with_heads_unknown_at_build_time(self):
+        """TensorRT cannot prove two inputs' ``T`` equal when it builds, so after
+        ``view(1, T, -1, 8)`` it does not know the head count the KV layer checks."""
+
+        class M(_ChunkCache):
+            def forward(self, x, y, input_pos):
+                t = x.shape[1]
+                update = torch.where(x > 0, x, y).view(1, t, -1, 8).transpose(1, 2)
+                return super().forward(update, input_pos)
+
+        def call(t, pos):
+            x, y = torch.randn(2, 1, t, 32, device="cuda")
+            return x, y, torch.tensor([pos], device="cuda")
+
+        model = M().cuda()
+        eager = copy.deepcopy(model)
+        T = Dim("T", min=1, max=8)
+        ep = export(model, call(4, 0), dynamic_shapes=({1: T}, {1: T}, None))
+        compiled = torch_tensorrt.dynamo.compile(
+            ep, inputs=list(call(4, 0)), min_block_size=1
+        )
+        self.assertEqual(len(_aliased_io(compiled)), 1)
+        calls = [call(t, p) for t, p in ((5, 0), (1, 5), (8, 6), (3, 4))]
+        _check_calls(compiled, eager, calls)
+
+    def test_a_write_that_can_be_empty_stays_in_pytorch(self):
+        """The KV layer cannot write 0 tokens, so a write of ``Dim("T", max=8)``
+        tokens runs in PyTorch, where a call with none works."""
+        model = _ChunkCache().cuda()
+        eager = copy.deepcopy(model)
+        compiled = _compile_chunk(
+            model, Dim("T", max=8), torch_executed_ops=_POSITIONS_IN_PYTORCH
+        )
+        self.assertEqual(_aliased_io(compiled), {})
+        calls = [_chunk(t, p) for t, p in ((3, 0), (0, 3), (1, 3))]
+        _check_calls(compiled, eager, calls)
+
+    def test_assume_dynamic_shape_support_keeps_other_dynamic_writes_in_pytorch(self):
+        """The setting skips the converters' static-shape gate, so the scatter that
+        takes the writes the KV layer declines refuses dynamic shapes itself: a
+        write that can be empty, and positions not known to be consecutive."""
+
+        class Positions(_ChunkCache):
+            def forward(self, x, index):
+                self.cache.index_copy_(2, index, x)
+                return self.cache.sum(2)
+
+        T = Dim("T", min=1, max=8)
+        cases = {
+            "can be empty": (_ChunkCache, ({2: Dim("T", max=8)}, None), _chunk),
+            "positions": (
+                Positions,
+                ({2: T}, {0: T}),
+                lambda t, p: (
+                    torch.randn(1, 4, t, 8, device="cuda"),
+                    torch.randperm(16, device="cuda")[:t],
+                ),
+            ),
+        }
+        for name, (model_type, dims, make) in cases.items():
+            with self.subTest(write=name):
+                model = model_type().cuda()
+                eager = copy.deepcopy(model)
+                ep = export(model, make(3, 0), dynamic_shapes=dims)
+                compiled = torch_tensorrt.dynamo.compile(
+                    ep,
+                    inputs=list(make(3, 0)),
+                    min_block_size=1,
+                    assume_dynamic_shape_support=True,
+                )
+                _check_calls(
+                    compiled, eager, [make(t, p) for t, p in ((3, 2), (1, 9), (5, 4))]
+                )
+
+    class _LinearChunkCache(_ChunkCache):
+        """Converted ops on both sides of the write, so where it runs decides how
+        the graph splits into engines."""
+
+        def __init__(self, seed):
+            super().__init__()
+            torch.manual_seed(seed)
+            self.l1 = torch.nn.Linear(8, 8)
+            self.l2 = torch.nn.Linear(8, 8)
+
+        def forward(self, x, input_pos):
+            return self.l2(super().forward(self.l1(x), input_pos))
+
+    def test_refit_splits_a_write_that_can_be_empty_out_as_compile_does(self):
+        """Refit decides where the write runs as compile did, so the new weights
+        fit the engines compile built."""
+        from torch_tensorrt.dynamo import refit_module_weights
+
+        dim = Dim("T", max=8)
+        compiled = _compile_chunk(
+            self._LinearChunkCache(0).cuda(), dim, immutable_weights=False
+        )
+        model = self._LinearChunkCache(1).cuda()
+        args = _chunk(3, 0)
+        new = export(model, args, dynamic_shapes=({2: dim}, None))
+        refitted = refit_module_weights(compiled, new, arg_inputs=list(args))
+        calls = [_chunk(t, p) for t, p in ((3, 0), (1, 3), (5, 4))]
+        _check_calls(refitted, copy.deepcopy(model), calls, atol=1e-3, rtol=1e-3)
+
+    def test_the_windows_cross_compile_keeps_a_write_that_can_be_empty_out(self):
+        """Building for Windows needs a Windows-enabled build, so this checks the
+        graph the build would be handed."""
+        from torch_tensorrt import _features
+
+        class Writer(torch.nn.Module):
+            def forward(self, cache, x, input_pos):
+                idx = input_pos + torch.arange(x.shape[2], device=x.device)
+                cache.index_copy_(2, idx, x)
+                return cache.sum(2)
+
+        handed = []
+        args = (torch.zeros(1, 4, 16, 8, device="cuda"),) + _chunk(3, 0)
+        enabled = _features.ENABLED_FEATURES._replace(windows_cross_compile=True)
+        with (
+            mock.patch.object(_features, "ENABLED_FEATURES", enabled),
+            mock.patch.object(
+                torch_tensorrt.dynamo._compiler,
+                "compile_module",
+                lambda gm, *a, **k: handed.append(gm) or gm,
+            ),
+        ):
+            torch_tensorrt.dynamo.cross_compile_for_windows(
+                export(
+                    Writer(), args, dynamic_shapes=(None, {2: Dim("T", max=8)}, None)
+                ),
+                arg_inputs=list(args),
+                min_block_size=1,
+                dryrun=True,
+            )
+        (write,) = [
+            n
+            for n in handed[0].graph.nodes
+            if n.target is torch.ops.aten.index_copy.default
+        ]
+        self.assertTrue(write.meta.get("_trt_write_can_be_empty"))
+
+    def test_a_doubled_length_from_a_derived_dim_that_can_be_zero(self):
+        """``6 * b`` positions from ``3 * b`` tokens: export records ``b`` from 2 and
+        ``3 * b`` from 0, so ``6 * b`` can be 0 and the write stays in PyTorch."""
+
+        class M(_ChunkCache):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 4, 24, 8))
+
+            def forward(self, x, input_pos):
+                return super().forward(torch.cat((x, x), dim=2), input_pos)
+
+        model = M().cuda()
+        eager = copy.deepcopy(model)
+        compiled = _compile_chunk(
+            model,
+            3 * Dim("b", min=0, max=4),
+            t=6,
+            torch_executed_ops=_POSITIONS_IN_PYTORCH | {"torch.ops.aten.cat.default"},
+        )
+        calls = [_chunk(t, p) for t, p in ((6, 0), (0, 3), (3, 6))]
+        _check_calls(compiled, eager, calls)
+
+    def test_cuda_graphs_record_again_for_another_token_count(self):
+        """The token count reaches the engine as a shape tensor when its size is
+        computed in PyTorch, so each count records again, on both runtimes."""
+        ep = export(
+            _TokenCountCache().cuda(),
+            _token_count(3),
+            dynamic_shapes=({2: Dim("T", min=1, max=8)}, None),
+        )
+        options = dict(
+            inputs=list(_token_count(3)),
+            torch_executed_ops={torch.ops.aten.sym_size.int},
+        )
+        modules = {
+            "cpp": (
+                torch_tensorrt.dynamo.compile(ep, **options),
+                contextlib.nullcontext,
+            )
+        }
+        with _python_runtime():
+            modules["python"] = (
+                torch_tensorrt.dynamo.compile(ep, **options),
+                _python_engine_op,
+            )
+        for kind, (compiled, engine_op) in modules.items():
+            with self.subTest(runtime=kind), engine_op():
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+                for t in (3, 1, 5, 3):
+                    compiled.cache.zero_()
+                    (got,) = compiled(*_token_count(t))
+                    want = _TokenCountCache().cuda()(*_token_count(t))
+                    torch.testing.assert_close(got, want)
+
+    def test_torch_compile_keeps_a_write_that_can_be_empty_in_pytorch(self):
+        """Under ``torch.compile`` the rows come from ``nonzero``, so the write can
+        have none. It stays in PyTorch, as with export, and an empty mask works."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, x, mask, pos):
+                rows = torch.index_select(x, 0, torch.nonzero(mask).flatten())
+                index = pos + torch.arange(rows.shape[0], device=x.device)
+                cache.index_copy_(2, index, rows.view(1, 1, rows.shape[0], 2))
+                return cache.sum(2)
+
+        x = torch.arange(16.0, device="cuda").view(8, 2)
+        pos = torch.tensor([0], device="cuda")
+        cache, expected = (torch.zeros(1, 1, 16, 2, device="cuda") for _ in range(2))
+        in_pytorch = _POSITIONS_IN_PYTORCH | {
+            "torch.ops.aten.nonzero.default",
+            "torch.ops.aten.index_select.default",
+        }
+        options = {"min_block_size": 1, "torch_executed_ops": in_pytorch}
+        torch._dynamo.reset()
+        with torch._dynamo.config.patch(capture_dynamic_output_shape_ops=True):
+            compiled = torch.compile(
+                M(), backend="torch_tensorrt", options=options, dynamic=False
+            )
+            for rows in (4, 0):
+                mask = torch.zeros(8, dtype=torch.bool, device="cuda")
+                mask[:rows] = True
+                torch.testing.assert_close(
+                    compiled(cache, x, mask, pos), M()(expected, x, mask, pos)
+                )
+                torch.testing.assert_close(cache, expected)
 
 
 class TestIndexCopyFallback(TestCase):
@@ -224,6 +553,71 @@ class TestIndexCopyFallback(TestCase):
         out = compiled(x.clone(), index, update)
         eager = torch.ops.aten.index_copy.default(x.clone(), -1, index, update)
         torch.testing.assert_close(out, eager)
+
+    def test_a_dynamic_input_with_a_static_index_and_source_uses_fallback(self):
+        """Under ``assume_dynamic_shape_support`` the scatter takes an input with a
+        dynamic size, as long as the index and the source are static."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, index, update):
+                return torch.index_copy(x, 0, index, update)
+
+        index = torch.tensor([2, 0], device="cuda")
+        update = torch.randn(2, 8, device="cuda")
+        example = (torch.zeros(4, 8, device="cuda"), index, update)
+        ep = export(
+            M(), example, dynamic_shapes=({0: Dim("n", min=3, max=64)}, None, None)
+        )
+        compiled = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=list(example),
+            min_block_size=1,
+            assume_dynamic_shape_support=True,
+            require_full_compilation=True,
+        )
+        for n in (4, 10, 64):
+            x = torch.randn(n, 8, device="cuda")
+            torch.testing.assert_close(
+                compiled(x, index, update), M()(x, index, update)
+            )
+
+    def test_an_input_that_can_be_empty_does_not_keep_the_write_in_pytorch(self):
+        """Only the index and the source decide whether a write can be empty, so an
+        input whose size can be 0 still goes to the scatter, with no warning."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, index, update):
+                return torch.index_copy(x, 0, index, update)
+
+        index = torch.tensor([2, 0], device="cuda")
+        update = torch.randn(2, 8, device="cuda")
+        example = (torch.zeros(4, 8, device="cuda"), index, update)
+        ep = export(M(), example, dynamic_shapes=({0: Dim("n", max=64)}, None, None))
+        from torch_tensorrt.dynamo import _compiler as compiler
+
+        with mock.patch.object(
+            compiler.logger, "warning", wraps=compiler.logger.warning
+        ) as warn:
+            compiled = torch_tensorrt.dynamo.compile(
+                ep,
+                inputs=list(example),
+                min_block_size=1,
+                assume_dynamic_shape_support=True,
+            )
+        self.assertFalse([c for c in warn.call_args_list if "0 rows" in str(c.args[0])])
+        in_pytorch = [
+            n
+            for m in compiled.modules()
+            if isinstance(m, torch.fx.GraphModule)
+            for n in m.graph.nodes
+            if n.target is torch.ops.aten.index_copy.default
+        ]
+        self.assertEqual(in_pytorch, [])
+        for n in (4, 10):
+            x = torch.randn(n, 8, device="cuda")
+            torch.testing.assert_close(
+                compiled(x, index, update), M()(x, index, update)
+            )
 
     def test_caches_the_kv_layer_cannot_take_use_the_fallback(self):
         """The KV layer takes float32, float16 and bfloat16 caches only, so a

@@ -37,6 +37,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterPriority,
     dynamo_tensorrt_converter,
+    has_dynamic_shapes_in_args,
     has_static_shapes_in_args,
     node_has_dynamic_shapes,
 )
@@ -1557,11 +1558,20 @@ def aten_ops_gather(
     )
 
 
+_KV_INDEX_DTYPES = (torch.int32, torch.int64)
+_ARANGE_OPS = (
+    torch.ops.aten.arange.default,
+    torch.ops.aten.arange.start,
+    torch.ops.aten.arange.start_step,
+)
+
+
 def _index_copy_kv_eligible(
     node: Node,
     settings: Optional[CompilationSettings] = None,
     *,
     input_node: Optional[Node] = None,
+    index_is_run: bool = True,
 ) -> bool:
     """Validator for the KV-cache fast path of aten.index_copy.default.
 
@@ -1574,8 +1584,14 @@ def _index_copy_kv_eligible(
       aliasing).
     * Input has rank 4 and fully static shape [b, d, s_max, h].
     * dim argument is exactly 2.
-    * Source tensor has rank 4 with shape[2] == 1 (single-position
-      write; matches HF's per-step StaticCache.update call).
+    * Source tensor has rank 4 and either writes one position
+      (shape[2] == 1, matching HF's per-step StaticCache.update call) or
+      several, possibly a dynamic number, at consecutive positions. The layer
+      takes one start per batch, and only ``lift_mutated_buffers`` can tell
+      that the positions are one run: it reads the index while the ``arange``
+      that builds it is still in the graph.
+    * It writes at least 1 position, and none of its sizes can be 0 (``compile``
+      marks such a write ``node.meta['_trt_write_can_be_empty']``).
     * The cache is float32, float16 or bfloat16, the types
       IKVCacheUpdateLayer accepts.
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
@@ -1588,7 +1604,8 @@ def _index_copy_kv_eligible(
     partitioner never passes it: by the time this runs as a capability validator,
     lowering has settled what the input is. The pre-conversion classifier in
     lowering/_buffer_lifting.py runs before that and passes the node lowering
-    will leave behind, which is not always node.args[0].
+    will leave behind, which is not always node.args[0], and index_is_run in
+    place of the mark it has not recorded yet.
     """
     # The layer changes its input. Only the classifier knows that a write is meant
     # to, so the partitioner takes only the writes it marked; a functional
@@ -1630,17 +1647,58 @@ def _index_copy_kv_eligible(
     if src_val is None:
         return False
     src_shape = tuple(src_val.shape)
-    if len(src_shape) != 4 or not isinstance(src_shape[2], int) or src_shape[2] != 1:
+    if len(src_shape) != 4:
         return False
+    if node.meta.get("_trt_write_can_be_empty") or (
+        isinstance(src_shape[2], int) and src_shape[2] < 1
+    ):
+        return False
+    if isinstance(src_shape[2], int) and src_shape[2] == 1:
+        return True
+    return index_is_run
 
-    return True
+
+def _index_is_consecutive_run(index: Argument) -> bool:
+    """Whether the graph builds ``index`` as ``start + arange(n)``, read from the
+    ops alone. Each step has to be int32 or int64: a narrower type can wrap."""
+    if not isinstance(index, Node):
+        return False
+    val = index.meta.get("val")
+    if not isinstance(val, torch.Tensor) or val.dtype not in _KV_INDEX_DTYPES:
+        return False
+    if index.target in _ARANGE_OPS:
+        step = index.args[2] if len(index.args) > 2 else index.kwargs.get("step", 1)
+        return isinstance(step, int) and step == 1
+    if index.target is torch.ops.aten.add.Tensor and index.kwargs.get("alpha", 1) == 1:
+        lhs, rhs = index.args[:2]
+        return (_index_is_consecutive_run(lhs) and _is_single_index(rhs)) or (
+            _index_is_consecutive_run(rhs) and _is_single_index(lhs)
+        )
+    return False
+
+
+def _is_single_index(arg: Argument) -> bool:
+    """Whether ``arg`` is an integer scalar or an int32 or int64 tensor of one
+    element."""
+    if isinstance(arg, (int, torch.SymInt)) and not isinstance(arg, bool):
+        return True
+    if not isinstance(arg, Node):
+        return False
+    val = arg.meta.get("val")
+    if isinstance(val, torch.SymInt):
+        return True
+    return (
+        isinstance(val, torch.Tensor)
+        and val.dtype in _KV_INDEX_DTYPES
+        and all(isinstance(s, int) and s == 1 for s in val.shape)
+    )
 
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_copy.default,
     capability_validator=_index_copy_kv_eligible,
     priority=ConverterPriority.HIGH,
-    supports_dynamic_shapes=False,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})
 def aten_ops_index_copy_kv(
@@ -1667,7 +1725,12 @@ def _index_copy_fallback_validator(
 ) -> bool:
     """TensorRT treats an int8 scatter as quantized and fails the engine build. A
     float64 write needs ``truncate_double``, as the other converters require, or
-    the engine expects float32 and refuses the caller's tensor."""
+    the engine expects float32 and refuses the caller's tensor. The scatter needs
+    a static index and source, also under ``assume_dynamic_shape_support``, which
+    lets the input be dynamic."""
+    if has_dynamic_shapes_in_args([2, 3])(node):
+        _LOGGER.debug("index_copy with a dynamic index or source, falling back")
+        return False
     input_node = node.args[0] if node.args else None
     input_val = input_node.meta.get("val") if isinstance(input_node, Node) else None
     if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.int8:

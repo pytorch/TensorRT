@@ -18,7 +18,10 @@ from torch._subclasses.functional_tensor import FunctionalTensor
 from torch.multiprocessing.reductions import StorageWeakRef
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo._compiler import compile_module
+from torch_tensorrt.dynamo._compiler import (
+    _mark_writes_that_can_be_empty,
+    compile_module,
+)
 from torch_tensorrt.dynamo.lowering import (
     filter_decomposition_table,
     get_decompositions,
@@ -455,6 +458,15 @@ def _pretraced_backend(
             # Remove sym_int placeholders and inputs *after* AOT tracing
             # so we don't inject sym_size nodes that confuse the tracer.
             remove_sym_nodes(gm, sample_inputs, settings)
+
+            # Export reads which sizes can be 0 from the program's range_constraints;
+            # here the ShapeEnv holds those ranges.
+            shape_env = getattr(fake_mode, "shape_env", None)
+            _mark_writes_that_can_be_empty(
+                gm,
+                dict(shape_env.var_to_range) if shape_env is not None else {},
+                settings,
+            )
 
             # The engine updates a written input in place when it can; otherwise the
             # write-back copy_ stores the write after the engines run.

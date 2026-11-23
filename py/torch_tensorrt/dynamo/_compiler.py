@@ -19,6 +19,7 @@ from torch.export.graph_signature import InputKind
 from torch.fx.graph import _PyTreeCodeGen, _PyTreeInfo
 from torch.fx.node import Target
 from torch.utils._sympy.numbers import int_oo
+from torch.utils._sympy.value_ranges import ValueRanges, bound_sympy
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
@@ -471,6 +472,7 @@ def cross_compile_for_windows(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    _mark_writes_that_can_be_empty(gm, exported_program.range_constraints, settings)
     logger.debug("Input graph: " + str(gm.graph))
 
     # Buffers stay engine constants here, but a write into a caller's tensor is
@@ -992,6 +994,7 @@ def compile(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    _mark_writes_that_can_be_empty(gm, exported_program.range_constraints, settings)
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
@@ -1098,6 +1101,64 @@ def compile(
     if _copyback_mutation_buffers:
         hide_copyback_outputs(trt_gm, trt_gm.meta["_copyback_mutation_buffers"])
     return trt_gm
+
+
+def _mark_writes_that_can_be_empty(
+    gm: torch.fx.GraphModule,
+    range_constraints: Dict[sympy.Symbol, Any],
+    settings: CompilationSettings,
+) -> None:
+    """Mark each ``index_copy`` whose sizes can be 0 to run in PyTorch.
+
+    The write's converter cannot take a size of 0. The program's
+    ``range_constraints`` decide which sizes can be 0. With the whole graph in one
+    engine the write has nowhere else to run.
+    """
+    if settings.require_full_compilation:
+        return
+
+    def can_be_zero(node: Any) -> bool:
+        val = node.meta.get("val") if isinstance(node, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        for size in val.shape:
+            if not isinstance(size, torch.SymInt):
+                continue
+            expr = size.node.expr
+            if expr in range_constraints:
+                lower = recorded_lower(expr, range_constraints)
+            elif expr.free_symbols <= range_constraints.keys():
+                # The roots' smallest values, which export can record too high for
+                # a size like 6 * s whose own range it does not record.
+                bounds = {
+                    s: ValueRanges(
+                        recorded_lower(s, range_constraints), range_constraints[s].upper
+                    )
+                    for s in expr.free_symbols
+                }
+                lower = bound_sympy(expr, bounds).lower
+            else:
+                continue
+            if lower <= 0:
+                return True
+        return False
+
+    for module in gm.modules():
+        if not isinstance(module, torch.fx.GraphModule):
+            continue
+        for node in module.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.index_copy.default
+        ):
+            # The cache itself is static on the KV path, so only the index and the
+            # source can make a write empty.
+            if len(node.args) >= 4 and any(can_be_zero(node.args[i]) for i in (2, 3)):
+                node.meta["_trt_write_can_be_empty"] = True
+                logger.warning(
+                    "%s can write 0 rows, which the KV cache layer cannot do, so it "
+                    "runs in PyTorch. For a KV cache write, export its sizes with "
+                    "min=1 to let the engine write it in place.",
+                    node.name,
+                )
 
 
 def _insert_complex_io_adapters(
@@ -2778,6 +2839,7 @@ def convert_exported_program_to_serialized_trt_engine(
     exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
+    # One engine holds the whole graph, so no index_copy is marked to run in PyTorch.
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 

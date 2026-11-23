@@ -163,9 +163,9 @@ def _kv_write_will_alias(
     preserve -- for a full overwrite the source *is* the buffer's new contents -- and
     the ones that raise never get as far as needing one. Some never reach a
     converter: a ``slice_scatter`` written on a dynamic dim, and an ``index_copy``
-    the scatter converter refuses (int8, or float64 without ``truncate_double``)
-    when the KV path does not take it. Their validators run them in PyTorch, and
-    they need the copy-back like any other.
+    the scatter converter refuses (int8, float64 without ``truncate_double``, or a
+    dynamic size) when the KV path does not take it. Their validators run them in
+    PyTorch, and they need the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -189,13 +189,21 @@ def _kv_write_will_alias(
     if value_node.target is torch.ops.aten.index_copy.default:
         from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
             _index_copy_kv_eligible,
+            _index_is_consecutive_run,
         )
 
         # The validator applies its own placeholder check to args[0], and here that
         # can still be the clone lowering is about to erase. Point it at what the
         # converter will be handed instead; the partitioner, running after lowering,
-        # passes nothing and reads args[0] itself.
-        return bool(_index_copy_kv_eligible(value_node, input_node=cache_input))
+        # passes nothing and reads args[0] itself. The index is read here too, before
+        # constant folding and partitioning hide how it was built.
+        return bool(
+            _index_copy_kv_eligible(
+                value_node,
+                input_node=cache_input,
+                index_is_run=len(args) > 2 and _index_is_consecutive_run(args[2]),
+            )
+        )
 
     if value_node.target is torch.ops.aten.slice_scatter.default:
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
@@ -588,6 +596,9 @@ def lift_mutated_buffers(
     tensor traced on the host is not written in place. With
     ``host_inputs_copied=False``, for a serialized engine whose caller binds the
     memory itself, the example's device does not matter.
+
+    The ``index_copy`` converter trusts the mark for a write of several tokens from
+    one start: only this pass sees the ``arange`` that builds the positions.
 
     The markers go on the write *nodes* while the classification is per *buffer*, so
     one value node written back into two buffers would put the two in conflict.
