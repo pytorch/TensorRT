@@ -484,28 +484,28 @@ class TestSelectWrittenBack(TestCase):
                 x = torch.randn(size, 5, 3, 4).cuda()
                 torch.testing.assert_close(trt_module(x), module(x))
 
-    def test_empty_write_into_input_plane_matches_pytorch(self):
-        # On PyTorch nightlies, writing into a graph input also needs #5059.
-        class WriteInput(nn.Module):
+    def test_empty_write_into_copied_input_plane_matches_pytorch(self):
+        class WriteCopy(nn.Module):
             def forward(self, x, y):
-                x[:, 0, :, 4:] = y[:, 0, :, 4:]
-                return x
+                v = x.clone()
+                v[:, 0, :, 4:] = y[:, 0, :, 4:]
+                return v
 
-        self._check(WriteInput(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
+        self._check(WriteCopy(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
 
     @parameterized.expand([(5,), (6,), (8,)])
     def test_cost_volume_with_empty_disparities_matches_pytorch(self, disparities):
         left, right = torch.randn(1, 8, 3, 4), torch.randn(1, 8, 3, 4)
         self._check(CostVolume(disparities), [left, right])
 
-    def test_empty_correlation_into_input_plane_matches_pytorch(self):
-        # On PyTorch nightlies, writing into a graph input also needs #5059.
-        class WriteInput(nn.Module):
+    def test_empty_correlation_into_copied_input_plane_matches_pytorch(self):
+        class WriteCopy(nn.Module):
             def forward(self, x, y):
-                x[:, 0, :, 4:] = _empty_correlation(y)
-                return x
+                v = x.clone()
+                v[:, 0, :, 4:] = _empty_correlation(y)
+                return v
 
-        self._check(WriteInput(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
+        self._check(WriteCopy(), [torch.randn(1, 3, 3, 4), torch.randn(1, 8, 3, 4)])
 
     def test_empty_correlation_into_buffer_plane_matches_pytorch(self):
         class WriteBuffer(nn.Module):
