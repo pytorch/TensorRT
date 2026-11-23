@@ -82,6 +82,13 @@ struct CudaCalls {
   bool disable_stream_context = false;
   size_t stream_context_queries = 0;
   size_t memory_pool_queries = 0;
+  size_t pointer_queries = 0;
+  // cuPointerGetAttributes reports this address as device memory on another GPU that this one cannot reach.
+  const void* report_on_another_device = nullptr;
+  // cuPointerGetAttributes reports this address as device memory on another GPU that this one can reach.
+  const void* report_reachable_on_another_device = nullptr;
+  // cuPointerGetAttributes reports managed memory as host memory with the managed flag set, as on a Jetson Orin.
+  bool report_managed_as_host = false;
   cudaError_t launch_error = cudaSuccess;
   std::vector<cudaStream_t> captures;
   std::vector<cudaStream_t> launches;
