@@ -388,6 +388,11 @@ Error ExecutionGraph::enqueue_in(
           }
           fall_back("buffer allocation failed", allocation);
           release_buffers(stream);
+          // Refused by a global capture on another thread, like the cudaGraphInstantiate below, so a later call
+          // still tries again.
+          if (allocation == cudaErrorStreamCaptureUnsupported) {
+            return enqueue_plain(context, stream);
+          }
           if (staged_until_repeat_) {
             // Only the bindings that waited for a repeat go back to the caller's addresses, and calls run plainly
             // until one repeats the previous call's address for every binding read in place. A binding that moved
@@ -439,6 +444,7 @@ Error ExecutionGraph::enqueue_in(
     cudaGraphExec_t exec = nullptr;
     cudaError_t error = cudaErrorDeviceUninitialized;
     bool enqueued = true;
+    bool refused_by_a_capture = false;
     {
       // The engine is captured on a stream of its own in record_context. The scope ends before the launch
       // below, which runs on the caller's stream, in whichever context it belongs to.
@@ -461,6 +467,9 @@ Error ExecutionGraph::enqueue_in(
       capture_lock.unlock();
       if (error == cudaSuccess && enqueued) {
         error = cudaGraphInstantiate(&exec, graph, nullptr, nullptr, 0);
+        // A global capture on another thread refuses this, which says nothing about whether the engine can be
+        // recorded, so it does not count toward turning replay off.
+        refused_by_a_capture = error == cudaErrorStreamCaptureUnsupported;
       }
       if (graph != nullptr) {
         cudaGraphDestroy(graph);
@@ -500,7 +509,7 @@ Error ExecutionGraph::enqueue_in(
       if (records_for_other_context) {
         return Error::InvalidState;
       }
-      if (++failed_captures_ == kMaxCaptureAttempts) {
+      if (!refused_by_a_capture && ++failed_captures_ == kMaxCaptureAttempts) {
         ET_LOG(
             Error,
             "TensorRTBackend::execute: CUDA graph recording failed %d times; until its input shapes or profile "
