@@ -439,18 +439,42 @@ example.
 Give inputs and outputs their buffers from C++
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A program exported as in `Keep inputs and outputs on the GPU`_, with all 4 settings shown there,
-does not allocate its outputs. Give it a buffer on the engine's GPU for each output once, before
-the first call, and every call writes there. Without it, the first call fails. This holds only for
-an input that a GPU delegate reads and an output that a GPU delegate writes. One that a CPU
-operator reads or writes stays in host memory, as ``device()`` in its metadata says, and needs host
-memory instead. Read the output's shape from what ``forward`` returns: for a dynamic shape, the
-buffer is sized for the largest shape. Set any options from `Setting a runtime option`_ before
-``set_output``, which loads the method. The program makes and copies its GPU buffers with
-ExecuTorch's ``clone_tensor_ptr_to``, so the CMake file above builds it as it is. It is for one
-input and one output. It stops unless the method has exactly those, both float and on
-the GPU. It skips ``set_output`` for an output that is memory planned, because that output already
-has memory. It assumes that the engine's GPU is the current device.
+A program exported with ``alloc_graph_output=False``, as in `Keep inputs and outputs on the GPU`_,
+does not allocate its outputs. Before the first call, give it one persistent buffer per output with
+``Module::set_output``. Every ``forward`` call then writes the output into that same buffer, so read
+or copy it before the next call. Without the buffers, the first call fails with error ``0x12``
+(``InvalidArgument``) when TensorRT writes the output, and the log mentions ``set_output_data_ptr``.
+On a GPU that reads host memory directly, such as Jetson AGX Thor, the error can be ``0x2``
+(``InvalidState``) instead.
+
+Give each input and output memory where the method expects it. ``device()`` in the tensor's metadata
+says where that is. With the skip flags from `Keep inputs and outputs on the GPU`_, an input that a
+GPU delegate reads and an output that a GPU delegate writes are on the GPU. When the export has no
+``CudaPartitioner``, an operator that TensorRT does not take runs on the CPU. An input that only
+such operators read, and an output that such an operator writes, are on the CPU and need host
+memory. A GPU pointer there crashes the process. An input that TensorRT also reads stays on the GPU,
+and ExecuTorch copies it to the host for the CPU operator.
+
+The program below is for a method with one float input and one float output, both on the GPU. Put it
+in ``main.cpp`` in place of the first program, with the ``device_resident.pte`` from `Keep inputs
+and outputs on the GPU`_ next to it. It makes and copies the GPU buffers with ExecuTorch's
+``clone_tensor_ptr_to``, which uses the allocator that ``backend_cuda`` registers, so the
+``CMakeLists.txt`` above builds it as it is.
+
+What the program does:
+
+* It stops with a message unless the method has exactly that one input and one output.
+* It gives the output a GPU buffer with ``set_output``. It skips this for an output that is memory
+  planned (exported with ``alloc_graph_output=True``), because that output already has memory, and
+  ExecuTorch does not let you replace it.
+* It calls ``forward`` 3 times with the same input. It copies each result back with the shape
+  that ``forward`` returns, because for a dynamic shape the buffer is sized for the largest shape.
+
+When you adapt it:
+
+* Set any runtime options (see `Setting a runtime option`_) before ``set_output``, because that
+  call loads the method.
+* It assumes that the engine's GPU is the current device.
 
 .. code-block:: cpp
 
