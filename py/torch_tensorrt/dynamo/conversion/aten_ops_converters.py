@@ -1568,6 +1568,8 @@ def _index_copy_kv_eligible(
     Returns True only for the narrow case our IKVCacheUpdateLayer
     emitter can handle without a graph break:
 
+    * ``lift_mutated_buffers`` classified the write in place and marked it
+      ``node.meta['_trt_kv_alias']``. Only checked without ``input_node``.
     * Input is an FX placeholder (i.e. a network input — required for
       aliasing).
     * Input has rank 4 and fully static shape [b, d, s_max, h].
@@ -1586,10 +1588,11 @@ def _index_copy_kv_eligible(
     lowering/_buffer_lifting.py runs before that and passes the node lowering
     will leave behind, which is not always node.args[0].
     """
-    # That same classifier marks a write it filed copy-back rather than KV, and its
-    # value is a graph output by now. Aliasing it as well would hand the runtime an
-    # output it keeps to itself while the graph still reads it.
-    if node.meta.get("_trt_no_kv_alias"):
+    # The layer changes its input. Only the classifier knows that a write is meant
+    # to, so the partitioner takes only the writes it marked; a functional
+    # index_copy leaves its input alone. The classifier passes input_node while it
+    # decides.
+    if input_node is None and not node.meta.get("_trt_kv_alias"):
         return False
     if len(node.args) < 4:
         return False

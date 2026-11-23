@@ -27,13 +27,22 @@ def _has_side_effect(node: torch.fx.Node) -> bool:
     A block such as torch.autocast or torch.no_grad is a call of a higher order op on
     a submodule. When the only effect of the block is an in-place write, such as
     h.add_(1.0) with a view of h that is read after the block, nothing uses the call
-    either.
+    either. Nor does anything use a submodule call whose graph holds a node with a
+    side effect, such as a partition left to PyTorch with the write-back copy_ of a
+    caller's cache.
     """
     if node.is_impure() or (
         node.op == "call_function"
         and getattr(node.target, "__module__", None) == "torch._functorch.predispatch"
     ):
         return True
+    if node.op == "call_module":
+        owner: Any = node.graph.owning_module
+        partition = owner.get_submodule(str(node.target))
+        return isinstance(partition, torch.fx.GraphModule) and any(
+            n.op in ("call_function", "call_module") and _has_side_effect(n)
+            for n in partition.graph.nodes
+        )
     if node.op != "call_function" or not isinstance(
         node.target, torch._ops.HigherOrderOperator
     ):
