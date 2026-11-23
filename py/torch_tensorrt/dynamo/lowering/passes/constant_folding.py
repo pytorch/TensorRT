@@ -788,6 +788,12 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
                 self._repeat_of[node] = first
                 if first in self.node_replacements:
                     return self.node_replacements[first]
+        # The parent computes a node's value before it asks is_impure, so a node that
+        # stays in the graph would still run here. A quantize kernel that cannot run
+        # in this environment would then fail the compile for a value never used.
+        # This comes after the repeat bookkeeping, so repeats share as before.
+        if self.is_impure(node):
+            return self.unknown_value
         return super()._deduce_value(node)
 
     def _fold_key(self, node: torch.fx.Node) -> Optional[Tuple[Any, ...]]:

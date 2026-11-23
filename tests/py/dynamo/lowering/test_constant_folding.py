@@ -13,6 +13,9 @@ import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
+    CONSTANT_FOLD_EXCLUSION_META_KEY,
+)
 from torch_tensorrt.dynamo.lowering.passes import (
     _aten_lowering_pass,
     complex_decomposition_adapter,
@@ -191,6 +194,16 @@ class _Select(torch.nn.Module):
 
     def forward(self, x):
         return x + self.weight[0]
+
+
+@torch.library.custom_op("constant_folding_test::quantize", mutates_args=())
+def _quantize(x: torch.Tensor) -> torch.Tensor:
+    raise AssertionError("constant folding ran the quantize op")
+
+
+@_quantize.register_fake
+def _(x: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like(x)
 
 
 class TestConstantFolding(TestCase):
@@ -976,6 +989,54 @@ class TestConstantFolding(TestCase):
         targets = [node.target for node in gm.graph.nodes]
         self.assertNotIn(torch.ops.aten.permute.default, targets)
         self.assertIn(dequantize_affine, targets)
+
+    def test_quantization_ops_on_constants_are_not_run(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                return x @ (_quantize(self.weight * 2) + 1)
+
+        gm = torch.export.export(Model(), (torch.randn(4, 4),)).module()
+        quantize = torch.ops.constant_folding_test.quantize.default
+        folder = constant_folding._TorchTensorRTConstantFolder(
+            gm, skip_constructors=False
+        )
+        folder.quantization_ops.add(quantize)
+        folder.run()
+
+        folded = [node.target for node in folder.node_replacements]
+        self.assertIn(torch.ops.aten.mul.Tensor, folded)
+        self.assertNotIn(quantize, folded)
+        self.assertNotIn(torch.ops.aten.add.Tensor, folded)
+
+    def test_nodes_marked_by_an_exclusion_rule_are_not_folded_past(self):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                values, _ = torch.max(self.weight * 2, dim=0)
+                return x + values
+
+        # A node that returns several tensors, and a read of a module attribute.
+        for marked, folded in (
+            (torch.ops.aten.max.dim, [torch.ops.aten.mul.Tensor]),
+            ("get_attr", []),
+        ):
+            with self.subTest(marked=str(marked)):
+                gm = torch.export.export(Model(), (torch.randn(4),)).module()
+                for node in gm.graph.nodes:
+                    if marked in (node.target, node.op):
+                        node.meta[CONSTANT_FOLD_EXCLUSION_META_KEY] = {"test_rule"}
+                folder = constant_folding._TorchTensorRTConstantFolder(
+                    gm, skip_constructors=False
+                )
+                folder.run()
+                self.assertEqual([n.target for n in folder.node_replacements], folded)
 
     @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
     def test_aliased_view_models_compile_end_to_end(self):
