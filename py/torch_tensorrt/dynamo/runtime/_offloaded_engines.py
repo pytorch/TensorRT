@@ -7,7 +7,9 @@ Inside ``offload_engines_to_disk()``, ``convert_module`` writes each engine to a
 directory as soon as it is built, and gives its ``TorchTensorRTModule`` the file memory-mapped as the plan. The
 engines built so far are then held neither on the GPU nor in host memory while the next ones build.
 ``compile_module`` leaves them in their files: an ExecuTorch save streams each file into the program, and
-``compile_and_save`` loads them before any other save. The files are deleted when the block ends.
+``compile_and_save`` loads them before any other save. The files are deleted when the block ends, or earlier
+by ExecuTorch, which owns each file once it is lowered and deletes it when its data is freed after the save. So
+the block holds one ExecuTorch save.
 """
 
 import contextlib
@@ -15,7 +17,7 @@ import logging
 import os
 import tempfile
 from contextvars import ContextVar
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 
 import torch
 from torch_tensorrt._utils import _cache_root
@@ -43,6 +45,40 @@ def offload_engines_to_disk() -> Iterator[None]:
         for path in paths:
             with contextlib.suppress(FileNotFoundError):
                 os.remove(path)
+
+
+@contextlib.contextmanager
+def moving_out_of(sources: Sequence[Tuple[str, int]]) -> Iterator[None]:
+    """Around an ExecuTorch save inside the block that may move data out of ``sources``, each a file with
+    the size of its data.
+
+    If the save fails after it moved data, the output holding that data can't be finished, since the block
+    deletes the engine files that hold the rest. So this says to export again, and deletes each source the
+    save moved data out of, since ExecuTorch keeps one it moved only in part, such as a file of CUDA weights.
+    """
+    assert (
+        _offloaded_engine_files.get() is not None
+    ), "engines move only inside offload_engines_to_disk()"
+    try:
+        yield
+    except BaseException as e:
+        moved = [path for path, size in sources if _size(path) < size]
+        for path in moved:
+            with contextlib.suppress(OSError):
+                os.remove(path)
+        if moved:
+            e.add_note(
+                "The files that held the rest of the data this save moved are deleted, so its output "
+                "can't be finished. Export again."
+            )
+        raise
+
+
+def _size(path: str) -> int:
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def defer_engine_setup_to_load() -> bool:
