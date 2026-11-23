@@ -14,6 +14,7 @@
 #include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/runtime/backend/options.h>
 #include <executorch/runtime/core/evalue.h>
+#include <executorch/runtime/core/exec_aten/util/tensor_util.h>
 #include <executorch/runtime/core/memory_allocator.h>
 #include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
@@ -1628,7 +1629,7 @@ TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
     nvinfer1::IExecutionContext& context = *engine->handle()->exec_ctx;
     // compare() gives the plain engine its own output buffer.
     void* const output = engine == &plain ? reference_output_ : outputs_[0];
-    // As many elements as 2x8, so the output tensor takes the shape the context reports.
+    // As many elements as 2x8, so the output tensor would take this shape if the call asked the context for it.
     ASSERT_TRUE(context.setInputShape("input_0", nvinfer1::Dims2{4, 4}));
     ASSERT_TRUE(context.setTensorAddress("input_0", inputs_[1]));
     ASSERT_TRUE(context.setTensorAddress("output_0", outputs_[1]));
@@ -1652,6 +1653,8 @@ TEST_F(ExecutionGraphReplayTest, UnchangedShapesAndAddressesAreNotSetAgain) {
     EXPECT_EQ(shape.d[1], 4);
     EXPECT_EQ(context.getTensorAddress("input_0"), inputs_[1]);
     EXPECT_EQ(context.getTensorAddress("output_0"), outputs_[1]);
+    EXPECT_EQ(output_impl.size(0), 2);
+    EXPECT_EQ(output_impl.size(1), 8);
     // Back to what the delegate holds, so the calls below run as usual.
     ASSERT_TRUE(context.setInputShape("input_0", nvinfer1::Dims2{2, 8}));
     ASSERT_TRUE(context.setTensorAddress("input_0", inputs_[0]));
@@ -2088,6 +2091,100 @@ TEST_F(ExecutionGraphTest, ManagedMemoryIsBoundInPlaceAlsoWhereItReadsAsHostMemo
   }
   EXPECT_EQ(cudaFree(input), cudaSuccess);
   EXPECT_EQ(cudaFree(output), cudaSuccess);
+}
+
+// Tensors at the engine's largest shape that execute() resizes, as a program's dynamic tensors are.
+struct ResizableIo {
+  ResizableIo(void* input, void* output)
+      : input_impl(
+            ScalarType::Float,
+            2,
+            input_sizes,
+            input,
+            dim_order,
+            input_strides,
+            TensorShapeDynamism::DYNAMIC_BOUND),
+        output_impl(
+            ScalarType::Float,
+            2,
+            output_sizes,
+            output,
+            dim_order,
+            output_strides,
+            TensorShapeDynamism::DYNAMIC_BOUND) {}
+
+  SizesType input_sizes[2] = {8, 32};
+  SizesType output_sizes[2] = {8, 32};
+  DimOrderType dim_order[2] = {0, 1};
+  StridesType input_strides[2] = {32, 1};
+  StridesType output_strides[2] = {32, 1};
+  TensorImpl input_impl;
+  TensorImpl output_impl;
+  EValue input{Tensor(&input_impl)};
+  EValue output{Tensor(&output_impl)};
+  EValue* args[2] = {&input, &output};
+};
+
+// The output takes the shape inferred for each new set of input shapes, also when they go back to earlier ones, and
+// also when it is aliased. A call with the shapes of the call before resizes an output that was resized in between.
+TEST_F(ExecutionGraphTest, AnOutputTakesTheInferredShapeOnEveryCall) {
+  for (const std::vector<uint8_t>* blob : {&blob_, &alias_blob_}) {
+    SCOPED_TRACE(blob == &alias_blob_ ? "aliased" : "plain");
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(*blob), Error::Ok);
+    ResizableIo io(inputs_[0], outputs_[0]);
+    Tensor input = io.input.toTensor();
+    Tensor output = io.output.toTensor();
+    // Some steps change one dimension only, so a size check that compares part of the shape is caught.
+    const SizesType shapes[][2] = {{2, 8}, {4, 4}, {2, 8}, {2, 8}, {1, 8}, {1, 2}, {8, 32}, {8, 16}};
+    for (int i = 0; i < 8; ++i) {
+      SCOPED_TRACE(i);
+      SizesType shape[] = {shapes[i][0], shapes[i][1]};
+      ASSERT_EQ(resize_tensor(input, {shape, 2}), Error::Ok);
+      if (i == 3) {
+        SizesType other[] = {4, 4};
+        ASSERT_EQ(resize_tensor(output, {other, 2}), Error::Ok);
+      }
+      const size_t count = static_cast<size_t>(shape[0]) * shape[1];
+      std::vector<float> values(count);
+      for (size_t j = 0; j < count; ++j) {
+        values[j] = static_cast<float>(i * 16 + static_cast<int>(j % 64));
+      }
+      ASSERT_EQ(cudaMemcpy(inputs_[0], values.data(), count * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+      ASSERT_EQ(cudaMemset(outputs_[0], 0xff, kMaxBytes), cudaSuccess);
+      ASSERT_EQ(engine.run({io.args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      ASSERT_EQ(output.dim(), 2);
+      EXPECT_EQ(output.size(0), shape[0]);
+      EXPECT_EQ(output.size(1), shape[1]);
+      std::vector<float> result(count);
+      ASSERT_EQ(cudaMemcpy(result.data(), outputs_[0], count * sizeof(float), cudaMemcpyDeviceToHost), cudaSuccess);
+      for (size_t j = 0; j < count; ++j) {
+        ASSERT_FLOAT_EQ(result[j], values[j] * 2.0f + 1.0f) << "element " << j;
+      }
+    }
+  }
+}
+
+// An output whose sizes already match is not resized, plain or aliased. A resize would rewrite the stride of its
+// dimension of size 1 from the dim order, so that stride shows whether one ran.
+TEST_F(ExecutionGraphTest, AnOutputWhoseSizesMatchIsNotResized) {
+  for (const std::vector<uint8_t>* blob : {&blob_, &alias_blob_}) {
+    SCOPED_TRACE(blob == &alias_blob_ ? "aliased" : "plain");
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(*blob), Error::Ok);
+    ResizableIo io(inputs_[0], outputs_[0]);
+    SizesType shape[] = {1, 16};
+    ASSERT_EQ(resize_tensor(io.input.toTensor(), {shape, 2}), Error::Ok);
+    ASSERT_EQ(resize_tensor(io.output.toTensor(), {shape, 2}), Error::Ok);
+    io.output_strides[0] = 64;
+    for (int i = 0; i < 2; ++i) {
+      SCOPED_TRACE(i);
+      ASSERT_EQ(engine.run({io.args, 2}, streams_[0]), Error::Ok);
+      ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+      EXPECT_EQ(io.output_strides[0], 64);
+    }
+  }
 }
 
 TEST_F(ExecutionGraphReplayTest, DestroyFreesReplayBuffers) {
