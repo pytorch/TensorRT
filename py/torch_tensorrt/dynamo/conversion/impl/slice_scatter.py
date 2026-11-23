@@ -436,15 +436,15 @@ def slice_scatter(
 
     update_len = end - start
 
-    # KV fast path, unless the write carries _trt_no_kv_alias: the classifier already
-    # filed it copy-back and re-attached its value as a graph output, and a buffer
-    # that is both copy-back and engine-aliased raises on every call. The layer also
-    # updates its cache in place, so the write must be on a graph input, as for
-    # index_copy: a converter like clone hands back its input as is, and writing
-    # through that would change the caller's tensor.
+    # KV fast path. The layer updates its cache in place, so it takes only a write
+    # the classifier marked _trt_kv_alias, which is how it says the write is meant
+    # to change the cache, and only on a graph input, as for index_copy: a converter
+    # like clone hands back its input as is, and writing through that would change
+    # the caller's tensor.
     node = ctx.current_node
-    kv_forbidden = node is not None and (
-        node.meta.get("_trt_no_kv_alias")
+    kv_forbidden = (
+        node is None
+        or not node.meta.get("_trt_kv_alias")
         or not (isinstance(node.args[0], Node) and node.args[0].op == "placeholder")
     )
     kv_out = (

@@ -69,12 +69,12 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
-    assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
     erase_export_guards,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
+    write_back_writes_left_in_pytorch,
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     reset_folded_constructors,
@@ -471,6 +471,11 @@ def cross_compile_for_windows(
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
+    # Buffers stay engine constants here, but a write into a caller's tensor is
+    # classified as in compile().
+    gm, _ = lift_mutated_buffers(gm, settings, lift_buffers=False)
+    predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
     unlowered_gm = gm
@@ -501,6 +506,21 @@ def cross_compile_for_windows(
         trt_kwarg_inputs,
         settings,
         graph_signature=exported_program.graph_signature,
+    )
+    restored = (
+        []
+        if settings.dryrun
+        else write_back_writes_left_in_pytorch(trt_gm, predicted_kv_bindings)
+    )
+    assert_predicted_kv_aliased(
+        aliased_input_bindings(
+            # With full support compile_module returns the engine module itself.
+            getattr(sub, "aliased_io", None)
+            for sub in trt_gm.modules()
+        ),
+        [b for b in predicted_kv_bindings if b not in restored],
+        settings,
+        engines_built=not settings.dryrun,
     )
     return trt_gm
 
@@ -981,7 +1001,6 @@ def compile(
     _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
     _copyback_bindings = gm.meta.get("_copyback_bindings", [])
     _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
-    _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -1002,12 +1021,6 @@ def compile(
     stage_end(Stage.LOWERING)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    # The marker is what keeps a re-routed write out of the engine's aliased_io, and
-    # it rides on node.meta through every pass above. Read it back before conversion
-    # so a pass that dropped it is named here rather than surfacing as a module that
-    # raises on every call.
-    assert_no_kv_alias_markers_survived(gm, _no_kv_alias_writes)
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
@@ -1035,6 +1048,16 @@ def compile(
     )
     if _copyback_mutation_buffers:
         trt_gm.meta["_copyback_mutation_buffers"] = _copyback_mutation_buffers
+    # A graph too small for an engine runs in PyTorch, which stores a caller's
+    # tensor only through its copy_. Buffers keep the error below.
+    restored = (
+        []
+        if settings.dryrun
+        else write_back_writes_left_in_pytorch(
+            trt_gm, set(_predicted_kv_bindings) - {p for p, _, _ in lifted_buffers}
+        )
+    )
+    _predicted_kv_bindings = [b for b in _predicted_kv_bindings if b not in restored]
     # Ground-truth check on both directions of the classification: every write lift
     # called KV (engine-aliased, so its copy_ was dropped) must appear in a compiled
     # engine's aliased_io or its write-back is silently lost, and no write lift
@@ -1043,7 +1066,9 @@ def compile(
     # dryrun returns before conversion, so there is no ground truth to check against.
     assert_predicted_kv_aliased(
         aliased_input_bindings(
-            getattr(sub, "aliased_io", None) for _name, sub in trt_gm.named_children()
+            # With full support compile_module returns the engine module itself.
+            getattr(sub, "aliased_io", None)
+            for sub in trt_gm.modules()
         ),
         _predicted_kv_bindings,
         settings,
@@ -1057,13 +1082,17 @@ def compile(
         # engine via get_attr nodes in the fx graph. This shape is naturally
         # serializable by torch_tensorrt.save / torch.export (no external
         # Python wrapper that would be lost on a round-trip).
-        trt_gm = inline_lifted_buffers_into_gm(trt_gm, lifted_buffers)
+        trt_gm = inline_lifted_buffers_into_gm(
+            trt_gm,
+            lifted_buffers,
+            [*exported_program.state_dict, *exported_program.constants],
+        )
     # A copy-back value stays on the output node, where the exporters read it and
-    # where dead-code elimination cannot reach it, but nothing between here and the
-    # ExecuTorch runtime writes it into the buffer. Returning it would report a
-    # mutation the caller cannot act on, so the compiled module keeps the arity of
-    # the model it was compiled from.
-    hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
+    # where dead-code elimination cannot reach it. Called from PyTorch, the module
+    # writes it into the buffer itself and returns only the model's outputs. Read
+    # after inlining, which renames nested buffers.
+    if _copyback_mutation_buffers:
+        hide_copyback_outputs(trt_gm, trt_gm.meta["_copyback_mutation_buffers"])
     return trt_gm
 
 
@@ -1477,6 +1506,23 @@ def compile_module(
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
 
+    # Each of these writes needs a copy_ in PyTorch after the engine runs.
+    written_back = [
+        str(n.args[0]) for n in gm.graph.nodes if n.meta.get("_trt_write_back")
+    ]
+    if settings.require_full_compilation and written_back and not settings.dryrun:
+        raise AssertionError(
+            "require_full_compilation=True was specified, but the engine cannot "
+            f"update input(s) {written_back} in place, so PyTorch has to store the "
+            "write after the engine runs. An engine updates an input in place only "
+            "when the input is a contiguous tensor on the GPU that is not float64, "
+            "the model writes it once, its KV cache layer takes the write, the model "
+            "reads the written input afterwards, and nothing else reads its old "
+            "contents. Compile without "
+            "require_full_compilation, or return the updated tensor instead of "
+            "writing the input."
+        )
+
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops, op_support = (
         partitioning.get_graph_converter_support_overview(
@@ -1586,13 +1632,17 @@ def compile_module(
     # convert the lowered graph as a single engine. Mixed graphs still partition, and so does
     # compile_and_save, since save() takes the partitioned GraphModule, not a bare engine module.
     # Graphs with non-tensor inputs (Flux `return_dict`) also partition, since those inputs
-    # cannot be engine bindings.
+    # cannot be engine bindings, and so do graphs with lifted buffers, which compile inlines
+    # into the partitioned GraphModule.
     if (
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
         and not defer_engine_setup_to_load()
         and _placeholders_are_engine_bindings(gm)
+        and not any(
+            "_lifted_buffer" in n.meta for n in gm.graph.find_nodes(op="placeholder")
+        )
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -2583,12 +2633,26 @@ def convert_exported_program_to_serialized_trt_engine(
     # module-held caches). The caller is responsible for threading the
     # resulting bindings at runtime — they are appended after the user inputs
     # in the order returned here.
-    lifted_buffers: List[Tuple[str, str, torch.Tensor]] = []
-    predicted_kv_bindings: List[str] = []
+    # Without it, the buffers stay engine constants, and a write into a caller's
+    # tensor is still classified: the engine updates the tensor in place when it can.
+    gm, lifted_buffers = lift_mutated_buffers(
+        gm, settings, lift_buffers=lift_mutable_buffers, host_inputs_copied=False
+    )
+    # Read before lowering: `gm` is replaced below and the meta does not follow it.
+    predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+    # A write the engine cannot apply in place needs PyTorch to store it, and the
+    # bytes returned here run without PyTorch.
+    written_inputs = [
+        n.args[0].name for n in gm.graph.nodes if n.meta.get("_trt_write_back")
+    ]
+    if written_inputs:
+        raise RuntimeError(
+            "convert_exported_program_to_serialized_trt_engine cannot update input(s) "
+            f"{written_inputs} in place, so the engine would leave them unchanged. "
+            "Use torch_tensorrt.dynamo.compile, which stores the write, or return the "
+            "updated tensor instead of writing the input."
+        )
     if lift_mutable_buffers:
-        gm, lifted_buffers = lift_mutated_buffers(gm, settings)
-        # Read before lowering: `gm` is replaced below and the meta does not follow it.
-        predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
         # A write the engine cannot alias in place is classified as copy-back: its
         # new value is appended as an extra engine output, and whatever loads the
         # serialized program copies that output into the buffer afterwards. This
@@ -2704,6 +2768,10 @@ def convert_exported_program_to_serialized_trt_engine(
         )
         raise RuntimeError(f"While interpreting the module got an error: {e}") from e
 
+    if flat_input_names is not None:
+        placeholders = [n.name for n in gm.graph.nodes if n.op == "placeholder"]
+        renamed = dict(zip(placeholders, flat_input_names))
+        predicted_kv_bindings = [renamed.get(b, b) for b in predicted_kv_bindings]
     assert_predicted_kv_aliased(
         aliased_input_bindings([interpreter_result.aliased_io]),
         predicted_kv_bindings,

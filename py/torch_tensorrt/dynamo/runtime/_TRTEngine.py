@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import copy
 import logging
+import math
 import pickle
 import tempfile
 from contextlib import nullcontext
@@ -88,6 +89,133 @@ class _InputBindingInfo(NamedTuple):
     # so the per-call input-setup loop avoids an aliased_input_binding_names lookup
     # on every input, every execution.
     is_aliased_input: bool
+    # True when TensorRT updates this input in place as a KV cache.
+    is_kv_cache_input: bool
+
+
+def _bound_through_a_copy(tensor: torch.Tensor) -> bool:
+    return (
+        not (tensor.is_cuda and tensor.is_contiguous())
+        or tensor.is_neg()
+        or tensor.is_conj()
+    )
+
+
+def _refuse_a_copy_under_cuda_graphs(name: str, tensor: torch.Tensor) -> None:
+    """A recorded CUDA graph keeps the address an input was bound to, so the update
+    of an input bound through a copy would go to a copy freed after the call."""
+    if tensor.numel() > 0 and _bound_through_a_copy(tensor):
+        if tensor.is_neg() or tensor.is_conj():
+            where = "a negative or conjugate view"
+        else:
+            where = "not contiguous" if tensor.is_cuda else "on the host"
+        raise RuntimeError(
+            f"Input '{name}' is updated in place but is {where}, so it would be "
+            "bound through a copy, which CUDA graphs cannot update. Pass a "
+            "contiguous CUDA tensor, or run without CUDA graphs."
+        )
+
+
+def _extent(tensor: torch.Tensor) -> Tuple[int, int]:
+    lo = tensor.data_ptr()
+    if tensor.is_contiguous():
+        return lo, lo + tensor.nbytes
+    span = 1 + sum((n - 1) * s for n, s in zip(tensor.shape, tensor.stride()))
+    return lo, lo + span * tensor.element_size()
+
+
+# Extent, element size, and the (stride, size) of each dimension above size 1,
+# largest stride first.
+_Layout = Tuple[int, int, int, List[Tuple[int, int]]]
+
+
+def _layout(tensor: torch.Tensor) -> _Layout:
+    lo, hi = _extent(tensor)
+    dims = [(s, n) for n, s in zip(tensor.shape, tensor.stride()) if n > 1]
+    return lo, hi, tensor.element_size(), sorted(dims, reverse=True)
+
+
+def _layouts_share(a: _Layout, b: _Layout) -> bool:
+    """Decided from sizes, strides and addresses alone, so it needs no device work.
+    Interleaved views such as ``kv[..., 0]`` and ``kv[..., 1]`` share no element.
+    Other layouts whose bytes overlap count as sharing."""
+    (a_lo, a_hi, size, dims), (b_lo, b_hi, b_size, b_dims) = a, b
+    if a_hi <= b_lo or b_hi <= a_lo:
+        return False
+    if size != b_size or dims != b_dims:
+        return True
+    distance, rest = divmod(b_lo - a_lo, size)
+    if rest:
+        return True
+    # A shared element means distance = sum(c * stride) with |c| < n, so distance
+    # is a multiple of the strides' common divisor. When each stride exceeds the
+    # span of the smaller ones, only the two counts around distance / stride can
+    # work at each dimension.
+    divisor = math.gcd(*(s for s, _ in dims))
+    if divisor and distance % divisor:
+        return False
+    after = [0] * len(dims)
+    for k in range(len(dims) - 2, -1, -1):
+        after[k] = after[k + 1] + (dims[k + 1][1] - 1) * dims[k + 1][0]
+    if any(s <= after[k] for k, (s, _) in enumerate(dims)):
+        return True
+    pending = [(distance, 0)]
+    while pending:
+        d, k = pending.pop()
+        if k == len(dims):
+            if d == 0:
+                return True
+            continue
+        s, n = dims[k]
+        for c in (d // s, d // s + 1):
+            if abs(c) < n and abs(d - c * s) <= after[k]:
+                pending.append((d - c * s, k + 1))
+    return False
+
+
+def _refuse_inputs_that_share_memory(
+    inputs: Sequence[Tuple[str, torch.Tensor, bool, bool]],
+) -> None:
+    """``inputs`` holds each input's name, its tensor, whether it is a KV cache and
+    whether the engine updates it in place.
+
+    TensorRT reads an input in a KV cache's memory before or after it writes the
+    cache, in an order the model does not set. A plugin's updated input may share
+    elements only with an input of the same address and layout: ``x.add_(y)`` with
+    ``x`` and ``y`` the same tensor reads both before it writes. Two updated inputs
+    may do so only when neither is bound through a copy, since a copy takes the
+    shared element's update and one is lost."""
+    # CUDA uses one address space for every device and the host, so tensors on
+    # different devices never overlap here.
+    live = sorted((*_extent(t), k) for k, (_, t, _, _) in enumerate(inputs))
+    layouts: Dict[int, _Layout] = {}
+
+    def layout(k: int) -> _Layout:
+        if k not in layouts:
+            layouts[k] = _layout(inputs[k][1])
+        return layouts[k]
+
+    for k, (_, hi, i) in enumerate(live):
+        m = k + 1
+        while m < len(live) and live[m][0] < hi:
+            j = live[m][2]
+            m += 1
+            (name, t, kv, aliased), (other, o, o_kv, o_aliased) = inputs[i], inputs[j]
+            if o.numel() == 0:
+                continue
+            refused = kv or o_kv
+            if not refused and (aliased or o_aliased):
+                refused = layout(i) != layout(j) or (
+                    aliased
+                    and o_aliased
+                    and (_bound_through_a_copy(t) or _bound_through_a_copy(o))
+                )
+            if refused and _layouts_share(layout(i), layout(j)):
+                raise RuntimeError(
+                    f"Inputs '{name}' and '{other}' share memory, and the engine "
+                    f"updates {'a KV cache' if kv or o_kv else 'one of them'} in place. "
+                    "Pass tensors that do not share memory."
+                )
 
 
 class _InputShapeRefusedError(RuntimeError):
@@ -281,6 +409,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.runtime_states = TorchTRTRuntimeStates(
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
+        self._cudagraph_aliased_input_addresses: List[int] = []
         self.resource_allocation_strategy = 0
         # When true, ``_execute_standard`` must skip manual torch.cuda.CUDAGraph
         # capture because TRT-RTX handles it internally.
@@ -423,6 +552,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.runtime_states = TorchTRTRuntimeStates(
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
+        self._cudagraph_aliased_input_addresses = []
         self.resource_allocation_strategy = 0
         self._rtx_native_cudagraphs = False
         self._num_execution_contexts_created = 0
@@ -667,12 +797,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dtype._from(self.cuda_engine.get_tensor_dtype(input_name)).to(torch.dtype)
             for input_name in self.in_binding_names
         ]
+        kv_cache_inputs = {
+            in_name
+            for in_name, kind in self.aliased_io.values()
+            if kind == "kv_cache_update"
+        }
         self._input_binding_infos = [
             _InputBindingInfo(
                 input_name,
                 self.input_dtypes[idx],
                 self.cuda_engine.is_shape_inference_io(input_name),
                 input_name in self.aliased_input_binding_names,
+                input_name in kv_cache_inputs,
             )
             for idx, input_name in enumerate(self.in_binding_names)
         ]
@@ -1222,8 +1358,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             # Aliased inputs are bound directly to the user's tensor so the engine
             # writes through to the user's storage; cloning into a persistent
-            # cudagraph staging buffer would break the aliasing (and the user is
-            # already required to pass stable input addresses under cudagraphs).
+            # cudagraph staging buffer would break the aliasing. A new address
+            # records the graph again (see _execute_standard).
             if need_cudagraphs_record and not binding.is_aliased_input:
                 self._input_buffers[i] = contiguous_inputs[i].clone()
 
@@ -1350,6 +1486,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             and self._auto_select_profiles
         ):
             self._auto_select_profile(contiguous_inputs)
+        aliased_addresses = None
+        if effective_cudagraphs and self.aliased_io:
+            # A recorded graph writes each aliased input at its recorded address.
+            aliased_addresses = [
+                tensor.data_ptr()
+                for binding, tensor in zip(self._input_binding_infos, contiguous_inputs)
+                if binding.is_aliased_input
+            ]
+            if aliased_addresses != self._cudagraph_aliased_input_addresses:
+                if self._cudagraph_aliased_input_addresses:
+                    logger.debug(
+                        f"Engine {self.name} records its CUDA graph again: an input "
+                        "it updates in place has a new address"
+                    )
+                self.runtime_states.context_changed = True
         if self.use_pre_allocated_outputs and self.aliased_io:
             logger.warning(
                 "pre_allocated_outputs is enabled but this engine has aliased I/O; "
@@ -1374,6 +1525,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if need_cudagraphs_record:
             self._input_buffers = [None] * len(self.in_binding_names)
             self._output_buffers = [None] * len(self.out_binding_names)
+            # A call that fails before the capture records again on the next one,
+            # whatever addresses it brings.
+            self._cudagraph_aliased_input_addresses = []
 
         with self._profile_section("TRTEngine:ProcessInputs"):
             self.setup_input_tensors(
@@ -1446,6 +1600,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                             self.cudagraph.enable_debug_mode()
                         with torch.cuda.graph(self.cudagraph, stream=engine_stream):
                             self._enqueue(engine_stream)
+                        if aliased_addresses is not None:
+                            self._cudagraph_aliased_input_addresses = aliased_addresses
                         if self._profile_execution:
                             self.cudagraph.debug_dump(
                                 f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
@@ -1552,6 +1708,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def execute(
         self, inputs: Sequence[torch.Tensor]
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        # Checked first, as the C++ runtime does.
+        if self.aliased_io:
+            _refuse_inputs_that_share_memory(
+                [
+                    (b.name, caller, b.is_kv_cache_input, b.is_aliased_input)
+                    for b, caller in zip(self._input_binding_infos, inputs)
+                    if not b.is_shape_tensor
+                ]
+            )
         contiguous_inputs = [tensor.contiguous() for tensor in inputs]
 
         if self._has_nccl_ops and self._nccl_comm is None:
@@ -1593,6 +1758,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if self.requires_output_allocator or self.use_output_allocator_outputs:
             logger.debug("Using the dynamic allocator runtime mode.")
             return self._execute_output_allocator(contiguous_inputs)
+
+        if self.aliased_io:
+            if torch_tensorrt.runtime.get_cudagraphs_mode():
+                for binding, caller in zip(self._input_binding_infos, inputs):
+                    if binding.is_aliased_input:
+                        _refuse_a_copy_under_cuda_graphs(binding.name, caller)
+            outputs = self._execute_standard(contiguous_inputs)
+            # An input bound through a copy gets the copy's update.
+            for binding, caller, bound in zip(
+                self._input_binding_infos, inputs, contiguous_inputs
+            ):
+                if binding.is_aliased_input and bound is not caller:
+                    # The engine's write stores state, as a write under no_grad does.
+                    caller.detach().copy_(bound)
+            return outputs
 
         effective_cudagraphs = (
             torch_tensorrt.runtime.get_cudagraphs_mode()

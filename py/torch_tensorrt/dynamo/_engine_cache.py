@@ -111,6 +111,22 @@ class BaseEngineCache(ABC):
                         # A refit replaces a weight's values, not its shape or dtype.
                         elif isinstance(attr, torch.Tensor):
                             canonical += f"{tuple(attr.shape)}{attr.dtype}"
+                    # The mark decides whether the engine updates its input in
+                    # place, and the same graph can get it or not. An unmarked
+                    # write gets a token too, so an engine cached before the mark
+                    # existed, which may update its input in place, is not reused.
+                    # aliased_io names the input the engine updates, so the name of
+                    # a marked write's input is part of the key too.
+                    if node.target in (
+                        torch.ops.aten.index_copy.default,
+                        torch.ops.aten.slice_scatter.default,
+                    ):
+                        written = node.args[0]
+                        canonical += (
+                            f"_trt_kv_alias({getattr(written, 'name', '')})"
+                            if node.meta.get("_trt_kv_alias")
+                            else "_trt_no_kv_alias"
+                        )
                     canonical_nodes.append(canonical)
                 positions[node] = len(positions)
 

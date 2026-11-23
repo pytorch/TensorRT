@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import contextlib
 import gc
 import importlib
 import inspect
@@ -75,6 +76,7 @@ if ENABLED_FEATURES.dynamo_frontend:
         get_dynamic_shapes_kwargs,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
+    from torch_tensorrt.dynamo.lowering._buffer_lifting import buffers_restored
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
     from torch_tensorrt.dynamo.runtime._offloaded_engines import (
         offload_engines_to_disk,
@@ -1267,9 +1269,22 @@ def save(
     elif module_type == _ModuleType.fx:
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
-            module_ts = torch.jit.trace(
-                module, arg_inputs, example_kwarg_inputs=kwarg_inputs
+            # Tracing calls the module. One that writes its buffers must start the
+            # saved module from the buffers it had before, and the trace check, which
+            # calls it again, would see other values.
+            # torch.load drops meta, and its rebuilt forward writes with copy_ nodes.
+            writes = bool(module.meta.get("_copyback_mutation_buffers")) or any(
+                node.target is torch.ops.aten.copy_.default
+                and getattr(node.args[0], "op", None) == "get_attr"
+                for node in module.graph.nodes
             )
+            with buffers_restored(module) if writes else contextlib.nullcontext():
+                module_ts = torch.jit.trace(
+                    module,
+                    arg_inputs,
+                    example_kwarg_inputs=kwarg_inputs,
+                    check_trace=not writes,
+                )
             function_overload_with_kwargs(
                 torch.jit.save,
                 module_ts,
@@ -1491,6 +1506,12 @@ def save(
                         **kwargs,
                     )
                 elif output_format == "aot_inductor":
+                    # AOT Inductor applies a declared buffer mutation, so the package
+                    # writes the copy-back buffers as the module does.
+                    if _copyback_bufs:
+                        exp_program = _declare_aliased_kv_mutations_on_ep(
+                            exp_program, copyback_buffers=_copyback_bufs
+                        )
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
                         inductor_configs = kwargs["inductor_configs"]

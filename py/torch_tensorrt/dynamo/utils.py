@@ -31,6 +31,7 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 from torch.utils._sympy.numbers import int_oo
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -887,20 +888,146 @@ def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
     return nested_decorator
 
 
+def _copy_inputs(inputs: Any) -> Any:
+    """Copy the tensors in ``inputs`` so that inputs sharing memory still share it.
+
+    Inputs whose bytes overlap are copied once, over the bytes they use, and each
+    tensor becomes a view of its copy. The copies are new tensors, so inputs with
+    autograd history and Parameters copy like any other tensor.
+    """
+
+    def by_storage(t: torch.Tensor) -> bool:
+        # A sparse or wrapper subclass tensor has no storage to copy, and a quantized
+        # one loses its scale when rebuilt from its storage, so these are cloned.
+        return (
+            t.layout == torch.strided
+            and not t.is_quantized
+            and not is_traceable_wrapper_subclass(t)
+        )
+
+    def start(t: torch.Tensor) -> int:
+        address = t.untyped_storage().data_ptr() + t.storage_offset() * t.element_size()
+        return int(address)
+
+    tensors = [
+        t
+        for t in torch.utils._pytree.tree_leaves(inputs)
+        if isinstance(t, torch.Tensor) and t.numel() > 0 and by_storage(t)
+    ]
+    # Spans are addresses, not offsets, because two storages can hold the same
+    # memory, as after torch.from_dlpack of a view.
+    groups: List[List[Any]] = []
+    for t in sorted(tensors, key=lambda t: (str(t.device), start(t))):
+        lo = start(t)
+        span = 1 + sum((n - 1) * s for n, s in zip(t.shape, t.stride()))
+        hi = lo + span * t.element_size()
+        if groups and groups[-1][0] == t.device and lo < groups[-1][2]:
+            groups[-1][2] = max(groups[-1][2], hi)
+            groups[-1][3].append(t)
+        else:
+            groups.append([t.device, lo, hi, [t]])
+    # Each tensor's copy and the address its first byte stands for.
+    copies: Dict[int, Tuple[torch.UntypedStorage, int]] = {}
+    for device, lo, hi, members in groups:
+        holders = [
+            m.untyped_storage()
+            for m in members
+            if m.untyped_storage().data_ptr() <= lo
+            and m.untyped_storage().data_ptr() + m.untyped_storage().nbytes() >= hi
+        ]
+        # Without a storage that holds the whole group, its tensors are cloned.
+        if not holders:
+            continue
+        storage = holders[0]
+        # Starting at a multiple of 16 bytes keeps every element size's offset whole.
+        first = (lo - storage.data_ptr()) // 16 * 16
+        whole = torch.empty(0, dtype=torch.uint8, device=device)
+        whole.set_(storage, 0, (storage.nbytes(),), (1,))
+        copy = whole[first : hi - storage.data_ptr()].clone().untyped_storage()
+        for m in members:
+            copies[id(m)] = (copy, storage.data_ptr() + first)
+
+    def copy_one(t: torch.Tensor) -> torch.Tensor:
+        if id(t) not in copies:
+            return t.detach().clone()
+        copy, first = copies[id(t)]
+        view = torch.empty(0, dtype=t.dtype, device=t.device)
+        view = view.set_(
+            copy, (start(t) - first) // t.element_size(), t.size(), t.stride()
+        )
+        # The storage holds the values before a conjugate or negative view's flag.
+        if t.is_conj():
+            view = view.conj()
+        if t.is_neg():
+            view = torch._neg_view(view)
+        return view
+
+    return torch.utils._pytree.tree_map_only(torch.Tensor, copy_one, inputs)
+
+
 def check_module_output(
     new_module: torch.fx.GraphModule,
     refitted_module: torch.fx.GraphModule,
     arg_inputs: Any,
     kwarg_inputs: Any = None,
 ) -> bool:
+    # Each module gets its own copy of the inputs: a module that writes an input,
+    # such as a caller's cache, must not change the caller's tensor or what the
+    # other module sees.
+    old_args = _copy_inputs(arg_inputs)
+    new_args, new_kwargs = _copy_inputs((arg_inputs, kwarg_inputs))
     old_outputs, new_outputs = (
-        refitted_module(*arg_inputs),
-        new_module(*arg_inputs, **kwarg_inputs),
+        refitted_module(*old_args),
+        new_module(*new_args, **new_kwargs),
     )
-    if type(old_outputs) != type(new_outputs):
-        logger.warning("The output types are different. Output check is skipped.")
-        return True
-    return check_output_equal(old_outputs, new_outputs)
+
+    # A compiled module can return a tuple where the model returns one tensor or a
+    # dictionary, so the outputs are compared flattened.
+    # Dictionary keys must match when both outputs have them, on a leaf's path and
+    # for each dictionary, also one whose entries hold no leaf. A leaf that is not a
+    # tensor, such as a size, is compared as it is.
+    def leaves(outputs: Any) -> List[Tuple[List[Any], Any]]:
+        try:
+            flat = torch.utils._pytree.tree_flatten_with_path(outputs)[0]
+        except ValueError:
+            # A type registered without key paths, as diffusers registers its
+            # outputs, flattens without them.
+            return [([], leaf) for leaf in torch.utils._pytree.tree_leaves(outputs)]
+        return [
+            (
+                [k.key for k in path if isinstance(k, torch.utils._pytree.MappingKey)],
+                leaf,
+            )
+            for path, leaf in flat
+        ]
+
+    def key_sets(outputs: Any) -> Dict[Any, int]:
+        found: Dict[Any, int] = {}
+        pending = [outputs]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, dict):
+                found[frozenset(value)] = found.get(frozenset(value), 0) + 1
+                pending.extend(value.values())
+            elif isinstance(value, (list, tuple)):
+                pending.extend(value)
+        return found
+
+    def equal(old: Any, new: Any) -> bool:
+        if isinstance(old, torch.Tensor) and isinstance(new, torch.Tensor):
+            return old.dtype == new.dtype and check_output_equal(old, new)
+        if isinstance(old, torch.Tensor) or isinstance(new, torch.Tensor):
+            return False
+        return type(old) == type(new) and bool(old == new)
+
+    old_dicts, new_dicts = key_sets(old_outputs), key_sets(new_outputs)
+    if old_dicts and new_dicts and old_dicts != new_dicts:
+        return False
+    old_leaves, new_leaves = leaves(old_outputs), leaves(new_outputs)
+    return len(old_leaves) == len(new_leaves) and all(
+        (not old_keys or not new_keys or old_keys == new_keys) and equal(old, new)
+        for (old_keys, old), (new_keys, new) in zip(old_leaves, new_leaves)
+    )
 
 
 def check_output_equal(

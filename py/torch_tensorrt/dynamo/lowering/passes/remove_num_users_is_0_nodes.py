@@ -30,9 +30,12 @@ def apply_remove_num_users_is_0_nodes(gm: torch.fx.GraphModule) -> bool:
             and len(node.users) == 0
             and len(node.all_input_nodes) > 0
             # Functionalized custom ops write back to their inputs even when
-            # the model returns None. Other unused writes (e.g. to buffers
-            # baked into a standalone engine) retain the existing removal.
+            # the model returns None, and so does a cache write into a caller's
+            # tensor that buffer lifting left to PyTorch. Other unused writes
+            # (e.g. to buffers baked into a standalone engine) retain the
+            # existing removal.
             and not _is_matching_writeback(node)
+            and not node.meta.get("_trt_write_back")
         ):
             gm.graph.erase_node(node)
             erased += 1
