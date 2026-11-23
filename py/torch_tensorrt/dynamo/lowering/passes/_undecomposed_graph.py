@@ -26,6 +26,23 @@ logger = logging.getLogger(__name__)
 
 _ATTRIBUTE = "_torch_tensorrt_needs_undecomposed_graph"
 
+_WARNED_UNDECLARED: set[str] = set()
+
+
+def _warn_undeclared(lowering_pass: Any) -> None:
+    """Warn once per pass that it does not declare whether it needs the undecomposed graph."""
+    name = getattr(lowering_pass, "__name__", None) or repr(lowering_pass)
+    if name in _WARNED_UNDECLARED:
+        return
+    _WARNED_UNDECLARED.add(name)
+    logger.warning(
+        "Pre-export lowering pass %s does not declare whether it needs the "
+        "graph before Torch-TRT decompositions (see needs_undecomposed_graph "
+        "and runs_on_decomposed_graph), so dynamo.trace exports without them",
+        name,
+    )
+
+
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -58,12 +75,7 @@ def any_needs_undecomposed_graph(
     for lowering_pass in passes:
         when = getattr(lowering_pass, _ATTRIBUTE, None)
         if when is None:
-            logger.warning(
-                "Pre-export lowering pass %s does not declare whether it needs the "
-                "graph before Torch-TRT decompositions (see needs_undecomposed_graph "
-                "and runs_on_decomposed_graph), so dynamo.trace exports without them",
-                getattr(lowering_pass, "__name__", lowering_pass),
-            )
+            _warn_undeclared(lowering_pass)
             return True
         if when(settings):
             return True

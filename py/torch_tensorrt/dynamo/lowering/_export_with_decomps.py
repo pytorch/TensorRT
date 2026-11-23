@@ -24,15 +24,12 @@ import dataclasses
 import functools
 import logging
 from contextlib import contextmanager
-from typing import Any, Callable, Generator, Mapping, Optional, cast
+from typing import Any, Callable, Generator, Mapping, Optional
 
 import torch
 from torch.export import ExportedProgram
 from torch.export._trace import _export
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering._decomposition_filter import (
-    filter_decomposition_table,
-)
 from torch_tensorrt.dynamo.lowering._decompositions import get_decompositions
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
     pre_export_lowering_needs_undecomposed_graph,
@@ -54,16 +51,6 @@ def settings_from_kwargs(kwargs: Mapping[str, Any]) -> CompilationSettings:
     return CompilationSettings(**{k: v for k, v in kwargs.items() if k in names})
 
 
-def _decomp_table(settings: CompilationSettings) -> dict[Any, Callable[..., Any]]:
-    table = get_decompositions(
-        settings.enable_experimental_decompositions,
-        settings.decompose_attention,
-        settings.use_distributed_mode_trace,
-        settings.use_fp32_acc,
-    )
-    return cast(dict[Any, Callable[..., Any]], table)
-
-
 def _graph_targets(graph_module: torch.fx.GraphModule) -> set[Any]:
     # Includes subgraphs, such as the branches of torch.cond.
     return {
@@ -82,8 +69,7 @@ def _is_post_dispatch_aten(exported_program: ExportedProgram) -> bool:
     ops outside the decomp table; ``run_decompositions`` functionalizes those
     whatever the table holds, so the graph's ops alone cannot tell it is done.
     """
-    verifiers = getattr(exported_program, "verifiers", None)
-    return bool(verifiers) and getattr(verifiers[0], "dialect", None) == "ATEN"
+    return bool(exported_program.dialect == "ATEN")
 
 
 def _record_applied(
@@ -195,12 +181,15 @@ def maybe_run_decompositions(
 
     Call after ``pre_export_lowering``. Skips only when the program is already
     post-dispatch ATen IR, as ``dynamo.trace`` produces, and has no op that the
-    decomp table for ``settings``, filtered for this graph, would rewrite and that
+    decomp table for ``settings`` would rewrite and that
     the table ``trace`` applied did not already try. Ops that a different
     ``settings`` decomposes were not in that table, so they rerun it.
     """
-    table = filter_decomposition_table(
-        _decomp_table(settings), exported_program.graph_module
+    table = get_decompositions(
+        settings.enable_experimental_decompositions,
+        settings.decompose_attention,
+        settings.use_distributed_mode_trace,
+        settings.use_fp32_acc,
     )
     if not _is_post_dispatch_aten(exported_program):
         logger.info("Running run_decompositions: the graph is not yet ATen IR")
@@ -273,7 +262,12 @@ def export_with_tensorrt_decomps(
     # A decomposition that cannot apply to a node, such as scatter_add over a
     # symbolic extent, declines and leaves the op in place; recording the table
     # keeps compile from retracing for it.
-    table = _decomp_table(settings)
+    table = get_decompositions(
+        settings.enable_experimental_decompositions,
+        settings.decompose_attention,
+        settings.use_distributed_mode_trace,
+        settings.use_fp32_acc,
+    )
     logger.info(
         "export_with_tensorrt_decomps: exporting with decomp_table (%d entries)",
         len(table),

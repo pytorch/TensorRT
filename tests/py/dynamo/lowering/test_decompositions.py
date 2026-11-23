@@ -16,7 +16,6 @@ from torch.testing._internal.common_cuda import (
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import (
-    filter_decomposition_table,
     get_decompositions,
     remove_alias_from_exported_program,
 )
@@ -1402,57 +1401,65 @@ class TestLowering(TestCase):
             f"The optimized model results shape and torch model results shape should be equal in empty_stride",
         )
 
-    def test_scatter_add_symbolic_extent_filters_unrolled_decomposition(self):
+    def test_scatter_add_symbolic_extent_is_declined(self):
+        scatter_add = torch.ops.aten.scatter_add.default
+
         class ScatterAdd(torch.nn.Module):
             def forward(self, base, index, src):
-                return torch.ops.aten.scatter_add.default(base, 0, index, src)
+                return scatter_add(base, 0, index, src)
 
-        model = ScatterAdd().eval()
+        class MixedScatterAdd(torch.nn.Module):
+            def forward(self, base, index, src, static_index):
+                return scatter_add(base, 0, index, src), scatter_add(
+                    base, 0, static_index, src
+                )
+
+        def count_scatter_add(program):
+            return sum(
+                node.target == scatter_add for node in program.graph_module.graph.nodes
+            )
+
         base = torch.zeros((16, 8))
         index = torch.zeros((4, 8), dtype=torch.int64)
         src = torch.ones((16, 8))
         index_rows = torch.export.Dim("index_rows", min=1, max=16)
+        decompositions = get_decompositions()
+        self.assertIn(scatter_add, decompositions)
 
-        # The decomposition loops over index, so only its extent matters.
+        # The decomposition loops over index, so only its extent matters. A
+        # symbolic extent declines, leaving the op for partitioning to fall back
+        # to Torch, with the table passed through unfiltered.
         dynamic_export = torch.export.export(
-            model,
+            ScatterAdd().eval(),
             (base, index, src),
             dynamic_shapes={"base": {}, "index": {0: index_rows}, "src": {}},
         )
-        base_decompositions = get_decompositions()
-        dynamic_decompositions = filter_decomposition_table(
-            base_decompositions, dynamic_export.graph_module
-        )
-        self.assertNotIn(torch.ops.aten.scatter_add.default, dynamic_decompositions)
-        self.assertIn(torch.ops.aten.scatter_add.default, base_decompositions)
-
-        dynamic_lowered = dynamic_export.run_decompositions(dynamic_decompositions)
-        self.assertTrue(
-            any(
-                node.target == torch.ops.aten.scatter_add.default
-                for node in dynamic_lowered.graph_module.graph.nodes
-            )
+        self.assertEqual(
+            count_scatter_add(dynamic_export.run_decompositions(decompositions)), 1
         )
 
-        # Dynamo records fake tensor metadata under example_value, rather than val.
-        dynamic_scatter = next(
-            node
-            for node in dynamic_export.graph_module.graph.nodes
-            if node.target == torch.ops.aten.scatter_add.default
+        # A static extent still decomposes.
+        static_export = torch.export.export(ScatterAdd().eval(), (base, index, src))
+        self.assertEqual(
+            count_scatter_add(static_export.run_decompositions(decompositions)), 0
         )
-        dynamic_index = dynamic_scatter.args[2]
-        self.assertIsInstance(dynamic_index, torch.fx.Node)
-        dynamic_index.meta["example_value"] = dynamic_index.meta.pop("val")
-        dynamo_decompositions = filter_decomposition_table(
-            get_decompositions(), dynamic_export.graph_module
-        )
-        self.assertNotIn(torch.ops.aten.scatter_add.default, dynamo_decompositions)
 
-        static_export = torch.export.export(model, (base, index, src))
-        static_decompositions = filter_decomposition_table(
-            get_decompositions(), static_export.graph_module
+        # The decline is per call, so a static scatter_add in the same graph
+        # as a dynamic one is still decomposed.
+        mixed_export = torch.export.export(
+            MixedScatterAdd().eval(),
+            (base, index, src, index.clone()),
+            dynamic_shapes={
+                "base": {},
+                "index": {0: index_rows},
+                "src": {},
+                "static_index": {},
+            },
         )
-        self.assertIn(torch.ops.aten.scatter_add.default, static_decompositions)
+        self.assertEqual(count_scatter_add(mixed_export), 2)
+        self.assertEqual(
+            count_scatter_add(mixed_export.run_decompositions(decompositions)), 1
+        )
 
     @parameterized.expand(
         [
