@@ -581,11 +581,7 @@ def tile(
         isinstance(dim, TRTTensor) for dim in dims
     )
     if diff > 0:
-        # prepend 1 to input.shape
-        new_shape = (1,) * diff + tuple(input.shape)
-        input = impl.shuffle.reshape(
-            ctx, target, source_ir, f"{name}_prepend_input_shape", input, new_shape
-        )
+        input = prepend_ones(ctx, input, f"{name}_prepend_input_shape", diff)
     elif diff < 0:
         # prepend 1 to dims
         dims = (1,) * -diff + tuple(dims)

@@ -283,6 +283,13 @@ def _is_rank1_empty(value: Any) -> bool:
     return shape is not None and _is_rank1_empty_shape(shape)
 
 
+def _is_empty_along(shape: Sequence[int], dim: int) -> bool:
+    """Does an operand of this shape have size 0 on the concatenation dim?"""
+    if not -len(shape) <= dim < len(shape):
+        return False
+    return bool(statically_known_true(shape[dim % len(shape)] == 0))
+
+
 def _promoted_dtype(operands: Sequence[Any]) -> Optional[_enums.dtype]:
     """The dtype torch.cat would produce over these operands.
 
@@ -307,14 +314,15 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
 
     PyTorch allows torch.tensor([]) (shape (0,)) to be concatenated with higher-dimensional
     tensors, but TensorRT requires all inputs to have the same rank. A rank-1 empty operand
-    holds no elements, so aten_ops_cat leaves it out and the ranks then agree.
+    holds no elements, so aten_ops_cat leaves it out and the ranks then agree. It also
+    leaves out an operand of size 0 on the concatenation dim.
 
     Example valid case: cat([(3, 4), (0,)], dim=0) - the empty operand is dropped
     Example invalid case: cat([(0,), (2, 3), (2, 3, 4)], dim=0) - the operands that hold
     elements still disagree on rank after the empty one is dropped
     """
     # Use parse_cat_args to properly extract inputs (handles both args and kwargs patterns)
-    inputs, _ = parse_cat_args(node.args, node.kwargs)
+    inputs, dim = parse_cat_args(node.args, node.kwargs)
 
     if len(inputs) < 2:
         return True
@@ -342,7 +350,10 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
     # the promoted dtype out over every operand and passes it through. TensorRT has no
     # float64, so if the promotion lands there and truncate_double is not set, the build
     # fails on a graph that used to fall back. Refuse it here instead.
-    if any(_is_rank1_empty_shape(tuple(shape)) for shape in input_metas):
+    if any(
+        _is_rank1_empty_shape(tuple(shape)) or _is_empty_along(shape, dim)
+        for shape in input_metas
+    ):
         try:
             promoted = functools.reduce(torch.promote_types, input_dtypes)
         except TypeError:
@@ -392,14 +403,22 @@ def aten_ops_cat(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     inputs, dim = parse_cat_args(args, kwargs)
     # TensorRT requires every operand to have the same rank, so a rank-1 empty operand
-    # has to go. It holds no elements, so leaving it out does not change the result,
-    # but torch.cat still counts it when it promotes the output dtype: concatenating
-    # torch.tensor([]), which is float32, onto a float16 tensor produces float32. Work
-    # the promoted dtype out over every operand and pass it through, or the engine
-    # builds the concatenation in the survivors' narrower type and overflows.
-    non_empty = [operand for operand in inputs if not _is_rank1_empty(operand)]
+    # has to go. An operand of size 0 on the cat dim goes too, since the TensorRT
+    # builder can fail with an internal error on one. Neither holds elements, so
+    # leaving them out does not change the result, but torch.cat still counts them
+    # when it promotes the output dtype: concatenating torch.tensor([]), which is
+    # float32, onto a float16 tensor produces float32. Work the promoted dtype out
+    # over every operand and pass it through, or the engine builds the concatenation
+    # in the survivors' narrower type and overflows.
+    ranked = [operand for operand in inputs if not _is_rank1_empty(operand)] or inputs
+    # If every operand is empty, the ones of the output rank still give its shape.
+    non_empty = [
+        operand
+        for operand in ranked
+        if not _is_empty_along(getattr(operand, "shape", ()), dim)
+    ] or ranked
     cast_dtype = None
-    if non_empty and len(non_empty) != len(inputs):
+    if len(non_empty) != len(inputs):
         cast_dtype = _promoted_dtype(inputs)
         # TensorRT has no float64. The validator only lets float64 reach here when
         # truncate_double is set, which means the caller accepts float32, so map it.
@@ -4479,6 +4498,7 @@ def aten_ops_reshape(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # In a PyTorch shape a 0 is an empty dim, not "copy the input's size".
     return impl.shuffle.reshape(
         ctx,
         target,
@@ -4486,6 +4506,7 @@ def aten_ops_reshape(
         name,
         input=args[0],
         shape=args[1],
+        zero_is_placeholder=False,
     )
 
 
