@@ -243,8 +243,8 @@ def _in_place_write(
     memory in place; otherwise ``None``.
 
     ``write_back`` is the ``copy_`` that stores ``value`` into ``cache``, when it is
-    still in the graph. ``stored`` are the new values of the written buffers, whose
-    ``copy_`` is already gone, so each counts as read.
+    still in the graph. ``stored`` are the new values of the written buffers, which
+    forward stores after the graph, so each counts as read.
 
     The KV layer updates only a network input, so the write has to be a single
     eligible write of ``cache`` itself. Nothing else may read the old contents:
@@ -554,9 +554,10 @@ def lift_mutated_buffers(
     Side effects: the trailing ``copy_`` of each mutated buffer is erased. A write
     the converter will lower to an ``IKVCacheUpdateLayer`` with in-place aliased
     I/O (an eligible ``slice_scatter`` / ``index_copy``, per
-    :func:`_kv_write_will_alias`) relies on that engine aliasing for its
-    write-back, so nothing further is added, and the write gets
-    ``node.meta['_trt_kv_alias']``: the converters alias only a marked write. Every
+    :func:`_kv_write_will_alias`) and whose old contents nothing else reads relies
+    on that engine aliasing for its write-back, so nothing further is added, and
+    the write gets ``node.meta['_trt_kv_alias']``: the converters alias only a
+    marked write. Every
     other mutation, and one whose result nothing else reads, has no engine
     aliasing, so its new value is re-appended as a graph output ("copy-back") and
     its buffer name recorded, in output order, in
@@ -649,7 +650,7 @@ def lift_mutated_buffers(
     # and it is exactly what aliased_io records on the input side.
     predicted_kv_bindings: set[str] = set()
 
-    for copy_node, get_attr_node in mutation_pairs:
+    for index, (copy_node, get_attr_node) in enumerate(mutation_pairs):
         buffer_name = get_attr_node.target
         # A get_attr target is fully qualified, so a buffer owned by a submodule
         # arrives as "layers.0.self_attn.kv_cache.k_cache". getattr does not walk a
@@ -721,15 +722,18 @@ def lift_mutated_buffers(
             stored.append(new_value)
             # A value nothing else reads is dead once its copy_ is gone, and dead-code
             # elimination would take it before any engine saw it. Copy-back keeps it.
-            if (
-                new_value.users
-                and _engine_takes_its_memory(buffer_tensor)
-                and _kv_write_will_alias(
-                    new_value, tuple(buffer_tensor.shape), settings
+            # The buffers written later read this one's old contents too.
+            later = [c.args[1] for c, _ in mutation_pairs[index + 1 :] if c.args[1:]]
+            write = (
+                _in_place_write(
+                    new_value, replacement, settings, stored=[*stored, *later]
                 )
-            ):
+                if new_value.users and _engine_takes_its_memory(buffer_tensor)
+                else None
+            )
+            if write is not None:
                 predicted_kv_bindings.add(replacement.name)
-                new_value.meta["_trt_kv_alias"] = True
+                write.meta["_trt_kv_alias"] = True
             else:
                 copyback.append((new_value, buffer_name, replacement.name))
                 # A clone of this buffer holds its old value past the point where
@@ -770,9 +774,10 @@ def lift_mutated_buffers(
         ):
             continue
         copy_node.meta["_trt_write_back"] = True
-        # The partitioner orders the copy_ only after the value it stores, so the
-        # other readers of the old contents read a copy taken before it.
-        if any(
+        # The partitioner orders the copy_ only after the value it stores, and forward
+        # writes a buffer stored from the cache after the graph, so the other readers
+        # of the old contents read a copy taken before it.
+        if cache in stored or any(
             _uses_data_of(user, cache)
             for user in set(cache.users) - {copy_node, write, new_value}
         ):
@@ -783,6 +788,7 @@ def lift_mutated_buffers(
             cache.replace_all_uses_with(
                 old, delete_user_cb=lambda user: user not in (copy_node, old)
             )
+            copyback = [(old if v is cache else v, b, n) for v, b, n in copyback]
 
     # Re-attach non-KV mutation new-values as graph outputs so they survive
     # compilation (otherwise, with the copy_ gone, they are dead and eliminated).

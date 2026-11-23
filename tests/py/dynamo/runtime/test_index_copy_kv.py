@@ -439,6 +439,81 @@ class TestCallerTensorsKeepWhatEagerDoes(_CudaGraphsOff):
         torch.testing.assert_close(out, M()(expected, x, pos))
         torch.testing.assert_close(given, expected)
 
+    def test_a_read_of_the_old_contents_of_a_cache_sees_them(self):
+        """A buffer stored from a caller's cache, and a clone or sum of a cache
+        buffer, read the contents from before the write, as in eager."""
+
+        class StoredFromCache(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("buf", torch.zeros(1, 4, 16, 8, device="cuda"))
+
+            def forward(self, cache, x, pos):
+                self.buf.copy_(cache)
+                cache.index_copy_(2, pos, x)
+                return cache.sum(2)
+
+        class ReadBeforeWrite(torch.nn.Module):
+            def __init__(self, read):
+                super().__init__()
+                self.read = read
+                self.register_buffer(
+                    "cache", torch.arange(512.0, device="cuda").reshape(1, 4, 16, 8)
+                )
+
+            def forward(self, x, pos):
+                old = self.read(self.cache)
+                self.cache.index_copy_(2, pos, x)
+                return old.sum() + self.cache.sum()
+
+        x = torch.full((1, 4, 1, 8), 1000.0, device="cuda")
+        make = lambda: torch.ones(1, 4, 16, 8, device="cuda")
+        eager, compiled = StoredFromCache(), _compile(
+            StoredFromCache(), (make(), x, torch.tensor([3]).cuda())
+        )
+        given, expected = make(), make()
+        for step in range(2):
+            pos = torch.tensor([step + 3]).cuda()
+            compiled(given, x, pos)
+            eager(expected, x, pos)
+            torch.testing.assert_close(given, expected)
+            torch.testing.assert_close(dict(compiled.named_buffers())["buf"], eager.buf)
+        for name, read in (("clone", torch.clone), ("sum", torch.sum)):
+            with self.subTest(read=name):
+                eager = ReadBeforeWrite(read)
+                compiled = _compile(
+                    ReadBeforeWrite(read), (x, torch.tensor([3]).cuda())
+                )
+                for step in range(2):
+                    pos = torch.tensor([step + 3]).cuda()
+                    out = compiled(x, pos)
+                    out = out[0] if isinstance(out, (tuple, list)) else out
+                    torch.testing.assert_close(out, eager(x, pos))
+
+    def test_a_buffer_write_wrapped_in_a_copy_is_done_in_place(self):
+        """The check looks through copy(cache, write) to the write, so the mark goes
+        on the write the converter reads."""
+
+        class CopyWrapped(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8, device="cuda"))
+
+            def forward(self, x, pos):
+                write = torch.index_copy(self.cache, 2, pos, x)
+                self.cache.copy_(torch.ops.aten.copy(self.cache, write))
+                return self.cache.sum(2)
+
+        x = torch.ones(1, 4, 1, 8, device="cuda")
+        eager = CopyWrapped()
+        compiled = _compile(CopyWrapped(), (x, torch.tensor([3]).cuda()))
+        self.assertEqual(len(_aliased_io(compiled)), 1)
+        for step in range(2):
+            pos = torch.tensor([step + 3]).cuda()
+            out = compiled(x * (step + 1), pos)
+            out = out[0] if isinstance(out, (tuple, list)) else out
+            torch.testing.assert_close(out, eager(x * (step + 1), pos))
+
     def test_a_write_back_copies_the_cache_only_for_readers_of_its_old_contents(self):
         """The copy is of the whole cache, so it is taken only when something reads
         the old contents: not for export's guards, nor for the copy a functional
