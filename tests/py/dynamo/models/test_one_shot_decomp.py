@@ -265,6 +265,31 @@ class TestPreExportPassDeclarations(unittest.TestCase):
         decomposed = maybe_run_decompositions(lowered, settings)
         torch.testing.assert_close(decomposed.module()(*inputs), _Interleave()(*inputs))
 
+    def test_warns_when_settings_need_a_graph_that_trace_already_decomposed(
+        self,
+    ) -> None:
+        inputs = (torch.randn(2, 4, 8), torch.randn(2, 4, 8))
+        settings = CompilationSettings(replace_interleave_stack_with_cat=True)
+        logger_name = "torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass"
+
+        # trace() with defaults decomposes aten.stack, so the rewrite finds nothing.
+        decomposed = trace(_Interleave(), inputs)
+        with self.assertLogs(logger_name, "WARNING") as logs:
+            pre_export_lowering(decomposed, settings)
+        self.assertIn("already decomposed", "\n".join(logs.output))
+
+        # No warning when trace() got the same settings, or the program is stock.
+        for program in (
+            trace(_Interleave(), inputs, replace_interleave_stack_with_cat=True),
+            torch.export.export(_Interleave(), inputs),
+        ):
+            with self.assertNoLogs(logger_name, "WARNING"):
+                pre_export_lowering(program, settings)
+
+        # Nor when the settings need nothing undecomposed.
+        with self.assertNoLogs(logger_name, "WARNING"):
+            pre_export_lowering(decomposed, CompilationSettings())
+
     def test_interleave_stack_decomposes_without_the_rewrite(self) -> None:
         exported_program = trace(_Interleave(), (torch.randn(2, 4, 8),) * 2)
         self.assertNotIn(torch.ops.aten.stack.default, _call_targets(exported_program))
