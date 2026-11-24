@@ -6,7 +6,7 @@
 ``nn.MultiheadAttention`` with ``need_weights=True``, its default, runs attention as
 ``bmm`` on (batch * heads, seq, head_dim) operands. It makes each operand from a
 (seq, batch, embed) tensor with a reshape to (seq, batch * heads, head_dim) and a
-transpose of the first two dims. For this form, TensorRT 11.3 and 11.4 and
+transpose of the first two dims. For this form, TensorRT 11.3 through 11.5 and
 TensorRT-RTX 1.7 can build a fused attention kernel that gives wrong float16 and
 bfloat16 results. Which attention is affected depends on the TensorRT build and on the
 shapes. For example, TensorRT 11.4 is wrong for the decoder cross-attention of
@@ -230,7 +230,7 @@ def _split_heads(
 
 
 def _has_the_attention_bug() -> bool:
-    """Whether the installed TensorRT is 11.3, 11.4 or TensorRT-RTX 1.7.
+    """Whether the installed TensorRT is 11.3 through 11.5 or TensorRT-RTX 1.7.
 
     These versions can build a fused kernel that gives wrong results for float16 and
     bfloat16 attention whose heads are split as the module docstring describes.
@@ -241,7 +241,7 @@ def _has_the_attention_bug() -> bool:
     """
     if trt._package_name == "tensorrt_rtx":
         return bool(trt.__version__.startswith("1.7."))
-    return bool(trt.__version__.startswith(("11.3.", "11.4.")))
+    return bool(trt.__version__.startswith(("11.3.", "11.4.", "11.5.")))
 
 
 def split_sequence_first_attention_heads(
@@ -257,7 +257,7 @@ def split_sequence_first_attention_heads(
     query and value are split the same way or are constants. Attention whose sequence is
     empty or has a length that depends on the data, such as one that a mask selects, and
     attention that torch_executed_ops or torch_executed_modules keep in PyTorch are left
-    as they are. With a TensorRT version other than 11.3, 11.4 and TensorRT-RTX 1.7 the
+    as they are. With a TensorRT version outside 11.3 through 11.5 and TensorRT-RTX 1.7 the
     pass does nothing.
     """
     if not _has_the_attention_bug():
