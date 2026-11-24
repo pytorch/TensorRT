@@ -5,10 +5,11 @@
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import torch.distributed as dist
+import torch.nn as nn
 
 
 class TestNativeCollectiveParent(unittest.TestCase):
@@ -103,6 +104,62 @@ class TestNativeCollectiveParent(unittest.TestCase):
                 _require_native_parent(object(), "2,3")
             with self.assertRaisesRegex(RuntimeError, "compiled for parent"):
                 _require_native_parent(object(), "0,1")
+
+    def test_rejected_mixed_parents_preserve_every_binding(self):
+        from torch_tensorrt.distributed._distributed import (
+            _state,
+            distributed_context,
+            set_distributed_mode,
+        )
+
+        for module_list in (False, True):
+            with self.subTest(module_list=module_list):
+                selected = SimpleNamespace(group_name="parent_2_3")
+                previous = object()
+                engines = [
+                    SimpleNamespace(
+                        requires_native_multidevice=True,
+                        native_collective_parent=parent,
+                        nccl_initialized=True,
+                        set_group_name=MagicMock(),
+                        release_nccl_comm=MagicMock(),
+                    )
+                    for parent in ("2,3", "0,1")
+                ]
+                modules = [nn.Module(), nn.Module()]
+                for module, engine in zip(modules, engines):
+                    module.engine = engine
+                requested = modules if module_list else nn.ModuleList(modules)
+                with (
+                    patch.object(dist, "is_available", return_value=True),
+                    patch.object(dist, "is_initialized", return_value=True),
+                    patch.object(dist, "get_rank", return_value=2),
+                    patch.object(dist, "get_process_group_ranks", return_value=[2, 3]),
+                    patch.object(_state, "pg", previous, create=True),
+                    patch.object(_state, "md_engines", engines, create=True),
+                ):
+                    for _ in range(2):
+                        with self.assertRaisesRegex(
+                            RuntimeError, "compiled for parent"
+                        ):
+                            with distributed_context(selected, requested):
+                                self.fail("Mixed parents must be rejected before entry")
+                        self.assertIs(_state.pg, previous)
+                        self.assertIs(_state.md_engines, engines)
+                        for engine in engines:
+                            engine.set_group_name.assert_not_called()
+                            engine.release_nccl_comm.assert_not_called()
+                    with self.assertRaisesRegex(RuntimeError, "compiled for parent"):
+                        set_distributed_mode(selected, nn.ModuleList(modules))
+                    for engine in engines:
+                        engine.set_group_name.assert_not_called()
+                    engines[1].native_collective_parent = "2,3"
+                    set_distributed_mode(selected, nn.ModuleList(modules))
+                    for engine in engines:
+                        engine.set_group_name.assert_called_once_with(
+                            selected.group_name
+                        )
+                        engine.release_nccl_comm.assert_not_called()
 
     def test_nonmember_rejected_without_querying_handle(self):
         from torch_tensorrt.distributed._distributed import _require_native_parent

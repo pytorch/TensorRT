@@ -211,8 +211,8 @@ def distributed_context(
 
     entered = False
     try:
-        for mod in modules:
-            set_distributed_mode(group, mod)
+        if modules:
+            _set_distributed_mode(group, modules)
         entered = True
         if single:
             yield modules[0]
@@ -246,6 +246,11 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
         group:  The ``ProcessGroup`` to bind for NCCL collectives.
         module: Compiled or loaded module whose TRT engines should use *group*.
     """
+    _set_distributed_mode(group, [module])
+
+
+def _set_distributed_mode(group: Any, modules: Sequence[nn.Module]) -> None:
+    """Validate all requested parents before changing any engine binding."""
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
     group_name = str(group.group_name) if hasattr(group, "group_name") else ""
@@ -254,35 +259,38 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
         return
 
     seen: set[int] = set()
-
-    def pin_engine(engine: Any) -> None:
-        _require_native_parent(group, getattr(engine, "native_collective_parent", ""))
-        if hasattr(engine, "set_group_name"):
-            engine.set_group_name(group_name)
+    engines: List[Any] = []
 
     # Walk the module tree for direct submodules and inlined engines.
-    for submod in module.modules():
-        if isinstance(submod, TorchTensorRTModule):
-            engine = getattr(submod, "engine", None)
-            if engine is not None and id(engine) not in seen:
-                seen.add(id(engine))
-                if engine.requires_native_multidevice:
-                    pin_engine(engine)
-            continue
+    for module in modules:
+        for submod in module.modules():
+            if isinstance(submod, TorchTensorRTModule):
+                engine = getattr(submod, "engine", None)
+                if engine is not None and id(engine) not in seen:
+                    seen.add(id(engine))
+                    if engine.requires_native_multidevice:
+                        engines.append(engine)
+                continue
 
-        for attr_val in vars(submod).values():
-            if (
-                id(attr_val) not in seen
-                and hasattr(attr_val, "requires_native_multidevice")
-                and hasattr(attr_val, "set_group_name")
-                and attr_val.requires_native_multidevice
-            ):
-                seen.add(id(attr_val))
-                pin_engine(attr_val)
+            for attr_val in vars(submod).values():
+                if (
+                    id(attr_val) not in seen
+                    and hasattr(attr_val, "requires_native_multidevice")
+                    and hasattr(attr_val, "set_group_name")
+                    and attr_val.requires_native_multidevice
+                ):
+                    seen.add(id(attr_val))
+                    engines.append(attr_val)
 
     # Also pin on any engines in the thread-local registry (handles torch.compile).
     for engine in getattr(_state, "md_engines", None) or []:
         if id(engine) not in seen:
             seen.add(id(engine))
             if getattr(engine, "requires_native_multidevice", False):
-                pin_engine(engine)
+                engines.append(engine)
+
+    for engine in engines:
+        _require_native_parent(group, getattr(engine, "native_collective_parent", ""))
+    for engine in engines:
+        if hasattr(engine, "set_group_name"):
+            engine.set_group_name(group_name)
