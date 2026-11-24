@@ -225,7 +225,6 @@ class TestEngineConverterBindingNames(TestCase):
             arg_inputs=inputs,
             require_full_compilation=True,
             min_block_size=1,
-            use_python_runtime=False,
             immutable_weights=True,
         )
         engine = self._deserialize(engine_bytes)
@@ -243,7 +242,6 @@ class TestEngineConverterBindingNames(TestCase):
             output_binding_names=("relu_out", "tanh_out"),
             require_full_compilation=True,
             min_block_size=1,
-            use_python_runtime=False,
             immutable_weights=True,
         )
         engine = self._deserialize(engine_bytes)
@@ -275,7 +273,6 @@ class TestEngineConverterBindingNames(TestCase):
             kwarg_input_binding_names={"image": "img_in", "positions": "pos_in"},
             require_full_compilation=True,
             min_block_size=1,
-            use_python_runtime=False,
             immutable_weights=True,
         )
         engine = self._deserialize(engine_bytes)
@@ -307,7 +304,6 @@ class TestEngineConverterBindingNames(TestCase):
                 output_binding_names=("only_one",),
                 require_full_compilation=True,
                 min_block_size=1,
-                use_python_runtime=False,
                 immutable_weights=True,
             )
 
@@ -321,7 +317,6 @@ class TestEngineConverterBindingNames(TestCase):
                 output_binding_names=("same", "same"),
                 require_full_compilation=True,
                 min_block_size=1,
-                use_python_runtime=False,
                 immutable_weights=True,
             )
 
@@ -336,7 +331,6 @@ class TestEngineConverterBindingNames(TestCase):
                 output_binding_names=("shared_name", "tanh_out"),
                 require_full_compilation=True,
                 min_block_size=1,
-                use_python_runtime=False,
                 immutable_weights=True,
             )
 
@@ -354,7 +348,6 @@ class TestEngineConverterBindingNames(TestCase):
             output_binding_names={"primary": "p_out", "secondary": "s_out"},
             require_full_compilation=True,
             min_block_size=1,
-            use_python_runtime=False,
             immutable_weights=True,
         )
         engine = self._deserialize(engine_bytes)

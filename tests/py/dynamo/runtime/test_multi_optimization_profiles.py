@@ -59,7 +59,6 @@ def _compile_mlp_single_profile(model, **kwargs):
         ep,
         arg_inputs=[example],
         min_block_size=1,
-        enabled_precisions={torch.float16},
         **kwargs,
     )
 
@@ -76,7 +75,6 @@ def _compile_mlp(model, **kwargs):
         ep,
         arg_inputs=[inp],
         min_block_size=1,
-        enabled_precisions={torch.float16},
         **kwargs,
     )
 
@@ -449,7 +447,6 @@ class TestMultiProfileSharedDims(TestCase):
             ep,
             arg_inputs=[a, b],
             min_block_size=1,
-            enabled_precisions={torch.float32},
         )
         for e in self._trt_engines(trt_gm):
             self.assertEqual(e.num_optimization_profiles, 2)

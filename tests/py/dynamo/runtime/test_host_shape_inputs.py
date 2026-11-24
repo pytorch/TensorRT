@@ -31,7 +31,6 @@ class TestHostShapeInput(TestCase):
             ep,
             inputs=[x, n],
             min_block_size=1,
-            use_python_runtime=False,
             pass_through_build_failures=True,
             assume_dynamic_shape_support=True,
         )

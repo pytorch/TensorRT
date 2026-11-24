@@ -180,7 +180,6 @@ class TestTuringCapabilityGuards(TestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_python_runtime=True,
             **kwargs,
         )
 
@@ -350,8 +349,8 @@ class TestTuringCapabilityGuards(TestCase):
 
     def test_declared_turing_target_falls_back_fp16_cdist_p2(self):
         # Unlike every other guard here, this one is not FP32-only: on a T4 the fused
-        # Matmul_MUL_SUB_SQRT_ pattern fails for FP16 operands too, under every
-        # enabled_precisions setting, even though a bare FP16 GEMM runs there fine.
+        # Matmul_MUL_SUB_SQRT_ pattern fails for FP16 operands too, even though a bare
+        # FP16 GEMM runs there fine.
         mod = Cdist(compute_mode=1)
         inputs = _cdist_inputs(6, 8, dtype=torch.half)
         compiled = self._compile(
@@ -588,7 +587,6 @@ class TestTuringNativeFallback(TestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_python_runtime=True,
             **kwargs,
         )
 
@@ -614,7 +612,6 @@ class TestTuringNativeFallback(TestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_python_runtime=True,
         )
         with torch.no_grad():
             out = compiled(a, b)
@@ -641,7 +638,6 @@ class TestTuringNativeFallback(TestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_python_runtime=True,
         )
         with torch.no_grad():
             out = compiled(x)
@@ -668,7 +664,6 @@ class TestTuringNativeFallback(TestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            use_python_runtime=True,
             decompose_attention=False,
         )
         with torch.no_grad():
@@ -706,7 +701,7 @@ class TestTuringNativeFallback(TestCase):
 
         mod = Add()
         inputs = (torch.randn(4, 8, dtype=torch.bfloat16).cuda(),)
-        compiled = self._compile(mod, inputs, enabled_precisions={torch.bfloat16})
+        compiled = self._compile(mod, inputs)
         self.assertEqual(_trt_submodule_count(compiled), 0)
         with torch.no_grad():
             out = compiled(*inputs)

@@ -43,7 +43,6 @@ Example ``test.py``:
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_python_runtime": True,
     }
 
     try:

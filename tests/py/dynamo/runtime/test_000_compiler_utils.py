@@ -162,9 +162,7 @@ class TestNoncontiguousArgInputs(unittest.TestCase):
         x = torch.randn(1, 4, 8, device="cuda").transpose(1, 2)
         self.assertFalse(x.is_contiguous())
         ep = torch.export.export(M(), (x,))
-        trt_mod = torch_tensorrt.dynamo.compile(
-            ep, arg_inputs=[x], min_block_size=1, use_python_runtime=True
-        )
+        trt_mod = torch_tensorrt.dynamo.compile(ep, arg_inputs=[x], min_block_size=1)
         with torch.no_grad():
             torch.testing.assert_close(trt_mod(x), M().cuda()(x), rtol=1e-2, atol=1e-2)
 
@@ -180,7 +178,6 @@ class TestNoncontiguousArgInputs(unittest.TestCase):
             ir="dynamo",
             arg_inputs=[x],
             min_block_size=1,
-            use_python_runtime=True,
         )
         with torch.no_grad():
             torch.testing.assert_close(trt_mod(x), M().cuda()(x), rtol=1e-2, atol=1e-2)

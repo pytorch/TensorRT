@@ -71,7 +71,8 @@ Compile
 Export once over the union range, then compile as usual. Every input that
 declares ``profiles`` must declare the **same number** of profiles; static
 inputs (or dynamic inputs without ``profiles``) reuse their single shape in every
-profile.
+profile. Set the model and input dtypes before export; Dynamo compilation preserves
+those dtypes through strong typing.
 
 .. code-block:: python
 
@@ -81,7 +82,6 @@ profile.
     trt_model = torch_tensorrt.dynamo.compile(
         exported,
         arg_inputs=[profiled_input],
-        enabled_precisions={torch.float16},
         min_block_size=1,
     )
 

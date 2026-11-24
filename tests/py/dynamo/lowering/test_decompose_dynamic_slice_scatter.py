@@ -35,7 +35,6 @@ class TestDecomposeDynamicSliceScatter(TestCase):
             ep,
             ir="dynamo",
             inputs=list(sample_inputs),
-            enabled_precisions={torch.float32},
             min_block_size=1,
             require_full_compilation=require_full_compilation,
         )
@@ -155,7 +154,6 @@ class TestStaticPathPreserved(TestCase):
             ep,
             ir="dynamo",
             inputs=[cache, src],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         out = compiled(cache.clone(), src)

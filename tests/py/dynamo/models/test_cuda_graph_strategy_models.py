@@ -62,8 +62,6 @@ class TestCudaGraphStrategyModels(TestCase):
             model,
             ir="dynamo",
             inputs=inputs,
-            enabled_precisions={torch.float32},
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(
@@ -96,8 +94,6 @@ class TestCudaGraphStrategyModels(TestCase):
             model,
             ir="dynamo",
             inputs=inputs,
-            enabled_precisions={torch.float32},
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(
@@ -136,8 +132,6 @@ class TestCudaGraphStrategyDynamic(TestCase):
             model,
             ir="dynamo",
             inputs=inputs,
-            enabled_precisions={torch.float32},
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(
@@ -172,8 +166,6 @@ class TestCudaGraphStrategyDynamic(TestCase):
             model,
             ir="dynamo",
             inputs=inputs,
-            enabled_precisions={torch.float32},
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(

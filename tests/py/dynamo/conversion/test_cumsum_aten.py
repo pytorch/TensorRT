@@ -160,7 +160,6 @@ class TestCumsumConverter(DispatchTestCase):
             torch.export.export(module, (values,)),
             inputs=[values],
             min_block_size=1,
-            enabled_precisions={torch.float32},
             truncate_double=True,
         )
         self.assertTrue(
@@ -197,7 +196,6 @@ class TestCumsumConverter(DispatchTestCase):
             torch.export.export(module, (values,)),
             inputs=[values],
             min_block_size=1,
-            enabled_precisions={torch.float32},
             truncate_double=True,
         )
         result = compiled(values)

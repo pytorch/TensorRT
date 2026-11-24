@@ -119,9 +119,7 @@ class TestHFStaticCacheCurrentLimitations(unittest.TestCase):
                 ep,
                 ir="dynamo",
                 inputs=[input_ids, cache_position],
-                enabled_precisions={torch.float32},
                 min_block_size=1,
-                use_python_runtime=False,
             )
         # The torch internal raises an AssertionError with a specific
         # message. Match loosely so the test isn't brittle to phrasing

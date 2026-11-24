@@ -36,9 +36,7 @@ def _compile_and_roundtrip(model, args):
         ep,
         ir="dynamo",
         inputs=list(args),
-        enabled_precisions={torch.float32},
         min_block_size=1,
-        use_python_runtime=False,
     )
     with tempfile.NamedTemporaryFile(suffix=".ep", delete=False) as f:
         path = f.name
