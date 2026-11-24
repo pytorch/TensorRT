@@ -8,10 +8,11 @@ The active process group controls which NCCL communicator TRT engines use.
 For the common case (default world group) no setup is needed — engines pick it
 up automatically after dist.init_process_group().
 
-Native TRT collective converters emit global rank IDs, so their engines must
-bind WORLD. Individual collective operations can still select TP/CP subgroups.
-Use distributed_context(dist.group.WORLD, model) for loaded native engines.
-Python checks the group identity before passing its actual registry name to C++.
+Native engines compiled with WORLD use global rank IDs. Compiling inside
+distributed_context(subgroup) translates each collective into that parent's
+rank space. Run loaded engines with the same ordered parent membership; changing
+the parent mapping requires recompilation. Python validates membership before
+passing the actual registry name to C++; no registry alias is needed.
 """
 
 import threading
@@ -37,6 +38,51 @@ def _require_world_group(group: Any) -> None:
             "Native TRT engines use global rank IDs and require the WORLD communicator. "
             "Use distributed_context(dist.group.WORLD, model); select subgroups on "
             "the collective operations, not as the engine's parent communicator."
+        )
+
+
+def _active_native_parent() -> str:
+    """Snapshot the active parent; empty string denotes WORLD (also for AOT)."""
+    group = get_active_group()
+    if group is None:
+        return ""
+    if not dist.is_available() or not dist.is_initialized():
+        raise RuntimeError(
+            "Initialize torch.distributed before compiling with a subgroup"
+        )
+    if group is dist.group.WORLD:
+        return ""
+    if group == dist.GroupMember.NON_GROUP_MEMBER:
+        raise RuntimeError(
+            "This rank is not a member of the requested parent communicator"
+        )
+    ranks = dist.get_process_group_ranks(group)
+    if dist.get_rank() not in ranks:
+        raise RuntimeError(
+            "This rank is not a member of the requested parent communicator"
+        )
+    return ",".join(str(rank) for rank in ranks)
+
+
+def _require_native_parent(group: Any, parent: str = "") -> None:
+    """Check the saved parent mapping before warm-up, binding, or re-pinning."""
+    if not parent:
+        _require_world_group(group)
+        return
+    if not dist.is_available() or not dist.is_initialized():
+        raise RuntimeError(
+            "Initialize torch.distributed before binding a native TRT engine"
+        )
+    if group is None or group == dist.GroupMember.NON_GROUP_MEMBER:
+        raise RuntimeError(
+            "This rank is not a member of the requested parent communicator"
+        )
+    ranks = dist.get_process_group_ranks(group)
+    actual = ",".join(str(rank) for rank in ranks)
+    if actual != parent or dist.get_rank() not in ranks:
+        raise RuntimeError(
+            f"Native TRT engine was compiled for parent [{parent}], but selected "
+            f"parent has ranks {ranks}. Recompile to change the parent mapping."
         )
 
 
@@ -89,11 +135,19 @@ def distributed_context(
     """Context manager: run TRT engines using *group* for NCCL.
 
     Sets the active process group for the duration of the ``with`` block.
-    Native TRT engines require ``dist.group.WORLD`` because their collective
-    rank arrays use global IDs. Select TP/CP subgroups on the model's collective
-    operations. For loaded C++ engines, pass the loaded module to this context
-    before inference to validate and configure its group. Newly compiled modules
-    do this during engine setup; C++ does not auto-select a group.
+    Native TRT engines use rank IDs relative to the parent selected during
+    compilation. Run with WORLD for WORLD-built engines, or the same ordered
+    subgroup membership for subgroup-built engines. Every collective in an
+    engine must be contained in its parent; use WORLD for overlapping TP/CP
+    groups that do not fit inside one subgroup. Changing parents requires
+    recompilation. Saved engines preserve this contract. Subgroup-parent builds
+    currently require ``cache_built_engines=False`` and ``reuse_cached_engines=False``.
+
+    For example, create ``tp_group = dist.new_group([2, 3])`` on every rank,
+    then compile and execute on its members inside ``distributed_context(tp_group)``.
+    Model collectives naming that group use parent-local IDs ``[0, 1]``. On load,
+    enter ``distributed_context(tp_group, loaded_model)`` before inference.
+    C++ requires this explicit setup and does not auto-select a group.
 
     When *module* is supplied the group is also pre-pinned on all TRT engines
     in the module via :func:`set_distributed_mode`, and the configured module
@@ -157,8 +211,8 @@ def distributed_context(
 
     entered = False
     try:
-        for mod in modules:
-            set_distributed_mode(group, mod)
+        if modules:
+            _set_distributed_mode(group, modules)
         entered = True
         if single:
             yield modules[0]
@@ -192,6 +246,11 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
         group:  The ``ProcessGroup`` to bind for NCCL collectives.
         module: Compiled or loaded module whose TRT engines should use *group*.
     """
+    _set_distributed_mode(group, [module])
+
+
+def _set_distributed_mode(group: Any, modules: Sequence[nn.Module]) -> None:
+    """Validate all requested parents before changing any engine binding."""
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
     group_name = str(group.group_name) if hasattr(group, "group_name") else ""
@@ -200,37 +259,38 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
         return
 
     seen: set[int] = set()
-
-    def pin_engine(engine: Any) -> None:
-        _require_world_group(group)
-        # The Python runtime reads WORLD from the active/default context and
-        # needs no persistent group-name update. C++ engines keep a registry name.
-        if hasattr(engine, "set_group_name"):
-            engine.set_group_name(group_name)
+    engines: List[Any] = []
 
     # Walk the module tree for direct submodules and inlined engines.
-    for submod in module.modules():
-        if isinstance(submod, TorchTensorRTModule):
-            engine = getattr(submod, "engine", None)
-            if engine is not None and id(engine) not in seen:
-                seen.add(id(engine))
-                if engine.requires_native_multidevice:
-                    pin_engine(engine)
-            continue
+    for module in modules:
+        for submod in module.modules():
+            if isinstance(submod, TorchTensorRTModule):
+                engine = getattr(submod, "engine", None)
+                if engine is not None and id(engine) not in seen:
+                    seen.add(id(engine))
+                    if engine.requires_native_multidevice:
+                        engines.append(engine)
+                continue
 
-        for attr_val in vars(submod).values():
-            if (
-                id(attr_val) not in seen
-                and hasattr(attr_val, "requires_native_multidevice")
-                and hasattr(attr_val, "set_group_name")
-                and attr_val.requires_native_multidevice
-            ):
-                seen.add(id(attr_val))
-                pin_engine(attr_val)
+            for attr_val in vars(submod).values():
+                if (
+                    id(attr_val) not in seen
+                    and hasattr(attr_val, "requires_native_multidevice")
+                    and hasattr(attr_val, "set_group_name")
+                    and attr_val.requires_native_multidevice
+                ):
+                    seen.add(id(attr_val))
+                    engines.append(attr_val)
 
     # Also pin on any engines in the thread-local registry (handles torch.compile).
     for engine in getattr(_state, "md_engines", None) or []:
         if id(engine) not in seen:
             seen.add(id(engine))
             if getattr(engine, "requires_native_multidevice", False):
-                pin_engine(engine)
+                engines.append(engine)
+
+    for engine in engines:
+        _require_native_parent(group, getattr(engine, "native_collective_parent", ""))
+    for engine in engines:
+        if hasattr(engine, "set_group_name"):
+            engine.set_group_name(group_name)

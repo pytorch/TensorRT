@@ -315,8 +315,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   if (compiled_engine->requires_native_multidevice && !compiled_engine->nccl_initialized) {
     TORCHTRT_CHECK(
         compiled_engine->bind_nccl_comm(),
-        "Native TRT engine has no initialized WORLD communicator. Use "
-        "distributed_context(dist.group.WORLD, model) and initialize its NCCL communicator before inference.");
+        "Native TRT engine has no initialized parent communicator. Use "
+        "distributed_context(parent, model) with its compile-time parent before inference.");
   }
 #endif
 

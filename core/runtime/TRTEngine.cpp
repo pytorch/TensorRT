@@ -162,6 +162,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
   // expected backend was exercised.
   LOG_INFO("[torch-TensorRT C++ runtime] TRTEngine constructed from serialized info");
   this->requires_native_multidevice = std::stoi(serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]);
+  this->native_collective_parent = serialized_info[NATIVE_COLLECTIVE_PARENT_IDX];
   if (this->requires_native_multidevice) {
     LOG_INFO("Loaded distributed TRT engine (contains NCCL collectives); NCCL comm will be bound on first execution");
   }
@@ -612,7 +613,8 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]),
       std::tuple("resource_allocation_strategy", serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]),
       std::tuple("requires_native_multidevice", serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX]),
-      std::tuple("aliased_io", serialized_info[ALIASED_IO_IDX]));
+      std::tuple("aliased_io", serialized_info[ALIASED_IO_IDX]),
+      std::tuple("native_collective_parent", serialized_info[NATIVE_COLLECTIVE_PARENT_IDX]));
 }
 
 std::vector<std::string> TRTEngine::serialize_metadata_only() {
@@ -639,6 +641,7 @@ std::vector<std::string> TRTEngine::serialize_metadata_only() {
       this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
   serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX] = this->requires_native_multidevice ? "1" : "0";
   serialized_info[ALIASED_IO_IDX] = serialize_aliased_io(this->aliased_io);
+  serialized_info[NATIVE_COLLECTIVE_PARENT_IDX] = this->native_collective_parent;
 
   return serialized_info;
 }
@@ -862,7 +865,7 @@ bool TRTEngine::bind_nccl_comm() {
   TORCHTRT_CHECK(
       !requires_native_multidevice || !group_name.empty(),
       "Native TRT engine has no process group configured. Use "
-      "distributed_context(dist.group.WORLD, model) before inference.");
+      "distributed_context(parent, model) with the compile-time parent before inference.");
 
   // Soft-return when the process group isn't available yet (e.g. at engine
   // construction time when the caller hasn't called dist.init_process_group()).

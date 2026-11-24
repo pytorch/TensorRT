@@ -668,7 +668,12 @@ class TestNativeCollectiveWorldContract(unittest.TestCase):
 
         world = _FakeGroup("world")
         subgroup = _FakeGroup("tp_2_3")
-        engine = MagicMock(is_distributed=True, requires_native_multidevice=True)
+        engine = MagicMock(
+            is_distributed=True,
+            requires_native_multidevice=True,
+            native_collective_parent="",
+            group_name="",
+        )
         with (
             patch.object(dist, "is_available", return_value=True),
             patch.object(dist, "is_initialized", return_value=True),
@@ -967,6 +972,7 @@ class TestNativeCollectiveNumRanks(unittest.TestCase):
         layer = self._RecordingLayer()
         ctx = mock.MagicMock()
         ctx.net.add_dist_collective.return_value = layer
+        ctx.native_collective_parent = None
 
         converter = getattr(nccl_ops, converter_name)
         # The converters are wrapped in @needs_native_collectives, which raises unless the
@@ -3073,6 +3079,119 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     """
 
     world_size = 4
+
+    def _compile_subgroup_parent(self):
+        import torch_tensorrt
+        from torch_tensorrt.distributed import distributed_context
+        from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+        if not torch_tensorrt.ENABLED_FEATURES.native_trt_collectives:
+            self.skipTest("Requires native TRT collectives")
+        device = self._init_dist()
+        setup_nccl_for_torch_tensorrt()
+        parents = [dist.new_group(ranks=ranks) for ranks in ([0, 1], [2, 3])]
+        parent = parents[self.rank // 2]
+        ranks = dist.get_process_group_ranks(parent)
+        # C++ needs the communicator materialized before its first lazy bind.
+        dist.all_reduce(torch.zeros(1, device=device), group=parent)
+
+        class GatherAndReduce(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                gathered = torch.ops._c10d_functional.all_gather_into_tensor.default(
+                    x, 2, parent.group_name
+                )
+                gathered = torch.ops._c10d_functional.wait_tensor.default(gathered)
+                reduced = torch.ops._c10d_functional.all_reduce.default(
+                    gathered, "sum", parent.group_name
+                )
+                return torch.ops._c10d_functional.wait_tensor.default(reduced)
+
+        inp = torch.full((2, 4), float(self.rank + 1), device=device)
+        expected = torch.cat([torch.full_like(inp, float(r + 1) * 2) for r in ranks])
+        with distributed_context(parent):
+            compiled = torch_tensorrt.dynamo.compile(
+                torch.export.export(GatherAndReduce().to(device), (inp,)),
+                inputs=[inp],
+                min_block_size=1,
+                require_full_compilation=True,
+                use_distributed_mode_trace=True,
+            )
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        self.assertIsInstance(compiled, TorchTensorRTModule)
+        self.assertEqual(compiled.native_collective_parent, ",".join(map(str, ranks)))
+        return parent, inp, expected, compiled
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @unittest.skipUnless(_cpp_runtime_available(), "Requires the C++ TRT runtime")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_subgroup_parent_roundtrip(self) -> None:
+        """C++ subgroup engines retain their parent through exported save/load."""
+        import tempfile
+
+        import torch_tensorrt
+        from torch_tensorrt.distributed import distributed_context
+
+        parent, inp, expected, compiled = self._compile_subgroup_parent()
+        with tempfile.TemporaryDirectory() as tmp:
+            with distributed_context(parent, compiled):
+                _check_close(compiled(inp), expected, "subgroup parent")
+                # Full compilation returns a TorchTensorRTModule. save() accepts
+                # an FX GraphModule, so preserve a single call to that engine.
+                graph = torch.fx.Graph()
+                x = graph.placeholder("x")
+                graph.output(graph.call_module("engine", (x,)))
+                wrapped = torch.fx.GraphModule({"engine": compiled}, graph)
+                path = f"{tmp}/rank{self.rank}.pt2"
+                torch_tensorrt.save(wrapped, path, arg_inputs=[inp])
+                loaded = torch_tensorrt.load(path).module()
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "compiled for parent"):
+                    with distributed_context(dist.group.WORLD, loaded):
+                        self.fail("A loaded subgroup engine must reject WORLD")
+            with distributed_context(parent, loaded):
+                _check_close(loaded(inp), expected, "loaded subgroup parent")
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_python_subgroup_parent_roundtrip(self) -> None:
+        """Exercise the Python engine directly, including pickle and rebinding.
+
+        The C++ execute_engine operator may already be registered in this process;
+        changing feature flags cannot replace its schema with the Python schema.
+        """
+        import pickle
+
+        from torch_tensorrt.distributed import distributed_context
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        parent, inp, expected, compiled = self._compile_subgroup_parent()
+        engine = TRTEngine(compiled._pack_engine_info())
+        restored = None
+        try:
+            with distributed_context(parent):
+                _check_close(engine.execute([inp]), expected, "Python subgroup parent")
+                restored = pickle.loads(pickle.dumps(engine))
+            self.assertEqual(
+                restored.native_collective_parent, engine.native_collective_parent
+            )
+            self.assertFalse(restored.nccl_initialized)
+            holder = nn.Module()
+            holder.engine = restored
+            for _ in range(2):
+                with self.assertRaisesRegex(RuntimeError, "compiled for parent"):
+                    with distributed_context(dist.group.WORLD, holder):
+                        self.fail("A restored Python engine must reject WORLD")
+            with distributed_context(parent, holder):
+                _check_close(
+                    restored.execute([inp]), expected, "restored Python subgroup"
+                )
+        finally:
+            if restored is not None:
+                restored.close()
+            engine.close()
 
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
