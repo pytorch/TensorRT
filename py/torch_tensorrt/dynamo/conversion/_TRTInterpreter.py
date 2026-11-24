@@ -18,6 +18,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -55,8 +56,6 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -85,6 +84,9 @@ class TRTInterpreterResult(NamedTuple):
     aliased_io: dict[str, tuple[str, str]] = {}
     # Explicit count: a user return may itself be an aliased output.
     num_user_outputs: Optional[int] = None
+    # Set when the build already produced bytes (RTX / version-compatible path),
+    # so they need not be re-serialized from ``engine``.
+    serialized_engine: Optional[bytes] = None
 
 
 def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
@@ -585,6 +587,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
+        engine_bytes: Optional[bytes] = None
         if (
             ENABLED_FEATURES.tensorrt_rtx
             or self.compilation_settings.version_compatible
@@ -597,6 +600,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 raise RuntimeError(
                     "TensorRT build_serialized_network returned None; engine build failed."
                 )
+            engine_bytes = bytes(serialized_engine)
             runtime = trt.Runtime(TRT_LOGGER)
             cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
@@ -641,6 +645,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice,
             engine_aliased_io,
             self._num_user_outputs,
+            engine_bytes,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:

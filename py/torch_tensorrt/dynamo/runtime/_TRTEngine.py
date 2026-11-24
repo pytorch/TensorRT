@@ -39,6 +39,7 @@ from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.runtime._engine_handle import EngineHandle
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ABI_TARGET_IDX,
     ALIASED_IO_IDX,
@@ -251,8 +252,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         serialized_info: SerializedTensorRTEngineFmt,
         *,
         profile_execution: bool = False,
-        cuda_engine: Optional[Any] = None,
     ) -> None:
+        """``serialized_info[ENGINE_IDX]`` may hold bytes or an :class:`EngineHandle`.
+
+        Passing a handle that already wraps a live engine skips deserialization.
+        """
         self._profile_execution = profile_execution
         self.profile_path_prefix = tempfile.gettempdir()
         self.use_pre_allocated_outputs = False
@@ -310,12 +314,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._active_profile_index = 0
         self._auto_select_profiles = False
 
-        self._load_serialized_info(
-            serialized_info, allow_empty_engine=cuda_engine is not None
-        )
-        self._setup_engine(live_cuda_engine=cuda_engine)
+        self._load_serialized_info(serialized_info)
+        self._setup_engine()
 
     # --- public property forwards ---
+
+    @property
+    def serialized_info(self) -> SerializedTensorRTEngineFmt:
+        """Wire-format engine info. Serializes a live engine on first access."""
+        info = list(self._serialized_info)
+        info[ENGINE_IDX] = self._engine_handle.serialized()
+        return info
+
+    @property
+    def serialized_engine(self) -> bytes:
+        return self._engine_handle.serialized()
 
     @property
     def runtime_settings(self) -> RuntimeSettings:
@@ -382,15 +395,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         Outer tuple with a single element: the ``serialize()``-style list of string
         slots, with ``ENGINE_IDX`` base64-encoded (matches ``def_pickle`` getter).
         """
-        serialized_info = list(self.serialized_info)
-        engine_bytes = serialized_info[ENGINE_IDX]
-        live_engine = getattr(self, "cuda_engine", None)
-        if not engine_bytes and live_engine is not None:
-            engine_bytes = bytes(live_engine.serialize())
-            serialized_info[ENGINE_IDX] = engine_bytes
-            self.serialized_engine = engine_bytes
-            self.serialized_info[ENGINE_IDX] = engine_bytes
-        serialized_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+        serialized_info = self.serialized_info
+        serialized_info[ENGINE_IDX] = base64.b64encode(
+            serialized_info[ENGINE_IDX]
+        ).decode("utf-8")
         return (serialized_info, "TRTEngine")
 
     def __setstate__(self, state: Any) -> None:
@@ -450,46 +458,40 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return "real"
 
     def _load_serialized_info(
-        self,
-        serialized_info: SerializedTensorRTEngineFmt,
-        allow_empty_engine: bool = False,
+        self, serialized_info: SerializedTensorRTEngineFmt
     ) -> None:
         if len(serialized_info) != SERIALIZATION_LEN:
             raise RuntimeError(
                 f"Expected serialized info length {SERIALIZATION_LEN}, got {len(serialized_info)}"
             )
 
-        self.serialized_info: SerializedTensorRTEngineFmt = list(serialized_info)
-        self.version = str(self.serialized_info[ABI_TARGET_IDX])
-        self.name = str(self.serialized_info[NAME_IDX]).replace(".", "_")
-        self.serialized_device_info = str(self.serialized_info[DEVICE_IDX])
-        self.serialized_engine = self.serialized_info[ENGINE_IDX]
-        if allow_empty_engine and not self.serialized_engine:
-            self.serialized_engine = b""
-        elif not isinstance(self.serialized_engine, (bytes, bytearray)):
-            raise TypeError("Expected serialized engine as bytes")
+        info = list(serialized_info)
+        # The engine lives only in the handle; the stored list keeps the other
+        # slots, and ``serialized_info`` re-inserts the bytes on demand.
+        self._engine_handle = EngineHandle.coerce(info[ENGINE_IDX])
+        info[ENGINE_IDX] = b""
+        self._serialized_info: SerializedTensorRTEngineFmt = info
+        self.version = str(info[ABI_TARGET_IDX])
+        self.name = str(info[NAME_IDX]).replace(".", "_")
+        self.serialized_device_info = str(info[DEVICE_IDX])
 
         self.in_binding_names = deserialize_binding_names(
-            str(self.serialized_info[INPUT_BINDING_NAMES_IDX])
+            str(info[INPUT_BINDING_NAMES_IDX])
         )
         self.out_binding_names = deserialize_binding_names(
-            str(self.serialized_info[OUTPUT_BINDING_NAMES_IDX])
+            str(info[OUTPUT_BINDING_NAMES_IDX])
         )
-        self.hardware_compatible = bool(int(self.serialized_info[HW_COMPATIBLE_IDX]))
-        self.serialized_metadata = str(self.serialized_info[SERIALIZED_METADATA_IDX])
+        self.hardware_compatible = bool(int(info[HW_COMPATIBLE_IDX]))
+        self.serialized_metadata = str(info[SERIALIZED_METADATA_IDX])
         self.serialized_target_platform = Platform._normalize_serialized_platform(
-            str(self.serialized_info[TARGET_PLATFORM_IDX])
+            str(info[TARGET_PLATFORM_IDX])
         )
-        self.requires_output_allocator = bool(
-            int(self.serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])
-        )
-        self.resource_allocation_strategy = int(
-            self.serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]
-        )
+        self.requires_output_allocator = bool(int(info[REQUIRES_OUTPUT_ALLOCATOR_IDX]))
+        self.resource_allocation_strategy = int(info[RESOURCE_ALLOCATION_STRATEGY_IDX])
         # Mirrors the C++ TRTEngine::requires_native_multidevice field; consumed
         # by TorchTensorRTModule.setup_engine() and the distributed helpers.
         self.requires_native_multidevice = bool(
-            int(self.serialized_info[REQUIRES_NATIVE_MULTIDEVICE_IDX])
+            int(info[REQUIRES_NATIVE_MULTIDEVICE_IDX])
         )
         # Internal alias used by the NCCL setup paths (matches the original
         # _PythonTorchTensorRTModule attribute name).
@@ -503,7 +505,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         )
 
         self.aliased_io: Dict[str, Tuple[str, str]] = deserialize_aliased_io(
-            str(self.serialized_info[ALIASED_IO_IDX])
+            str(info[ALIASED_IO_IDX])
         )
         # Input binding names that are the alias source of some output, so the
         # per-call input-setup loop can test membership in O(1).
@@ -563,7 +565,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         """
         return self._num_execution_contexts_created
 
-    def _setup_engine(self, live_cuda_engine: Optional[Any] = None) -> None:
+    def _setup_engine(self) -> None:
         multi_gpu_device_check()
         if self.serialized_target_platform == str(Platform.UNKNOWN):
             raise RuntimeError(
@@ -579,14 +581,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             )
 
         self.runtime = trt.Runtime(TRT_LOGGER)
-        if live_cuda_engine is not None:
-            self.cuda_engine = live_cuda_engine
-        else:
-            self.cuda_engine = self.runtime.deserialize_cuda_engine(
-                self.serialized_engine
-            )
-            if self.cuda_engine is None:
-                raise RuntimeError("Unable to deserialize the TensorRT engine")
+        self.cuda_engine = self._engine_handle.cuda_engine(self.runtime)
 
         if self.cuda_engine.streamable_weights_size > 0:
             budget_bytes = self.cuda_engine.get_weight_streaming_automatic_budget()
