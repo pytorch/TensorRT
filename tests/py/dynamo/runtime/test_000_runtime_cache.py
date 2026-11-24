@@ -5,10 +5,14 @@ import gc
 import io
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -17,10 +21,13 @@ from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from torch_tensorrt.runtime import (
+    RuntimeCache,
     RuntimeSettings,
     apply_runtime_settings,
     runtime_cache,
 )
+
+pytestmark = [pytest.mark.trt_rtx_only]
 
 
 class SimpleModel(torch.nn.Module):
@@ -61,6 +68,31 @@ def _compile(model, inputs, *, runtime_cache_path=None):
             compiled, RuntimeSettings(runtime_cache=runtime_cache_path)
         )
     return compiled
+
+
+def _check_cache_in_child(path, payload):
+    state = torch.load(payload, weights_only=True)
+    model = ConvModel().eval().cuda()
+    model.load_state_dict(state["state"])
+    inputs = [state["input"].cuda()]
+    compiled = _compile(model, inputs)
+    expected_size = Path(path).stat().st_size
+    loaded_sizes = []
+    load_from_stream = RuntimeCache.load_from_stream
+
+    def record_load(cache, stream):
+        size = load_from_stream(cache, stream)
+        loaded_sizes.append(size)
+        return size
+
+    with torch.no_grad(), patch.object(RuntimeCache, "load_from_stream", record_load):
+        with runtime_cache(compiled, path) as cache:
+            assert loaded_sizes == [expected_size], "The cache did not load."
+            torch.testing.assert_close(
+                compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+            )
+            assert cache.has_cache(), "The engine did not attach the cache."
+            assert cache.save_to_stream(io.BytesIO()) > 0, "The cache has no data."
 
 
 def _compile_simple(runtime_cache_path=None):
@@ -161,17 +193,63 @@ class TestRuntimeCachePersistence(TestCase):
     """End-to-end: compile with a cache path, infer, destroy, reload, infer again."""
 
     def test_cache_saved_on_del(self):
+        self.addCleanup(torch._dynamo.reset)
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "rc.bin")
             model, inputs = _fresh_conv_model_and_inputs(seed=42)
             compiled = _compile(model, inputs, runtime_cache_path=path)
-            _ = compiled(*inputs)
+            with torch.no_grad():
+                compiled(*inputs)
+            self.assertFalse(os.path.exists(path))
+            del compiled
+            gc.collect()
+            self.assertTrue(os.path.isfile(path))
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_cache_loaded_in_fresh_process(self):
+        self.addCleanup(torch._dynamo.reset)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            model, inputs = _fresh_conv_model_and_inputs(seed=42)
+            payload = os.path.join(tmp, "model.pt")
+            torch.save(
+                {
+                    "state": {
+                        name: value.cpu() for name, value in model.state_dict().items()
+                    },
+                    "input": inputs[0].cpu(),
+                },
+                payload,
+            )
+            compiled = _compile(model, inputs, runtime_cache_path=path)
+            with torch.no_grad():
+                torch.testing.assert_close(
+                    compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+                )
             del compiled
             gc.collect()
             self.assertTrue(
                 os.path.exists(path),
                 f"Implicit cache handle should have saved to {path} on engine __del__",
             )
+            cold_size = os.path.getsize(path)
+            self.assertGreater(cold_size, 0)
+            child = (
+                "import sys\n"
+                "from test_000_runtime_cache import _check_cache_in_child\n"
+                "_check_cache_in_child(*sys.argv[1:])\n"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", child, path, payload],
+                cwd=Path(__file__).resolve().parent,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            self.assertEqual(
+                result.returncode, 0, msg=result.stdout + "\n" + result.stderr
+            )
+            self.assertGreaterEqual(os.path.getsize(path), cold_size)
 
     def test_set_runtime_settings_saves_prior_cache_on_swap(self):
         """Re-pointing ``runtime_cache`` via the property setter saves the
@@ -250,24 +328,37 @@ class TestRuntimeCacheContextManager(TestCase):
                 _ = compiled(*inputs)
             self.assertFalse(os.listdir(tmp), "No files should be created for path=''")
 
-    @unittest.skipIf(
-        ENABLED_FEATURES.torch_tensorrt_runtime,
-        "Identity assertion requires the Python TRTEngine path (whitebox)",
-    )
     def test_shared_cache_pointer_across_modules(self):
-        """Two modules sharing one runtime_cache handle reference the same IRuntimeCache."""
-        compiled_a, inputs_a = _compile_simple()
-        compiled_b, inputs_b = _compile_simple()
-        eng_a = _find_python_trt_engine(compiled_a)
-        eng_b = _find_python_trt_engine(compiled_b)
+        self.addCleanup(torch._dynamo.reset)
+        first, inputs = _fresh_conv_model_and_inputs()
+        second = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 16, 5, padding=2), torch.nn.ReLU())
+            .eval()
+            .cuda()
+        )
+        modules = [_compile(model, inputs) for model in (first, second)]
+        for module in modules:
+            apply_runtime_settings(module, RuntimeSettings(runtime_cache=None))
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "shared.bin")
-            with runtime_cache([compiled_a, compiled_b], path) as rc:
-                self.assertIs(eng_a.runtime_settings.runtime_cache, rc)
-                self.assertIs(eng_b.runtime_settings.runtime_cache, rc)
-                _ = compiled_a(*inputs_a)
-                _ = compiled_b(*inputs_b)
+            with torch.no_grad():
+                with runtime_cache(modules, path) as cache:
+                    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+                        for module in modules:
+                            engine = _find_python_trt_engine(module)
+                            self.assertIsNotNone(engine)
+                            self.assertIs(engine.runtime_settings.runtime_cache, cache)
+                    torch.testing.assert_close(
+                        modules[0](*inputs), first(*inputs), rtol=1e-3, atol=1e-3
+                    )
+                    one = io.BytesIO()
+                    cache.save_to_stream(one)
+                    self.assertGreater(len(one.getvalue()), 0)
+                    torch.testing.assert_close(
+                        modules[1](*inputs), second(*inputs), rtol=1e-3, atol=1e-3
+                    )
             self.assertTrue(os.path.exists(path))
+            self.assertGreater(os.path.getsize(path), len(one.getvalue()))
 
     def test_runtime_cache_on_empty_target_raises(self):
         """A target with no TRT submodules raises a clear error on enter."""
@@ -988,6 +1079,43 @@ class TestPostLoadOwnsNoCache(TestCase):
                 os.path.exists(RUNTIME_CACHE_PATH),
                 "an unrelated CM wrote the shared default cache file",
             )
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache requires TensorRT-RTX",
+)
+class TestRuntimeCacheBadFile(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.addCleanup(torch._dynamo.reset)
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = str(Path(self.directory.name) / "cache.bin")
+
+    def _run_and_save(self, model, inputs, path):
+        compiled = _compile(model, inputs, runtime_cache_path=path)
+        with torch.no_grad():
+            torch.testing.assert_close(
+                compiled(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+            )
+        del compiled
+        gc.collect()
+        self.assertTrue(Path(path).is_file())
+        self.assertGreater(Path(path).stat().st_size, 0)
+
+    @parameterized.expand([("empty",), ("random",), ("truncated",)])
+    def test_invalid_cache_file_recovers_and_matches_eager(self, kind):
+        model, inputs = _fresh_conv_model_and_inputs()
+        if kind == "truncated":
+            self._run_and_save(model, inputs, self.path)
+            data = Path(self.path).read_bytes()
+            data = data[: len(data) // 2]
+        else:
+            data = b"" if kind == "empty" else b"invalid runtime cache" * 8
+        Path(self.path).write_bytes(data)
+        self._run_and_save(model, inputs, self.path)
+        self.assertGreater(Path(self.path).stat().st_size, len(data))
 
 
 if __name__ == "__main__":

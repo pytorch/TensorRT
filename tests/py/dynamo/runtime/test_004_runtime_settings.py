@@ -199,7 +199,6 @@ class TestLazyExecutionContextCreation(TestCase):
             if isinstance(mod, TorchTensorRTModule):
                 yield mod
 
-    @pytest.mark.trt_api
     @pytest.mark.trt_rtx_only
     def test_one_context_create_with_default_settings(self):
         compiled = _compile_simple()
@@ -361,30 +360,69 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
                 f"Nested form should create exactly 1 context, got {n}",
             )
 
+    @pytest.mark.trt_rtx_only
     @unittest.skipIf(
         not ENABLED_FEATURES.tensorrt_rtx,
         "cuda_graph_strategy is TRT-RTX-only",
     )
-    def test_collapsed_cudagraphs_with_strategy_is_one_create(self):
-        """``with enable_cudagraphs(mod, cuda_graph_strategy=...) as w:`` --
-        the collapsed form folds the prior ``set_cuda_graph_strategy`` CM
-        into ``enable_cudagraphs``. Should yield the same single
-        ``createExecutionContext`` call as the explicit nested form."""
+    def test_enable_cudagraphs_creates_one_context(self):
         from torch_tensorrt.runtime import enable_cudagraphs
 
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
         compiled = _compile_simple()
-        inputs = [torch.randn(2, 3).cuda()]
+        modules = list(self._walk_engines(compiled))
+        self.assertTrue(modules)
         with enable_cudagraphs(
             compiled, cuda_graph_strategy="whole_graph_capture"
-        ) as w:
-            _ = w(*inputs)
-        for mod in self._walk_engines(compiled):
-            n = mod.engine.num_execution_contexts_created()
-            self.assertEqual(
-                n,
-                1,
-                f"Collapsed form should create exactly 1 context, got {n}",
-            )
+        ) as captured:
+            captured(torch.randn(2, 3, device="cuda"))
+        for module in modules:
+            self.assertEqual(module.engine.num_execution_contexts_created(), 1)
+
+    @pytest.mark.trt_rtx_only
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx,
+        "cuda_graph_strategy is TRT-RTX-only",
+    )
+    def test_enable_cudagraphs_applies_and_restores_strategy(self):
+        from torch_tensorrt.runtime import enable_cudagraphs
+
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torchtrt.runtime.set_cudagraphs_mode, False)
+        torchtrt.runtime.set_cudagraphs_mode(False)
+        torch.manual_seed(0)
+        model = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 8, 3, padding=1), torch.nn.ReLU())
+            .eval()
+            .cuda()
+        )
+        x = torch.randn(2, 3, 16, 16, device="cuda")
+        compiled = torchtrt.compile(model, ir="dynamo", inputs=[x], min_block_size=1)
+        apply_runtime_settings(
+            compiled,
+            RuntimeSettings(cuda_graph_strategy="disabled", runtime_cache=None),
+        )
+        modules = list(self._walk_engines(compiled))
+        self.assertTrue(modules)
+        prior = [module.runtime_settings for module in modules]
+        with torch.no_grad():
+            with enable_cudagraphs(
+                compiled, cuda_graph_strategy="whole_graph_capture"
+            ) as captured:
+                for module in modules:
+                    self.assertEqual(
+                        module.runtime_settings.cuda_graph_strategy,
+                        "whole_graph_capture",
+                    )
+                for _ in range(3):
+                    x = torch.randn_like(x)
+                    torch.testing.assert_close(
+                        captured(x).clone(), model(x), rtol=1e-3, atol=1e-3
+                    )
+        for module, settings in zip(modules, prior):
+            self.assertEqual(module.runtime_settings, settings)
 
     @unittest.skipIf(
         ENABLED_FEATURES.tensorrt_rtx,
