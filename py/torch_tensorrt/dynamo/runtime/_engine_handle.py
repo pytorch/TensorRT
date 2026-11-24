@@ -25,7 +25,7 @@ class EngineHandle:
     via :meth:`refitted` or the constructor.
     """
 
-    __slots__ = ("_serialized", "_cuda_engine")
+    __slots__ = ("_serialized", "_cuda_engine", "_engine_checked")
 
     def __init__(
         self,
@@ -41,6 +41,9 @@ class EngineHandle:
             bytes(serialized) if serialized is not None else None
         )
         self._cuda_engine: Optional[trt.ICudaEngine] = cuda_engine
+        # Whether ``_cuda_engine`` is known to run in this process. A passed-in
+        # engine is checked on first use; one this handle deserialized is.
+        self._engine_checked = False
 
     @classmethod
     def coerce(cls, value: "EngineHandle | bytes | bytearray") -> "EngineHandle":
@@ -67,13 +70,21 @@ class EngineHandle:
     def cuda_engine(self, runtime: trt.Runtime) -> trt.ICudaEngine:
         """Live engine, deserializing with ``runtime`` on first request.
 
-        Callers must have the engine's target device current.
+        A passed-in engine is used only if it is this process's
+        ``trt.ICudaEngine``. Anything else, such as a bytes-only proxy engine from
+        a builder outside this process, cannot run here, so the engine is
+        reloaded from its bytes. Callers must have the engine's target device
+        current.
         """
+        if self._cuda_engine is not None and not self._engine_checked:
+            if not isinstance(self._cuda_engine, trt.ICudaEngine):
+                self.release_cuda_engine()
         if self._cuda_engine is None:
             engine = runtime.deserialize_cuda_engine(self._serialized)
             if engine is None:
                 raise RuntimeError("Unable to deserialize the TensorRT engine")
             self._cuda_engine = engine
+        self._engine_checked = True
         return self._cuda_engine
 
     def release_cuda_engine(self) -> None:
