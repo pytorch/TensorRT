@@ -2477,10 +2477,13 @@ class TestLowering(TestCase):
             self.assertEqual(len(attention_masks), 2)
             for mask in attention_masks:
                 self.assertEqual(mask["Datatype"], "Bool")
-                # Internal Myelin dimensions may stay symbolic in the inspector.
-                # The query dimension must be 1, not a dense L-by-S mask.
-                self.assertEqual(mask["Dimensions"][-2], 1)
-                self.assertIn(mask["Dimensions"][-1], (-1, key_length))
+                # Myelin can expose a flat key mask or include broadcast dimensions.
+                # Internal dimensions may stay symbolic in the inspector.
+                dimensions = mask["Dimensions"]
+                self.assertGreaterEqual(len(dimensions), 1)
+                if len(dimensions) >= 2:
+                    self.assertEqual(dimensions[-2], 1)
+                self.assertIn(dimensions[-1], (-1, key_length))
             self.assertEqual(attention_masks[0]["Name"], attention_masks[1]["Name"])
 
     def test_lowering_scaled_dot_product_attention_causal_bias(self):

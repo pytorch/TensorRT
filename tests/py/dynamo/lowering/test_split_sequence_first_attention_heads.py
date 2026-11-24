@@ -429,6 +429,8 @@ class TestSplitSequenceFirstAttentionHeadsVersions(unittest.TestCase):
             ("tensorrt", "11.1.0", False),
             ("tensorrt", "11.3.0", True),
             ("tensorrt", "11.4.0.106", True),
+            ("tensorrt", "11.5.0", True),
+            ("tensorrt", "11.6.0", False),
             ("tensorrt_rtx", "1.7.1", True),
         ):
             with (
