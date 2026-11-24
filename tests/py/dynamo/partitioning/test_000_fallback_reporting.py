@@ -91,7 +91,6 @@ class TestFallbackIsReported(TestCase):
                 torch.export.export(module, tuple(inputs)),
                 inputs=list(inputs),
                 min_block_size=1,
-                enabled_precisions={torch.float32},
                 truncate_double=True,
                 **kwargs,
             )

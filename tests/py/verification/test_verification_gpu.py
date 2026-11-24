@@ -20,7 +20,7 @@ def test_compiled_artifact_validation_and_cuda_timing(tmp_path):
     tensor = torch.randn(2, 3, device="cuda", dtype=torch.float16)
     exported = torch.export.export(reference, (tensor,))
     compiled = torch_tensorrt.dynamo.compile(
-        exported, inputs=[tensor], enabled_precisions={torch.float16}, min_block_size=1
+        exported, inputs=[tensor], min_block_size=1
     )
     path = tmp_path / "compiled.pt2"
     torch_tensorrt.save(compiled, str(path), arg_inputs=[tensor])

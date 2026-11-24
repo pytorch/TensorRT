@@ -187,7 +187,6 @@ def test_export_compile_save():
         use_fp32_acc=True,
         device=torch.device("cuda:0"),
         disable_tf32=True,
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
         assume_dynamic_shape_support=True,

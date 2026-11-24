@@ -1336,7 +1336,6 @@ class TestNcclOpsSingleRank(unittest.TestCase):
                 model,
                 backend="torch_tensorrt",
                 options={
-                    "use_python_runtime": True,
                     "min_block_size": 1,
                     "use_distributed_mode_trace": True,
                 },
@@ -2047,7 +2046,6 @@ def _multirank_cpp_runtime_bind_nccl(
         backend="torch_tensorrt",
         dynamic=False,
         options={
-            "use_python_runtime": False,  # C++ runtime
             "min_block_size": 1,
             "use_distributed_mode_trace": True,
         },
@@ -2287,7 +2285,6 @@ def _multirank_comm_survives_invalidation(
         inputs=[inp],
         device=device,
         disable_tf32=True,
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
     )

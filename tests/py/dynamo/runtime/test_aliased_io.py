@@ -5,11 +5,10 @@
 """End-to-end tests for aliased I/O (KV-cache fast path + buffer lifting).
 
 The KV-cache fast path emits ``IKVCacheUpdateLayer`` and binds the layer's
-output to the cache input via aliased I/O. The C++ runtime honors the
-aliasing by binding both bindings to the same device pointer; the engine
-writes through the binding into the user's input storage. The Python
-runtime does NOT support aliasing, so all tests here force the C++ runtime
-(``use_python_runtime=False``).
+output to the cache input via aliased I/O. On builds with the C++ runtime,
+the automatically selected runtime binds both bindings to the same device
+pointer, so the engine writes through the binding into the user's input
+storage.
 
 These tests exercise the full pipeline:
 
@@ -36,16 +35,14 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
 
-def _compile_cpp(model, args):
-    """Convenience: torch.export + torch_tensorrt.compile with C++ runtime."""
+def _compile_aliased_model(model, args):
+    """Convenience wrapper for exporting and compiling an aliased-I/O model."""
     ep = export(model, tuple(args))
     return torch_tensorrt.compile(
         ep,
         ir="dynamo",
         inputs=list(args),
-        enabled_precisions={torch.float32},
         min_block_size=1,
-        use_python_runtime=False,
     )
 
 
@@ -66,7 +63,7 @@ class TestSliceScatterFallback(TestCase):
 
         cache = torch.zeros(2, 4, 16, 8, device="cuda")
         update = torch.ones(2, 4, 8, 8, device="cuda")
-        compiled = _compile_cpp(M().cuda(), (cache.clone(), update.clone()))
+        compiled = _compile_aliased_model(M().cuda(), (cache.clone(), update.clone()))
 
         # A strided update is not eligible for the contiguous KV-cache layer.
         self.assertEqual(_find_aliased_io(compiled), {})
@@ -91,7 +88,7 @@ class TestSliceScatterFallback(TestCase):
 
         cache = torch.zeros(2, 4, 16, 8, device="cuda")
         update = torch.ones(2, 4, 1, 8, device="cuda")
-        compiled = _compile_cpp(M().cuda(), (cache.clone(), update))
+        compiled = _compile_aliased_model(M().cuda(), (cache.clone(), update))
 
         cache_run = cache.clone()
         actual = compiled(cache_run, update)
@@ -112,7 +109,7 @@ class TestUserInputKVCache(TestCase):
 
         cache = torch.zeros(2, 4, 16, 8, device="cuda")
         update = torch.ones(2, 4, 1, 8, device="cuda") * 7.0
-        compiled = _compile_cpp(M().cuda(), (cache.clone(), update.clone()))
+        compiled = _compile_aliased_model(M().cuda(), (cache.clone(), update.clone()))
 
         # Aliasing is recorded with kv_cache_update kind.
         aliased = _find_aliased_io(compiled)
@@ -146,7 +143,7 @@ class TestUserInputKVCache(TestCase):
         cv = torch.zeros(2, 4, 16, 8, device="cuda")
         k = torch.ones(2, 4, 1, 8, device="cuda") * 3.0
         v = torch.ones(2, 4, 1, 8, device="cuda") * 5.0
-        compiled = _compile_cpp(
+        compiled = _compile_aliased_model(
             M().cuda(), (ck.clone(), cv.clone(), k.clone(), v.clone())
         )
 
@@ -178,7 +175,7 @@ class TestUserInputKVCache(TestCase):
 
         cache = torch.zeros(2, 4, 16, 8, device="cuda")
         update = torch.full((2, 4, 1, 8), 7.25, device="cuda", dtype=torch.float16)
-        compiled = _compile_cpp(M().cuda(), (cache.clone(), update))
+        compiled = _compile_aliased_model(M().cuda(), (cache.clone(), update))
         self.assertEqual(len(_find_aliased_io(compiled)), 1)
 
         cache_run, cache_eager = cache.clone(), cache.clone()
@@ -199,7 +196,9 @@ class TestUserInputKVCache(TestCase):
 
         proto = torch.zeros(2, 4, 16, 8, device="cuda")
         upd_proto = torch.ones(2, 4, 1, 8, device="cuda")
-        compiled = _compile_cpp(M().cuda(), (proto.clone(), upd_proto.clone()))
+        compiled = _compile_aliased_model(
+            M().cuda(), (proto.clone(), upd_proto.clone())
+        )
 
         cache = torch.zeros(2, 4, 16, 8, device="cuda")
         # Step 1: write 1s -> 64 elements of 1 at position 3
@@ -230,7 +229,7 @@ class TestBufferBackedKVCache(TestCase):
 
         m = M().cuda()
         x = torch.ones(2, 4, 1, 8, device="cuda") * 7.0
-        compiled = _compile_cpp(m, (x.clone(),))
+        compiled = _compile_aliased_model(m, (x.clone(),))
 
         # The lifted buffer should be aliased.
         aliased = _find_aliased_io(compiled)
@@ -264,7 +263,7 @@ class TestBufferBackedKVCache(TestCase):
                 return self.cache.sum()
 
         x = torch.ones(2, 4, 1, 8, device="cuda") * 7.0
-        compiled = _compile_cpp(M().cuda(), (x.clone(),))
+        compiled = _compile_aliased_model(M().cuda(), (x.clone(),))
 
         aliased = _find_aliased_io(compiled)
         self.assertEqual(len(aliased), 1)
@@ -294,7 +293,7 @@ class TestBufferBackedKVCache(TestCase):
         m = M().cuda()
         x_k = torch.ones(2, 4, 1, 8, device="cuda") * 3.0
         x_v = torch.ones(2, 4, 1, 8, device="cuda") * 5.0
-        compiled = _compile_cpp(m, (x_k.clone(), x_v.clone()))
+        compiled = _compile_aliased_model(m, (x_k.clone(), x_v.clone()))
 
         aliased = _find_aliased_io(compiled)
         self.assertEqual(len(aliased), 2)
@@ -320,7 +319,7 @@ class TestBufferBackedKVCache(TestCase):
 
         m = M().cuda()
         x_proto = torch.ones(2, 4, 1, 8, device="cuda")
-        compiled = _compile_cpp(m, (x_proto.clone(),))
+        compiled = _compile_aliased_model(m, (x_proto.clone(),))
 
         compiled(torch.ones(2, 4, 1, 8, device="cuda") * 1.0)
         self.assertAlmostEqual(compiled.cache.sum().item(), 64.0, places=3)
@@ -340,7 +339,7 @@ class TestAliasedIORegressions(TestCase):
 
         x = torch.randn(4, 8, device="cuda")
         y = torch.randn(4, 8, device="cuda")
-        compiled = _compile_cpp(M().cuda(), (x, y))
+        compiled = _compile_aliased_model(M().cuda(), (x, y))
 
         aliased = _find_aliased_io(compiled)
         self.assertEqual(aliased, {})
@@ -361,7 +360,7 @@ class TestAliasedIORegressions(TestCase):
 
         x = torch.ones(2, 8, 4, device="cuda")
         y = torch.zeros(2, 2, 4, device="cuda")
-        compiled = _compile_cpp(M().cuda(), (x, y))
+        compiled = _compile_aliased_model(M().cuda(), (x, y))
 
         # No aliasing since the cache isn't 4-D.
         self.assertEqual(_find_aliased_io(compiled), {})
@@ -381,7 +380,7 @@ class TestPythonRuntimeAliasedIO(TestCase):
     """
 
     def _python_engine_for(self, model, args):
-        compiled = _compile_cpp(model, args)
+        compiled = _compile_aliased_model(model, args)
         for _name, mod in compiled.named_modules():
             if hasattr(mod, "aliased_io") and mod.aliased_io:
                 return TRTEngine(mod._pack_engine_info())
