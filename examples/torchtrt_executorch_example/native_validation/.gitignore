@@ -1,0 +1,6 @@
+__pycache__/
+build/
+artifacts/
+*.bin
+*.pte
+*.ptd
