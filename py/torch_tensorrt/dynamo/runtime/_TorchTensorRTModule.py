@@ -251,7 +251,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """Engine bytes. Serializes a live engine on first access."""
         if self._engine_handle is None:
             return None
-        return self._engine_handle.serialized()
+        serialized: bytes = self._engine_handle.serialized()
+        return serialized
 
     @serialized_engine.setter
     def serialized_engine(self, value: Optional[bytes]) -> None:
@@ -484,6 +485,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             )
         else:
             assert self._engine_handle is not None
+            # The C++ runtime always starts from bytes, so a fresh compile still pays
+            # one serialize + deserialize here (~3.5s on a large model). Handing it the
+            # builder's live engine is possible (pybind11 conduit for the pointer, plus
+            # a keep-alive so the C++ engine cannot outlive the Python one), but needs
+            # either a Python-linked extension or fragile ctypes/DLPack plumbing. We
+            # chose to forgo that saving for simplicity.
             self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
             # The C++ engine deserialized its own copy; drop the builder's so its
             # device memory is not held twice.
