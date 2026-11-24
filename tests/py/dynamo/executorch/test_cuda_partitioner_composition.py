@@ -146,6 +146,61 @@ def test_erfinv_routes_to_cuda_backend(tmp_path):
     ), f"tanh/cos were not delegated to TensorRT; delegates={delegate_ids}"
 
 
+class _ReshapeFallback(torch.nn.Module):
+    def forward(self, x):
+        return x.view(3, 8).sin()
+
+
+def test_trt_view_decomposition_exports_in_cuda_partition(tmp_path):
+    """TRT's view rewrite must remain exportable in an excluded module."""
+    import torch_tensorrt
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fallback = _ReshapeFallback()
+
+        def forward(self, x):
+            return self.fallback(x.tanh()).cos()
+
+    inputs = (torch.randn(2, 3, 4, device="cuda"),)
+    model = Model().eval().cuda()
+    trt_gm = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, inputs),
+        inputs=list(inputs),
+        min_block_size=1,
+        torch_executed_modules={
+            f"{_ReshapeFallback.__module__}.{_ReshapeFallback.__qualname__}"
+        },
+    )
+    assert any(
+        node.target == torch.ops.aten._reshape_copy.default
+        for module in trt_gm.modules()
+        if isinstance(module, torch.fx.GraphModule)
+        for node in module.graph.nodes
+    ), "test must exercise the TRT view decomposition in a fallback region"
+    source_graphs = [
+        str(module.graph)
+        for module in trt_gm.modules()
+        if isinstance(module, torch.fx.GraphModule)
+    ]
+    out = tmp_path / "reshape_cuda.pte"
+    torch_tensorrt.save(
+        trt_gm,
+        str(out),
+        output_format="executorch",
+        retrace=False,
+        arg_inputs=list(inputs),
+        partitioners=[_cuda_partitioner()],
+    )
+    assert {"TensorRTBackend", "CudaBackend"} <= set(_delegate_ids(out))
+    assert source_graphs == [
+        str(module.graph)
+        for module in trt_gm.modules()
+        if isinstance(module, torch.fx.GraphModule)
+    ]
+
+
 def test_weighted_partition_persists_external_data(tmp_path):
     """A CUDA partition that carries weights must have its external data persisted
     next to the .pte.

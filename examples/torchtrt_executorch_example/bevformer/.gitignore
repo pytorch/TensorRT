@@ -1,0 +1,7 @@
+__pycache__/
+upstream/
+checkpoints/
+artifacts/
+logs/
+data/
+recorded-work/
