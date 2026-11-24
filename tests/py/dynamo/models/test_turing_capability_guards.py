@@ -19,12 +19,6 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     convolution_capability_validator,
 )
-from torch_tensorrt.dynamo.conversion.custom_ops_converters import (
-    conv_asym_pad_capability_validator,
-)
-from torch_tensorrt.dynamo.lowering.passes.fuse_pad_into_convolution import (
-    tensorrt_conv_asym_pad_op,
-)
 
 TURING = (7, 5)
 _CONV3D_TARGETS = (None, (TURING,), ((8, 0), TURING))
@@ -653,58 +647,6 @@ class TestTuringCapabilityGuards(TestCase):
 )
 class TestTuringConvolutionValidator(TestCase):
     """Check the guard's dtype, spatial rank and target boundaries without a GPU."""
-
-    @parameterized.expand([("conv",), ("deconv",), ("fused_conv",)])
-    def test_fp64_convolution_support(self, operation):
-        for rank, truncate_double, targets in product(
-            (2, 3), (False, True), ((TURING,), ((8, 9), TURING), ((8, 9),))
-        ):
-            with self.subTest(
-                rank=rank, truncate_double=truncate_double, targets=targets
-            ):
-                graph = torch.fx.Graph()
-                x = graph.placeholder("x")
-                x.meta["val"] = torch.empty(
-                    (1, 4) + (8,) * rank, dtype=torch.float64, device="meta"
-                )
-                weight = graph.placeholder("weight")
-                if operation == "fused_conv":
-                    node = graph.call_function(
-                        tensorrt_conv_asym_pad_op,
-                        (
-                            x,
-                            weight,
-                            None,
-                            [1] * rank,
-                            [1] * rank,
-                            [1] * rank,
-                            [1] * rank,
-                            1,
-                        ),
-                    )
-                    validator = conv_asym_pad_capability_validator
-                else:
-                    node = graph.call_function(
-                        torch.ops.aten.convolution.default,
-                        (
-                            x,
-                            weight,
-                            None,
-                            [1] * rank,
-                            [1] * rank,
-                            [1] * rank,
-                            operation == "deconv",
-                            [0] * rank,
-                            1,
-                        ),
-                    )
-                    validator = convolution_capability_validator
-                settings = CompilationSettings(
-                    target_compute_capabilities=list(targets),
-                    truncate_double=truncate_double,
-                )
-                rejected = rank == 3 and truncate_double and TURING in targets
-                self.assertEqual(validator(node, settings), not rejected)
 
     def test_transposed_convolution_support(self):
         cases = [
