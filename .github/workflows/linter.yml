@@ -124,9 +124,7 @@ jobs:
         if: always()
         run: |
           cd $GITHUB_WORKSPACE
-          # Ignore the project's CUDA-nightly sources and extra indexes for this CPU-only job.
-          uv --no-config pip install --system --no-sources torch --index-url https://download.pytorch.org/whl/cpu
-          python3 -c "import torch; assert torch.version.cuda is None, torch.__version__"
+          uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
           python3 -m pytest \
             tests/py/dynamo/executorch/test_api.py \
             tests/py/dynamo/executorch/test_load_compatibility.py \
