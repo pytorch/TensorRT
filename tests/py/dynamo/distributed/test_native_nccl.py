@@ -94,30 +94,28 @@ def has_native_collective_api() -> bool:
 
 
 def trt_supports_collective_subgroups() -> bool:
-    """Whether this TensorRT routes a collective to a subset of the bound communicator.
+    """Whether one collective can select a subset of the bound communicator.
 
-    ``setCommunicator`` installs one communicator that "must be uniform across all
-    multi-device instances", and each ``addDistCollective`` layer names its group as a subset
-    of it. TensorRT splits a child communicator per group, which is what lets one engine carry
-    collectives on several groups -- a CP x TP mesh.
-
-    That routing was fixed by TensorRT **MR !49040** ("Fix DistCollective subgroup communicator
-    routing", 2026-08-20), which derives the split colour/key from the parent communicator's
-    rank instead of assuming rank 0. It is present on TensorRT ``main`` and ``rel-11.4``, and
-    absent from the 11.2.1.x releases and ``rel-11.3``.
-
-    Measured on 8 GPUs, every rank binding the same 8-rank communicator:
-
-      with the fix     subset ``[0,1,2,3]`` -> 10 to its members, ``[4,5,6,7]`` -> 26 to its
-                       members, and CP4 x TP2 in a single engine -> 360 on every rank.
-      without it       a subset containing rank 0 is silently ignored and reduces over the
-                       whole communicator (36 instead of 10); a subset without rank 0 fails
-                       with "Did not properly set the child communicator".
-
-    Detecting this needs a real multi-rank run, so it cannot be probed from a skipIf. Opt in
-    with ``TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1`` once building against TensorRT >= 11.4.
+    Standard TRT >= 11.4 includes the native subgroup-routing fix (MR !49040).
+    Multiple groups inside one Myelin region need a separate fix; see
+    ``trt_supports_collective_mesh``. TensorRT-RTX has not been qualified.
     """
-    return os.environ.get("TORCHTRT_TEST_COLLECTIVE_SUBGROUPS") == "1"
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collective_subgroups)
+    except Exception:
+        return False
+
+
+def trt_supports_collective_mesh() -> bool:
+    """Whether different groups can execute inside one native TRT engine."""
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collective_mesh)
+    except Exception:
+        return False
 
 
 def has_nccl_collectives() -> bool:
@@ -202,6 +200,11 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         self.get_active_group = get_active_group
         self.get_active_group_name = get_active_group_name
         self.distributed_context = distributed_context
+        # These tests isolate context bookkeeping with fake groups/engines.
+        # The real parent-communicator validation is covered separately below.
+        guard = patch("torch_tensorrt.distributed._distributed._require_world_group")
+        guard.start()
+        self.addCleanup(guard.stop)
 
     # -- default / no-dist cases --------------------------------------------
 
@@ -562,6 +565,126 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         self.assertEqual(eng.group_name_calls, ["tp0"])
 
 
+class TestNativeCollectiveWorldContract(unittest.TestCase):
+    """Reject incompatible parents before a collective or communicator mutation."""
+
+    def test_world_identity_required(self) -> None:
+        from torch_tensorrt.distributed._distributed import _require_world_group
+
+        world = _FakeGroup("world_after_reinit")
+        duplicate = _FakeGroup(world.group_name)
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+        ):
+            _require_world_group(world)
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                _require_world_group(duplicate)
+
+    def test_uninitialized_dist_rejected(self) -> None:
+        from torch_tensorrt.distributed._distributed import _require_world_group
+
+        with patch.object(dist, "is_initialized", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "Initialize torch.distributed"):
+                _require_world_group(None)
+
+    def test_rejected_pin_does_not_change_engine(self) -> None:
+        from torch_tensorrt.distributed._distributed import _state, set_distributed_mode
+
+        world = _FakeGroup("world_after_reinit")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        module = nn.Module()
+        module.engine = engine
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "md_engines", [], create=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                set_distributed_mode(subgroup, module)
+            self.assertEqual(engine.group_name_calls, [])
+            set_distributed_mode(world, module)
+            self.assertEqual(engine.group_name_calls, [world.group_name])
+
+    def test_rejected_context_preserves_registered_engine(self) -> None:
+        """Rejecting a parent must leave a cached engine usable and discoverable."""
+        from torch_tensorrt.distributed._distributed import (
+            _state,
+            distributed_context,
+            set_distributed_mode,
+        )
+
+        world = _FakeGroup("world")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        engine.nccl_initialized = True
+        engine.release_nccl_comm = MagicMock()
+        # torch.compile engines can live in Dynamo's cache, outside module.modules().
+        module = nn.Identity()
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "pg", world, create=True),
+            patch.object(_state, "md_engines", [engine], create=True),
+        ):
+            for _ in range(2):
+                with self.assertRaisesRegex(
+                    RuntimeError, "require the WORLD communicator"
+                ):
+                    with distributed_context(subgroup, module):
+                        self.fail("An invalid parent must be rejected before entry")
+                self.assertIs(_state.pg, world)
+                self.assertEqual(_state.md_engines, [engine])
+                engine.release_nccl_comm.assert_not_called()
+                self.assertEqual(engine.group_name_calls, [])
+
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                set_distributed_mode(subgroup, module)
+            set_distributed_mode(world, module)
+            self.assertEqual(engine.group_name_calls, [world.group_name])
+
+    def test_actual_world_registry_name_is_pinned(self) -> None:
+        from torch_tensorrt.distributed._distributed import _state, set_distributed_mode
+
+        world = _FakeGroup("world_after_reinit")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        module = nn.Module()
+        module.engine = engine
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "md_engines", [], create=True),
+        ):
+            set_distributed_mode(world, module)
+        self.assertEqual(engine.group_name_calls, ["world_after_reinit"])
+
+    def test_python_runtime_rejects_before_nccl_warmup(self) -> None:
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        world = _FakeGroup("world")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = MagicMock(is_distributed=True, requires_native_multidevice=True)
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch(
+                "torch_tensorrt.distributed._distributed.get_active_group",
+                return_value=subgroup,
+            ),
+            patch.object(dist, "all_reduce") as warmup,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                TRTEngine.setup_nccl_comm(engine)
+            warmup.assert_not_called()
+            engine.context.set_communicator.assert_not_called()
+
+
 # ============================================================================
 # Section 2 — set_distributed_mode() (no GPU / no dist init)
 # ============================================================================
@@ -582,6 +705,9 @@ class TestSetDistributedGroup(unittest.TestCase):
         if hasattr(_state, "pg"):
             del _state.pg
         self._state = _state
+        guard = patch("torch_tensorrt.distributed._distributed._require_world_group")
+        guard.start()
+        self.addCleanup(guard.stop)
 
     def _call(self, module: nn.Module, group: Any) -> None:
         from torch_tensorrt.distributed import set_distributed_mode
@@ -1402,6 +1528,10 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         set_environment_variables_pytest()
         if not dist.is_initialized():
             dist.init_process_group(backend="nccl")
+        # A one-rank collective may fold to identity, but the engine still carries
+        # its native-collective marker. Materialize WORLD's lazy NCCL communicator
+        # before the runtime's required binding check.
+        dist.all_reduce(torch.zeros(1, device="cuda"), group=dist.group.WORLD)
         cls.group = dist.new_group(ranks=[0])
         cls.group_name = cls.group.group_name
         cls.world_size = 1
@@ -2216,7 +2346,7 @@ def _multirank_compute_collective_single_engine(
 
 
 def _multirank_two_dimensional_mesh_routing(
-    rank: int, world_size: int, device: torch.device
+    rank: int, world_size: int, device: torch.device, *, combined: bool = False
 ) -> None:
     """Each collective must reduce over its own subgroup, not the world group.
 
@@ -2322,13 +2452,11 @@ def _multirank_two_dimensional_mesh_routing(
                 f"expected {expected_value}{hint}"
             )
 
-    # Both axes inside ONE model, i.e. one engine carrying collectives on two different
-    # subgroups. This is the case binding the world communicator is meant to support.
-    #
-    # A plain TP-then-CP sum would be indistinguishable from the bug: summing over both
-    # mesh axes covers all four ranks, which is exactly the world sum. Scaling between the
-    # two collectives breaks that symmetry -- correct routing gives (3 or 7) * 10 summed
-    # down the CP axis = 100 everywhere, while two world-routed all_reduces give 400.
+    if not combined:
+        return
+
+    # The combined case must compile into one engine. Correct subgroup routing
+    # gives 100; routing both all-reduces to WORLD gives 400.
     class TwoAxisModel(nn.Module):
         def __init__(self, tp_name: str, cp_name: str) -> None:
             super().__init__()
@@ -2344,12 +2472,17 @@ def _multirank_two_dimensional_mesh_routing(
 
     two_axis = TwoAxisModel(tp_group.group_name, cp_group.group_name).to(device).eval()
     with distributed_context(world_group):
-        trt_two_axis = torch.compile(
-            two_axis,
-            backend="torch_tensorrt",
-            dynamic=False,
-            options={"min_block_size": 1, "use_distributed_mode_trace": True},
+        trt_two_axis = torch_tensorrt.dynamo.compile(
+            torch.export.export(two_axis, (inp,)),
+            inputs=[inp],
+            min_block_size=1,
+            require_full_compilation=True,
+            use_distributed_mode_trace=True,
         )
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        if not isinstance(trt_two_axis, TorchTensorRTModule):
+            raise AssertionError("The combined mesh must use one fully compiled engine")
         with torch.no_grad():
             combined = trt_two_axis(inp)
 
@@ -2381,10 +2514,10 @@ def _multirank_two_dimensional_mesh_routing(
 def _multirank_distributed_mode_subgroup(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """distributed_context() with a TP subgroup (not the world group) routes NCCL correctly.
+    """A collective can name a subgroup while its native engine binds WORLD.
 
-    We create a subgroup containing all ranks (same topology as world, but a
-    distinct process group object). The all_reduce result must still be correct.
+    The subgroup here has all ranks; true subset routing is covered by the
+    four-GPU mesh test. Plugin engines retain their existing group selection.
     """
     if world_size < 2:
         print(f"[SKIP] _multirank_distributed_mode_subgroup requires world_size >= 2")
@@ -2415,11 +2548,13 @@ def _multirank_distributed_mode_subgroup(
     inp = torch.full((1, 8), float(rank + 1), device=device)
     expected_sum = sum(r + 1 for r in range(world_size))
 
-    with distributed_context(subgroup):
-        # Verify get_active_group_name returns the subgroup name inside context
-        assert get_active_group_name() == sg_name, (
-            f"Expected group name {sg_name!r}, " f"got {get_active_group_name()!r}"
-        )
+    parent = (
+        dist.group.WORLD
+        if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives
+        else subgroup
+    )
+    with distributed_context(parent):
+        assert get_active_group_name() == parent.group_name
 
         trt_model = torch.compile(
             model,
@@ -2488,7 +2623,7 @@ def _multirank_cpp_runtime_bind_nccl(
 def _multirank_distributed_mode_context_switch(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """Switching distributed_context context between two subgroups routes to the correct communicator."""
+    """Different collective groups share the WORLD parent for native engines."""
     import torch_tensorrt
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
@@ -2524,7 +2659,12 @@ def _multirank_distributed_mode_context_switch(
 
     for i, (sg, sg_name) in enumerate([(sg1, sg1_name), (sg2, sg2_name)]):
         model = AllReduceModel(sg_name).to(device).eval()
-        with distributed_context(sg):
+        parent = (
+            dist.group.WORLD
+            if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives
+            else sg
+        )
+        with distributed_context(parent):
             trt_model = torch.compile(
                 model,
                 backend="torch_tensorrt",
@@ -2549,8 +2689,8 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
     Tests both the C++ runtime (set_group_name resets nccl_initialized) and the
     Python runtime (setup_nccl_comm re-runs on next forward after _nccl_comm reset).
 
-    Covers the API contract: a compiled/loaded TRT model can be migrated from one
-    process group to another without recompilation.
+    Native engines reject migration away from WORLD without changing their
+    binding. Plugin engines retain their existing migration behavior.
     """
     if world_size < 2:
         print(f"[SKIP] _multirank_pg_migration requires world_size >= 2")
@@ -2600,6 +2740,23 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
             out_world = trt_model(inp)
 
     _check_close(out_world, expected, f"world group rank={rank}")
+
+    if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives:
+        # Global IDs are baked into this engine. Reject replacing its WORLD
+        # parent even when a different group happens to have identical members.
+        case = unittest.TestCase()
+        with case.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+            with distributed_context(subgroup, trt_model):
+                pass
+        with case.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+            torch_tensorrt.distributed.set_distributed_mode(subgroup, trt_model)
+        with distributed_context(world_group, trt_model):
+            with torch.no_grad():
+                out_after_rejection = trt_model(inp)
+        _check_close(
+            out_after_rejection, expected, f"WORLD after rejected migration rank={rank}"
+        )
+        return
 
     # ---- Step 2: migrate to subgroup via distributed_context(subgroup, model) ----
     # set_distributed_mode() resets nccl_initialized on the C++ engine so
@@ -2920,8 +3077,20 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
         trt_supports_collective_subgroups(),
-        "needs TensorRT subgroup routing (TRT MR !49040, in main and rel-11.4; absent from "
-        "11.2.1.x) — set TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1 when building against it",
+        "requires native TRT subgroup routing (standard TensorRT >= 11.4 with NCCL)",
+    )
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_individual_subgroup_routing(self) -> None:
+        """TP and CP each execute in their own engine on nontrivial subgroups."""
+        device = self._init_dist()
+        _multirank_two_dimensional_mesh_routing(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @unittest.skipUnless(
+        trt_supports_collective_mesh(),
+        "requires a validated release with Myelin subgroup communicator support "
+        "(TensorRT MR !51865); basic TRT 11.4 subgroup support is insufficient",
     )
     @requires_nccl()
     @skip_if_lt_x_gpu(4)
@@ -2931,7 +3100,9 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
             self.world_size, 4, "the 2-D mesh test is meaningless below 4 ranks"
         )
         device = self._init_dist()
-        _multirank_two_dimensional_mesh_routing(self.rank, self.world_size, device)
+        _multirank_two_dimensional_mesh_routing(
+            self.rank, self.world_size, device, combined=True
+        )
 
 
 # ============================================================================

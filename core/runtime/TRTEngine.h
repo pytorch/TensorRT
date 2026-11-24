@@ -386,10 +386,12 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
   // Member variables for distributed inference
-  bool requires_native_multidevice = false; // compile-time flag: engine contains NCCL collectives
+  // Serialized marker for native collectives, whose converters emit WORLD-global rank IDs.
+  // These engines must bind the current WORLD communicator, including after deserialization.
+  bool requires_native_multidevice = false;
   int64_t rank = -1; // populated at runtime by setup_nccl_comm()
   int64_t world_size = -1; // populated at runtime by setup_nccl_comm()
-  std::string group_name = ""; // c10d registry name; "" = default world group
+  std::string group_name = ""; // c10d registry name set after Python validation; empty = not configured
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   const bool _native_nccl_support = true; // Support value that is mostly here to back the torchbind hooks
@@ -398,7 +400,8 @@ struct TRTEngine : torch::CustomClassHolder {
   // Resolve ProcessGroup via group_name, fetch the NCCL comm from PyTorch,
   // and bind it to exec_ctx.  Returns true on success.  Returns false (without
   // throwing) when the process group or NCCL communicator is not yet available
-  // so callers can retry later.  Throws on hard misconfiguration (wrong backend).
+  // so callers can retry later. Throws if a native engine has no configured group
+  // or on hard misconfiguration (wrong backend).
   bool bind_nccl_comm();
 
   // Detach the NCCL communicator from the execution context by recreating it.

@@ -397,9 +397,9 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
         setup=("mpi",),
         env={"USE_HOST_DEPS": "1", "CI_BUILD": "1", "USE_TRTLLM_PLUGINS": "1"},
-        # The --multirank follow-ups need 2 GPUs, so this suite cannot run on
-        # the default single-GPU validation_runner.
-        runner="linux.g4dn.12xlarge.nvidia.gpu",
+        # Both variants use four A10G GPUs for the multi-rank tests.
+        # The mesh test is gated on native subgroup-routing support.
+        runner="linux.g5.12xlarge.nvidia.gpu",
         # TensorRT-RTX has no TensorRT-LLM plugin path, so multi-device runs
         # entirely on the native TRT DistCollective API. Drop test_nccl_ops.py
         # (every test in it is gated on ENABLED_FEATURES.trtllm_for_nccl and
@@ -411,10 +411,6 @@ _L2: list[Suite] = [
                     "distributed/test_export_save_load.py",
                 ),
                 "env": {"USE_HOST_DEPS": "1", "CI_BUILD": "1"},
-                # Multi-GPU box: the --multirank follow-ups need 2 devices.
-                # g5 is A10G (SM 8.6) rather than g4dn's T4 (SM 7.5), since the
-                # TensorRT docs describe DistCollective as needing Ampere+.
-                "runner": "linux.g5.12xlarge.nvidia.gpu",
             }
         },
         follow=(

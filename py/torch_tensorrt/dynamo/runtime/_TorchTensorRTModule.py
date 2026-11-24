@@ -477,10 +477,17 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
         if self.engine.requires_native_multidevice:
+            from torch_tensorrt.distributed._distributed import (
+                _require_world_group,
+                get_active_group,
+            )
             from torch_tensorrt.distributed._nccl_utils import (
                 check_nccl_engine_requirements,
             )
 
+            active_group = get_active_group()
+            if active_group is not None:
+                _require_world_group(active_group)
             check_nccl_engine_requirements()
 
         # Store the active process group name on the C++ engine so that the
@@ -562,6 +569,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.requires_output_allocator = bool(
                 int(serialized_engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])
             )
+            # Preserve the native/WORLD contract if this restored module is saved again.
+            self.requires_native_multidevice = bool(
+                int(serialized_engine_info[REQUIRES_NATIVE_MULTIDEVICE_IDX])
+            )
+            self.serialized_engine = serialized_engine_info[ENGINE_IDX]
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
             # ``_pack_engine_info`` packs the metadata as a ``str``

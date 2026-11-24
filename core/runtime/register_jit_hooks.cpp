@@ -158,6 +158,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def(
             "set_group_name",
             [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
+              // Low-level setter: Python's distributed helpers validate the parent
+              // before passing its actual c10d registry name here.
               // Only reset nccl_initialized when the group actually changes.
               // Re-pinning the same group should be a no-op — calling
               // setCommunicator() on an exec_ctx that already has one causes

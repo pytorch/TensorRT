@@ -30,6 +30,8 @@ FeatureSet = namedtuple(
         "tensorrt_rtx",
         "trtllm_for_nccl",
         "native_trt_collectives",
+        "native_trt_collective_subgroups",
+        "native_trt_collective_mesh",
         "complex_decomposition",
     ],
 )
@@ -67,6 +69,29 @@ _NATIVE_TRT_COLLECTIVES_AVAIL = check_native_trt_collectives(
     linked_file_full_path, linked_file_runtime_full_path
 )
 
+# Subgroup routing requires changes in standard TRT 11.4.
+# TensorRT-RTX has separate version numbers; leave this disabled for RTX until
+# the first release containing the routing fix has been verified.
+_NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL = False
+if (
+    _NATIVE_TRT_COLLECTIVES_AVAIL
+    and not _TENSORRT_RTX
+    and hasattr(tensorrt, "CollectiveOperation")
+):
+    try:
+        _NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL = version.parse(
+            tensorrt.__version__
+        ) >= version.parse("11.4")
+    except (AttributeError, version.InvalidVersion):
+        _NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL = False
+
+# TRT 11.4 subgroup routing does not cover Myelin regions containing different
+# collective groups (runtime world_size differs from the compiled subgroup size).
+# A local build with TensorRT MR !51865 passed the standalone mesh probes. Keep
+# this separate capability disabled until a released build containing that fix
+# has been validated; do not infer it from the basic subgroup version gate.
+_NATIVE_TRT_COLLECTIVE_MESH_AVAIL = False
+
 # Only load TRT-LLM for NCCL if native TRT collectives are not available
 _TRTLLM_AVAIL = False
 if not _NATIVE_TRT_COLLECTIVES_AVAIL:
@@ -96,6 +121,8 @@ ENABLED_FEATURES = FeatureSet(
     _TENSORRT_RTX,
     _TRTLLM_AVAIL,
     _NATIVE_TRT_COLLECTIVES_AVAIL,
+    _NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL,
+    _NATIVE_TRT_COLLECTIVE_MESH_AVAIL,
     _COMPLEX_DECOMP_AVAIL,
 )
 
@@ -104,7 +131,7 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n - Complex Decomposition: {enabled(_COMPLEX_DECOMP_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n - Native TRT Collectives: {enabled(_NATIVE_TRT_COLLECTIVES_AVAIL)}\n - Native TRT Collective Subgroups: {enabled(_NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL)}\n - Native TRT Collective Mesh: {enabled(_NATIVE_TRT_COLLECTIVE_MESH_AVAIL)}\n - Complex Decomposition: {enabled(_COMPLEX_DECOMP_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 
