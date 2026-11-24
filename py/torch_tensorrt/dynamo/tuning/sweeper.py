@@ -24,6 +24,7 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._conversion import SerializedInterpreterResult
+from torch_tensorrt.dynamo.runtime._engine_handle import EngineHandle
 from torch_tensorrt.dynamo.tuning import cache as tuning_cache
 from torch_tensorrt.dynamo.tuning._capability import (
     get_all_build_routes_raw,
@@ -250,7 +251,7 @@ def _serialized_result_from_trial(
     if trial.get("crashed") or engine is None:
         return None
     return SerializedInterpreterResult(
-        serialized_engine=engine,
+        engine=EngineHandle(serialized=engine),
         input_names=list(trial.get("input_names") or []),
         output_names=list(trial.get("output_names") or []),
         requires_output_allocator=bool(trial.get("requires_output_allocator", False)),
@@ -676,7 +677,7 @@ def tune_subgraph(
     def _remaining_join_timeout(*, ignore_timeout: bool = False) -> Optional[float]:
         if ignore_timeout or effective_settings.tuning_timeout_s < 0:
             return None
-        remaining = effective_settings.tuning_timeout_s - (
+        remaining: float = effective_settings.tuning_timeout_s - (
             time.monotonic() - sweep_start
         )
         return max(0.0, remaining)
@@ -766,10 +767,11 @@ def tune_subgraph(
         return gpu_time, result
 
     def _timeout_reached() -> bool:
-        return (
+        reached: bool = (
             effective_settings.tuning_timeout_s >= 0
             and time.monotonic() - sweep_start >= effective_settings.tuning_timeout_s
         )
+        return reached
 
     phase_rows: Dict[Tuple[str, int], Dict[str, Any]] = {}
     for row in cached_rows:

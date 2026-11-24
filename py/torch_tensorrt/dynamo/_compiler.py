@@ -2407,12 +2407,8 @@ def convert_exported_program_to_serialized_trt_engine(
         settings,
     )
 
-    packed_engine = interpreter_result.serialized_engine
-    if not isinstance(packed_engine, (bytes, bytearray)):
-        raise RuntimeError(
-            "convert_exported_program_to_serialized_trt_engine expected a serialized engine"
-        )
-    return bytes(packed_engine)
+    serialized_engine: bytes = interpreter_result.serialized_engine
+    return serialized_engine
 
 
 @needs_cross_compile  # type: ignore[misc]
