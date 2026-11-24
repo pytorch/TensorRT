@@ -53,10 +53,8 @@
 // 2. A TensorRT exposing the native collectives API (TRT_HAS_NATIVE_NCCL above)
 //
 // These macros and TORCHTRT_HAS_IRUNTIME_CONFIG() may gate code, but not data
-// members. Code built outside Bazel does not get Bazel's defines, such as
-// USE_C10D_NCCL: torch_tensorrt._C, built by setuptools, allocates TRTEngine
-// objects that libtorchtrt's constructor initializes, so both must see the same
-// layout.
+// members. Native consumers of the shipped headers may not get Bazel's defines,
+// such as USE_C10D_NCCL, but must see the same layout as libtorchtrt.
 #if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
 #define ENABLE_TRT_NCCL_COLLECTIVES 1
 #endif
