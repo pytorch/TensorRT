@@ -143,3 +143,6 @@ saved `loaded-maps.txt` files, including dynamically loaded AOTI libraries.
 BEVFormer/OpenMMLab attribution and Apache-2.0 licensing are retained in the
 source and `LICENSE`. Check the upstream dataset and checkpoint terms before
 using them beyond this validation example.
+
+For caller-owned CPU input/output buffers and CUDA host registration, see the
+[latency comparison workflow](../native_validation/README.md#reuse-application-buffers-for-inference).

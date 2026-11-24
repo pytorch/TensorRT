@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import sys
 from pathlib import Path
 
 import torch
@@ -97,7 +98,20 @@ def main():
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--width", type=int, default=1024)
     parser.add_argument("--eager-only", action="store_true")
+    parser.add_argument(
+        "--caller-owned-io",
+        action="store_true",
+        help="Export caller-owned CPU input/output buffers for benchmark_pte",
+    )
     args = parser.parse_args()
+    save_options = {}
+    if args.caller_owned_io:
+        sys.path.insert(
+            0, str(Path(__file__).resolve().parents[1] / "native_validation")
+        )
+        from caller_owned_io import backend_config
+
+        save_options["backend_config"] = backend_config()
     if min(args.height, args.width) < 32 or args.height % 32 or args.width % 32:
         parser.error("Input dimensions must be positive multiples of 32")
     args.output.mkdir(parents=True, exist_ok=False)
@@ -108,6 +122,7 @@ def main():
     model, count = load_model(args.checkpoint)
     model = model.cuda()
     report = {
+        "caller_owned_io": args.caller_owned_io,
         "scope": "Pretrained SegFormer-B0 Cityscapes tensor inference; synthetic inputs, no mIoU",
         "model_id": MODEL_ID,
         "revision": REVISION,
@@ -180,8 +195,13 @@ def main():
             output_format="executorch",
             arg_inputs=inputs,
             retrace=False,
+            **save_options,
         )
         program = deserialize_pte_binary(path.read_bytes()).program
+        if args.caller_owned_io:
+            from caller_owned_io import validate_program
+
+            validate_program(program)
         report["delegates"] = [
             d.id for plan in program.execution_plan for d in plan.delegates
         ]

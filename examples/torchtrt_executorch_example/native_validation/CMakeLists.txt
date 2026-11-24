@@ -22,7 +22,14 @@ target_link_libraries(validate_pte PRIVATE
   executorch executorch::backends executorch::extensions executorch::kernels
   executorch::backend_tensorrt CUDA::cudart)
 
-install(TARGETS validate_pte
+# Separate from the recurrence/correctness checker: fixed-input latency samples.
+add_executable(benchmark_pte benchmark.cpp)
+target_compile_features(benchmark_pte PRIVATE cxx_std_17)
+target_link_libraries(benchmark_pte PRIVATE
+  executorch executorch::backends executorch::extensions executorch::kernels
+  executorch::backend_tensorrt CUDA::cudart)
+
+install(TARGETS validate_pte benchmark_pte
   RUNTIME DESTINATION bin COMPONENT native_validation)
 foreach(_support aoti_cuda_shims extension_cuda)
   if(TARGET ${_support})

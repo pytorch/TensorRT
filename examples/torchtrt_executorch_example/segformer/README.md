@@ -99,3 +99,6 @@ The same bundle directory holds the `.pte` and its `seed_*` fixtures. The runner
 compares every logit at `atol=rtol=3e-4`, records raw native outputs, and checks
 linked and dynamically loaded libraries. Inspect its final PASS and output
 files before proceeding to a different input.
+
+For caller-owned buffers and CUDA host registration, see the
+[latency comparison workflow](../native_validation/README.md#reuse-application-buffers-for-inference).
