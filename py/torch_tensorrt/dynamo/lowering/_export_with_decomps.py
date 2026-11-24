@@ -83,6 +83,13 @@ def _record_applied(
     ``_fused_rms_norm`` on CUDA or a ``scatter_add`` that declined. Rerunning the table
     would not remove them. A table op absent here was not left behind by this run, so
     one that appears later, from a pass, still counts as pending.
+
+    The record is per op, not per node. A decomposition that declines per call, such
+    as ``scatter_add`` over a symbolic extent, may leave one node behind while a
+    second node of the same op, added later by a pass, could have been decomposed.
+    That node is not pending, so it stays undecomposed. This is accepted: it needs a
+    pass to add such an op after trace, partitioning handles the op that stays, and
+    tracking nodes would not survive passes that rebuild the graph.
     """
     exported_program.graph_module.meta[_APPLIED_KEY] = tuple(
         sorted(
