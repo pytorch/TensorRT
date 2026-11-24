@@ -94,34 +94,26 @@ def has_native_collective_api() -> bool:
 
 
 def trt_supports_collective_subgroups() -> bool:
-    """Whether this TensorRT routes a collective to a subset of the bound communicator.
+    """Whether one collective can select a subset of the bound communicator.
 
-    ``setCommunicator`` installs one communicator that "must be uniform across all
-    multi-device instances", and each ``addDistCollective`` layer names its group as a subset
-    of it. TensorRT splits a child communicator per group, which is what lets one engine carry
-    collectives on several groups -- a CP x TP mesh.
-
-    That routing was fixed by TensorRT **MR !49040** ("Fix DistCollective subgroup communicator
-    routing", 2026-08-20), which derives the split colour/key from the parent communicator's
-    rank instead of assuming rank 0. It is present on TensorRT ``main`` and ``rel-11.4``, and
-    absent from the 11.2.1.x releases and ``rel-11.3``.
-
-    Measured on 8 GPUs, every rank binding the same 8-rank communicator:
-
-      with the fix     subset ``[0,1,2,3]`` -> 10 to its members, ``[4,5,6,7]`` -> 26 to its
-                       members, and CP4 x TP2 in a single engine -> 360 on every rank.
-      without it       a subset containing rank 0 is silently ignored and reduces over the
-                       whole communicator (36 instead of 10); a subset without rank 0 fails
-                       with "Did not properly set the child communicator".
-
-    Capability detection lives in ``torch_tensorrt._features`` and requires native
-    collectives with standard TensorRT >= 11.4. TensorRT-RTX remains disabled until
-    its first release containing the fix has been verified.
+    Standard TRT >= 11.4 includes the native subgroup-routing fix (MR !49040).
+    Multiple groups inside one Myelin region need a separate fix; see
+    ``trt_supports_collective_mesh``. TensorRT-RTX has not been qualified.
     """
     try:
         from torch_tensorrt._features import ENABLED_FEATURES
 
         return bool(ENABLED_FEATURES.native_trt_collective_subgroups)
+    except Exception:
+        return False
+
+
+def trt_supports_collective_mesh() -> bool:
+    """Whether different groups can execute inside one native TRT engine."""
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collective_mesh)
     except Exception:
         return False
 
@@ -614,6 +606,44 @@ class TestNativeCollectiveWorldContract(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
                 set_distributed_mode(subgroup, module)
             self.assertEqual(engine.group_name_calls, [])
+            set_distributed_mode(world, module)
+            self.assertEqual(engine.group_name_calls, [world.group_name])
+
+    def test_rejected_context_preserves_registered_engine(self) -> None:
+        """Rejecting a parent must leave a cached engine usable and discoverable."""
+        from torch_tensorrt.distributed._distributed import (
+            _state,
+            distributed_context,
+            set_distributed_mode,
+        )
+
+        world = _FakeGroup("world")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        engine.nccl_initialized = True
+        engine.release_nccl_comm = MagicMock()
+        # torch.compile engines can live in Dynamo's cache, outside module.modules().
+        module = nn.Identity()
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "pg", world, create=True),
+            patch.object(_state, "md_engines", [engine], create=True),
+        ):
+            for _ in range(2):
+                with self.assertRaisesRegex(
+                    RuntimeError, "require the WORLD communicator"
+                ):
+                    with distributed_context(subgroup, module):
+                        self.fail("An invalid parent must be rejected before entry")
+                self.assertIs(_state.pg, world)
+                self.assertEqual(_state.md_engines, [engine])
+                engine.release_nccl_comm.assert_not_called()
+                self.assertEqual(engine.group_name_calls, [])
+
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                set_distributed_mode(subgroup, module)
             set_distributed_mode(world, module)
             self.assertEqual(engine.group_name_calls, [world.group_name])
 
@@ -1498,6 +1528,10 @@ class TestNcclOpsSingleRank(unittest.TestCase):
         set_environment_variables_pytest()
         if not dist.is_initialized():
             dist.init_process_group(backend="nccl")
+        # A one-rank collective may fold to identity, but the engine still carries
+        # its native-collective marker. Materialize WORLD's lazy NCCL communicator
+        # before the runtime's required binding check.
+        dist.all_reduce(torch.zeros(1, device="cuda"), group=dist.group.WORLD)
         cls.group = dist.new_group(ranks=[0])
         cls.group_name = cls.group.group_name
         cls.world_size = 1
@@ -2312,7 +2346,7 @@ def _multirank_compute_collective_single_engine(
 
 
 def _multirank_two_dimensional_mesh_routing(
-    rank: int, world_size: int, device: torch.device
+    rank: int, world_size: int, device: torch.device, *, combined: bool = False
 ) -> None:
     """Each collective must reduce over its own subgroup, not the world group.
 
@@ -2418,13 +2452,11 @@ def _multirank_two_dimensional_mesh_routing(
                 f"expected {expected_value}{hint}"
             )
 
-    # Both axes inside ONE model, i.e. one engine carrying collectives on two different
-    # subgroups. This is the case binding the world communicator is meant to support.
-    #
-    # A plain TP-then-CP sum would be indistinguishable from the bug: summing over both
-    # mesh axes covers all four ranks, which is exactly the world sum. Scaling between the
-    # two collectives breaks that symmetry -- correct routing gives (3 or 7) * 10 summed
-    # down the CP axis = 100 everywhere, while two world-routed all_reduces give 400.
+    if not combined:
+        return
+
+    # The combined case must compile into one engine. Correct subgroup routing
+    # gives 100; routing both all-reduces to WORLD gives 400.
     class TwoAxisModel(nn.Module):
         def __init__(self, tp_name: str, cp_name: str) -> None:
             super().__init__()
@@ -2440,12 +2472,17 @@ def _multirank_two_dimensional_mesh_routing(
 
     two_axis = TwoAxisModel(tp_group.group_name, cp_group.group_name).to(device).eval()
     with distributed_context(world_group):
-        trt_two_axis = torch.compile(
-            two_axis,
-            backend="torch_tensorrt",
-            dynamic=False,
-            options={"min_block_size": 1, "use_distributed_mode_trace": True},
+        trt_two_axis = torch_tensorrt.dynamo.compile(
+            torch.export.export(two_axis, (inp,)),
+            inputs=[inp],
+            min_block_size=1,
+            require_full_compilation=True,
+            use_distributed_mode_trace=True,
         )
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        if not isinstance(trt_two_axis, TorchTensorRTModule):
+            raise AssertionError("The combined mesh must use one fully compiled engine")
         with torch.no_grad():
             combined = trt_two_axis(inp)
 
@@ -3040,8 +3077,20 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
         trt_supports_collective_subgroups(),
-        "requires native TRT subgroup routing (standard TensorRT >= 11.4 with NCCL; "
-        "TensorRT-RTX support is not enabled)",
+        "requires native TRT subgroup routing (standard TensorRT >= 11.4 with NCCL)",
+    )
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_individual_subgroup_routing(self) -> None:
+        """TP and CP each execute in their own engine on nontrivial subgroups."""
+        device = self._init_dist()
+        _multirank_two_dimensional_mesh_routing(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @unittest.skipUnless(
+        trt_supports_collective_mesh(),
+        "requires a validated release with Myelin subgroup communicator support "
+        "(TensorRT MR !51865); basic TRT 11.4 subgroup support is insufficient",
     )
     @requires_nccl()
     @skip_if_lt_x_gpu(4)
@@ -3051,7 +3100,9 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
             self.world_size, 4, "the 2-D mesh test is meaningless below 4 ranks"
         )
         device = self._init_dist()
-        _multirank_two_dimensional_mesh_routing(self.rank, self.world_size, device)
+        _multirank_two_dimensional_mesh_routing(
+            self.rank, self.world_size, device, combined=True
+        )
 
 
 # ============================================================================

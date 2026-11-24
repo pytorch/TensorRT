@@ -155,9 +155,11 @@ def distributed_context(
         modules = list(module)
         single = False
 
+    entered = False
     try:
         for mod in modules:
             set_distributed_mode(group, mod)
+        entered = True
         if single:
             yield modules[0]
         elif modules:
@@ -168,7 +170,8 @@ def distributed_context(
         _state.pg = old
         # Release NCCL communicators from all md engines registered on
         # this thread so dist.destroy_process_group() is safe after exit.
-        if modules:
+        # A rejected __enter__ must preserve the existing binding and registry.
+        if modules and entered:
             engines = getattr(_state, "md_engines", None) or []
             for engine in engines:
                 if getattr(engine, "nccl_initialized", False):
