@@ -11,6 +11,8 @@ no op that its table would rewrite. That holds whatever produced the program and
 whatever settings ``trace`` was given. An op that a table already tried and left in
 place, such as ``_fused_rms_norm`` on CUDA, where its decomposition never applies,
 is recorded on the program and not counted, since rerunning would not remove it.
+Only the table ops that survive the export are recorded, so a table op that a later
+pass adds is still counted.
 
 ``pre_export_lowering`` runs between the two. If any of its passes needs the graph
 before Torch-TRT decompositions under the given settings (see
@@ -75,9 +77,19 @@ def _is_post_dispatch_aten(exported_program: ExportedProgram) -> bool:
 def _record_applied(
     exported_program: ExportedProgram, table: Mapping[Any, Any]
 ) -> ExportedProgram:
-    """Record that ``table`` has been applied to ``exported_program``."""
+    """Record the ops ``table`` tried and left in ``exported_program``.
+
+    These are the table ops still in the graph after ``table`` was applied, such as
+    ``_fused_rms_norm`` on CUDA or a ``scatter_add`` that declined. Rerunning the table
+    would not remove them. A table op absent here was not left behind by this run, so
+    one that appears later, from a pass, still counts as pending.
+    """
     exported_program.graph_module.meta[_APPLIED_KEY] = tuple(
-        sorted(str(op) for op in table)
+        sorted(
+            str(target)
+            for target in _graph_targets(exported_program.graph_module)
+            if target in table
+        )
     )
     return exported_program
 
@@ -260,8 +272,8 @@ def export_with_tensorrt_decomps(
         )
 
     # A decomposition that cannot apply to a node, such as scatter_add over a
-    # symbolic extent, declines and leaves the op in place; recording the table
-    # keeps compile from retracing for it.
+    # symbolic extent, declines and leaves the op in place; recording the table ops
+    # left in the graph keeps compile from retracing for them.
     table = get_decompositions(
         settings.enable_experimental_decompositions,
         settings.decompose_attention,

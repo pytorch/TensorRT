@@ -123,6 +123,23 @@ class TestOneShotDecomp(unittest.TestCase):
             maybe_run_decompositions(exported_program, CompilationSettings())
             mocked.assert_not_called()
 
+    def test_table_op_added_after_trace_reruns(self) -> None:
+        # silu is in the table but absent from this graph when trace applied it, so
+        # a pass that adds one afterwards leaves work for run_decompositions.
+        exported_program = trace(self.model, self.inputs)
+        graph = exported_program.graph_module.graph
+        output = next(node for node in graph.nodes if node.op == "output")
+        with graph.inserting_before(output):
+            silu = graph.call_function(
+                torch.ops.aten.silu.default, (output.args[0][0],)
+            )
+        output.args = ((silu,),)
+        exported_program.graph_module.recompile()
+        self.assertIn(torch.ops.aten.silu.default, _call_targets(exported_program))
+        with _watch_run_decompositions(exported_program) as mocked:
+            maybe_run_decompositions(exported_program, CompilationSettings())
+            mocked.assert_called_once()
+
     def test_compile_settings_that_decompose_more_rerun(self) -> None:
         # Traced with the default table, which keeps SDPA; compile asks for it to
         # be decomposed, and the SDPA node left in the graph says so.
