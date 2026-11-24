@@ -17,7 +17,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
-    turing_rejects_forward_convolution,
+    turing_rejects_convolution,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import args_bounds_check
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
@@ -34,28 +34,34 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_pad_into_convolution import (
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+_CONV_ASYM_PAD_ARG_INPUT = 0
+_CONV_ASYM_PAD_ARG_STRIDE = 3
+_CONV_ASYM_PAD_ARG_GROUPS = 7
+
 
 def conv_asym_pad_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Apply the aten.convolution capability guards to the fused pad+conv op.
+    """Apply the Turing forward convolution checks after padding fusion.
 
-    ``fuse_pad_into_convolution`` rewrites constant_pad_nd -> aten.convolution into
-    this op during lowering, which erases the aten.convolution node that
-    ``convolution_capability_validator`` would otherwise have rejected. Without this,
-    the pass smuggles a 3D convolution past that guard onto Turing (SM 7.5), where it
-    surfaces at runtime as a null execution context. The pass runs in the normal
-    compile path, so this is not confined to tests.
-
-    Spatial rank comes from the argument list rather than node meta, so the guard holds
-    whether or not the caller traced with dynamo.
+    ``fuse_pad_into_convolution`` replaces constant_pad_nd and aten.convolution
+    with this operation during normal compilation. The ATen convolution validator
+    no longer sees the convolution node. Apply the same guard here because an
+    unsupported convolution can cause execution context creation to fail at runtime.
+    The fusion pass skips transposed convolution.
     """
-    # conv_asym_pad(source, weight, bias, stride, pre_padding, post_padding, dilation,
-    #               groups) -- no transposed argument; the pass skips those outright.
-    _ARG_STRIDE = 3
-    stride = args_bounds_check(node.args, _ARG_STRIDE)
+    input_node = node.args[_CONV_ASYM_PAD_ARG_INPUT]
+    val = getattr(input_node, "meta", {}).get("val")
+    stride = args_bounds_check(node.args, _CONV_ASYM_PAD_ARG_STRIDE)
     spatial_rank = len(stride) if stride is not None else None
-    return not turing_rejects_forward_convolution(node, spatial_rank, settings)
+    return not turing_rejects_convolution(
+        getattr(val, "dtype", None),
+        spatial_rank,
+        settings,
+        node_name=node.name,
+        transposed=False,
+        groups=args_bounds_check(node.args, _CONV_ASYM_PAD_ARG_GROUPS, 1),
+    )
 
 
 @dynamo_tensorrt_converter(
