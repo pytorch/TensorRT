@@ -88,6 +88,25 @@ jobs:
           python3 $GITHUB_WORKSPACE/.github/scripts/run_py_linter.py
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  executorch-cpu-checks:
+    name: ExecuTorch CPU Checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
       # These source checks need no GPU; --noconftest avoids importing torch.
       - name: Check the ExecuTorch pin is consistent
         if: always()
