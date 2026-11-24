@@ -19,6 +19,12 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     convolution_capability_validator,
 )
+from torch_tensorrt.dynamo.conversion.custom_ops_converters import (
+    conv_asym_pad_capability_validator,
+)
+from torch_tensorrt.dynamo.lowering.passes.fuse_pad_into_convolution import (
+    tensorrt_conv_asym_pad_op,
+)
 
 TURING = (7, 5)
 _CONV3D_TARGETS = (None, (TURING,), ((8, 0), TURING))
@@ -35,7 +41,11 @@ class _Conv3dCase:
 
     @property
     def name(self) -> str:
-        precision = {torch.float32: "fp32", torch.float16: "fp16"}[self.dtype]
+        precision = {
+            torch.float64: "fp64",
+            torch.float32: "fp32",
+            torch.float16: "fp16",
+        }[self.dtype]
         if self.targets is None:
             target = "native"
         elif self.targets == (TURING,):
@@ -52,6 +62,7 @@ class _Conv3dCase:
 
 def _forward_conv3d_cases() -> list[tuple[str, _Conv3dCase]]:
     dtype_groups = (
+        (torch.float64, 1),
         (torch.float32, 1),
         (torch.float32, 2),
         (torch.float16, 1),
@@ -74,7 +85,11 @@ def _forward_conv3d_cases() -> list[tuple[str, _Conv3dCase]]:
 
 
 def _transposed_conv3d_cases(*, dynamic: bool = False) -> list[tuple[str, _Conv3dCase]]:
-    dtypes = (torch.float32,) if dynamic else (torch.float32, torch.float16)
+    dtypes = (
+        (torch.float64, torch.float32)
+        if dynamic
+        else (torch.float64, torch.float32, torch.float16)
+    )
     group_counts = (1,) if dynamic else (1, 2)
     cases = []
     for dtype, targets, stride, groups in product(
@@ -381,10 +396,18 @@ class TestTuringCapabilityGuards(TestCase):
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 target_compute_capabilities=targets,
+                truncate_double=case.dtype == torch.float64,
             )
         else:
-            compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
-        rejected = targets_turing and (case.dtype == torch.float32 or case.groups > 1)
+            compiled = self._compile(
+                mod,
+                inputs,
+                target_compute_capabilities=targets,
+                truncate_double=case.dtype == torch.float64,
+            )
+        rejected = targets_turing and (
+            case.dtype in (torch.float32, torch.float64) or case.groups > 1
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0 if rejected else 1)
         for batch_size in ((1, 2, 4) if case.dynamic else (1,)):
             with self.subTest(batch_size=batch_size):
@@ -404,17 +427,23 @@ class TestTuringCapabilityGuards(TestCase):
             )
         mod = ConvTranspose3d(stride=case.stride, groups=case.groups).to(case.dtype)
         inputs = (torch.randn(1, 4, 8, 8, 8, dtype=case.dtype).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
+        compiled = self._compile(
+            mod,
+            inputs,
+            target_compute_capabilities=targets,
+            truncate_double=case.dtype == torch.float64,
+        )
         targets_turing = _is_turing() if targets is None else TURING in targets
-        expected_engines = 0 if case.dtype == torch.float32 and targets_turing else 1
+        rejected = case.dtype in (torch.float32, torch.float64) and targets_turing
+        expected_engines = 0 if rejected else 1
         self.assertEqual(_trt_submodule_count(compiled), expected_engines)
         self._assert_matches_eager(mod, compiled, inputs)
 
     @parameterized.expand(_transposed_conv3d_cases(dynamic=True))
-    def test_fp32_transposed_conv3d_dynamic(self, _, case: _Conv3dCase):
+    def test_transposed_conv3d_dynamic(self, _, case: _Conv3dCase):
         targets = list(case.targets) if case.targets is not None else None
-        mod = ConvTranspose3d(stride=case.stride).eval().cuda()
-        inputs = (torch.randn(2, 4, 4, 4, 4).cuda(),)
+        mod = ConvTranspose3d(stride=case.stride).eval().cuda().to(case.dtype)
+        inputs = (torch.randn(2, 4, 4, 4, 4, dtype=case.dtype).cuda(),)
         batch = torch.export.Dim("batch", min=1, max=4)
         ep = torch.export.export(mod, inputs, dynamic_shapes=({0: batch},))
         compiled = torchtrt.dynamo.compile(
@@ -431,6 +460,7 @@ class TestTuringCapabilityGuards(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
             target_compute_capabilities=targets,
+            truncate_double=case.dtype == torch.float64,
         )
         targets_turing = (
             _is_turing() if case.targets is None else TURING in case.targets
@@ -439,7 +469,9 @@ class TestTuringCapabilityGuards(TestCase):
         for batch_size in (1, 2, 4):
             with self.subTest(batch_size=batch_size):
                 self._assert_matches_eager(
-                    mod, compiled, (torch.randn(batch_size, 4, 4, 4, 4).cuda(),)
+                    mod,
+                    compiled,
+                    (torch.randn(batch_size, 4, 4, 4, 4, dtype=case.dtype).cuda(),),
                 )
 
     def test_declared_turing_target_falls_back_fp32_linear(self):
@@ -621,6 +653,58 @@ class TestTuringCapabilityGuards(TestCase):
 )
 class TestTuringConvolutionValidator(TestCase):
     """Check the guard's dtype, spatial rank and target boundaries without a GPU."""
+
+    @parameterized.expand([("conv",), ("deconv",), ("fused_conv",)])
+    def test_fp64_convolution_support(self, operation):
+        for rank, truncate_double, targets in product(
+            (2, 3), (False, True), ((TURING,), ((8, 9), TURING), ((8, 9),))
+        ):
+            with self.subTest(
+                rank=rank, truncate_double=truncate_double, targets=targets
+            ):
+                graph = torch.fx.Graph()
+                x = graph.placeholder("x")
+                x.meta["val"] = torch.empty(
+                    (1, 4) + (8,) * rank, dtype=torch.float64, device="meta"
+                )
+                weight = graph.placeholder("weight")
+                if operation == "fused_conv":
+                    node = graph.call_function(
+                        tensorrt_conv_asym_pad_op,
+                        (
+                            x,
+                            weight,
+                            None,
+                            [1] * rank,
+                            [1] * rank,
+                            [1] * rank,
+                            [1] * rank,
+                            1,
+                        ),
+                    )
+                    validator = conv_asym_pad_capability_validator
+                else:
+                    node = graph.call_function(
+                        torch.ops.aten.convolution.default,
+                        (
+                            x,
+                            weight,
+                            None,
+                            [1] * rank,
+                            [1] * rank,
+                            [1] * rank,
+                            operation == "deconv",
+                            [0] * rank,
+                            1,
+                        ),
+                    )
+                    validator = convolution_capability_validator
+                settings = CompilationSettings(
+                    target_compute_capabilities=list(targets),
+                    truncate_double=truncate_double,
+                )
+                rejected = rank == 3 and truncate_double and TURING in targets
+                self.assertEqual(validator(node, settings), not rejected)
 
     def test_transposed_convolution_support(self):
         cases = [

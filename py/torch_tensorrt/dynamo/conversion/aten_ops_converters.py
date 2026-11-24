@@ -3981,9 +3981,12 @@ def turing_rejects_convolution(
     """Reject FP32 3D convolution and deconvolution on Turing.
 
     Also reject grouped FP16 forward 3D convolution.
+    Account for FP64 truncation after partitioning.
     """
     if spatial_rank != 3 or not trt_rtx_targets_turing(settings):
         return False
+    if dtype == torch.float64 and settings is not None and settings.truncate_double:
+        dtype = torch.float32
     is_grouped_fp16_forward = dtype == torch.float16 and groups > 1 and not transposed
     if dtype == torch.float32 or is_grouped_fp16_forward:
         _LOGGER.debug(
