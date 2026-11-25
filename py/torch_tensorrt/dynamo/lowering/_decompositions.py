@@ -296,6 +296,13 @@ def scatter_add_decomposition(
     index: torch.Tensor,
     src_tensor: torch.Tensor,
 ) -> torch.Tensor:
+    # Both decompositions below unroll the extent of index along dim, which would
+    # specialize a symbolic extent and fail export. Decline, so the op stays for
+    # partitioning to fall back to Torch. This holds on every path that applies the
+    # table (dynamo.trace, run_decompositions, AOT), and it is per call, so a
+    # static scatter_add in the same graph is still decomposed.
+    if not isinstance(index.shape[dim], int):
+        return NotImplemented
     if _use_integer_scatter_add(input_tensor, dim, index, src_tensor):
         return _scatter_add_integer_decomposition(input_tensor, dim, index, src_tensor)
 
@@ -350,11 +357,12 @@ def _use_integer_scatter_add(
         extent = input_tensor.shape[dim]
     else:
         # Otherwise keep the loop, as before. On a dynamic extent the loop would
-        # specialize it, which is why filter_decomposition_table keeps such an op
-        # out of decomposition on the compile paths.
+        # specialize it, which is why scatter_add_decomposition declines such an op.
         return False
     comparisons = index.numel() * extent
-    return statically_known_true(comparisons <= _MAX_INTEGER_SCATTER_ADD_COMPARISONS)
+    return bool(
+        statically_known_true(comparisons <= _MAX_INTEGER_SCATTER_ADD_COMPARISONS)
+    )
 
 
 def _scatter_add_integer_decomposition(

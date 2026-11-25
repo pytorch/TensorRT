@@ -11,6 +11,9 @@ from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    any_needs_undecomposed_graph,
+)
 from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
     mark_constant_fold_exclusions,
 )
@@ -313,6 +316,17 @@ def pre_export_lowering(
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.export.ExportedProgram:
     """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
+    if ep.dialect == "ATEN" and pre_export_lowering_needs_undecomposed_graph(settings):
+        # The program is already decomposed, so a pass that matches an op the
+        # decompositions rewrite finds nothing and silently does nothing. This is
+        # what trace() with other settings than compile() gives.
+        logger.warning(
+            "The exported program was already decomposed, but the lowering passes "
+            "enabled by these settings need the graph before decompositions (for "
+            "example replace_interleave_stack_with_cat, decompose_attention or "
+            "enable_autocast), so they may find nothing to rewrite. Pass the same "
+            "settings to dynamo.trace as to compile, or export with torch.export."
+        )
     weights = _get_weights_the_graph_reads(ep)
     if not settings.dryrun:  # a dry run builds no engine: shapes are enough
         _raise_if_weights_on_meta(weights)
@@ -354,6 +368,15 @@ def pre_export_lowering(
     for sub in iter_cond_subgraphs(gm):
         ATEN_PRE_LOWERING_PASSES(sub, settings)
     return ep
+
+
+def pre_export_lowering_needs_undecomposed_graph(settings: CompilationSettings) -> bool:
+    """Whether pre_export_lowering needs the graph before Torch-TRT decompositions.
+
+    If so, ``dynamo.trace`` exports without them and ``compile`` decomposes after
+    pre_export_lowering.
+    """
+    return bool(any_needs_undecomposed_graph(ATEN_PRE_LOWERING_PASSES.passes, settings))
 
 
 def dump_lowering_passes() -> str:

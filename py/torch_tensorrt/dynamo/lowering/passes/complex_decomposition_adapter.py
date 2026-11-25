@@ -103,6 +103,7 @@ def complex_decomposition_adapter(
     from torch._functorch._aot_autograd.complex_decomposition import (
         decompose_complex_in_graph,
     )
+    from torch_tensorrt.dynamo.lowering import get_decompositions
 
     flat_args = _fake_flat_args(gm)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
@@ -126,7 +127,20 @@ def complex_decomposition_adapter(
             decomposed_gm = decompose(
                 gm,
                 flat_args,
-                decompositions=_trt_decomposition_table(settings, gm),
+                # decompose_complex_in_graph re-traces through make_fx, so the
+                # module it returns is built from whatever ComplexTensor
+                # dispatched to, not from the ops that survived the decomposition
+                # run at export time. Without a table that retrace re-introduces
+                # ops the flow has already decided to expand (aten.stack), long
+                # after the stage that would have handled them, and the
+                # partitioner then cuts the graph around them. Handing the
+                # retrace the same table keeps the two in step.
+                decompositions=get_decompositions(
+                    settings.enable_experimental_decompositions,
+                    settings.decompose_attention,
+                    settings.use_distributed_mode_trace,
+                    settings.use_fp32_acc,
+                ),
             )
     except Exception as e:
         # decompose_complex_in_graph is upstream, experimental PyTorch code
@@ -227,36 +241,6 @@ def _decompose_complex_symbolically(
         return make_fx(
             wrapper, decomposition_table=decompositions, tracing_mode="symbolic"
         )(*flat_args)
-
-
-def _trt_decomposition_table(
-    settings: CompilationSettings, graph_module: GraphModule
-) -> dict[Any, Any]:
-    """The op set the rest of the TRT flow expects to see.
-
-    ``decompose_complex_in_graph`` re-traces through ``make_fx``, so the module
-    it returns is built from whatever ``ComplexTensor`` dispatched to, not from
-    the ops that survived the decomposition run at export time. Without a table
-    that retrace re-introduces ops the flow has already decided to expand
-    (``aten.stack``), long after the stage that would have handled them, and
-    the partitioner then cuts the graph around them. Handing the retrace the
-    same table keeps the two in step.
-    """
-    from torch_tensorrt.dynamo.lowering import (
-        filter_decomposition_table,
-        get_decompositions,
-    )
-
-    decompositions: dict[Any, Any] = filter_decomposition_table(
-        get_decompositions(
-            settings.enable_experimental_decompositions,
-            settings.decompose_attention,
-            settings.use_distributed_mode_trace,
-            use_fp32_acc=settings.use_fp32_acc,
-        ),
-        graph_module,
-    )
-    return decompositions
 
 
 def _graph_has_complex(gm: GraphModule) -> bool:

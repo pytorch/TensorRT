@@ -9,11 +9,16 @@ from torch.fx import passes
 from torch.fx.passes.pass_manager import PassManager
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    runs_on_decomposed_graph,
+)
 
 
 def _generate_draw_fx_graph_pass(
     output_path_prefix: str, name: str
 ) -> Callable[[torch.fx.GraphModule, CompilationSettings], torch.fx.GraphModule]:
+    # The debugger inserts these into the pre-export pass list; drawing reads any graph.
+    @runs_on_decomposed_graph
     def draw_fx_graph_pass(
         gm: torch.fx.GraphModule, settings: CompilationSettings
     ) -> torch.fx.GraphModule:
