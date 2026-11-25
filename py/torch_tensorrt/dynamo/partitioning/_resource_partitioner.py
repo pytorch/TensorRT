@@ -65,6 +65,7 @@ import torch
 from torch.fx.experimental.const_fold import _inline_module
 from torch.fx.passes.splitter_base import Subgraph, _SplitterBase
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
     get_node_in_fusion_pattern,
 )
@@ -201,10 +202,19 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         # stays in one subgraph with the getitems that unpack them, like a fusion group.
         # Storing the group on the node alone is enough: a getitem left on the other side of a split
         # makes the node a leaf, and the split checks the groups of leaves.
+        # A quantize stays with its dequantizes too: the quantize converters keep their results
+        # in float32 inside the engine, and TensorRT-RTX cannot take the int8 values as an input.
         for node in nodes:
             getitems = {u for u in node.users if u.target == operator.getitem}
             if getitems:
                 self.fusion_patterns.setdefault(node, set()).update(getitems | {node})
+            dequantizes = {
+                u for u in node.users if impl.quantize.quantize_read_by(u) is node
+            }
+            if dequantizes:
+                self.fusion_patterns.setdefault(node, set()).update(
+                    dequantizes | {node}
+                )
 
         return subgraphs
 

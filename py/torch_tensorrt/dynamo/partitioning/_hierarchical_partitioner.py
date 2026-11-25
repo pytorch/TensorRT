@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
 )
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
@@ -76,6 +77,10 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> Tuple[bool, str]:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+        # A dequantize goes to TensorRT only with its quantize: TensorRT-RTX cannot take int8
+        # values from another block as an input. The rule holds on every build, for
+        # simplicity. Nodes are placed in graph order, so the quantize already has its backend.
+        quantize = impl.quantize.quantize_read_by(node)
 
         for i, backend_name in enumerate(self.backend_priority):
             supported_ops = self.backend_support_map.get(backend_name, set())
@@ -91,7 +96,12 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 and (
                     backend_name != TRT_BACKEND_NAME
                     or node.op == "get_attr"
-                    or (node in CONVERTERS and not makes_uint8_tensor(node))
+                    or (
+                        node in CONVERTERS
+                        and not makes_uint8_tensor(node)
+                        and getattr(quantize, "backend", TRT_BACKEND_NAME)
+                        == TRT_BACKEND_NAME
+                    )
                 )
                 and node_name not in self.torch_executed_ops
                 and node.target not in self.torch_executed_ops
@@ -337,7 +347,20 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
         while current_cpu_nodes or current_acc_nodes:
             # Find the first node that should belong to the current subgraph and has all dependencies resolved
             current_nodes = current_acc_nodes if acc_subgraph else current_cpu_nodes
+            # Prefer a node of the current backend, so that a node joins its producer's block
+            # whenever it can, rather than when the set order happens to pick it first. A
+            # dequantize must join its quantize's block (see BackendOpSupportTester).
+            backend = (
+                current_subgraph_nodes[-1].backend if current_subgraph_nodes else None
+            )
             node = next(
+                (
+                    n
+                    for n in current_nodes
+                    if n.backend == backend and self.deps[n] <= visited_nodes
+                ),
+                None,
+            ) or next(
                 (n for n in current_nodes if self.deps[n] <= visited_nodes),
                 None,
             )

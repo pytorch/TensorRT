@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_CONVERTERS,
     ConverterPriority,
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
@@ -45,6 +46,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
     get_positive_dim,
     is_only_operator_on_placeholder,
+)
+from torch_tensorrt.dynamo.partitioning._global_partitioner import (
+    TorchTensorRTOperatorSupport,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, extract_var_range_info
 
@@ -1335,6 +1339,231 @@ else:
             args[3],
             args[4],
             args[5],
+        )
+
+
+def _quantized_decomposed_args(
+    node_args: Tuple[Argument, ...], kwargs: Mapping[str, Argument], target: Target
+) -> Tuple[Argument, Argument, Argument, Optional[int], int, int, Any, Any]:
+    """Return (input, scale, zero_point, axis, quant_min, quant_max, dtype, out_dtype)."""
+    if target in impl.quantize.QUANTIZED_DECOMPOSED_PER_CHANNEL_OPS:
+        input, scale, zero_point, axis, quant_min, quant_max, dtype = node_args[:7]
+    else:
+        input, scale, zero_point, quant_min, quant_max, dtype = node_args[:6]
+        axis = None
+    return (
+        input,
+        scale,
+        zero_point,
+        cast(Optional[int], axis),
+        cast(int, quant_min),
+        cast(int, quant_max),
+        dtype,
+        kwargs.get("out_dtype"),
+    )
+
+
+def quantized_decomposed_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    quantize = node.target in impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS
+    per_channel = node.target in impl.quantize.QUANTIZED_DECOMPOSED_PER_CHANNEL_OPS
+    # The converters read these arguments by position.
+    if len(node.args) < (7 if per_channel else 6):
+        return False
+    input, scale, zero_point, axis, quant_min, quant_max, dtype, out_dtype = (
+        _quantized_decomposed_args(node.args, node.kwargs, node.target)
+    )
+
+    def meta_val(arg: Argument) -> Any:
+        if not isinstance(arg, Node):
+            return None
+        return arg.meta.get("val", arg.meta.get("tensor_meta"))
+
+    def meta_dtype(arg: Argument) -> Optional[torch.dtype]:
+        return getattr(meta_val(arg), "dtype", None)
+
+    # Only int8 and uint8 are converted and tested. int16 also has no TensorRT type for a
+    # value that crosses an engine boundary.
+    if dtype not in (torch.int8, torch.uint8):
+        return False
+    # The converters fold the scale and zero point into constants, so both must be known
+    # when the engine is built.
+    if any(
+        isinstance(qparam, Node) and qparam.op != "get_attr"
+        for qparam in (scale, zero_point)
+    ):
+        return False
+    # PyTorch raises for a range beyond the dtype, so that stays in PyTorch to raise there.
+    # quant_min above quant_max stays in PyTorch too: a quantize then gives quant_max, which
+    # only PyTorch's final cast wraps into the dtype. The per-channel dequantize ignores its
+    # range but shares the check, for simplicity; the per-tensor dequantize skips it. A
+    # range computed in the graph is not known when the engine is built.
+    if (quantize or per_channel) and not (
+        isinstance(quant_min, int)
+        and isinstance(quant_max, int)
+        and torch.iinfo(dtype).min <= quant_min <= quant_max <= torch.iinfo(dtype).max
+    ):
+        return False
+    if quantize and zero_point is None:
+        return False
+    if per_channel:
+        rank = len(getattr(meta_val(input), "shape", ()))
+        if not isinstance(axis, int) or not -rank <= axis < rank:
+            return False
+    # dequantize_per_channel subtracts a narrower integer zero point with wraparound, and a
+    # quantize drops the fraction of a float one in its final cast. float32 math matches
+    # neither, so these zero points stay in PyTorch for every op.
+    if isinstance(zero_point, Node) and meta_dtype(zero_point) not in (
+        torch.int32,
+        torch.int64,
+    ):
+        return False
+    # dequantize_per_channel multiplies in the dtype of its scales, so only float32 scales
+    # keep it in float32. The per-channel quantize shares the check.
+    if per_channel and meta_dtype(scale) != torch.float32:
+        return False
+    # convert_pt2e gives one scale per channel along axis. Other shapes stay in PyTorch,
+    # also the few that PyTorch broadcasts.
+    if per_channel and not (
+        len(meta_val(scale).shape) == 1
+        and statically_known_true(
+            meta_val(input).shape[axis] == meta_val(scale).shape[0]
+        )
+    ):
+        return False
+    # PyTorch views the zero points to the length of the scales and raises when they differ.
+    if (
+        per_channel
+        and isinstance(zero_point, Node)
+        and meta_val(zero_point).shape.numel() != meta_val(scale).shape.numel()
+    ):
+        return False
+    if quantize:
+        # The float32 values stand in for the integers only where a dequantize reads them or
+        # an engine output casts them back to the op's dtype. The torch.cond check refuses a
+        # quantize that is a branch output, because that is not an engine output.
+        return meta_dtype(input) in (
+            torch.float32,
+            torch.float16,
+            torch.bfloat16,
+        ) and all(
+            user.op == "output"
+            or user.target in impl.quantize.QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS
+            for user in node.users
+        )
+    # The converter reads int8 values that enter the engine with an int8 dequantize layer,
+    # and TensorRT-RTX has no int8 activations. A converted quantize gives float32 instead.
+    # The partitioners keep a quantize with no other user in its dequantize's engine, unless
+    # their rank or Turing bfloat16 checks, which its own validator does not make, keep it
+    # in PyTorch.
+    if (
+        ENABLED_FEATURES.tensorrt_rtx
+        and isinstance(input, Node)
+        and input.op != "get_attr"
+        and meta_dtype(input) == torch.int8
+        and not (
+            input.target in impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS
+            and len(input.users) == 1
+            and input in DYNAMO_CONVERTERS
+            and not TorchTensorRTOperatorSupport._exceeds_max_tensor_rank(input)
+            and not TorchTensorRTOperatorSupport._has_bf16_on_turing(input, settings)
+        )
+    ):
+        return False
+    return meta_dtype(input) == dtype and out_dtype in (
+        None,
+        torch.float32,
+        torch.float16,
+        torch.bfloat16,
+    )
+
+
+if impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS:
+
+    @functools.lru_cache(maxsize=None)
+    def _warn_quantized_decomposed_float32() -> None:
+        _LOGGER.warning(
+            "PT2E quantize and dequantize ops (quantized_decomposed) run as float32 "
+            "math, and int8 weights are folded into floating-point constants, so the "
+            "TensorRT engine gets no int8 speed or memory benefit."
+        )
+
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.quantize_per_tensor.default,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.quantize_per_tensor.tensor,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.quantize_per_channel.default,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_quantized_decomposed_quantize(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        input, scale, zero_point, axis, quant_min, quant_max, _, _ = (
+            _quantized_decomposed_args(args, kwargs, target)
+        )
+        _warn_quantized_decomposed_float32()
+        return impl.quantize.quantize_decomposed(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            input,
+            scale,
+            zero_point,
+            quant_min,
+            quant_max,
+            axis,
+        )
+
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.dequantize_per_tensor.default,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.dequantize_per_tensor.tensor,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    @dynamo_tensorrt_converter(
+        torch.ops.quantized_decomposed.dequantize_per_channel.default,
+        capability_validator=quantized_decomposed_validator,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_quantized_decomposed_dequantize(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        input, scale, zero_point, axis, _, _, _, out_dtype = _quantized_decomposed_args(
+            args, kwargs, target
+        )
+        _warn_quantized_decomposed_float32()
+        return impl.quantize.dequantize_decomposed(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            input,
+            scale,
+            zero_point,
+            out_dtype,
+            axis,
         )
 
 

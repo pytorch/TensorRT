@@ -10,7 +10,7 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from torch.fx.passes.splitter_base import Subgraph
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.conversion import CompilationSettings
+from torch_tensorrt.dynamo.conversion import CompilationSettings, impl
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -218,6 +218,41 @@ def test_a_getitem_is_passed_with_its_producer():
     # output a tuple.
     assert all(n.target is not operator.getitem for n in subgraphs[1].nodes)
     torch.testing.assert_close(gm(x, pair), module(x, pair))
+
+
+class _DequantizedInput(torch.nn.Module):
+    def __init__(self, quantize_reads_input):
+        super().__init__()
+        self.quantize_reads_input = quantize_reads_input
+
+    def forward(self, x):
+        qd = torch.ops.quantized_decomposed
+        value = x if self.quantize_reads_input else x * 2
+        q = qd.quantize_per_tensor.default(value, 0.1, 0, -128, 127, torch.int8)
+        dq = qd.dequantize_per_tensor.default(q, 0.1, 0, -128, 127, torch.int8)
+        return torch.relu(x + dq) * dq  # the multiply is in subgraph 1
+
+
+@pytest.mark.skipif(
+    not impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS,
+    reason="torch.ao.quantization.fx._decomposed is not available",
+)
+@pytest.mark.parametrize("quantize_reads_input", [True, False])
+def test_a_dequantize_goes_with_its_quantize(quantize_reads_input):
+    """A dequantize is passed when its quantize is and recomputed when its quantize is: alone, it would
+    make the quantize's int8 values an engine input, which TensorRT-RTX cannot take."""
+    module = _DequantizedInput(quantize_reads_input)
+    x = torch.randn(256, 256)
+    gm, nodes, subgraphs = _recompute(module, (x,), cuts=[-1])
+    qd = torch.ops.quantized_decomposed
+    quantize, dequantize = (
+        next(n for n in nodes if n.target == op)
+        for op in (qd.quantize_per_tensor.default, qd.dequantize_per_tensor.default)
+    )
+    inputs = _inputs_of(subgraphs[1])
+    assert quantize not in inputs
+    assert (dequantize in inputs) == quantize_reads_input
+    torch.testing.assert_close(gm(x), module(x))
 
 
 class _RandomFromTheMask(torch.nn.Module):
