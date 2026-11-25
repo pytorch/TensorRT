@@ -22,14 +22,16 @@ native_validation/
 ├── optimizations/
 │   ├── caller_owned_io.py        # Export with caller-owned CPU buffers
 │   └── registered_host_memory.h  # Register reusable CPU buffers with CUDA
-├── benchmarks/
-│   ├── benchmark.cpp             # Native latency and memory measurements
-│   ├── benchmark_host.sh         # Launches fresh native processes
-│   ├── benchmark_python.py       # PyTorch eager and Python ExecuTorch measurements
-│   ├── process_memory.py         # Linux process-memory sampling
-│   └── summarize_benchmark.py    # Summarizes measurements
-└── tests/                        # CPU tests for helpers and measurement tools
+└── benchmarks/
+    ├── benchmark.cpp             # Native latency and memory measurements
+    ├── benchmark_host.sh         # Launches fresh native processes
+    ├── benchmark_python.py       # PyTorch eager and Python ExecuTorch measurements
+    ├── process_memory.py         # Linux process-memory sampling
+    └── summarize_benchmark.py    # Summarizes measurements
 ```
+
+Regression tests live alongside the existing ExecuTorch tests in
+[`tests/py/dynamo/executorch/`](../../../tests/py/dynamo/executorch).
 
 Both model exporters use the helpers in `optimizations/`. The native benchmark
 includes the registration helper through CMake; the correctness runner remains
@@ -232,10 +234,12 @@ correctness tolerances; no CUDA Graph or shared-scratch settings are changed.
 CPU regression checks:
 
 ```bash
-python -m unittest discover \
-  -s examples/torchtrt_executorch_example/native_validation/tests \
-  -t examples/torchtrt_executorch_example/native_validation \
-  -p 'test_*.py' -v
+python -m pytest -v \
+  tests/py/dynamo/executorch/test_caller_owned_io.py \
+  tests/py/dynamo/executorch/test_registered_host_memory.py \
+  tests/py/dynamo/executorch/test_benchmark_profiles.py \
+  tests/py/dynamo/executorch/test_benchmark_summary.py \
+  tests/py/dynamo/executorch/test_process_memory.py
 ```
 
 The output-spec tests need PyTorch but no GPU. The host-registration tests compile

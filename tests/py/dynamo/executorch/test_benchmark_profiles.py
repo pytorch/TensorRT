@@ -3,9 +3,21 @@
 
 """CPU-only protocol checks; not model inference tests."""
 
+import sys
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from benchmarks.benchmark_python import INPUT_SHAPES, model_spec
+import pytest
+
+# Resolve example helpers from this checkout even when CI runs from tests/py/dynamo.
+with patch.object(sys, "path", [str(Path(__file__).resolve().parents[4]), *sys.path]):
+    from examples.torchtrt_executorch_example.native_validation.benchmarks.benchmark_python import (
+        INPUT_SHAPES,
+        model_spec,
+    )
+
+pytestmark = pytest.mark.unit
 
 
 class ProfileTests(unittest.TestCase):

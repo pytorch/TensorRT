@@ -7,6 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 
 @unittest.skipUnless(shutil.which("g++"), "Requires g++")
 class RegistrationTests(unittest.TestCase):
@@ -61,7 +65,10 @@ int main() {
                     "-I",
                     str(root),
                     "-I",
-                    str(Path(__file__).resolve().parents[1] / "optimizations"),
+                    str(
+                        Path(__file__).resolve().parents[4]
+                        / "examples/torchtrt_executorch_example/native_validation/optimizations"
+                    ),
                     str(root / "test.cpp"),
                     "-o",
                     str(binary),

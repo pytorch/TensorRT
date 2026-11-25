@@ -1,8 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """CPU regressions for output metadata after device-copy insertion."""
 
+import sys
 import unittest
+from pathlib import Path
 from types import SimpleNamespace as NS
+from unittest.mock import patch
+
+import pytest
+
+pytestmark = pytest.mark.unit
 
 try:
     import torch
@@ -13,7 +20,12 @@ except ImportError:
 @unittest.skipIf(torch is None, "Requires PyTorch; no GPU is needed")
 class CallerIOTests(unittest.TestCase):
     def test_cpu_outputs_replace_stale_gpu_specs_without_changing_intermediates(self):
-        from optimizations.caller_owned_io import refresh_output_specs
+        with patch.object(
+            sys, "path", [str(Path(__file__).resolve().parents[4]), *sys.path]
+        ):
+            from examples.torchtrt_executorch_example.native_validation.optimizations.caller_owned_io import (
+                refresh_output_specs,
+            )
 
         graph = torch.fx.Graph()
         x = graph.placeholder("x")
@@ -35,7 +47,12 @@ class CallerIOTests(unittest.TestCase):
         self.assertIs(output.meta["spec"][0], cpu_spec)
 
     def test_reject_planned_public_io_but_allow_planned_intermediates(self):
-        from optimizations.caller_owned_io import validate_program
+        with patch.object(
+            sys, "path", [str(Path(__file__).resolve().parents[4]), *sys.path]
+        ):
+            from examples.torchtrt_executorch_example.native_validation.optimizations.caller_owned_io import (
+                validate_program,
+            )
 
         values = [
             NS(val=NS(allocation_info=None)),

@@ -4,12 +4,21 @@
 import contextlib
 import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from benchmarks import process_memory
+import pytest
+
+# Resolve example helpers from this checkout even when CI runs from tests/py/dynamo.
+with patch.object(sys, "path", [str(Path(__file__).resolve().parents[4]), *sys.path]):
+    from examples.torchtrt_executorch_example.native_validation.benchmarks import (
+        process_memory,
+    )
+
+pytestmark = pytest.mark.unit
 
 
 class ProcessMemoryTests(unittest.TestCase):

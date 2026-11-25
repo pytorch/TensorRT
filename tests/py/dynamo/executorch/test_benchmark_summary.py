@@ -1,11 +1,22 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from benchmarks.summarize_benchmark import percentile, summarize_run
+import pytest
+
+# Resolve example helpers from this checkout even when CI runs from tests/py/dynamo.
+with patch.object(sys, "path", [str(Path(__file__).resolve().parents[4]), *sys.path]):
+    from examples.torchtrt_executorch_example.native_validation.benchmarks.summarize_benchmark import (
+        percentile,
+        summarize_run,
+    )
+
+pytestmark = pytest.mark.unit
 
 
 class SummaryTests(unittest.TestCase):
