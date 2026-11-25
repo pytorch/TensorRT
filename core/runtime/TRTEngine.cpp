@@ -25,8 +25,7 @@
 #include "torch/csrc/distributed/c10d/NCCLUtils.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroup.hpp"
 // Newer PyTorch wheels can expose NCCL2 without the legacy backend.
-#if __has_include("torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp")
-#define TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL 1
+#ifdef TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL
 #include "torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
 #endif
 #ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
