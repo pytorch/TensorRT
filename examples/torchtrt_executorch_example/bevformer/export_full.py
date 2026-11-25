@@ -55,7 +55,20 @@ def main():
     )
     parser.add_argument("--checkpoint", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--caller-owned-io",
+        action="store_true",
+        help="Export caller-owned CPU input/output buffers for benchmark_pte",
+    )
     args = parser.parse_args()
+    save_options = {}
+    if args.caller_owned_io:
+        sys.path.insert(
+            0, str(Path(__file__).resolve().parents[1] / "native_validation")
+        )
+        from optimizations.caller_owned_io import backend_config
+
+        save_options["backend_config"] = backend_config()
     args.output_dir.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.source_dir.resolve()))
     from model import Geometry, example_inputs, load_model
@@ -64,6 +77,7 @@ def main():
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     report = {
+        "caller_owned_io": args.caller_owned_io,
         "scope": "full pretrained BEVFormer-Tiny tensor computation; synthetic preprocessed inputs",
         "versions": {
             p: importlib.metadata.version(p)
@@ -106,6 +120,7 @@ def main():
                 output_format="executorch",
                 arg_inputs=inputs,
                 retrace=False,
+                **save_options,
                 partitioners=[
                     CudaPartitioner(
                         [CudaBackend.generate_method_name_compile_spec("forward")]
@@ -116,6 +131,10 @@ def main():
         if not data.is_file():
             raise FileNotFoundError("Expected external AOTI data alongside model.pte")
         program = deserialize_pte_binary(path.read_bytes()).program
+        if args.caller_owned_io:
+            from optimizations.caller_owned_io import validate_program
+
+            validate_program(program)
         report["delegates"] = [
             d.id for plan in program.execution_plan for d in plan.delegates
         ]
