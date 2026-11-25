@@ -109,7 +109,7 @@ class TestLinearConverter(DispatchTestCase):
                 if layer.type == trt.LayerType.CONSTANT
             ]
             weights = [
-                (layer.get_input(1).name, tuple(layer.get_input(1).shape))
+                tuple(layer.get_input(1).shape)
                 for layer in layers
                 if layer.type == trt.LayerType.MATRIX_MULTIPLY
             ]
@@ -117,12 +117,14 @@ class TestLinearConverter(DispatchTestCase):
 
         constants, weights = network(False)
         self.assertEqual(constants.count((6, 4)), 3)
-        self.assertEqual(sorted(s for _, s in weights), [(1, 5, 4)] + [(1, 6, 4)] * 3)
+        self.assertEqual(sorted(weights), [(1, 5, 4)] + [(1, 6, 4)] * 3)
 
         constants, weights = network(True)
+        # 3 of the 4 matrix multiplies read the shared weight, and each transposes it
+        # itself: TensorRT 11.4 can crash building a large network that reuses one
+        # transposed copy.
         self.assertEqual(constants.count((6, 4)), 1)
-        self.assertEqual(sorted(s for _, s in weights), [(1, 4, 6)] * 3 + [(1, 5, 4)])
-        self.assertEqual(len({name for name, s in weights if s == (1, 4, 6)}), 1)
+        self.assertEqual(sorted(weights), [(1, 5, 4)] + [(1, 6, 4)] * 3)
 
 
 if __name__ == "__main__":

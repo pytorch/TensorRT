@@ -721,40 +721,6 @@ def get_trt_tensor(
         raise AssertionError(f"Cannot convert {input_val} to TRT constant")
 
 
-def get_transposed_trt_tensor(
-    ctx: ConversionContext,
-    value: Union[torch.Tensor, np.ndarray],
-    name: str,
-    rank: int = 2,
-) -> TRTTensor:
-    """
-    Convert a matrix, such as the weight of a linear layer, to a TensorRT ITensor
-    holding its transpose, with leading dimensions of size 1 up to ``rank`` so a
-    batched matrix multiply can read it as it is. With the deduplicate_weights
-    setting, the result is added to the network once and shared, like the constant
-    itself (see ``get_trt_tensor``): TensorRT can keep a host copy of a constant for
-    every layer that transposes it, and in a refittable engine for every layer that
-    reshapes it. A 1-D value is returned as it is.
-    Args:
-        ctx (ConversionContext): A TensorRT ConversionContext
-        value (Union[torch.Tensor, np.ndarray]): A 1-D or 2-D tensor or array
-        name (str): The name of the constant layer, if one is added
-        rank (int): The rank of the matrix multiply that reads the result
-    Returns:
-        A TensorRT ITensor holding the transpose of ``value``.
-    """
-    constant = get_trt_tensor(ctx, value, name)
-    if len(constant.shape) < 2:
-        return constant
-    if (constant, rank) not in ctx.transposed_constants:
-        layer = ctx.net.add_shuffle(constant)
-        layer.first_transpose = (1, 0)
-        layer.reshape_dims = (1,) * (rank - 2) + tuple(constant.shape)[::-1]
-        layer.name = f"{name}_transpose"
-        ctx.transposed_constants[constant, rank] = layer.get_output(0)
-    return ctx.transposed_constants[constant, rank]
-
-
 def _constant_key(
     value: Any,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
