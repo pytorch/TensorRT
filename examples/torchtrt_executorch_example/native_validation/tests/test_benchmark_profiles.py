@@ -5,7 +5,7 @@
 
 import unittest
 
-from benchmark_python import INPUT_SHAPES, model_spec
+from benchmarks.benchmark_python import INPUT_SHAPES, model_spec
 
 
 class ProfileTests(unittest.TestCase):

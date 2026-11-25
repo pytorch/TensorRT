@@ -12,6 +12,29 @@ in Python. No exported models, weights, images or benchmark results are shipped.
 
 `benchmark_pte` measures inference latency and process memory for fixed inputs.
 
+## Source layout
+
+```text
+native_validation/
+├── CMakeLists.txt                # Builds validate_pte and benchmark_pte
+├── main.cpp                      # Output checks and BEV state feedback
+├── run_cases_host.sh             # Runs native correctness checks
+├── optimizations/
+│   ├── caller_owned_io.py        # Export with caller-owned CPU buffers
+│   └── registered_host_memory.h  # Register reusable CPU buffers with CUDA
+├── benchmarks/
+│   ├── benchmark.cpp             # Native latency and memory measurements
+│   ├── benchmark_host.sh         # Launches fresh native processes
+│   ├── benchmark_python.py       # PyTorch eager and Python ExecuTorch measurements
+│   ├── process_memory.py         # Linux process-memory sampling
+│   └── summarize_benchmark.py    # Summarizes measurements
+└── tests/                        # CPU tests for helpers and measurement tools
+```
+
+Both model exporters use the helpers in `optimizations/`. The native benchmark
+includes the registration helper through CMake; the correctness runner remains
+independent of these optional optimizations.
+
 ## Build and stage
 
 In the configured authoring container, set paths for your source checkouts,
@@ -88,23 +111,23 @@ env -i PATH=/usr/bin:/bin \
 ## Compare execution modes
 
 Use the same checkpoint, inputs, precision and serialized artifact. Do not
-compile during measurement. `benchmark_python.py` accepts `--mode eager` or
+compile during measurement. `benchmarks/benchmark_python.py` accepts `--mode eager` or
 `--mode executorch`, and `--model-family bevformer` or `segformer`. Supply the
 appropriate example directory as `--source-dir` and the checkpoint path.
 BEVFormer's mixed artifact also requires `--data`.
 
 ```bash
-python "$validation/benchmark_python.py" \
+python "$validation/benchmarks/benchmark_python.py" \
   --mode executorch --model-family segformer \
   --source-dir "$segformer_source" --checkpoint "$checkpoint" \
   --model "$bundle/model.pte" --case "$one_fixture" \
   --output "$python_results" --warmup 20 --iterations 100
 
 # Native comparison: run on the host, outside Docker.
-bash "$validation/benchmark_host.sh" \
+bash "$validation/benchmarks/benchmark_host.sh" \
   "$deployment/bin/benchmark_pte" "$bundle" "$one_fixture" \
   "$native_results" "$deployment/lib" "$cuda_root" 20 100 3
-python "$validation/summarize_benchmark.py" "$native_results" \
+python "$validation/benchmarks/summarize_benchmark.py" "$native_results" \
   --output "$native_summary"
 ```
 
@@ -115,7 +138,7 @@ output checks before warmup, after warmup and after measurement. Timing starts
 with prepared CPU tensors and ends with completed inference and owned CPU
 outputs. It excludes image decoding, preprocessing and reference comparison.
 
-`process_memory.py` and the native benchmark record Linux RSS, PSS and lifetime
+`benchmarks/process_memory.py` and the native benchmark record Linux RSS, PSS and lifetime
 peak RSS in KiB (1024 bytes); divide by 1024 for MiB. These include runtime
 libraries, fixtures, reference tensors and application buffers. They are not
 total GPU memory and must not be summed with CUDA free-memory snapshots. Peak
@@ -157,7 +180,7 @@ python examples/torchtrt_executorch_example/segformer/export_full.py \
   --checkpoint "$SEG_CHECKPOINT" --output "$SEG_BUNDLE" --caller-owned-io
 ```
 
-The shared `caller_owned_io.py` selects `alloc_graph_input=False` and
+The shared `optimizations/caller_owned_io.py` selects `alloc_graph_input=False` and
 `alloc_graph_output=False`. It refreshes output metadata after CUDA copies so
 that the final CPU outputs, rather than GPU intermediates, are excluded from
 memory planning. This workaround came from the pinned PBR exporter; it does not
@@ -210,7 +233,9 @@ CPU regression checks:
 
 ```bash
 python -m unittest discover \
-  -s examples/torchtrt_executorch_example/native_validation -p 'test_*.py' -v
+  -s examples/torchtrt_executorch_example/native_validation/tests \
+  -t examples/torchtrt_executorch_example/native_validation \
+  -p 'test_*.py' -v
 ```
 
 The output-spec tests need PyTorch but no GPU. The host-registration tests compile

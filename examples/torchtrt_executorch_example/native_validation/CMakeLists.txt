@@ -23,7 +23,8 @@ target_link_libraries(validate_pte PRIVATE
   executorch::backend_tensorrt CUDA::cudart)
 
 # Separate from the recurrence/correctness checker: fixed-input latency samples.
-add_executable(benchmark_pte benchmark.cpp)
+add_executable(benchmark_pte benchmarks/benchmark.cpp)
+target_include_directories(benchmark_pte PRIVATE "${CMAKE_CURRENT_LIST_DIR}/optimizations")
 target_compile_features(benchmark_pte PRIVATE cxx_std_17)
 target_link_libraries(benchmark_pte PRIVATE
   executorch executorch::backends executorch::extensions executorch::kernels

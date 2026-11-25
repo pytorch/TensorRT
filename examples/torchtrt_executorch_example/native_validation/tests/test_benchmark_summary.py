@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from summarize_benchmark import percentile, summarize_run
+from benchmarks.summarize_benchmark import percentile, summarize_run
 
 
 class SummaryTests(unittest.TestCase):

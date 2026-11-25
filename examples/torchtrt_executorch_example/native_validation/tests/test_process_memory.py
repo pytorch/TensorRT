@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import process_memory
+from benchmarks import process_memory
 
 
 class ProcessMemoryTests(unittest.TestCase):

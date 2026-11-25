@@ -18,8 +18,12 @@ import sys
 import time
 from pathlib import Path
 
-from process_memory import log_memory
-from summarize_benchmark import percentile
+if __package__:
+    from .process_memory import log_memory
+    from .summarize_benchmark import percentile
+else:
+    from process_memory import log_memory
+    from summarize_benchmark import percentile
 
 INPUT_SHAPES = ((1, 6, 3, 480, 800), (1, 6, 4, 4), (1, 18), (1, 2500, 256), (1, 1, 1))
 

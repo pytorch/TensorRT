@@ -13,7 +13,7 @@ except ImportError:
 @unittest.skipIf(torch is None, "Requires PyTorch; no GPU is needed")
 class CallerIOTests(unittest.TestCase):
     def test_cpu_outputs_replace_stale_gpu_specs_without_changing_intermediates(self):
-        from caller_owned_io import refresh_output_specs
+        from optimizations.caller_owned_io import refresh_output_specs
 
         graph = torch.fx.Graph()
         x = graph.placeholder("x")
@@ -35,7 +35,7 @@ class CallerIOTests(unittest.TestCase):
         self.assertIs(output.meta["spec"][0], cpu_spec)
 
     def test_reject_planned_public_io_but_allow_planned_intermediates(self):
-        from caller_owned_io import validate_program
+        from optimizations.caller_owned_io import validate_program
 
         values = [
             NS(val=NS(allocation_info=None)),

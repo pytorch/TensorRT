@@ -61,7 +61,7 @@ int main() {
                     "-I",
                     str(root),
                     "-I",
-                    str(Path(__file__).resolve().parent),
+                    str(Path(__file__).resolve().parents[1] / "optimizations"),
                     str(root / "test.cpp"),
                     "-o",
                     str(binary),

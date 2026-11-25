@@ -66,7 +66,7 @@ def main():
         sys.path.insert(
             0, str(Path(__file__).resolve().parents[1] / "native_validation")
         )
-        from caller_owned_io import backend_config
+        from optimizations.caller_owned_io import backend_config
 
         save_options["backend_config"] = backend_config()
     args.output_dir.mkdir(parents=True, exist_ok=False)
@@ -132,7 +132,7 @@ def main():
             raise FileNotFoundError("Expected external AOTI data alongside model.pte")
         program = deserialize_pte_binary(path.read_bytes()).program
         if args.caller_owned_io:
-            from caller_owned_io import validate_program
+            from optimizations.caller_owned_io import validate_program
 
             validate_program(program)
         report["delegates"] = [
