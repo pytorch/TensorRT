@@ -235,17 +235,19 @@ already on the GPU, those copies are wasted time. Turn them off at export:
 * **Do not let the program allocate its inputs:** pass ``alloc_graph_input=False``. Otherwise
   the program keeps its own input buffer, and every call fails with error ``0x10``
   (``NotSupported``). The log then says ``Planned-buffer copy needs host memory on both sides``.
-* **Do not let it allocate its outputs either:** ``alloc_graph_output=False`` keeps the outputs
-  out of the program's memory. From Python, the runtime allocates GPU memory for each output, and
-  the next call does not overwrite an output you still hold, unless you pass
-  ``clone_outputs=False``. From C++, you must give the method your own GPU buffer once with
-  ``Module::set_output``, before the first run. If you keep outputs planned instead, the next call
-  overwrites them, so Python's ``execute()`` copies them on every call unless you pass
-  ``clone_outputs=False``.
+* **Do not let it allocate its outputs either:** ``alloc_graph_output=False`` keeps the outputs out
+  of the program's memory. From Python, the runtime allocates each output for you: GPU memory for an
+  output that a GPU delegate writes, and host memory for one that a CPU operator writes. The next
+  call does not overwrite an output you still hold, unless you pass ``clone_outputs=False``. From
+  C++, you must give each output, except a constant one, your own buffer in that same memory with
+  ``Module::set_output``, once, before the first run (see `Give inputs and outputs their buffers
+  from C++`_). If you keep outputs planned instead, the next call overwrites them, so Python's
+  ``execute()`` copies them on every call unless you pass ``clone_outputs=False``.
 
-Pass CUDA tensors to a program exported this way. ExecuTorch's Python runtime refuses a CPU
-tensor. From C++, a CPU tensor costs a copy on every call when the first delegate to use that
-input is TensorRT, and fails when it is the CUDA backend.
+Pass CUDA tensors for the inputs that a GPU delegate reads. ExecuTorch's Python runtime refuses a
+CPU tensor for those. An input that only CPU operators read stays in host memory, so pass a CPU
+tensor for it. From C++, a CPU tensor for a GPU input costs a copy on every call when the first
+delegate to use that input is TensorRT, and fails when it is the CUDA backend.
 
 Keep the engines in a separate file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -312,7 +314,10 @@ fails without it:
     )
     outputs = program.load_method("forward").execute((torch.ones(64, 64),))
 
-A program that keeps its inputs and outputs on the GPU takes CUDA tensors and returns CUDA tensors:
+A program exported as in `Keep inputs and outputs on the GPU`_ takes a CUDA tensor for each input
+that a GPU delegate reads, and a CPU tensor for an input that only CPU operators read. It returns
+CUDA tensors for the outputs that a GPU delegate writes. When the whole model runs on the GPU,
+that is every input and output:
 
 .. code-block:: python
 
@@ -333,7 +338,7 @@ Run from C++
 -------------
 
 The wheels ship a prebuilt delegate and a CMake package, so a C++ application can link it without
-building anything. The steps below are for Linux. Put the program shown further down in
+building anything. The steps below are for Linux. Put the first program below in
 ``main.cpp``, the ``model.pte`` from `Export a Model`_ in the same folder, and this next to them as
 ``CMakeLists.txt``:
 
@@ -429,6 +434,115 @@ To build the delegate from source instead, follow the
 The same README lists the rules a C++ caller has to keep (threads, buffers, streams), the load
 errors, and the known issues. ``examples/executorch_reference_runner/`` is a complete C++
 example.
+
+Give inputs and outputs their buffers from C++
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A program exported with ``alloc_graph_output=False``, as in `Keep inputs and outputs on the GPU`_,
+does not allocate its outputs. Before the first call, give each output one persistent buffer with
+``Module::set_output``. A constant output is the exception: it keeps its data in the program,
+``is_memory_planned()`` in its metadata returns true, and ``Module::set_output`` refuses a buffer
+for it. Every ``forward`` call then writes the outputs into those same buffers, so read or copy them
+before the next call. Without the buffers, the first call fails with error ``0x12``
+(``InvalidArgument``) when TensorRT writes the output, and the process can crash when a CPU operator
+writes it. The TensorRT log line contains ``copy out of output`` and names ``set_output_data_ptr``,
+which ``Module::set_output`` calls for you. On a GPU that reads host memory directly, such as Jetson
+AGX Thor, the error can be ``0x2`` (``InvalidState``) instead.
+
+Put each input and output in the memory that the method expects. ``device()`` in the tensor's
+metadata says where that is. With the skip flags from `Keep inputs and outputs on the GPU`_, an
+input that a GPU delegate reads and an output that a GPU delegate writes are on the GPU. When the
+export has no ``CudaPartitioner``, an operator that TensorRT does not take runs on the CPU. An input
+that only such operators read, and an output that such an operator writes, are on the CPU and need
+host memory. A GPU pointer there crashes the process. An input that TensorRT also reads stays on
+the GPU, and ExecuTorch copies it to the host for the CPU operator.
+
+The program below is for a method with one float input and one float output, both on the GPU. Put it
+in ``main.cpp`` in place of the first program, with the ``device_resident.pte`` from `Keep inputs
+and outputs on the GPU`_ next to it. It makes and copies the GPU buffers with ExecuTorch's
+``clone_tensor_ptr_to``, which uses the allocator that ``backend_cuda`` registers, so the
+``CMakeLists.txt`` above builds it as it is.
+
+What the program does:
+
+* It returns 1 if the method does not have exactly that one input and one output, or if an
+  ExecuTorch call fails. For a failed ExecuTorch call, the ExecuTorch log says why. A failed GPU
+  allocation or copy stops the program with a message.
+* It gives the output a GPU buffer with ``Module::set_output``. It skips this for an output that is
+  memory planned (exported with ``alloc_graph_output=True``), because that output already has
+  memory, and ExecuTorch does not let you replace it.
+* It calls ``forward`` 3 times with the same input. It copies each result back with the shape that
+  ``forward`` returns, because for a dynamic shape the buffer is sized for the largest shape.
+
+When you adapt it:
+
+* Set any runtime options (see `Setting a runtime option`_) before ``Module::set_output``, because
+  that call loads the method. Options set later are ignored.
+* It assumes that the engine's GPU is the current device.
+
+.. code-block:: cpp
+
+    #include <cstdio>
+
+    #include <executorch/extension/module/module.h>
+    #include <executorch/extension/tensor/tensor.h>
+
+    using namespace executorch::extension;
+    using namespace executorch::runtime;
+
+    int main() {
+      Module module("device_resident.pte");
+      const auto meta = module.method_meta("forward");
+      if (!meta.ok()) {
+        return 1;
+      }
+      const auto in = meta->input_tensor_meta(0);
+      const auto out = meta->output_tensor_meta(0);
+      if (!in.ok() || !out.ok()) {
+        return 1;
+      }
+      if (meta->num_inputs() != 1 || meta->num_outputs() != 1 ||
+          in->device().is_cpu() || out->device().is_cpu() ||
+          in->scalar_type() != executorch::aten::ScalarType::Float ||
+          out->scalar_type() != executorch::aten::ScalarType::Float) {
+        printf("this program needs one float input and one float output, both on the GPU\n");
+        return 1;
+      }
+
+      const auto input =
+          clone_tensor_ptr_to(full({in->sizes().begin(), in->sizes().end()}, 1), in->device());
+      // Declared here so that the buffer lives as long as the calls that write into it.
+      TensorPtr output;
+      if (!out->is_memory_planned()) {
+        output = clone_tensor_ptr_to(
+            zeros({out->sizes().begin(), out->sizes().end()}), out->device());
+        if (module.set_output(output, 0) != Error::Ok) {
+          return 1;
+        }
+      }
+
+      for (int step = 0; step < 3; ++step) {
+        const auto result = module.forward(input);
+        if (!result.ok()) {
+          return 1;
+        }
+        const auto& tensor = result->at(0).toTensor();
+        if (tensor.numel() == 0) {
+          continue;
+        }
+        const auto host =
+            clone_tensor_ptr_to(make_tensor_ptr(tensor), executorch::aten::DeviceType::CPU);
+        printf("step %d, first value: %f\n", step, host->const_data_ptr<float>()[0]);
+      }
+      return 0;
+    }
+
+``examples/executorch_module_consumer/main.cpp`` runs the programs that ``export_coalesced.py`` and
+``export_device_resident.py`` in ``examples/torchtrt_executorch_example/`` write, and checks them
+against the reference value that each script saves next to the ``.pte``. With ``--device_io``, it
+gives every input and output a GPU buffer, and calls ``Module::set_output`` for every output. It
+reads neither ``device()`` nor ``is_memory_planned()``, so with that flag it works only when every
+input and output is on the GPU and no output is memory planned.
 
 ----
 
@@ -586,7 +700,8 @@ A replay reads and writes the buffers it was recorded on. Keep each input and ou
 device buffer from call to call, as the memory planning of ``torch_tensorrt.save()`` does, and
 replays copy nothing. With the recipe in `Keep inputs and outputs on the GPU`_, memory planning
 does not own them: from Python pass ``clone_outputs=False``, or from C++ give each output once with
-``Module::set_output``, and reuse the same input tensors. These are still copied on every call:
+``Module::set_output`` (see `Give inputs and outputs their buffers from C++`_), and reuse the same
+input tensors. These are still copied on every call:
 host buffers (unless the GPU reads host memory directly), buffers off a 256-byte boundary,
 non-row-major inputs, and an output that shares memory with an input. A graph goes on the caller's
 buffers once a call brings the same buffers as the call before it. Until then the engine records on
