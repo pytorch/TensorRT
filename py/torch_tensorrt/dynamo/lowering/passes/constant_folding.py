@@ -375,8 +375,17 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             return None
         return node.target, _describe_args((node.args, node.kwargs), self._repeat_of)
 
+    def run_node(self, node: torch.fx.Node) -> Any:
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+
+        # Skip before evaluation: upstream's impurity check misses tuple outputs.
+        if REGION_META_KEY in node.meta and node.op != "placeholder":
+            return self.unknown_value
+        return super().run_node(node)
+
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
         # Folding an observable view loses its relation to the original storage.
         # Keep the view so the reset pass can clone a fresh allocation once and
@@ -384,6 +393,9 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         if _aliases_input(node) and _storage_escapes(node):
             return True
 
+        # Constant-input regions must still execute on their requested backend.
+        if REGION_META_KEY in node.meta and node.op != "placeholder":
+            return True
         if node.target in self.quantization_ops:
             return True
         # The meta value holds the IDs of the rules that marked this node; it is

@@ -347,7 +347,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     def _is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
+        from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
+
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        if is_torch_region_node(submodules, node):
+            self.unsupported_operators[node_name] = (
+                self.unsupported_operators.get(node_name, 0) + 1
+            )
+            self._record_fallback(node, node_name, "explicit execute_in_torch region")
+            return False
 
         settings = CONVERTERS.compilation_settings
         if settings is not None and self._is_explicit_non_target_region(

@@ -182,6 +182,13 @@ _L0: list[Suite] = [
         jobs=_HEAVY,
     ),
     Suite(
+        "dynamo-regions",
+        tier="l0",
+        lanes=("fast", "full", "nightly", "python-only"),
+        paths=("regions/",),
+        jobs=_HEAVY,
+    ),
+    Suite(
         "py-core",
         tier="l0",
         lanes=("fast", "full", "nightly"),

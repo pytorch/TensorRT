@@ -72,6 +72,16 @@ class _CudagraphsContextManager(object):
         compiled_module: torch.nn.Module,
         cuda_graph_strategy: Optional[str] = None,
     ) -> None:
+        from torch_tensorrt.dynamo.region_compilation import (
+            RegionError,
+            get_region_records,
+        )
+
+        if any(r.route == "torch" for r in get_region_records(compiled_module)):
+            raise RegionError(
+                "CUDA graphs do not support a model with execute_in_torch or "
+                "fused_op regions yet"
+            )
         global _PY_RT_CUDAGRAPHS
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module

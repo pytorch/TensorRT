@@ -154,6 +154,63 @@ class _ModuleType(Enum):
     ep = 3
 
 
+def _trace_with_regions(
+    module: torch.nn.Module,
+    arg_inputs: Any,
+    kwarg_inputs: Any,
+    options: dict[str, Any],
+) -> tuple[torch.export.ExportedProgram, Any]:
+    """Trace a model for the Dynamo frontend, recording what its regions need.
+
+    Returns the program and the ``regions`` rules of ``options`` matched
+    against the model, which knows subclasses and every name of a shared module.
+    """
+    from torch_tensorrt.dynamo.region_compilation import (
+        has_region_markers,
+        resolve_rules,
+        validate_model_mode,
+    )
+    from torch_tensorrt.region._session import current_session
+
+    rules = options.get("regions")
+    trace_options = {key: value for key, value in options.items() if key != "regions"}
+    if rules:
+        validate_model_mode(module)
+        rules, replaced = resolve_rules(module, rules)
+        # A rule that replaces a module call binds its tensors by call order.
+        trace_options["preserve_module_call_signature"] = replaced
+    session = current_session()
+    try:
+        exp_program = dynamo_trace(
+            module, arg_inputs, kwarg_inputs=kwarg_inputs, **trace_options
+        )
+    except Exception as error:
+        if not trace_options.get("preserve_module_call_signature"):
+            raise
+        # The record of the calls may be what failed, for example for a module
+        # called with different argument layouts: trace again without it. If
+        # the model cannot be traced at all, this raises the reason.
+        trace_options["preserve_module_call_signature"] = ()
+        exp_program = dynamo_trace(
+            module, arg_inputs, kwarg_inputs=kwarg_inputs, **trace_options
+        )
+        reason = f"{type(error).__name__}: {str(error).splitlines()[0] if str(error) else ''}"
+        logger.warning(
+            "torch.export could not record how the modules selected by "
+            "regions= are called (%s). Rules that bind several tensors by "
+            "position, or replace a module that returns several, will fail.",
+            reason,
+        )
+        if session is not None:
+            session.call_record_failure = reason
+    if rules or has_region_markers(exp_program.graph_module):
+        validate_model_mode(module)
+        if session is not None:
+            # The program says less about the model's mode than the model did.
+            session.model_in_eval_mode = True
+    return exp_program, rules
+
+
 def _parse_module_type(module: Any) -> _ModuleType:
     if any(
         isinstance(module, t)
@@ -278,6 +335,7 @@ def compile(
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Legacy TorchScript/FX-only option specifying the datatypes TensorRT may use when selecting kernels. Dynamo and ``torch_compile`` reject this option; express precision in the model or use the Dynamo autocast options instead.
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        regions (Mapping): With ``ir="dynamo"`` or ``ir="torch_compile"``, rules that place whole submodules in regions without editing their source, such as ``{"encoder.layers.*.mlp": torch_tensorrt.region.ExecuteInTorch()}``. See ``torch_tensorrt.dynamo.compile``.
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     Returns:
@@ -292,6 +350,14 @@ def compile(
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
+    if kwargs.get("regions") and target_ir not in (
+        _IRType.dynamo,
+        _IRType.torch_compile,
+    ):
+        raise ValueError(
+            "regions= requires ir='dynamo' or ir='torch_compile'; the TorchScript "
+            "and FX frontends do not support regions"
+        )
 
     if target_ir == _IRType.ts:
         ts_mod = module
@@ -383,20 +449,24 @@ def compile(
             kwarg_inputs, disable_memory_format_check=True
         )
 
-        if module_type == _ModuleType.ep:
-            exp_program = module
-        else:
-            exp_program = dynamo_trace(
-                module,
-                torchtrt_arg_inputs,
+        from torch_tensorrt.region._session import RegionCompilationSession
+
+        # The session explains capture failures of this compilation's trace.
+        with RegionCompilationSession():
+            if module_type == _ModuleType.ep:
+                exp_program = module
+            else:
+                exp_program, rules = _trace_with_regions(
+                    module, torchtrt_arg_inputs, torchtrt_kwarg_inputs, kwargs
+                )
+                if rules:
+                    compiler_kwargs = {**compiler_kwargs, "regions": rules}
+            trt_graph_module = dynamo_compile(
+                exp_program,
+                arg_inputs=torchtrt_arg_inputs,
                 kwarg_inputs=torchtrt_kwarg_inputs,
-                **kwargs,
+                **compiler_kwargs,
             )
-        trt_graph_module = dynamo_compile(
-            exp_program,
-            arg_inputs=torchtrt_arg_inputs,
-            **compiler_kwargs,
-        )
         return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         _reject_enabled_precisions_for_dynamo(enabled_precisions)
@@ -491,6 +561,7 @@ def cross_compile_for_windows(
         kwarg_inputs, disable_memory_format_check=True
     )
 
+    # The compile call below rejects scopes that the trace records.
     exp_program = dynamo_trace(
         module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
     )
@@ -514,6 +585,17 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
     sample inputs to compile the model to TRT.
     """
     from torch_tensorrt.dynamo.backend import torch_tensorrt_backend
+
+    if kwargs.get("regions"):
+        from torch_tensorrt.dynamo.region_compilation import (
+            bind_rules,
+            validate_model_mode,
+        )
+
+        # torch.compile traces at the first call: match the rules against the
+        # model now, so that a rule that selects nothing is reported here.
+        validate_model_mode(module)
+        kwargs["regions"] = bind_rules(module, kwargs["regions"])
 
     # TODO: Remove dynamic=False when SymInt Dynamic shape support is ready
     boxed_fn = torch.compile(
@@ -629,6 +711,7 @@ def convert_method_to_trt_engine(
             kwarg_inputs, disable_memory_format_check=True
         )
 
+        # The conversion call below rejects scopes that the trace records.
         exp_program = dynamo_trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
@@ -961,6 +1044,11 @@ def save(
         # Match torch_tensorrt.executorch.export, which lowers a compiled GraphModule as it
         # is, so writing a .pte needs no example inputs.
         retrace = output_format != "executorch"
+    # No saved format preserves regions yet.
+    if getattr(module, "meta", {}).get("torch_tensorrt_regions"):
+        from torch_tensorrt.region import RegionError
+
+        raise RegionError("Saving a model compiled with regions is not supported yet")
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(

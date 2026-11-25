@@ -254,6 +254,14 @@ def refit_module_weights(
 
     assert settings is not None
 
+    from torch_tensorrt.dynamo.region_compilation import RegionError, get_region_records
+
+    if get_region_records(compiled_module):
+        raise RegionError(
+            "A model compiled with regions cannot be refitted; compile it again "
+            "with the new weights"
+        )
+
     assert (
         not settings.immutable_weights
     ), "Refitting is not enabled. Please recompile the engine with immutable_weights=False."

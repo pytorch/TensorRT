@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import collections.abc
 import functools
 import logging
 import unittest
@@ -28,10 +29,28 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.lowering.passes.fold_get_attr_item_calls import (
     fold_get_attr_item_calls,
 )
+from torch_tensorrt.dynamo.region_compilation import (
+    RegionError,
+    check_decomposed_regions,
+    configure_region_backends,
+    find_compiled_model,
+    has_region_markers,
+    materialize_regions,
+    normalize_traced_scopes,
+    region_hop_records,
+    select_traced_regions,
+    validate_decomposed_bodies,
+    validate_eval_mode,
+    validate_model_mode,
+    validate_region_settings,
+)
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
     prepare_inputs,
 )
+from torch_tensorrt.region._context import BACKEND_ATTRIBUTE
+from torch_tensorrt.region._errors import RegionCaptureError
+from torch_tensorrt.region._rules import check_rules
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +80,11 @@ def aot_torch_tensorrt_aten_backend(
     import torch.distributed as dist
 
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
+    # torch.compile passes the same options to every graph: read, do not remove.
+    regions = (kwargs.get("options") or kwargs).get("regions")
+    if regions is not None and not isinstance(regions, collections.abc.Mapping):
+        check_rules(regions)
+    has_regions = bool(regions) or has_region_markers(gm)
 
     # Auto-enable distributed tracing when running inside an active distributed
     # context — mirrors how DistributedDataParallel works: no explicit flag needed.
@@ -78,6 +102,10 @@ def aot_torch_tensorrt_aten_backend(
         settings.use_distributed_mode_trace = True
 
     if settings.use_distributed_mode_trace:
+        if has_regions:
+            raise RegionError(
+                "Regions are incompatible with use_distributed_mode_trace=True"
+            )
         logger.debug(
             "Wrapping the backend with aot_autograd for Distributed examples\n"
         )
@@ -117,6 +145,11 @@ def aot_torch_tensorrt_aten_backend(
     # incompatible with aot_export_joint_simple, fall back to the aot_autograd
     # path which handles them correctly.
     if _graph_has_higher_order_ops(gm):
+        if has_regions:
+            raise RegionError(
+                "Regions are unsupported in a graph that uses torch.vmap or "
+                "another higher-order transform"
+            )
         logger.debug(
             "Graph contains higher-order ops (e.g. vmap); "
             "using aot_autograd path instead of aot_export_joint_simple"
@@ -141,7 +174,41 @@ def aot_torch_tensorrt_aten_backend(
             decompositions=aot_decomps,
         )(gm, sample_inputs)
 
-    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    return _pretraced_backend(gm, sample_inputs, settings, engine_cache, regions)
+
+
+# Lets torch_tensorrt.region scopes tell that their trace reaches these backends.
+setattr(torch_tensorrt_backend, BACKEND_ATTRIBUTE, True)
+setattr(aot_torch_tensorrt_aten_backend, BACKEND_ATTRIBUTE, True)
+
+
+def _capture_traced_regions(
+    gm: torch.fx.GraphModule, regions: Any
+) -> tuple[bool, bool]:
+    """Turn the regions of a torch.compile graph into opaque bodies, in place.
+
+    Regions come from scopes written in the model's source and from ``regions``
+    rules. Returns whether the graph has a live region, and whether the model
+    itself was found and checked to be in eval mode.
+    """
+    # The model, when torch.compile was given one rather than a function.
+    model = find_compiled_model()
+    if regions:
+        select_traced_regions(gm, regions, model)
+    if not has_region_markers(gm):
+        return False, False
+    try:
+        live = normalize_traced_scopes(gm)
+    except RegionCaptureError as error:
+        if "static shapes" not in str(error):
+            raise
+        raise RegionCaptureError(
+            f"{error}: compile with torch.compile(..., dynamic=False), or with "
+            "torch_tensorrt.compile(model, ir='torch_compile', ...)"
+        ) from error
+    if live and model is not None:
+        validate_model_mode(model)
+    return live, model is not None
 
 
 def _strip_trt_sdpa_kwargs(gm: torch.fx.GraphModule) -> None:
@@ -272,6 +339,7 @@ def _pretraced_backend(
     sample_inputs: Sequence[Any],
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Any = None,
+    regions: Any = None,
 ) -> torch.fx.GraphModule | Callable[..., Any]:
     """Helper function to manage translation of traced FX module to TRT engines
 
@@ -280,6 +348,7 @@ def _pretraced_backend(
         inputs: Inputs to the module
         settings: Compilation settings
         engine_cache: Engine cache instance
+        regions: Rules that place whole submodules in regions
     Returns:
         Compiled FX GraphModule
     """
@@ -289,11 +358,26 @@ def _pretraced_backend(
     # PyTorch fallback can execute it without encountering custom TRT-only kwargs
     # (e.g. use_fp32_acc) that standard torch ops don't accept.
     original_gm = gm
+    has_regions = False
+    model_in_eval_mode = False
 
     try:
+        # A graph that asks for regions must not fall back to plain PyTorch.
+        has_regions = bool(regions) or has_region_markers(gm)
         logger.debug("Pre-AOT Autograd graph:\n" + str(gm.graph))
 
         fake_mode = detect_fake_mode(sample_inputs)
+
+        # Extract regions first, while the graph still holds every traced
+        # operation and the scope markers: the fold below drops clones, and AOT
+        # tracing keeps each extracted body as one call.
+        if has_regions and settings.use_distributed_mode_trace:
+            raise RegionError(
+                "Regions are incompatible with use_distributed_mode_trace=True"
+            )
+        has_regions, model_in_eval_mode = _capture_traced_regions(gm, regions)
+        if has_regions:
+            validate_region_settings(settings, region_hop_records(gm))
 
         # Fold get_attr(...).item() / placeholder(...).item() patterns into Python
         # scalars BEFORE entering FakeTensorMode.  Inside FakeTensorMode, even
@@ -301,6 +385,7 @@ def _pretraced_backend(
         # the actual values via grapharg.example (weakref held by dynamo) which is
         # safe to dereference outside of fake mode.
         gm = fold_get_attr_item_calls(gm, sample_inputs)
+        captured = gm
 
         # Place backend tracing within FakeTensor context allowing nonfake Tensors
         with (
@@ -343,6 +428,14 @@ def _pretraced_backend(
                             gm,
                         ),
                     )
+
+            if has_regions:
+                check_decomposed_regions(captured, gm)
+                validate_decomposed_bodies(gm)
+                if not model_in_eval_mode:
+                    # A compiled function: the graph is all that tells the mode.
+                    validate_eval_mode(gm)
+                gm = materialize_regions(gm, captured)
 
             # Remove sym_int placeholders and inputs *after* AOT tracing
             # so we don't inject sym_size nodes that confuse the tracer.
@@ -388,8 +481,19 @@ def _pretraced_backend(
             # due to an unsupported op).  These nodes will be executed by
             # PyTorch which does not accept use_fp32_acc / sliding_window_size.
             _strip_trt_sdpa_kwargs(trt_compiled)
+            if has_regions and not settings.dryrun:
+                configure_region_backends(trt_compiled, inside_torch_compile=True)
             return trt_compiled
-    except (AssertionError, RuntimeError, TypeError):
+    except RegionError:
+        # RegionError is a RuntimeError: do not fall back to a graph without regions.
+        raise
+    except (AssertionError, RuntimeError, TypeError) as error:
+        if has_regions:
+            # Falling back would run the model without the regions it asked for.
+            raise RegionError(
+                "Compilation of a torch.compile graph with regions failed: "
+                f"{type(error).__name__}: {error}"
+            ) from error
         if not settings.pass_through_build_failures:
             logger.warning(
                 "TRT conversion failed on the subgraph. See trace above. "

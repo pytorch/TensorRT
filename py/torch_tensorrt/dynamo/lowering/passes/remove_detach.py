@@ -15,8 +15,11 @@ def remove_detach(
     """Remove detach ops in the graph"""
     count = 0
     for node in gm.graph.nodes:
-        # node.target = "detach" in torch.compile workflow
-        if node.target == torch.ops.aten.detach.default or node.target == "detach":
+        # node.target = "detach" in torch.compile workflow. A placeholder may
+        # be named "detach" too, as the input of a region body is.
+        if (
+            node.op == "call_function" and node.target == torch.ops.aten.detach.default
+        ) or (node.op == "call_method" and node.target == "detach"):
             # Detach node has only one input
             node_input = node.all_input_nodes[0]
             node.replace_all_uses_with(node_input)

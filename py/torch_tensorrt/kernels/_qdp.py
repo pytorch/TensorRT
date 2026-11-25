@@ -16,6 +16,27 @@ _LOGGER = logging.getLogger(__name__)
 _MISSING_REGISTRATION = object()
 
 
+def _native_creator(name: str, namespace: str) -> Any:
+    """Return TensorRT's version-1 creator for ``namespace::name``, or ``None``.
+
+    ``IPluginRegistry.get_creator`` reports a miss as an API usage error, which
+    TensorRT logs at ERROR once any builder or runtime exists. Registering a new
+    name always misses, so search the registered creators instead.
+    """
+    import tensorrt as trt
+
+    return next(
+        (
+            creator
+            for creator in trt.get_plugin_registry().all_creators
+            if creator.name == name
+            and creator.plugin_version == "1"
+            and creator.plugin_namespace == namespace
+        ),
+        None,
+    )
+
+
 def _patch_trt_shape_expr_reflected_ops() -> None:
     # TODO(upstream-trt): trtp.ShapeExpr defines forward __mul__ / __add__
     # but not the reflected __rmul__ / __radd__. torch_tensorrt lowers meta-fn
@@ -57,10 +78,8 @@ class _QDPRegistrationState(NamedTuple):
 
 def _snapshot_qdp_registration(op_name: str) -> _QDPRegistrationState:
     """Capture the exact slots ``custom_op`` may mutate for ``op_name``."""
-    import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -90,7 +109,7 @@ def _snapshot_qdp_registration(op_name: str) -> _QDPRegistrationState:
     return _QDPRegistrationState(
         QDP_REGISTRY.get(op_name, _MISSING_REGISTRATION),
         QDP_CREATORS.get(op_name, _MISSING_REGISTRATION),
-        trt.get_plugin_registry().get_creator(name, "1", namespace),
+        _native_creator(name, namespace),
         op_namespace,
         op_definition,
         converter_target,
@@ -110,7 +129,6 @@ def _rollback_qdp_registration(op_name: str, state: _QDPRegistrationState) -> No
     import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
-
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
         DYNAMO_ATEN_CONVERTERS,
     )
@@ -175,7 +193,7 @@ def _rollback_qdp_registration(op_name: str, state: _QDPRegistrationState) -> No
 
     try:
         plugin_registry = trt.get_plugin_registry()
-        current_native_creator = plugin_registry.get_creator(name, "1", namespace)
+        current_native_creator = _native_creator(name, namespace)
         # An exact-name native creator cannot coexist with another creator. If
         # there was one before the attempt, it is necessarily pre-existing and
         # must be retained even if QDP_CREATORS temporarily pointed at it.
@@ -203,13 +221,12 @@ def _rollback_qdp_registration(op_name: str, state: _QDPRegistrationState) -> No
 
 
 def assert_qdp_name_available(op_name: str) -> None:
-    import tensorrt as trt
     import tensorrt.plugin as trtp
     from tensorrt.plugin._lib import QDP_CREATORS, QDP_REGISTRY
 
     namespace, name = op_name.split("::")
     op_namespace = getattr(trtp.op, namespace, None)
-    native_creator = trt.get_plugin_registry().get_creator(name, "1", namespace)
+    native_creator = _native_creator(name, namespace)
     if (
         op_name in QDP_REGISTRY
         or op_name in QDP_CREATORS

@@ -837,6 +837,9 @@ def parse_dynamo_kwargs(
         if "options" in kwargs and len(kwargs) == 1:
             kwargs = kwargs["options"]
 
+        # ``regions`` holds rules with classes and kernels, which the settings,
+        # saved with every engine, cannot carry: the backend reads it itself.
+        kwargs = {key: value for key, value in kwargs.items() if key != "regions"}
         valid_attrs = {attr.name for attr in fields(settings)}
         validate_compiler_options(kwargs, valid_attrs, "torch.compile")
         settings = replace(settings, **kwargs)
