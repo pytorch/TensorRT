@@ -268,6 +268,29 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        and under ``"reclassify"``, regions with ``enabled=False`` and those nested in
        them, where one in another dtype logs as a warning. ``"reclassify_all"`` logs
        nothing. Regions inside a ``torch.no_grad()`` block do not count.
+   * - ``autocast_model_casts``
+     - ``"keep"``
+     - What autocast does with the casts to FP32 that the model itself writes with a
+       dtype, such as ``x.float()`` or ``x.to(torch.float32)``. ``"keep"`` keeps them. An
+       op that autocast runs in the low precision type still casts its inputs to that
+       type, so such a cast between two of those ops becomes a round trip, for example
+       float16 to FP32 and back.
+       ``"reclassify"`` removes these round trips: a cast that autocast runs in the low
+       precision type, and whose users all cast their input to that type too, keeps the
+       dtype of its input. With ``autocast_model_regions="reclassify"`` or
+       ``"reclassify_all"`` this also covers the casts that inlining adds at the boundary
+       of a region. A reclassified cast that
+       changed the dtype when traced keeps ``copy=True``, so it still makes the copy it
+       made then, and TensorRT adds no layer for it. Other casts still cast to FP32, such
+       as an excluded cast, one with a user in FP32, one with a user given a dtype such as
+       ``sum(dtype=torch.float32)``, or one that makes an output of the model. The values
+       do not change, since a cast from float16 or bfloat16 to FP32 is exact. One case can
+       differ: in an FP32 model, ``x.float()`` returns ``x`` itself, so an op that writes
+       in place into it also changes ``x``. ``"keep"`` makes that cast copy once autocast
+       gives ``x`` the low precision type, while ``"reclassify"`` can keep it returning
+       ``x``, as the model does. To keep an op in FP32, exclude the op, not the cast.
+       ``x.to(y)`` is such a cast too, since export gives it the dtype of ``y``. A
+       ``type_as`` is not: autocast chooses its precision as for other ops.
 
 ----
 
@@ -572,6 +595,7 @@ rebuilt from scratch:
 ``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
+``autocast_model_casts``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,

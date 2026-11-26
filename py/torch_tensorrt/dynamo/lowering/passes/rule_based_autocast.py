@@ -15,6 +15,7 @@ from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
     _wait_tensor_op,
     clean_up_graph_after_modifications,
+    set_schema_argument,
     tensors_maybe_written_by,
     tensors_written_by,
 )
@@ -57,6 +58,31 @@ def _is_given_a_dtype(n: torch.fx.Node) -> bool:
             given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
             return given is not None
     return False
+
+
+def _is_cast_to_float32(n: torch.fx.Node) -> bool:
+    """Whether n is a cast to float32, such as x.float(), of a float16 or bfloat16
+    tensor."""
+    if not (
+        _is_given_a_dtype(n)
+        and n.target.overloadpacket in (torch.ops.aten.to, torch.ops.aten._to_copy)
+        and n.args
+        and isinstance(n.args[0], torch.fx.Node)
+    ):
+        return False
+    src, out = n.args[0].meta.get("val"), n.meta.get("val")
+    return (
+        isinstance(src, torch.Tensor)
+        and isinstance(out, torch.Tensor)
+        and src.dtype in (torch.float16, torch.bfloat16)
+        and out.dtype == torch.float32
+    )
+
+
+def _keep_input_dtype(n: torch.fx.Node) -> None:
+    dtype = n.args[0].meta["val"].dtype
+    set_schema_argument(n, "dtype", dtype)
+    n.meta["val"] = n.meta["val"].to(dtype)
 
 
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
@@ -370,6 +396,24 @@ def rule_based_autocast(
                 # A factory op such as torch.zeros has no inputs to cast, so its
                 # output keeps the dtype it was created with.
                 continue
+            if (
+                settings.autocast_model_casts == "reclassify"
+                and _is_cast_to_float32(node)
+                and node.name in low_precision_nodes
+                # Each user must cast its input to the low precision type anyway. A user
+                # in FP32 would need a cast back, and an output of the model keeps the
+                # dtype the model gives it. Autocast leaves the input of an op given a
+                # dtype, such as sum(dtype=torch.float32), or of one that makes only
+                # integer or complex values, such as view_as_complex, as it is.
+                and all(
+                    user.name in low_precision_nodes
+                    and user not in kept
+                    and not _is_given_a_dtype(user)
+                    and not _has_only_integer_outputs(user)
+                    for user in node.users
+                )
+            ):
+                _keep_input_dtype(node)
             if _is_given_a_dtype(node):
                 # An op such as x.float() or cumsum(dtype=torch.float32) makes the
                 # dtype it is given, whatever its inputs are.

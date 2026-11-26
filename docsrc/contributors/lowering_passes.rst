@@ -191,6 +191,9 @@ inlining traces their ops again in other dtypes. TensorRT adds no layer for a ca
 same dtype, though in a segment that runs in PyTorch it still copies. A ``to()`` cast in a
 ``torch.no_grad`` block still fails when autocast gives its input another dtype, since
 export checks that dtype.
+With ``autocast_model_casts="reclassify"``, a cast to FP32 that runs in the low
+precision type, between ops that run in it, keeps the ``dtype`` of its input. One that
+changed the dtype when traced still has ``copy=True``.
 
 remove_sym_nodes
 ^^^^^^^^^^^^^^^^^
