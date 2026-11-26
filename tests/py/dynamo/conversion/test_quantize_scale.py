@@ -6,6 +6,7 @@ from unittest import mock
 
 import tensorrt as trt
 import torch
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion import aten_ops_converters, impl
@@ -296,6 +297,35 @@ class TestQuantizeScale(TestCase):
             )
         finally:
             torch.set_default_dtype(default_dtype)
+
+    def test_groupwise_int8_outside_int4_range_runs_in_pytorch(self):
+        # Packing these values into 4 bits would silently change the weights.
+        def supported(*values, block_size=(1, 16)):
+            qdata = torch.zeros(64, 256, dtype=torch.int8)
+            qdata.view(-1)[: len(values)] = torch.tensor(values, dtype=torch.int8)
+            module = torch.nn.Module()
+            module.register_buffer("qdata", qdata)
+            graph = torch.fx.Graph()
+            node = graph.call_function(
+                torch.ops.aten.mul.Tensor, (graph.get_attr("qdata"), list(block_size))
+            )
+            graph.output(node)
+            torch.fx.GraphModule(module, graph)
+            # torch.compile partitions in fake mode.
+            with FakeTensorMode(allow_non_fake_inputs=True):
+                return aten_ops_converters.torchao_dequantize_affine_validator(node)
+
+        for values in (range(-32, 32), [8], [-9]):
+            self.assertFalse(supported(*values))
+        self.assertTrue(supported(-8, 7))
+        # Per-row int8 weights are not packed into INT4.
+        self.assertTrue(supported(-128, 127, block_size=(1, 256)))
+        # TensorRT-RTX cannot dequantize INT4 into a matmul on Turing.
+        with mock.patch.object(
+            aten_ops_converters, "trt_rtx_targets_turing", return_value=True
+        ):
+            self.assertFalse(supported(-8, 7))
+            self.assertTrue(supported(-128, 127, block_size=(1, 256)))
 
     def test_fp8_dequantize_keeps_its_default_output_dtype(self):
         network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(

@@ -280,7 +280,7 @@ def _pack_int4_nibbles(qdata: torch.Tensor) -> torch.Tensor:
     return torch.bitwise_or(low, high).contiguous()
 
 
-def _is_groupwise_int4(
+def is_groupwise_int4(
     qdata: Union[torch.Tensor, TRTTensor],
     block_size: Sequence[object],
 ) -> bool:
@@ -300,6 +300,22 @@ def _is_groupwise_int4(
     if bs[-1] >= qdata.shape[-1]:
         return False
     return True
+
+
+def is_wide_groupwise_int8(qdata: object, block_size: Sequence[object]) -> bool:
+    """True for group-wise int8 weights with values outside -8..7.
+
+    dequantize_affine packs group-wise int8 weights into INT4, which would change these.
+    """
+    if (
+        not isinstance(qdata, torch.Tensor)
+        or not is_groupwise_int4(qdata, block_size)
+        or qdata.numel() == 0
+    ):
+        return False
+    with unset_fake_temporarily():
+        low, high = torch.aminmax(qdata)
+        return int(low) < -8 or int(high) > 7
 
 
 def _add_int4_constant(
@@ -475,7 +491,7 @@ def dequantize_affine(
     re-packs those nibbles into a trt.DataType.INT4 constant and dequantizes
     it to FP32. Nonzero zero-points are rejected for that path.
     """
-    use_int4 = _is_groupwise_int4(qdata, block_size)
+    use_int4 = is_groupwise_int4(qdata, block_size)
 
     if use_int4:
         if _zero_point_is_nonzero(zero_point):

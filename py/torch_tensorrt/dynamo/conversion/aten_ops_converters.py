@@ -1188,6 +1188,19 @@ if is_tensorrt_version_supported("10.8.0"):
             )
 
 
+def torchao_dequantize_affine_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    qdata = _get_attr_value(node.args[0])
+    block_size = cast(Sequence[object], node.args[1])
+    # TensorRT-RTX cannot dequantize INT4 into a matmul on Turing (SM 7.5).
+    if trt_rtx_targets_turing(settings) and impl.quantize.is_groupwise_int4(
+        qdata, block_size
+    ):
+        return False
+    return not impl.quantize.is_wide_groupwise_int8(qdata, block_size)
+
+
 try:
     import torchao  # noqa: F401
 
@@ -1201,6 +1214,7 @@ else:
 
     @dynamo_tensorrt_converter(
         torch.ops.torchao.dequantize_affine.default,
+        capability_validator=torchao_dequantize_affine_validator,
         supports_dynamic_shapes=False,
     )
     def aten_ops_torchao_dequantize_affine(
