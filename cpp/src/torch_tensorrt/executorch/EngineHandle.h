@@ -37,6 +37,9 @@ struct EngineHandle {
   // the same device and weight streaming request, so the weights are on the device once. The context
   // and everything below it stay this handle's own.
   std::shared_ptr<nvinfer1::ICudaEngine> engine;
+#ifdef TRT_MAJOR_RTX
+  TRTUniquePtr<nvinfer1::IRuntimeConfig> runtime_config;
+#endif
   TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
   std::vector<std::string> input_binding_names;
   std::vector<std::string> output_binding_names;

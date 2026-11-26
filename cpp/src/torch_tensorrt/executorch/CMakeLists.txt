@@ -19,8 +19,15 @@ foreach(_torchtrt_cmake_module_dir IN ITEMS
     endif()
 endforeach()
 
-find_package(TensorRT REQUIRED)
-if(NOT TARGET TensorRT::nvinfer_plugin)
+option(TORCH_TENSORRT_EXECUTORCH_USE_RTX "Build the TensorRT-RTX ExecuTorch delegate" OFF)
+if(TORCH_TENSORRT_EXECUTORCH_USE_RTX)
+    find_package(TensorRTRTX 1.7 REQUIRED)
+    set(_torchtrt_engine_libraries TensorRTRTX::runtime)
+else()
+    find_package(TensorRT REQUIRED)
+    set(_torchtrt_engine_libraries TensorRT::nvinfer TensorRT::nvinfer_plugin)
+endif()
+if(NOT TORCH_TENSORRT_EXECUTORCH_USE_RTX AND NOT TARGET TensorRT::nvinfer_plugin)
     message(FATAL_ERROR
         "Torch-TensorRT's ExecuTorch backend requires TensorRT's plugin library "
         "(nvinfer_plugin), which was not found. Set TensorRT_ROOT to a TensorRT "
@@ -212,8 +219,7 @@ endif()
 
 set(_executorch_backend_tensorrt_link_libraries
     CUDA::cudart
-    TensorRT::nvinfer
-    TensorRT::nvinfer_plugin
+    ${_torchtrt_engine_libraries}
     Threads::Threads
     extension_cuda
 )

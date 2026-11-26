@@ -189,6 +189,12 @@ Error ExecutionGraph::enqueue(
   if (addresses.size() != count || binding_bytes.size() != count) {
     return Error::InvalidArgument;
   }
+#ifdef TRT_MAJOR_RTX
+  if (!handle.exec_ctx->isStreamCapturable(stream)) {
+    reset_graph();
+    return enqueue_plain(*handle.exec_ctx, stream);
+  }
+#endif
   CUcontext stream_context = nullptr;
   CUgreenCtx stream_green = nullptr;
   unsigned long long stream_green_id = 0;

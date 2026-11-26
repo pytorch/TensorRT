@@ -448,7 +448,7 @@ def _is_tensorrt_delegate(graph_module: torch.fx.GraphModule, node: Node) -> boo
     delegate may legitimately need the staging copy.
     """
     from executorch.exir.delegate import executorch_call_delegate
-    from torch_tensorrt.executorch.backend import TensorRTBackend
+    from torch_tensorrt.executorch.backend import TensorRTBackend, TensorRTRTXBackend
 
     if node.op != "call_function" or node.target is not executorch_call_delegate:
         return False
@@ -456,7 +456,10 @@ def _is_tensorrt_delegate(graph_module: torch.fx.GraphModule, node: Node) -> boo
     if not isinstance(lowered, Node) or lowered.op != "get_attr":
         return False
     module = getattr(graph_module, lowered.target, None)
-    return bool(getattr(module, "backend_id", None) == TensorRTBackend.__name__)
+    return bool(
+        getattr(module, "backend_id", None)
+        in {TensorRTBackend.__name__, TensorRTRTXBackend.__name__}
+    )
 
 
 def _zero_copy_compile_spec(graph_module: torch.fx.GraphModule, node: Node) -> Any:

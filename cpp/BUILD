@@ -182,11 +182,21 @@ cc_library(
     ],
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = select({
         ":linux_x86_64": [
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+        ],
+        ":rtx_sbsa": [
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+        ],
+        ":rtx_x86_64": [
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
         ],
@@ -229,11 +239,19 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = select({
         ":linux_x86_64": [
+            "@cuda//:cuda_headers",
+        ],
+        ":rtx_sbsa": [
+            "@cuda//:cuda_headers",
+        ],
+        ":rtx_x86_64": [
             "@cuda//:cuda_headers",
         ],
         ":sbsa": [
@@ -272,6 +290,8 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
@@ -279,6 +299,14 @@ cc_library(
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
             "@tensorrt//:nvinfer",
+        ],
+        ":rtx_sbsa": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_rtx_sbsa//:nvinfer",
+        ],
+        ":rtx_x86_64": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_rtx//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
@@ -301,6 +329,8 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
@@ -327,6 +357,8 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
@@ -335,6 +367,12 @@ cc_library(
         ":tensorrt_executorch_shared_scratch_pool_reset",
     ] + select({
         ":linux_x86_64": [
+            "@cuda//:cudart",
+        ],
+        ":rtx_sbsa": [
+            "@cuda//:cudart",
+        ],
+        ":rtx_x86_64": [
             "@cuda//:cudart",
         ],
         ":sbsa": [
@@ -366,6 +404,8 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
@@ -374,6 +414,14 @@ cc_library(
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
             "@tensorrt//:nvinfer",
+        ],
+        ":rtx_sbsa": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_rtx_sbsa//:nvinfer",
+        ],
+        ":rtx_x86_64": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_rtx//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
@@ -393,11 +441,15 @@ cc_library(
     # resolve to an empty list.
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = select({
         ":linux_x86_64": ["@tensorrt//:nvinfer"],
+        ":rtx_sbsa": ["@tensorrt_rtx_sbsa//:nvinfer"],
+        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         "//conditions:default": [],
     }),
@@ -422,6 +474,8 @@ cc_library(
     # against, avoiding any runtime plugin/dlopen dependency.
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
@@ -441,6 +495,18 @@ cc_library(
             "@executorch//:extension_cuda",
             "@tensorrt//:nvinfer",
             "@tensorrt//:nvinferplugin",
+        ],
+        ":rtx_sbsa": [
+            "@cuda//:cudart",
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+            "@tensorrt_rtx_sbsa//:nvinfer",
+        ],
+        ":rtx_x86_64": [
+            "@cuda//:cudart",
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+            "@tensorrt_rtx//:nvinfer",
         ],
         ":sbsa": [
             "@cuda//:cudart",
@@ -465,6 +531,8 @@ cc_library(
     strip_include_prefix = "src",
     target_compatible_with = select({
         ":linux_x86_64": [],
+        ":rtx_sbsa": [],
+        ":rtx_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),

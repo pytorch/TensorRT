@@ -15,7 +15,7 @@ from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
-from torch_tensorrt._features import needs_qdp_plugin
+from torch_tensorrt._features import ENABLED_FEATURES, needs_qdp_plugin
 from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
     detect_and_validate_output_aliases,
     is_tensor_arg,
@@ -61,7 +61,8 @@ def _patch_trt_validator_issubclass() -> None:
     _trt_validate._torch_trt_issubclass_patched = True
 
 
-_patch_trt_validator_issubclass()
+if ENABLED_FEATURES.qdp_plugin:
+    _patch_trt_validator_issubclass()
 
 
 def np_scalar_attr_annotation(dtype: Any) -> Any:
@@ -87,9 +88,8 @@ _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {
 
 def _torch_dtype_to_trt(dtype: torch.dtype) -> Any:
     """Translate a fake/meta tensor dtype to TensorRT's ``DataType`` enum."""
-    from torch_tensorrt._enums import dtype as torchtrt_dtype
-
     import tensorrt as trt
+    from torch_tensorrt._enums import dtype as torchtrt_dtype
 
     try:
         return torchtrt_dtype._from(dtype).to(trt.DataType)
