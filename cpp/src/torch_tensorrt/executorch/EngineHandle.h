@@ -57,6 +57,9 @@ struct EngineHandle {
   uint64_t shape_epoch = 0;
   // Whether inferShapes has succeeded since the shapes or the profile last changed.
   bool shapes_inferred = false;
+  // What exec_ctx reports for each output's shape, read right after inferShapes succeeds, so a call whose shapes
+  // did not change skips one TensorRT lookup by name per output.
+  std::vector<nvinfer1::Dims> output_dims;
   size_t num_inputs = 0;
   size_t num_outputs = 0;
   // The ExecuTorch type of each binding, inputs then outputs, read once at init so execute() checks each

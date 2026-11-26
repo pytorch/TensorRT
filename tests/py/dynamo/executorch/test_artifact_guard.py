@@ -1089,7 +1089,7 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     # The aliased branch returns before reaching the ordinary output check, so it needs its own. It
     # went without one, and a buffer on a card the engine cannot reach was copied into.
     assert (
-        "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;"
+        "const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;"
         in execute
     ), "an aliased output is no longer checked, and its branch skips the ordinary check"
     # Each answer has to end the call. A device read into a variable that nothing acts on refuses
@@ -1103,21 +1103,21 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
             execute, condition
         ), f"the refusal for {device} no longer returns"
     # Capability asserted absent and usability asserted present: whether two cards CAN reach each
-    # other answered yes on every pair measured and still faulted, while a non-null devicePointer is
+    # other answered yes on every pair measured and still faulted, while a non-null device pointer is
     # an address that works from here.
     assert (
         "cudaDeviceCanAccessPeer" not in code
     ), "the capability check is back, and capability is not access"
-    assert (
-        "attrs.devicePointer == nullptr" in code
-    ), "the usability check is gone, so a buffer reachable from here is refused"
     # Read the helper's own body, so a mention elsewhere in the file cannot stand in for it.
     placement = _definition_body(code, helper)
     assert (
-        "attrs.type == cudaMemoryTypeManaged" in placement
-    ), "the managed-memory exemption is gone"
+        "device != engine_device && device_pointer == 0" in placement
+    ), "the usability check is gone, so a buffer reachable from here is refused"
     assert (
-        "attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device"
+        "type == CU_MEMORYTYPE_DEVICE || managed != 0" in placement
+    ), "managed memory is no longer device-reachable, and a Jetson Orin reports it as host memory"
+    assert (
+        "type == CU_MEMORYTYPE_DEVICE && managed == 0 && device != engine_device"
         in placement
     ), "the foreign-device check no longer gates on the buffer being device memory"
 
@@ -1157,6 +1157,7 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
         "drop-alias-check",
         "drop-helper",
         "drop-managed-exemption",
+        "drop-managed-access",
         "input-check-outside-execute",
         "peer-capability-back",
         "input-refusal-never-taken",
@@ -1178,8 +1179,9 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     the managed-memory exemption is present in the body that binds the buffers, with comments stripped first so a
     comment cannot stand in for the code. Each mutation below is required to turn the reading red,
     which is what keeps the reading from passing on any source at all. What text cannot see is a
-    check left in place and disabled by a surrounding condition; only two GPUs catch that, and the C++
-    test ABufferOnAnotherDeviceIsRefused does where it finds them.
+    check left in place and disabled by a surrounding condition. The C++ test
+    ABufferOnAnotherDeviceIsRefused catches that where it finds two GPUs, and
+    ABufferReportedOnAnotherDeviceIsRefusedUnlessReachable catches it on one, with the driver's answer made up.
     """
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
@@ -1240,9 +1242,10 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
             "drop-input-query": "input_placements[i] = placement_of(",
             "drop-output-query": "const BufferPlacement output_placement = placement_of(",
             "drop-output-check": "const int output_device = output_placement.foreign_device;",
-            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;",
+            "drop-alias-check": "const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;",
             "drop-helper": "BufferPlacement placement_of(",
-            "drop-managed-exemption": " || attrs.type == cudaMemoryTypeManaged",
+            "drop-managed-exemption": "managed == 0 && ",
+            "drop-managed-access": " || managed != 0",
         }[mutation]
         assert removed in source, f"mutation {mutation} has nothing to remove"
         source = source.replace(removed, "")
@@ -1272,6 +1275,10 @@ _CONVERSION_WIDTHS = {"%d": 11, "%zu": 20, "%lld": 20}
         (
             "cpp/src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
             "TensorRTBackend::execute: TensorRT could not size the activation scratch",
+        ),
+        (
+            "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp",
+            "TensorRTBackend::execute: usual causes, in order:",
         ),
     ],
 )

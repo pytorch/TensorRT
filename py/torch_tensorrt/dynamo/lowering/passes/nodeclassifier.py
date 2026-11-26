@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
 
-from .inline_autocast_regions import NAME_IN_REGION
+from .inline_autocast_regions import NAME_IN_REGION, OP_IN_REGION
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +120,10 @@ class DisabledOpTypes(NodeRuleBase):
         self.excluded_ops = excluded_ops
 
     def _check_inner(self, node):
-        node_name = ConverterRegistry.qualified_name_or_str(node.target)
-        return node_name in self.excluded_ops
+        return any(
+            ConverterRegistry.qualified_name_or_str(op) in self.excluded_ops
+            for op in (node.target, node.meta.get(OP_IN_REGION, node.target))
+        )
 
 
 class IORangeRule(NodeRuleBase):

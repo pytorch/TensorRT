@@ -206,12 +206,15 @@ def makes_uint8_tensor(node: torch.fx.Node) -> bool:
     slice_scatter that overwrites the whole tensor with a uint8 source, can hand an
     engine input through as it is, the where converter widens uint8 values first,
     and the interpreter widens the uint8 input of an op that only moves data, so
-    they are left to their converters. A get_attr is not refused: uint8 weights are
-    packed FP4 that the quantization converters read themselves.
+    they are left to their converters. The quantize_decomposed converters keep their
+    integer results in float32. A get_attr is not refused: uint8 weights are packed FP4
+    that the quantization converters read themselves.
     """
     if node.op not in CALLABLE_NODE_OPS:
         return False
     if node.target in (torch.ops.aten.clone.default, torch.ops.aten.where.self):
+        return False
+    if node.target in impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS:
         return False
     if node.target in UINT8_DATA_MOVEMENT_OPS or (
         node.target is operator.getitem

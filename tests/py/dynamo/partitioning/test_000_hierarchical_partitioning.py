@@ -1,12 +1,27 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import unittest
 from copy import deepcopy
+from unittest import mock
 
 import numpy as np
 import torch
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.partitioning._hierarchical_partitioner import (
+    HierarchicalAdjacencyPartitioner,
+)
+
+
+class _GraphOrder(set):
+    """A set of nodes that iterates in graph order."""
+
+    def __iter__(self):
+        nodes = list(super().__iter__())
+        order = {n: i for i, n in enumerate(nodes[0].graph.nodes)} if nodes else {}
+        return iter(sorted(nodes, key=order.__getitem__))
 
 
 class TestHierarchicalAdjacencyPartitioning(TestCase):
@@ -330,6 +345,68 @@ class TestHierarchicalAdjacencyPartitioning(TestCase):
         for block in trt_blocks:
             for node in block.graph.nodes:
                 self.assertNotEqual(node.kwargs.get("dtype"), torch.float64)
+
+    @unittest.skipIf(
+        not impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS,
+        "torch.ao.quantization.fx._decomposed is not available",
+    )
+    def test_dequantize_is_in_tensorrt_only_with_its_quantize(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_CONVERTERS as CONVERTERS,
+        )
+
+        qd = torch.ops.quantized_decomposed
+
+        class QDQ(torch.nn.Module):
+            def forward(self, x):
+                q = qd.quantize_per_tensor(torch.relu(x), 0.1, 0, -128, 127, torch.int8)
+                s = torch.sigmoid(x)
+                d = qd.dequantize_per_tensor(q, 0.1, 0, -128, 127, torch.int8)
+                return d * 2 + s
+
+        def blocks(inductor_ops):
+            gm = torch.export.export(QDQ(), (torch.randn(4, 8),)).module()
+            partitioned_graph, _ = partitioning.hierarchical_adjacency_partition(
+                gm,
+                min_block_size=1,
+                backend_priority=["inductor", "tensorrt"],
+                backend_support_map={
+                    "inductor": inductor_ops,
+                    "tensorrt": CONVERTERS.keys(),
+                },
+            )
+            return {
+                node.target: name
+                for name, block in partitioned_graph.named_children()
+                for node in block.graph.nodes
+            }
+
+        # A quantize on another backend keeps its dequantize out of TensorRT.
+        CONVERTERS.set_compilation_settings(CompilationSettings())
+        quantize_on_inductor = blocks(
+            {"torch.ops.quantized_decomposed.quantize_per_tensor.default"}
+        )
+        self.assertNotIn(
+            "_run_on_acc_tensorrt",
+            quantize_on_inductor[qd.dequantize_per_tensor.default],
+        )
+        # Ready nodes are picked in set order. In graph order the sigmoid comes between the
+        # quantize and its dequantize, and must not split them into two TensorRT blocks.
+        starter_nodes = HierarchicalAdjacencyPartitioner.starter_nodes
+        with mock.patch.object(
+            HierarchicalAdjacencyPartitioner,
+            "starter_nodes",
+            lambda self: tuple(_GraphOrder(nodes) for nodes in starter_nodes(self)),
+        ):
+            in_graph_order = blocks({"torch.ops.aten.sigmoid.default"})
+        self.assertIn(
+            "_run_on_acc_tensorrt", in_graph_order[qd.quantize_per_tensor.default]
+        )
+        self.assertEqual(
+            in_graph_order[qd.quantize_per_tensor.default],
+            in_graph_order[qd.dequantize_per_tensor.default],
+        )
 
 
 if __name__ == "__main__":
