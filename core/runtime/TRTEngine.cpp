@@ -24,7 +24,10 @@
 #include "torch/csrc/distributed/c10d/GroupRegistry.hpp"
 #include "torch/csrc/distributed/c10d/NCCLUtils.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroup.hpp"
+// Newer PyTorch wheels can expose NCCL2 without the legacy backend.
+#ifdef TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL
 #include "torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
+#endif
 #ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
 #include "torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
 #endif
@@ -51,13 +54,15 @@ constexpr int32_t kDynamicDim = -1;
 }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-// PyTorch exposes both the legacy ProcessGroupNCCL and the newer nccl2
-// implementation under the built-in "nccl" backend. Both provide the raw
+// PyTorch may expose the legacy ProcessGroupNCCL, nccl2, or both under the
+// built-in "nccl" backend. Both implementations provide the raw
 // ncclComm_t that TensorRT's setCommunicator() expects.
 std::optional<int64_t> get_nccl_comm_ptr(c10d::Backend* backend) {
+#ifdef TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL
   if (auto* legacy_nccl = dynamic_cast<c10d::ProcessGroupNCCL*>(backend)) {
     return legacy_nccl->getCommPtr();
   }
+#endif
 #ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
   if (auto* nccl2 = dynamic_cast<c10d::nccl2::ProcessGroupNCCL*>(backend)) {
     return nccl2->getCommPtr();
