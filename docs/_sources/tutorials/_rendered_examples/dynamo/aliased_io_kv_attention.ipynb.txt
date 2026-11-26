@@ -58,7 +58,7 @@
       },
       "outputs": [],
       "source": [
-        "torch.manual_seed(0)\nmodel = StaticKVAttention().cuda()\nhidden = torch.randn(1, 1, model.hidden, device=\"cuda\")\n\nep = export(model, (hidden.clone(),))\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[hidden.clone()],\n    enabled_precisions={torch.float32},\n    min_block_size=1,\n    use_python_runtime=False,\n)"
+        "torch.manual_seed(0)\nmodel = StaticKVAttention().cuda()\nhidden = torch.randn(1, 1, model.hidden, device=\"cuda\")\n\nep = export(model, (hidden.clone(),))\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[hidden.clone()],\n    min_block_size=1,\n)"
       ]
     },
     {

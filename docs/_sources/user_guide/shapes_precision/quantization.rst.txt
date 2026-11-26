@@ -11,6 +11,7 @@ weight-only**, and **MXFP4** (``MXDynamicActivationMXWeightConfig``) via
 `TorchAO <https://github.com/pytorch/ao>`_. Quantizers insert
 quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.
+PyTorch PT2E graphs work differently, see :ref:`PT2E graphs <pt2e_qdq>`.
 
 ----
 
@@ -388,8 +389,23 @@ For ModelOpt FP4, ``torch.ops.tensorrt.dynamic_block_quantize_op.default`` nodes
 are converted via the dynamic block quantize converter, which uses TRT's
 ``add_dynamic_quantize`` API (TRT ≥ 10.8).
 
-The ``constant_folding`` lowering pass explicitly marks quantization ops as *impure* to
-prevent their scales from being folded away before the TRT conversion step.
+The ``constant_folding`` lowering pass explicitly marks the ModelOpt and TorchAO
+quantization ops as *impure* to prevent their scales from being folded away before the
+TRT conversion step.
+
+.. _pt2e_qdq:
+
+For PyTorch PT2E graphs (``convert_pt2e``), the ``quantized_decomposed`` quantize and
+dequantize ops are not mapped to TRT quantization layers, because TRT's quantize layer is
+symmetric and has no uint8 output. Each op is built from elementwise layers in float32,
+where every int8 and uint8 value is exact; only an int8 engine input is read through a
+dequantize layer with a scale of 1. These ops are left out of the impure set on purpose:
+the engine would compute a weight's dequantize in floating point anyway, so constant
+folding turns each int8 weight into a floating-point constant of the dequantize's output
+dtype. So the engine gets no INT8 speed or memory gain. Results match PyTorch, except that
+a value on a halfway point can move by one quantization step.
+Full conversion needs ``torch.export``. Some cases stay in PyTorch, for example run-time
+scales, and on TensorRT-RTX an int8 dequantize whose quantize has other users.
 
 ----
 

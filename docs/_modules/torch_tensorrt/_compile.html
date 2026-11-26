@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -558,6 +558,9 @@ document.write(`
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">save_cross_compiled_exported_program</span> <span class="k">as</span> <span class="n">dynamo_save_cross_compiled_exported_program</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">validate_compiler_kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_device</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">build_dim_registry</span><span class="p">,</span>
@@ -582,6 +585,31 @@ document.write(`
     <span class="s2">"save"</span><span class="p">,</span>
     <span class="s2">"load"</span><span class="p">,</span>
 <span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_reject_enabled_precisions_for_dynamo</span><span class="p">(</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"`enabled_precisions` has been removed from Dynamo compilation. "</span>
+            <span class="s2">"Dynamo compilation is strongly typed and uses the "</span>
+            <span class="s2">"precisions in the model. Use the autocast options to change model "</span>
+            <span class="s2">"precision."</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_prepare_dynamo_compiler_kwargs</span><span class="p">(</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">compiler</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">strip_strict</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="n">compiler_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="s2">"strict"</span><span class="p">}</span> <span class="k">if</span> <span class="n">strip_strict</span> <span class="k">else</span> <span class="n">kwargs</span>
+    <span class="p">)</span>
+    <span class="n">validate_compiler_kwargs</span><span class="p">(</span><span class="n">compiler_kwargs</span><span class="p">,</span> <span class="n">compiler</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">compiler_kwargs</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_has_executorch_exir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -740,7 +768,7 @@ document.write(`
 <span class="sd">                ]</span>
 <span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
-<span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
+<span class="sd">        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Legacy TorchScript/FX-only option specifying the datatypes TensorRT may use when selecting kernels. Dynamo and ``torch_compile`` reject this option; express precision in the model or use the Dynamo autocast options instead.</span>
 <span class="sd">        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</span>
 <span class="sd">        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)</span>
 
@@ -756,6 +784,7 @@ document.write(`
 
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">target_ir</span> <span class="o">=</span> <span class="n">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">,</span> <span class="n">ir</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">ts</span><span class="p">:</span>
         <span class="n">ts_mod</span> <span class="o">=</span> <span class="n">module</span>
         <span class="k">if</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">nn</span><span class="p">:</span>
@@ -811,6 +840,13 @@ document.write(`
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">compiled_fx_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
+        <span class="n">_reject_enabled_precisions_for_dynamo</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="p">)</span>
+        <span class="n">compiler_kwargs</span> <span class="o">=</span> <span class="n">_prepare_dynamo_compiler_kwargs</span><span class="p">(</span>
+            <span class="n">kwargs</span><span class="p">,</span>
+            <span class="n">dynamo_compile</span><span class="p">,</span>
+            <span class="n">strip_strict</span><span class="o">=</span><span class="n">module_type</span> <span class="o">!=</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ep</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="c1"># Prepare torch and torchtrt inputs</span>
         <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"'arg_inputs' and 'inputs' should not both be None."</span><span class="p">)</span>
@@ -851,17 +887,20 @@ document.write(`
         <span class="n">trt_graph_module</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">compiler_kwargs</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">trt_graph_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>
+        <span class="n">_reject_enabled_precisions_for_dynamo</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Module is an unknown format or the ir requested is unknown"</span><span class="p">)</span></div>
 
 
 
-<span class="nd">@needs_cross_compile</span>  <span class="c1"># type: ignore[misc]</span>
+<div class="viewcode-block" id="cross_compile_for_windows">
+<a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.cross_compile_for_windows">[docs]</a>
+<span class="nd">@needs_cross_compile</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -902,10 +941,17 @@ document.write(`
 <span class="sd">                ]</span>
 <span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
-<span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
+<span class="sd">        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Removed from the Dynamo frontend used by cross-compilation. Passing this option raises ``TypeError``; express precision in the model or use the Dynamo autocast options instead.</span>
 <span class="sd">        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)</span>
 
 <span class="sd">    """</span>
+
+    <span class="n">_reject_enabled_precisions_for_dynamo</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="p">)</span>
+    <span class="n">compiler_kwargs</span> <span class="o">=</span> <span class="n">_prepare_dynamo_compiler_kwargs</span><span class="p">(</span>
+        <span class="n">kwargs</span><span class="p">,</span>
+        <span class="n">dynamo_cross_compile_for_windows</span><span class="p">,</span>
+        <span class="n">strip_strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">"Linux"</span> <span class="ow">or</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"64bit"</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -949,11 +995,12 @@ document.write(`
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">dynamo_cross_compile_for_windows</span><span class="p">(</span>
         <span class="n">exp_program</span><span class="p">,</span>
         <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
-        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">compiler_kwargs</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">dynamo_save_cross_compiled_exported_program</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"successfully compiled and saved the module for windows"</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"successfully compiled and saved the module for windows"</span><span class="p">)</span></div>
+
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
@@ -1010,7 +1057,7 @@ document.write(`
 
 <span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
-<span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
+<span class="sd">        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Legacy TorchScript-only option specifying the datatypes TensorRT may use when selecting kernels. The Dynamo path rejects this option; express precision in the model or use the Dynamo autocast options instead.</span>
 <span class="sd">        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)</span>
 <span class="sd">        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)</span>
 <span class="sd">    Returns:</span>
@@ -1032,6 +1079,7 @@ document.write(`
 
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">target_ir</span> <span class="o">=</span> <span class="n">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">,</span> <span class="n">ir</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">ts</span><span class="p">:</span>
         <span class="n">ts_mod</span> <span class="o">=</span> <span class="n">module</span>
         <span class="k">if</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">nn</span><span class="p">:</span>
@@ -1052,6 +1100,13 @@ document.write(`
             <span class="s2">"convert_method_to_trt_engine call is not supported for ir=fx"</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
+        <span class="n">_reject_enabled_precisions_for_dynamo</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="p">)</span>
+        <span class="n">compiler_kwargs</span> <span class="o">=</span> <span class="n">_prepare_dynamo_compiler_kwargs</span><span class="p">(</span>
+            <span class="n">kwargs</span><span class="p">,</span>
+            <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">,</span>
+            <span class="n">strip_strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="c1"># Prepare torch and torchtrt inputs</span>
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1082,7 +1137,7 @@ document.write(`
                 <span class="n">exp_program</span><span class="p">,</span>
                 <span class="n">arg_inputs</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">normalized_arg_inputs</span><span class="p">),</span>
                 <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
-                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">compiler_kwargs</span><span class="p">,</span>
             <span class="p">),</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">torch_compile</span><span class="p">:</span>
@@ -1566,8 +1621,11 @@ document.write(`
                     <span class="sa">f</span><span class="s2">"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: </span><span class="si">{</span><span class="n">dynamic_shapes</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
 
+        <span class="k">assert</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="n">arg_tensors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>
-        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">())</span>
+        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
+            <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">())</span>
+        <span class="p">)</span>
 
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Mixed case: some inputs are Tensors, some are Input objects</span>

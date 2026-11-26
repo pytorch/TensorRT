@@ -32,13 +32,12 @@ stays identical:
     ).to("cuda")
 
     # The only extra line you need
-    pipe.unet = torch_tensorrt.MutableTorchTensorRTModule(
-        pipe.unet,
-        use_explicit_typing=True,  # pipeline already loaded in float16 via torch_dtype
-    )
+    pipe.unet = torch_tensorrt.MutableTorchTensorRTModule(pipe.unet)
 
 The pipeline's ``unet`` is now backed by a TRT engine. The first call to ``pipe(...)``
-triggers compilation; subsequent calls run the cached engine.
+triggers compilation; subsequent calls run the cached engine. Dynamo compilation is
+always strongly typed, so it preserves the ``float16`` dtype selected by
+``torch_dtype`` above.
 
 **Dynamic shapes** are required for diffusion pipelines because batch size and image
 dimensions vary. Set the ranges before the first call:

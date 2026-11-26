@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -673,14 +673,14 @@ per-profile TensorRT tunings:</p>
 <p>Export once over the union range, then compile as usual. Every input that
 declares <code class="docutils literal notranslate"><span class="pre">profiles</span></code> must declare the <strong>same number</strong> of profiles; static
 inputs (or dynamic inputs without <code class="docutils literal notranslate"><span class="pre">profiles</span></code>) reuse their single shape in every
-profile.</p>
+profile. Set the model and input dtypes before export; Dynamo compilation preserves
+those dtypes through strong typing.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">seq</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"seq"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
 <span class="n">exported</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_ids</span><span class="p">,),</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="p">({</span><span class="mi">1</span><span class="p">:</span> <span class="n">seq</span><span class="p">},))</span>
 
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exported</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="n">profiled_input</span><span class="p">],</span>
-    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">},</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>

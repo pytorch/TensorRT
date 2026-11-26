@@ -58,7 +58,7 @@
       },
       "outputs": [],
       "source": [
-        "B, H, S_MAX, D = 1, 4, 16, 8\ncache_proto = torch.zeros(B, H, S_MAX, D, device=\"cuda\")\nupdate_proto = torch.ones(B, H, 1, D, device=\"cuda\")\n\nep = export(KVStep().cuda(), (cache_proto.clone(), update_proto.clone()))\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[cache_proto.clone(), update_proto.clone()],\n    enabled_precisions={torch.float32},\n    min_block_size=1,\n    use_python_runtime=False,  # aliased I/O requires the C++ runtime\n)"
+        "B, H, S_MAX, D = 1, 4, 16, 8\ncache_proto = torch.zeros(B, H, S_MAX, D, device=\"cuda\")\nupdate_proto = torch.ones(B, H, 1, D, device=\"cuda\")\n\nep = export(KVStep().cuda(), (cache_proto.clone(), update_proto.clone()))\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[cache_proto.clone(), update_proto.clone()],\n    min_block_size=1,\n)"
       ]
     },
     {

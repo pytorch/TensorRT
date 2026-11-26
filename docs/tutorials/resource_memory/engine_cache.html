@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -665,7 +665,7 @@ names are normalized so renaming inputs does not bust the cache).</p></li>
 <li><p><strong>Input specs</strong> — the <code class="docutils literal notranslate"><span class="pre">min/opt/max</span></code> shapes and dtypes of each input tensor.</p></li>
 <li><p><strong>Engine-invariant settings</strong> — the subset of
 <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.CompilationSettings</span></code> that affect the compiled engine
-(see <span class="xref std std-ref">engine-invariant-settings</span>). Settings like <code class="docutils literal notranslate"><span class="pre">debug</span></code> or <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> do not
+(see <span class="xref std std-ref">engine-invariant-settings</span>). Settings like <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> do not
 affect the cache key.</p></li>
 </ol>
 <p>Each cache entry stores:</p>
@@ -693,7 +693,7 @@ The following changes always require a cache miss (engine rebuild):</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">tiling_optimization_level</span></code> / <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code></p></li>
 <li><p>All <code class="docutils literal notranslate"><span class="pre">autocast_*</span></code> settings except <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code></p></li>
 </ul>
-<p>Changes to <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code>, <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>,
+<p>Changes to <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code>, <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>,
 <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>, etc. do <strong>not</strong> invalidate cached engines.</p>
 </section>
 <hr class="docutils" />
@@ -738,7 +738,6 @@ persisted to disk via <code class="docutils literal notranslate"><span class="pr
     <span class="n">exported_program</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
     <span class="n">runtime_cache_path</span><span class="o">=</span><span class="s2">"/data/trt_cache/runtime_cache.bin"</span><span class="p">,</span>
-    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>

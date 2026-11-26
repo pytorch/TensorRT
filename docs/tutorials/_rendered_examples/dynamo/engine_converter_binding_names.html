@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -642,17 +642,10 @@ queue, no in-band validation, just an up-front structural check.</p>
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import tensorrt as trt
+import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo._compiler import BindingNameMismatchError
-</pre></div>
-</div>
-</div>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
-</pre></div>
-</div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import tensorrt as trt
 
 DEVICE = torch.device("cuda", 0)
 </pre></div>
@@ -745,7 +738,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names=("relu_out", "tanh_out"),
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -794,7 +786,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names="combined",
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -855,7 +846,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names={"primary": "p_feats", "secondary": "s_feats"},
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -897,7 +887,6 @@ print("Case 3 native TRT run matches PyTorch.")
         output_binding_names=("only_one",),  # wrong arity for the 2-tuple return
         require_full_compilation=True,
         min_block_size=1,
-        use_python_runtime=False,
         immutable_weights=True,
     )
 except BindingNameMismatchError as err:

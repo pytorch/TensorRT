@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -573,18 +573,18 @@ efficiently copy new weights without traversing the full graph again.</p>
 </section>
 <section id="compilation-modes">
 <h2>Compilation Modes<a class="headerlink" href="#compilation-modes" title="Link to this heading">#</a></h2>
-<p>Three engine modes are supported (controlled by <code class="docutils literal notranslate"><span class="pre">make_refittable</span></code> and
+<p>Three engine modes are supported (controlled by <code class="docutils literal notranslate"><span class="pre">immutable_weights</span></code> and
 <code class="docutils literal notranslate"><span class="pre">strip_engine_weights</span></code>):</p>
 <ol class="arabic simple">
 <li><p><strong>Weightless + refittable</strong> (<code class="docutils literal notranslate"><span class="pre">strip_engine_weights=True</span></code>,
-<code class="docutils literal notranslate"><span class="pre">make_refittable=True</span></code>) — engine stores only the computation graph;
+<code class="docutils literal notranslate"><span class="pre">immutable_weights=False</span></code>) — engine stores only the computation graph;
 weights are supplied at runtime via refit. Cache-friendly: the engine file
 is much smaller, and any engine is cacheable regardless of weight values.</p></li>
-<li><p><strong>Refittable with embedded weights</strong> (<code class="docutils literal notranslate"><span class="pre">make_refittable=True</span></code>) — engine
+<li><p><strong>Refittable with embedded weights</strong> (<code class="docutils literal notranslate"><span class="pre">immutable_weights=False</span></code>) — engine
 stores both the computation graph and current weights. Refit replaces the
 embedded weights in-place (<code class="docutils literal notranslate"><span class="pre">kREFIT_IDENTICAL</span></code> semantic in TensorRT).</p></li>
-<li><p><strong>Non-refittable</strong> (legacy default) — weights are baked into the engine at
-build time; no post-build updates are possible.</p></li>
+<li><p><strong>Non-refittable</strong> (<code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code>, the default) — weights are
+baked into the engine at build time; no post-build updates are possible.</p></li>
 </ol>
 </section>
 <section id="user-facing-api">
@@ -597,7 +597,11 @@ build time; no post-build updates are possible.</p></li>
 
 <span class="c1"># Compile once</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Later: update weights (e.g. different LoRA applied to model)</span>
 <span class="n">new_model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span>   <span class="c1"># same architecture, different weights</span>
@@ -672,7 +676,7 @@ module to re-trace the new exported program through the ATen lowering stage only
 (e.g. <code class="docutils literal notranslate"><span class="pre">aten.cumsum</span></code>, <code class="docutils literal notranslate"><span class="pre">aten.embedding_bag</span></code>). Two options are available:</p>
 <ul class="simple">
 <li><p>Keep engines refittable and fall back those ops to PyTorch.</p></li>
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">make_refittable=False</span></code> and rebuild the engine when weights change.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code> and rebuild the engine when weights change.</p></li>
 </ul>
 </section>
 <section id="refit-caching-shortcut">
