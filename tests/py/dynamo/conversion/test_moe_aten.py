@@ -1,7 +1,18 @@
+import contextlib
+import importlib.util
+from unittest.mock import patch
+
 import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion import aten_ops_converters, impl
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    grouped_mm_kernel_validator,
+    grouped_mm_validator,
+)
+from torch_tensorrt.kernels import _triton
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
@@ -31,16 +42,77 @@ class TestHistcConverter(DispatchTestCase):
         self.run_test(Histc(), inputs, use_dynamo_tracer=True)
 
 
+def _kernel_unavailable():
+    if not torch.cuda.is_available():
+        return "it needs a CUDA GPU"
+    return aten_ops_converters._grouped_mm_kernel_unavailable()
+
+
+_KERNEL_ON = CompilationSettings(grouped_mm_kernel=True)
+
+
+def _decline_cause(name):
+    if name == "old_triton":
+        return patch.object(
+            _triton, "_triton_import", side_effect=ImportError("Triton 3.4")
+        )
+    if name == "triton_driver":
+        return patch.object(
+            _triton._triton_import().runtime.driver.active,
+            "get_current_target",
+            side_effect=RuntimeError("no launcher"),
+        )
+    if name == "sm75":
+        return patch.object(torch.cuda, "get_device_capability", return_value=(7, 5))
+    if name == "no_ptx_limit":
+        return patch.object(_triton, "_driver_max_ptx_version", return_value=None)
+    if name == "thor_triton_3_6":
+        stack = contextlib.ExitStack()
+        stack.enter_context(
+            patch.object(torch.cuda, "get_device_capability", return_value=(11, 0))
+        )
+        stack.enter_context(
+            patch.object(_triton._triton_import(), "__version__", "3.6.0")
+        )
+        return stack
+    return contextlib.nullcontext()
+
+
+def _kernel_spy():
+    return patch.object(impl.moe, "grouped_mm_kernel", wraps=impl.moe.grouped_mm_kernel)
+
+
 class TestGroupedMMConverter(DispatchTestCase):
+    # Each case checks which converter took the op.
     @parameterized.expand(
         [
-            (16, 32, 24, (3, 5, 0, 8), torch.bfloat16),
-            (32, 64, 48, (3, 5, 0, 4, 6, 0, 5, 9), torch.bfloat16),
+            ("dense", False, 16, 32, 24, (3, 5, 0, 8), torch.bfloat16),
+            (
+                "dense_8_groups",
+                False,
+                32,
+                64,
+                48,
+                (3, 5, 0, 4, 6, 0, 5, 9),
+                torch.bfloat16,
+            ),
+            ("kernel", True, 16, 32, 24, (3, 5, 0, 8), torch.bfloat16),
+            (
+                "kernel_fp16_partial_tiles",
+                True,
+                300,
+                40,
+                136,
+                (0, 129, 1, 0, 170),
+                torch.float16,
+            ),
         ]
     )
-    def test_grouped_mm(self, rows, k, n, counts, dtype):
+    def test_grouped_mm(self, _, kernel, rows, k, n, counts, dtype):
         if dtype == torch.bfloat16:
             skip_if_trt_rtx_turing(self, "bfloat16")
+        if kernel:
+            self._require_kernel()
 
         class GroupedMM(nn.Module):
             def forward(self, x, w, offs):
@@ -51,11 +123,18 @@ class TestGroupedMMConverter(DispatchTestCase):
         self.assertEqual(offs[-1].item(), rows, "Offsets must cover every output row.")
         x = torch.randn(rows, k, dtype=dtype)
         w = torch.randn(experts, k, n, dtype=dtype)
-        self.run_test(
-            GroupedMM(),
-            [x, w, offs],
-            use_dynamo_tracer=True,
-        )
+        # Float16 outputs near 6 are 0.004 apart, so a sum in another order can round
+        # one step away from PyTorch.
+        tolerance = {"rtol": 1e-2, "atol": 1e-2} if dtype == torch.float16 else {}
+        with _kernel_spy() as spy:
+            self.run_test(
+                GroupedMM(),
+                [x, w, offs],
+                use_dynamo_tracer=True,
+                grouped_mm_kernel=kernel,
+                **tolerance,
+            )
+        self.assertEqual(spy.called, kernel)
 
     def test_grouped_mm_kwargs_offs(self):
         skip_if_trt_rtx_turing(self, "bfloat16")
@@ -75,6 +154,220 @@ class TestGroupedMMConverter(DispatchTestCase):
             [x, w, offs],
             use_dynamo_tracer=True,
         )
+
+    @parameterized.expand(
+        [
+            ("small", 16, 32, 24, 4, True),
+            ("large_experts_decode", 8, 3072, 2560, 128, True),
+            ("at_limit", 16384, 1024, 1024, 16, True),
+            ("above_limit", 16385, 1024, 1024, 16, False),
+            ("large_experts_prefill", 28000, 3072, 2560, 128, False),
+            ("one_group", 32768, 4096, 4096, 1, True),
+        ]
+    )
+    def test_grouped_mm_validator_dense_cost(self, _, rows, k, n, experts, expected):
+        class GroupedMM(nn.Module):
+            def forward(self, x, w, offs):
+                return torch.ops.aten._grouped_mm.default(x, w, offs)
+
+        # Only the shapes matter, so meta tensors keep the large cases cheap.
+        args = (
+            torch.empty(rows, k, device="meta", dtype=torch.bfloat16),
+            torch.empty(experts, k, n, device="meta", dtype=torch.bfloat16),
+            torch.empty(experts, device="meta", dtype=torch.int32),
+        )
+        ep = torch.export.export(GroupedMM(), args)
+        node = next(
+            nd
+            for nd in ep.graph.nodes
+            if nd.target == torch.ops.aten._grouped_mm.default
+        )
+        limit = CompilationSettings(grouped_mm_dense_max_macs=2**38)
+        self.assertEqual(grouped_mm_validator(node, limit), expected)
+        full = CompilationSettings(
+            require_full_compilation=True, grouped_mm_dense_max_macs=2**38
+        )
+        self.assertTrue(grouped_mm_validator(node, full))
+        # The limit is opt-in: a default compile converts the op as before.
+        self.assertTrue(grouped_mm_validator(node))
+
+    @parameterized.expand(
+        [
+            ("false", False),
+            ("true", True),
+            ("zero", 0),
+            ("negative", -1),
+            ("float", 2.5),
+        ]
+    )
+    def test_grouped_mm_dense_max_macs_rejects_non_positive_integers(self, _, value):
+        with self.assertRaises(ValueError):
+            CompilationSettings(grouped_mm_dense_max_macs=value)
+
+    @parameterized.expand(
+        [
+            ("bfloat16", torch.bfloat16, None, True),
+            ("float32", torch.float32, None, False),
+            ("bias", torch.bfloat16, ("bias", None), False),
+            ("out_dtype_same", torch.bfloat16, ("out_dtype", torch.bfloat16), True),
+            ("out_dtype_float32", torch.bfloat16, ("out_dtype", torch.float32), False),
+            ("mat2_float16", torch.bfloat16, (1, torch.float16), False),
+            ("offs_int64", torch.bfloat16, (2, torch.int64), False),
+        ]
+    )
+    def test_grouped_mm_kernel_validator(self, _, dtype, change, expected):
+        node = self._grouped_mm_node(dtype=dtype)
+        # PyTorch's export rejects most of these, so the node is changed after export.
+        if change is not None:
+            where, value = change
+            if isinstance(where, int):
+                arg = node.args[where]
+                arg.meta["val"] = arg.meta["val"].to(value)
+            else:
+                node.kwargs = {**node.kwargs, where: value or node.args[2]}
+        self.assertEqual(grouped_mm_kernel_validator(node, _KERNEL_ON), expected)
+        # The kernel is opt-in.
+        self.assertFalse(grouped_mm_kernel_validator(node, CompilationSettings()))
+        self.assertFalse(grouped_mm_kernel_validator(node))
+
+    def _require_kernel(self):
+        reason = _kernel_unavailable()
+        if reason is not None:
+            self.skipTest(f"the grouped GEMM kernel is unavailable: {reason}")
+
+    def _grouped_mm_node(
+        self,
+        dynamic_shapes=None,
+        groups=8,
+        dtype=torch.bfloat16,
+        rows=512,
+        k=256,
+        n=128,
+    ):
+        # Without the kernel's requirements every case declines at the first check,
+        # so the negative cases would not test what they are named for.
+        self._require_kernel()
+
+        class GroupedMM(nn.Module):
+            def forward(self, x, w, offs):
+                return torch.ops.aten._grouped_mm.default(x, w, offs)
+
+        # Only the shapes matter, so meta tensors keep large cases cheap.
+        args = (
+            torch.empty(rows, k, device="meta", dtype=dtype),
+            torch.empty(groups, k, n, device="meta", dtype=dtype),
+            torch.empty(groups, device="meta", dtype=torch.int32),
+        )
+        ep = torch.export.export(GroupedMM(), args, dynamic_shapes=dynamic_shapes)
+        return next(
+            nd
+            for nd in ep.graph.nodes
+            if nd.target == torch.ops.aten._grouped_mm.default
+        )
+
+    def test_grouped_mm_kernel_validator_zero_width(self):
+        # N=0 would give the kernel an empty launch grid. PyTorch's export rejects
+        # such a weight, so the node is changed after export.
+        node = self._grouped_mm_node()
+        mat2 = node.args[1]
+        mat2.meta["val"] = mat2.meta["val"][..., :0]
+        self.assertFalse(grouped_mm_kernel_validator(node, _KERNEL_ON))
+
+    def test_grouped_mm_kernel_validator_one_group(self):
+        # With one group the dense lowering does no extra work, but it needs a static
+        # row count.
+        node = self._grouped_mm_node(groups=1)
+        self.assertFalse(grouped_mm_kernel_validator(node, _KERNEL_ON))
+        rows = torch.export.Dim("rows", min=2)
+        node = self._grouped_mm_node(groups=1, dynamic_shapes=({0: rows}, None, None))
+        self.assertTrue(grouped_mm_kernel_validator(node, _KERNEL_ON))
+
+    @parameterized.expand(
+        [
+            ("old_triton", {}, "Triton 3.4"),
+            ("triton_driver", {}, "no launcher"),
+            ("sm75", {}, "8.0"),
+            ("thor_triton_3_6", {}, "Triton 3.7"),
+            ("no_ptx_limit", {}, "cuda-python"),
+            (
+                "hardware_compatible",
+                {"hardware_compatible": True},
+                "hardware_compatible",
+            ),
+            ("windows", {"enable_cross_compile_for_windows": True}, "Windows"),
+        ]
+    )
+    def test_grouped_mm_kernel_validator_says_why_it_declines(
+        self, cause, settings, reason
+    ):
+        # The op declines with one warning that names the cause, however often the
+        # registry asks in one compile. Each compile has its own settings object, and
+        # each compile warns again.
+        node = self._grouped_mm_node()
+        with (
+            _decline_cause(cause),
+            self.assertLogs(aten_ops_converters.__name__, level="WARNING") as logs,
+        ):
+            for _ in range(2):
+                on = CompilationSettings(grouped_mm_kernel=True, **settings)
+                self.assertFalse(grouped_mm_kernel_validator(node, on))
+                self.assertFalse(grouped_mm_kernel_validator(node, on))
+        self.assertEqual(len(logs.records), 2)
+        self.assertIn(reason, logs.output[0])
+
+    @parameterized.expand(
+        [
+            ("unset", torch.bfloat16, {}, True),
+            ("set", torch.bfloat16, {"grouped_mm_kernel": True}, False),
+            (
+                "hardware_compatible",
+                torch.bfloat16,
+                {"hardware_compatible": True},
+                False,
+            ),
+            ("float32", torch.float32, {}, False),
+            ("old_triton", torch.bfloat16, {}, False),
+            ("no_cuda_python", torch.bfloat16, {}, False),
+            ("no_gpu", torch.bfloat16, {}, False),
+        ]
+    )
+    def test_dense_warning_suggests_the_kernel_only_where_it_helps(
+        self, name, dtype, settings, hint
+    ):
+        # Above this grouped_mm_dense_max_macs, so the dense converter declines and warns.
+        node = self._grouped_mm_node(
+            dtype=dtype, groups=128, rows=28000, k=3072, n=2560
+        )
+        real_find_spec = importlib.util.find_spec
+        missing = {
+            "no_cuda_python": patch.object(
+                importlib.util,
+                "find_spec",
+                side_effect=lambda module: (
+                    None if module.startswith("cuda") else real_find_spec(module)
+                ),
+            ),
+            # Without a GPU the dense validator must not raise.
+            "no_gpu": patch.object(torch.cuda, "is_available", return_value=False),
+        }.get(name, _decline_cause(name))
+        # The hint must not start Triton's driver or compile the kernel for users who did
+        # not opt in.
+        with (
+            missing,
+            patch.object(
+                aten_ops_converters,
+                "_grouped_mm_kernel_unavailable",
+                side_effect=AssertionError("the hint started Triton"),
+            ),
+            self.assertLogs(aten_ops_converters.__name__, level="WARNING") as logs,
+        ):
+            self.assertFalse(
+                grouped_mm_validator(
+                    node,
+                    CompilationSettings(grouped_mm_dense_max_macs=2**38, **settings),
+                )
+            )
+        self.assertEqual("grouped_mm_kernel=True" in logs.output[-1], hint)
 
 
 if __name__ == "__main__":

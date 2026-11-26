@@ -324,7 +324,7 @@ def test_driver_verification_fails_closed(monkeypatch):
     monkeypatch.setattr(
         _common,
         "load_ptx",
-        lambda ptx, kernel_name: cuda.CUresult.CUDA_ERROR_INVALID_PTX,
+        lambda ptx, kernel_name: (cuda.CUresult.CUDA_ERROR_INVALID_PTX, 0),
     )
     with pytest.raises(RuntimeError, match="could not load PTX ISA 9.3"):
         _cutile.verify_driver_accepts_ptx("ns::op", "k", FAKE_PTX)
@@ -332,7 +332,7 @@ def test_driver_verification_fails_closed(monkeypatch):
     monkeypatch.setattr(
         _common,
         "load_ptx",
-        lambda ptx, kernel_name: cuda.CUresult.CUDA_SUCCESS,
+        lambda ptx, kernel_name: (cuda.CUresult.CUDA_SUCCESS, 0),
     )
     assert _cutile.verify_driver_accepts_ptx("ns::op", "k", FAKE_PTX) is None
 

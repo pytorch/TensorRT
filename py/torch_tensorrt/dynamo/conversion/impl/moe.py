@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
+    set_layer_name,
 )
 
 
@@ -153,3 +154,54 @@ def grouped_mm(
             ctx, out, out_dtype, f"{name}_out_dtype", target, source_ir
         )
     return out
+
+
+def grouped_mm_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    mat1: trt.ITensor,
+    mat2: trt.ITensor,
+    offs: Union[trt.ITensor, torch.Tensor],
+) -> trt.ITensor:
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _grouped_mm_kernel
+
+    plugin = _grouped_mm_kernel.plugin()
+    offs = get_trt_tensor(ctx, offs, f"{name}_offs")
+    layer = ctx.net.add_plugin(plugin(mat1, mat2, offs), aot=True)
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
+
+
+def quantized_grouped_mm(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    mat1: trt.ITensor,
+    weights: Sequence[torch.Tensor],
+    offs: Union[trt.ITensor, torch.Tensor],
+    nvfp4: bool,
+    indexed: bool,
+) -> trt.ITensor:
+    """tensorrt.grouped_mm_* (offs holds group offsets) or tensorrt.gather_mm_* (offs holds each row's group)."""
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _quantized_grouped_mm_kernel
+
+    inputs = [get_trt_tensor(ctx, mat1, f"{name}_mat1")]
+    for i, weight in enumerate(weights):
+        # TensorRT has no 4-bit or E8M0 type a plugin takes; the same bytes go in as int32.
+        if weight.dtype != torch.float32:
+            weight = weight.contiguous().view(torch.int32)
+        inputs.append(get_trt_tensor(ctx, weight, f"{name}_weight_{i}"))
+    offs = get_trt_tensor(ctx, offs, f"{name}_offs")
+    if indexed and offs.dtype != trt.int32:
+        # Group indices arrive as int64 or int32 depending on the op that made them; the kernel reads int32.
+        offs = cast_trt_tensor(ctx, offs, trt.int32, f"{name}_index_int32", target, source_ir)
+    inputs.append(offs)
+    plugin = _quantized_grouped_mm_kernel.plugin(nvfp4, indexed)
+    layer = ctx.net.add_plugin(plugin(*inputs), aot=True)
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)
