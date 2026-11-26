@@ -488,8 +488,8 @@ def dequantize_affine(
     matmul's activations are INT8 too.
 
     Group-wise INT4 WOQ unpacks to int8 in the PyTorch graph; this converter
-    re-packs those nibbles into a trt.DataType.INT4 constant and dequantizes
-    it to FP32. Nonzero zero-points are rejected for that path.
+    re-packs those nibbles into a trt.DataType.INT4 constant. Nonzero
+    zero-points are rejected for that path.
     """
     use_int4 = is_groupwise_int4(qdata, block_size)
 
@@ -504,9 +504,24 @@ def dequantize_affine(
         qdata_trt = _add_int4_constant(ctx, qdata, f"{name}_qdata_int4")
         # Blocked along the group dimension (last dim of block_size > 1).
         axis: Optional[int] = len(_block_size_as_ints(block_size)) - 1
+        if isinstance(scale, np.ndarray):
+            scale = torch.from_numpy(scale)
+        if output_dtype == torch.float64:
+            # TensorRT has no float64, so a float64 output is float32.
+            output_dtype = torch.float32
         scale_for_trt = scale
-        # A bf16 output fails to build in a refittable engine.
-        trt_output_dtype = trt.DataType.FLOAT
+        # Like torchao, multiply in the promoted type of the scale and output dtypes.
+        # TensorRT builds a blocked INT4 DQ only with the scale in its output type.
+        scale_torch_dtype = (
+            scale.dtype
+            if isinstance(scale, torch.Tensor)
+            else _enums.dtype._from(scale.dtype).to(torch.dtype)
+        )
+        scale_dtype = dq_dtype = torch.promote_types(output_dtype, scale_torch_dtype)
+        if dq_dtype == torch.float64 or not ctx.compilation_settings.immutable_weights:
+            # TensorRT has no float64, and many refittable engines fail to build with a
+            # 16-bit INT4 DQ, so both dequantize in float32 and cast.
+            scale_dtype = dq_dtype = torch.float32
     else:
         int8_qdata = torch.int8 in (input_dtype, getattr(qdata, "dtype", None))
         qdata_trt = get_trt_tensor(
@@ -534,20 +549,30 @@ def dequantize_affine(
                     ) from exc
         else:
             scale_for_trt = scale
+        scale_dtype = torch.float32
+        dq_dtype = output_dtype
 
-        trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
-
-    scale_trt = get_trt_tensor(ctx, scale_for_trt, f"{name}_scale", dtype=torch.float32)
+    scale_trt = get_trt_tensor(ctx, scale_for_trt, f"{name}_scale", dtype=scale_dtype)
+    if use_int4 and scale_trt.dtype != _enums.dtype._from(scale_dtype).to(trt.DataType):
+        # get_trt_tensor leaves a run-time scale in its own dtype.
+        scale_trt = cast_trt_tensor(
+            ctx, scale_trt, scale_dtype, f"{name}_cast_scale", target, source_ir
+        )
 
     dequantize_layer = ctx.net.add_dequantize(
         qdata_trt,
         scale_trt,
-        output_type=trt_output_dtype,
+        output_type=_enums.dtype._from(dq_dtype).to(trt.DataType),
     )
     if axis is not None:
         dequantize_layer.axis = axis
     set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
-    return dequantize_layer.get_output(0)
+    output = dequantize_layer.get_output(0)
+    if dq_dtype != output_dtype:
+        output = cast_trt_tensor(
+            ctx, output, output_dtype, f"{name}_cast_output", target, source_ir
+        )
+    return output
 
 
 def _fp8_scale_and_axis(

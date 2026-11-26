@@ -47,8 +47,8 @@ def _int4_symmetric_quantize(
 class Int4TensorNonDecomposed(Int4Tensor):
     """Int4Tensor that dequantizes via explicit dequantize_affine.
 
-    Always emits zero_point=None. FP32 DQ output is what Myelin currently
-    accepts for INT4 blocked DQ; eager Linear casts back to the activation dtype.
+    Always emits zero_point=None. Dequantizes straight to the activation dtype,
+    so TensorRT can fuse the dequantize into the matmul.
     """
 
     def dequantize(self, output_dtype=None):
@@ -61,15 +61,14 @@ class Int4TensorNonDecomposed(Int4Tensor):
 
         qdata = unpack_int4(self.qdata)
         scale = self.scale.transpose(-2, -1).contiguous()
-        weight_hp = dequantize_affine(
+        return dequantize_affine(
             qdata,
             tuple(self.block_size),
             scale,
             None,
             qdata.dtype,
-            output_dtype=torch.float32,
+            output_dtype=output_dtype,
         )
-        return weight_hp.to(output_dtype)
 
 
 implements = Int4TensorNonDecomposed.implements
