@@ -3362,7 +3362,7 @@ def test_autocast_model_regions_excludes_a_type_as_by_op():
             torch.ops.aten.type_as.default,
         },
     )
-    # Inlining makes the type_as a to, which the exclusion keeps in float32 too.
+    # pre_export_lowering makes the type_as a to, which the exclusion still matches.
     ep = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
     torch.testing.assert_close(ep.module()(x), torch.full_like(x, 131072.0))
 
@@ -3649,6 +3649,202 @@ def test_autocast_model_regions_rejects_unknown_values():
     assert CompilationSettings().autocast_model_regions == "keep"
     with pytest.raises(ValueError, match="autocast_model_regions"):
         CompilationSettings(autocast_model_regions="inline")
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        torch.float16,
+        pytest.param(
+            torch.float32,
+            marks=pytest.mark.xfail(
+                raises=AssertionError,
+                strict=True,
+                reason="h.float() returns h when traced, but copies once autocast makes h "
+                "float16, so the write into it no longer reaches g. Also wrong before this "
+                "change.",
+            ),
+        ),
+    ],
+)
+def test_autocast_keeps_the_copy_an_in_place_op_writes(dtype):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            g = h.transpose(2, 3)
+            # h.float() of a float16 h is a copy, so the write must not reach g, a view
+            # of h. Of a float32 h it is h, so in eager the write reaches g.
+            y = h.float()
+            y.add_(10.0)
+            # y.half() is a copy, so this write must not reach y.
+            z = y.half()
+            z.mul_(2.0)
+            return self.conv2(g).float() + y + z
+
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=dtype)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    torch.testing.assert_close(
+        trt_model(x).float(), model(x).float(), rtol=1e-2, atol=5e-2
+    )
+    # Each cast that copied when traced keeps copy=True.
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    graph = pre_export_lowering(torch.export.export(model, (x,)), settings).graph
+    casts = graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    assert [n.args[0].name for n in casts if n.kwargs.get("copy")] == [
+        "conv2d",
+        "add_",
+        "conv2d_1",
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("case", ["dropout", "atleast_1d", "region"])
+def test_autocast_keeps_the_copy_of_a_cast_an_op_passes_on(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(16, 16)
+            self.drop = nn.Dropout(0.5)
+
+        def forward(self, x):
+            h = self.lin(x)
+            # h.half() is a copy, so the write must not reach h. These ops return their
+            # input, though their schemas do not say so.
+            z = h.half()
+            if case == "dropout":
+                z = self.drop(z)
+            elif case == "atleast_1d":
+                z = torch.atleast_1d(z)
+            else:
+                with torch.autocast("cuda", enabled=False):
+                    z = z[:, :8]
+            z.mul_(2.0)
+            return h + z.sum(-1, keepdim=True).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    with torch.no_grad():
+        ep = pre_export_lowering(torch.export.export(model, (x,)), settings)
+        torch.testing.assert_close(
+            ep.module()(x).float(), model(x), rtol=1e-2, atol=5e-2
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "case",
+    [
+        "written",
+        "input_written",
+        "alias",
+        "no_grad",
+        "view_dtype",
+    ],
+)
+def test_autocast_keeps_the_copy_of_type_as(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv(x)
+            if case == "no_grad":
+                # In the block, x.half() would assert the dtype that autocast gives x.
+                y = x.half()
+                with torch.no_grad():
+                    z = h.type_as(y)
+                    z.add_(10.0)
+                return h + z
+            if case == "alias":
+                # type_as returns h when traced, so the write must reach g, a view of h.
+                g = h.transpose(2, 3)
+                z = h.type_as(x)
+                z.add_(10.0)
+                return h.float() + g.transpose(2, 3)
+            if case == "view_dtype":
+                # z must stay float32, the dtype view(torch.int32) reads. Adding 1 << 23
+                # to the bits of a float32 adds 1 to its exponent, so it doubles z.
+                z = x[:, :1].half().type_as(h)
+                z.view(torch.int32).add_(1 << 23)
+                return h + z
+            # type_as copies when traced. Of the float16 h that autocast makes, it would
+            # return h, and the write would reach z through h or h through z.
+            z = h.type_as(x.half())
+            (h if case == "input_written" else z).add_(10.0)
+            return h + z
+
+    dtype = torch.float16 if case == "alias" else torch.float32
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=dtype)
+    with torch.no_grad():
+        ref = model(x).float()
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    with torch.no_grad():
+        torch.testing.assert_close(trt_model(x).float(), ref, rtol=1e-2, atol=5e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("op", ["chunk", "split", "unbind"])
+def test_autocast_keeps_the_copy_a_write_into_a_piece_needs(op):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(16, 16)
+
+        def forward(self, x):
+            a = self.lin(x)
+            # a.half() is a copy, so a write into a piece of it must not reach a.
+            if op == "chunk":
+                pieces = a.half().chunk(2, -1)
+            elif op == "split":
+                pieces = a.half().split(8, -1)
+            else:
+                pieces = a.half().unbind(-1)
+            pieces[0].mul_(2.0)
+            join = torch.stack if op == "unbind" else torch.cat
+            return a.float() + join(pieces, -1).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    # Autograd refuses in-place writes into the pieces of chunk.
+    with torch.no_grad():
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+        )
+        torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=5e-2)
 
 
 @pytest.mark.unit

@@ -180,6 +180,18 @@ cast nodes into the graph based on a set of rules:
 The pass inserts explicit ``aten._to_copy`` cast nodes around qualified operations to
 reduce them to ``autocast_low_precision_type`` (FP16 or BF16).
 
+Before this pass, ``pre_export_lowering`` also edits some casts of the model, which
+later passes and converters see. A ``to()`` cast that changed the dtype when traced
+gets ``copy=True``, and such a ``type_as`` becomes ``aten.to.other`` with
+``copy=True``, which ``autocast_excluded_ops`` also matches as ``type_as``. After
+autocast its input can already have that dtype, and the cast must still make the copy it
+made when traced. This also covers the casts of a ``torch.autocast`` block and a
+``type_as`` in a ``torch.no_grad`` block. It happens before regions are inlined, since
+inlining traces their ops again in other dtypes. TensorRT adds no layer for a cast to the
+same dtype, though in a segment that runs in PyTorch it still copies. A ``to()`` cast in a
+``torch.no_grad`` block still fails when autocast gives its input another dtype, since
+export checks that dtype.
+
 remove_sym_nodes
 ^^^^^^^^^^^^^^^^^
 

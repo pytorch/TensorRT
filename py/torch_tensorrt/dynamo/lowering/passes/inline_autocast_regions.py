@@ -15,7 +15,9 @@ from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 from torch.multiprocessing.reductions import StorageWeakRef
 
 from .pass_utils import (
+    changes_dtype,
     clean_up_graph_after_modifications,
+    keep_copy,
     tensors_maybe_written_by,
     tensors_written_by,
 )
@@ -26,9 +28,6 @@ logger = logging.getLogger(__name__)
 # Inlining can rename an op, as matmul to matmul_1, so autocast_excluded_node_names
 # also matches the name it had in its region.
 NAME_IN_REGION = "_torch_tensorrt_name_in_autocast_region"
-# Inlining makes a type_as that copies a to, so autocast_excluded_ops also matches
-# the op it was in its region.
-OP_IN_REGION = "_torch_tensorrt_op_in_autocast_region"
 # The traced values of the inputs of an op and its result when it ran on them again,
 # see _runs_again.
 _RAN_AGAIN = "_torch_tensorrt_ran_again"
@@ -160,7 +159,7 @@ def _may_hide_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool
     _foreach_add_ or a region, counts as such an op."""
     return (
         isinstance(op.target, torch._ops.OpOverload)
-        and not _copies(op)
+        and not changes_dtype(op)
         and not _runs_again(op)
         and any(
             not _aliases_an_input(n)
@@ -177,19 +176,6 @@ def _may_be_an_input(op: torch.fx.Node, writes: List[Tuple[Any, Any]]) -> bool:
         isinstance(op.target, torch._ops.OpOverload)
         and op.target.overloadpacket in _MAY_RETURN_AN_INPUT
         and _may_hide_an_input(op, writes)
-    )
-
-
-def _copies(node: torch.fx.Node) -> bool:
-    """Whether node is a cast, such as x.float() or x.type_as(y), that changed the
-    dtype in its region and so made a copy. Inlining keeps that copy."""
-    return (
-        isinstance(node.target, torch._ops.OpOverload)
-        and (
-            node.target.overloadpacket is torch.ops.aten.to
-            or node.target == torch.ops.aten.type_as.default
-        )
-        and node.args[0].meta["val"].dtype != node.meta["val"].dtype
     )
 
 
@@ -241,7 +227,7 @@ def _source(value: torch.fx.Node) -> Optional[torch.fx.Node]:
     op = value.args[0] if value.target == operator.getitem else value
     if op.target in _SET:
         return op.args[1]
-    if _returns_an_input(op) and not _copies(op):
+    if _returns_an_input(op) and not changes_dtype(op):
         return (
             tensors_written_by(op) or _inputs_sharing_memory(op, value) or [op.args[0]]
         )[0]
@@ -361,7 +347,7 @@ def _writes_only_a_new_value(
             or (
                 u < writer
                 and isinstance(u.target, torch._ops.OpOverload)
-                and (not _returns_an_input(u) or _copies(u))
+                and (not _returns_an_input(u) or changes_dtype(u))
                 and not _may_be_an_input(u, [(writer, value)])
             )
             for u in value.users
@@ -381,7 +367,9 @@ def _writes_only_a_new_value(
             continue
         op = value.args[0] if value.target == operator.getitem else value
         if op.target in _SET or (
-            not _aliases_an_input(op) and _returns_an_input(op) and not _copies(op)
+            not _aliases_an_input(op)
+            and _returns_an_input(op)
+            and not changes_dtype(op)
         ):
             # A write into the result of set_, or of an op that returns its input
             # though its schema does not say it, such as an eval dropout, is a write
@@ -392,7 +380,7 @@ def _writes_only_a_new_value(
         if len(written) != 1:
             return (
                 isinstance(op.target, torch._ops.OpOverload)
-                and (not _returns_an_input(op) or _copies(op))
+                and (not _returns_an_input(op) or changes_dtype(op))
                 and not _may_be_an_input(op, [(writer, value)])
             )
         value, writer = written[0], value
@@ -570,19 +558,10 @@ def _inline_region(
             else:
                 env[node] = gm.graph.node_copy(node, env.__getitem__)
                 env[node].meta[NAME_IN_REGION] = node.name
-                if _copies(node):
-                    # to() and type_as() return their input when that already has the
-                    # dtype, as it now can. Keep the copy, which a write into the
-                    # result or a view of it can need. type_as(y) is to(y), which
-                    # takes copy.
-                    if node.target == torch.ops.aten.type_as.default:
-                        env[node].target = torch.ops.aten.to.other
-                        env[node].meta[OP_IN_REGION] = node.target
-                    names = [a.name for a in env[node].target._schema.arguments]
-                    if names.index("copy") < len(node.args):
-                        env[node].update_arg(names.index("copy"), True)
-                    else:
-                        env[node].update_kwarg("copy", True)
+                if changes_dtype(node):
+                    # Its input can now have the dtype. pre_export_lowering keeps such
+                    # copies before inlining, and this keeps them for a direct call.
+                    keep_copy(env[node])
                 # Ops such as matmul and lerp need their floating point inputs in one
                 # dtype. Autocast gave them one when it ran and has a kernel for the op,
                 # which casts them, or when they all had one dtype in the region.

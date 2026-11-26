@@ -84,6 +84,11 @@ def _returns_its_input(n: torch.fx.Node) -> bool:
     if not isinstance(n.target, torch._ops.OpOverload):
         return False
     schema = n.target._schema
+    if n.target.overloadpacket is torch.ops.aten.to:
+        # Its schema says it may return its input, but with copy=True it never does.
+        i = [a.name for a in schema.arguments].index("copy")
+        if n.args[i] if i < len(n.args) else n.kwargs.get("copy"):
+            return False
     return bool(schema.arguments and schema.returns) and (
         schema.arguments[0].alias_info is not None
         and schema.returns[0].alias_info is not None

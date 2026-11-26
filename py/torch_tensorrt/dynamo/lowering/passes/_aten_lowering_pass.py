@@ -16,8 +16,10 @@ from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import 
     mark_constant_fold_exclusions,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    changes_dtype,
     flush_deferred_graph_cleanup,
     iter_cond_subgraphs,
+    keep_copy,
     set_defer_graph_cleanup,
     trace_intermediate_node_outputs,
 )
@@ -327,6 +329,17 @@ def pre_export_lowering(
         # Autocast inserts casts and changes the dtypes of nodes, so it works on a
         # copy, and the caller's program stays as it was.
         ep = _copy_program(ep)
+        # Autocast can give the input of a cast that changed the dtype that dtype, see
+        # keep_copy. A block such as torch.no_grad or torch.autocast keeps its ops in a
+        # graph of its own. Inlining traces the ops of a region again, in other dtypes,
+        # so this comes before it.
+        for module in ep.graph_module.modules():
+            if isinstance(module, torch.fx.GraphModule):
+                casts = [node for node in module.graph.nodes if changes_dtype(node)]
+                for node in casts:
+                    keep_copy(node)
+                if casts:
+                    module.recompile()
         # Without a low precision type autocast changes nothing, so the regions keep
         # theirs. Inlining comes before calibration, so that it records the values of
         # the inlined ops. Like inlining, the message about kept regions reads the graph
