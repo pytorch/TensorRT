@@ -535,7 +535,9 @@ class LoadedEngine {
       if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
         return Error::MemoryAllocationFailed;
       }
-      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
+      // A pageable copy can return before it lands, and the legacy stream does not order non-blocking streams.
+      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess ||
+          cudaStreamSynchronize(cudaStreamLegacy) != cudaSuccess) {
         return Error::Internal;
       }
     }
@@ -557,7 +559,8 @@ class LoadedEngine {
       return true;
     }
     const std::vector<float> host(elems(), value);
-    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess;
+    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess &&
+        cudaStreamSynchronize(cudaStreamLegacy) == cudaSuccess;
   }
 
   // Runs one inference on `stream`. Returns without waiting for the enqueue,
@@ -2146,8 +2149,7 @@ TEST_F(SharedScratchBackendTest, APooledEngineRefusesACaptureBeforeAnythingCanIn
   ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
 }
 
-// The same refusal on the per-thread stream used when no caller stream is set. The call that makes a
-// context current for that stream is one a capture cannot take, so the refusal has to come first.
+// The same refusal on the per-thread stream used when no caller stream is set.
 TEST_F(SharedScratchBackendTest, APooledEngineWithNoCallerStreamRefusesACaptureBeforeAnythingCanInvalidateIt) {
   ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
   void* captured_target = nullptr;
@@ -2175,7 +2177,56 @@ TEST_F(SharedScratchBackendTest, APooledEngineWithNoCallerStreamRefusesACaptureB
   EXPECT_EQ(cudaFree(captured_target), cudaSuccess);
 }
 
-// A Global capture cannot take cudaFree(nullptr), so bad input must be refused before that call.
+// The same refusal made from a thread with no current context, for an engine with CUDA graphs on. There a
+// cudaFree(nullptr) moved above the refusal would run, and a Global capture on any thread prohibits that call.
+TEST_F(SharedScratchBackendTest, APooledGraphEngineOnAFreshThreadRefusesACaptureBeforeAnythingCanInvalidateIt) {
+  int memory_pools = 0;
+  ASSERT_EQ(cudaDeviceGetAttribute(&memory_pools, cudaDevAttrMemoryPoolsSupported, 0), cudaSuccess);
+  if (memory_pools == 0) {
+    GTEST_SKIP() << "device 0 reports no stream-ordered allocator (cudaDevAttrMemoryPoolsSupported = 0), so an "
+                    "engine there runs without CUDA graphs";
+  }
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  BackendOption graphs;
+  std::strncpy(graphs.key, "use_cuda_graphs", sizeof(graphs.key) - 1);
+  graphs.value = true;
+  BackendOptionContext context;
+  ASSERT_EQ(backend_.set_option(context, Span<BackendOption>(&graphs, 1)), Error::Ok);
+  LoadedEngine pooled;
+  const Error loaded = pooled.load(blob(), 21);
+  graphs.value = false;
+  ASSERT_EQ(backend_.set_option(context, Span<BackendOption>(&graphs, 1)), Error::Ok);
+  ASSERT_EQ(loaded, Error::Ok);
+  ASSERT_TRUE(pooled.handle()->shared_scratch);
+  ASSERT_NE(pooled.handle()->execution_graph, nullptr);
+
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+  void* captured_target = nullptr;
+  ASSERT_EQ(cudaMalloc(&captured_target, 16), cudaSuccess);
+
+  ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal), cudaSuccess);
+  ASSERT_EQ(cudaMemsetAsync(captured_target, 0, 16, stream), cudaSuccess);
+  Error captured = Error::Ok;
+  std::thread([&] { captured = pooled.run(stream); }).join();
+  cudaGraph_t graph = nullptr;
+  const cudaError_t end_err = cudaStreamEndCapture(stream, &graph);
+  const bool have_graph = graph != nullptr;
+  if (have_graph) {
+    cudaGraphDestroy(graph);
+  }
+
+  EXPECT_EQ(captured, Error::NotSupported) << "execute() did not refuse a pooled run on a capturing stream";
+  EXPECT_EQ(end_err, cudaSuccess) << "the refused run had already made a call the capture could not take: "
+                                  << cudaGetErrorString(end_err);
+  EXPECT_TRUE(have_graph) << "the capture ended with no graph, so the run invalidated it before refusing";
+
+  EXPECT_EQ(cudaFree(captured_target), cudaSuccess);
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+}
+
+// A Global capture on any thread prohibits cudaFree(nullptr), which execute() makes on a thread with no current
+// context, so bad input must be refused before that call.
 TEST_F(SharedScratchBackendTest, AnUnpooledEngineRefusesABadInputBeforeAnythingCanInvalidateACapture) {
   LoadedEngine engine;
   // A batch of two, where the engine's profile admits only one.
@@ -2189,7 +2240,8 @@ TEST_F(SharedScratchBackendTest, AnUnpooledEngineRefusesABadInputBeforeAnythingC
 
   ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal), cudaSuccess);
   ASSERT_EQ(cudaMemsetAsync(captured_target, 0, 16, stream), cudaSuccess);
-  const Error refused = engine.run_on_the_synchronized_path();
+  Error refused = Error::Ok;
+  std::thread([&] { refused = engine.run_on_the_synchronized_path(); }).join();
   cudaGraph_t graph = nullptr;
   const cudaError_t end_err = cudaStreamEndCapture(stream, &graph);
   const bool have_graph = graph != nullptr;
@@ -3118,9 +3170,8 @@ TEST_F(SharedScratchBackendTest, APooledRunWorksOnEachDefaultStreamFromAFreshThr
   check_default_streams_on_fresh_threads(engine);
 }
 
-// execute() calls cudaFree(nullptr) rather than cudaSetDevice, which would replace a context the caller made current
-// with the device's primary context. The engine loads inside the caller's context because its memory belongs to the
-// context current at load.
+// execute() keeps a context the caller made current, where cudaSetDevice would replace it with the device's primary
+// context. The engine loads inside the caller's context because its memory belongs to the context current at load.
 TEST_F(SharedScratchBackendTest, ARunWithNoCallerStreamKeepsTheContextTheCallerMadeCurrent) {
   PFN_cuDeviceGet_v2000 device_get = nullptr;
   PFN_cuCtxCreate_v3020 ctx_create = nullptr;
@@ -3161,56 +3212,92 @@ TEST_F(SharedScratchBackendTest, ARunWithNoCallerStreamKeepsTheContextTheCallerM
   EXPECT_EQ(current_after_run, created) << "a run with no caller stream replaced the context the caller made current";
 }
 
-// A Global capture on any thread prohibits cudaFree(nullptr). Its failure must leave no pending CUDA error
-// and stop before enqueue: without this call, the engine writes the output before the final synchronize fails.
-TEST_F(SharedScratchBackendTest, AFailedContextCallReturnsInternalAndLeavesNoCudaErrorPending) {
-  LoadedEngine engine;
-  ASSERT_EQ(engine.load(blob(), 25), Error::Ok);
-  ASSERT_FALSE(engine.handle()->shared_scratch);
-  ASSERT_TRUE(engine.fill_output(kSentinel));
-
-  std::mutex mu;
-  std::condition_variable cv;
-  bool capturing = false;
-  bool run_done = false;
-  cudaError_t begin_err = cudaErrorUnknown;
-  cudaError_t end_err = cudaErrorUnknown;
-  bool have_graph = false;
-  std::thread capturer([&] {
-    begin_err = cudaStreamBeginCapture(cudaStreamPerThread, cudaStreamCaptureModeGlobal);
-    std::unique_lock<std::mutex> lock(mu);
-    capturing = true;
-    cv.notify_all();
-    cv.wait(lock, [&] { return run_done; });
-    cudaGraph_t graph = nullptr;
-    end_err = cudaStreamEndCapture(cudaStreamPerThread, &graph);
-    have_graph = graph != nullptr;
-    if (have_graph) {
-      cudaGraphDestroy(graph);
+// A Global capture on any thread prohibits cudaFree(nullptr) and the final synchronize. A call that overlaps one
+// must fail, leave no pending CUDA error, and leave nothing it queued still running. execute() makes the
+// cudaFree(nullptr) only on a thread with no current context, and that call stops there, before enqueue. A call on a
+// thread with a context current queues the engine before its synchronize is refused, so it has to wait for it.
+TEST_F(SharedScratchBackendTest, ACallOverlappingAGlobalCaptureReturnsInternalAndLeavesNoCudaErrorPending) {
+  for (const bool fresh_thread : {true, false}) {
+    SCOPED_TRACE(fresh_thread ? "thread with no current context" : "thread with a current context");
+    LoadedEngine engine;
+    ASSERT_EQ(engine.load(blob(), 25), Error::Ok);
+    ASSERT_FALSE(engine.handle()->shared_scratch);
+    // TensorRT advises one enqueue before any capture, since the first may do setup that a capture forbids.
+    ASSERT_EQ(engine.run_on_the_synchronized_path(), Error::Ok);
+    ASSERT_TRUE(engine.fill_output(kSentinel));
+    // Work queued ahead of the engine, so a call that returns before what it queued has finished is seen.
+    const auto queued = std::chrono::steady_clock::now();
+    if (!fresh_thread) {
+      ASSERT_EQ(cudaLaunchHostFunc(cudaStreamPerThread, sleep_on_the_stream, nullptr), cudaSuccess);
     }
-  });
-  {
-    std::unique_lock<std::mutex> lock(mu);
-    cv.wait(lock, [&] { return capturing; });
-  }
-  const Error result = engine.run_on_the_synchronized_path();
-  const cudaError_t pending = cudaGetLastError();
-  {
-    std::lock_guard<std::mutex> lock(mu);
-    run_done = true;
-  }
-  cv.notify_all();
-  capturer.join();
 
-  ASSERT_EQ(begin_err, cudaSuccess) << "the other thread could not begin its capture";
-  EXPECT_EQ(end_err, cudaErrorStreamCaptureInvalidated);
-  EXPECT_FALSE(have_graph);
-  EXPECT_EQ(result, Error::Internal) << "a run whose context call failed did not return Internal";
-  EXPECT_EQ(pending, cudaSuccess) << "the failed context call left '" << cudaGetErrorString(pending)
-                                  << "' pending for the caller's next CUDA call to report";
-  const std::vector<float> output = engine.read_output();
-  ASSERT_EQ(output.size(), kElems);
-  EXPECT_EQ(output[0], kSentinel) << "the engine wrote its output, so the run did not stop at the failed context call";
+    std::mutex mu;
+    std::condition_variable cv;
+    bool capturing = false;
+    bool run_done = false;
+    cudaError_t begin_err = cudaErrorUnknown;
+    cudaError_t end_err = cudaErrorUnknown;
+    bool have_graph = false;
+    std::thread capturer([&] {
+      begin_err = cudaStreamBeginCapture(cudaStreamPerThread, cudaStreamCaptureModeGlobal);
+      std::unique_lock<std::mutex> lock(mu);
+      capturing = true;
+      cv.notify_all();
+      cv.wait(lock, [&] { return run_done; });
+      cudaGraph_t graph = nullptr;
+      end_err = cudaStreamEndCapture(cudaStreamPerThread, &graph);
+      have_graph = graph != nullptr;
+      if (have_graph) {
+        cudaGraphDestroy(graph);
+      }
+    });
+    {
+      std::unique_lock<std::mutex> lock(mu);
+      cv.wait(lock, [&] { return capturing; });
+    }
+    Error result = Error::Ok;
+    cudaError_t pending = cudaErrorUnknown;
+    cudaStreamCaptureMode mode_after = cudaStreamCaptureModeRelaxed;
+    std::chrono::steady_clock::time_point returned{};
+    const auto run = [&] {
+      result = engine.run_on_the_synchronized_path();
+      returned = std::chrono::steady_clock::now();
+      pending = cudaGetLastError();
+      cudaThreadExchangeStreamCaptureMode(&mode_after);
+      cudaStreamCaptureMode restore = mode_after;
+      cudaThreadExchangeStreamCaptureMode(&restore);
+    };
+    if (fresh_thread) {
+      std::thread(run).join();
+    } else {
+      run();
+    }
+    {
+      std::lock_guard<std::mutex> lock(mu);
+      run_done = true;
+    }
+    cv.notify_all();
+    capturer.join();
+    EXPECT_EQ(cudaStreamSynchronize(cudaStreamPerThread), cudaSuccess);
+
+    ASSERT_EQ(begin_err, cudaSuccess) << "the other thread could not begin its capture";
+    EXPECT_EQ(end_err, cudaErrorStreamCaptureInvalidated);
+    EXPECT_FALSE(have_graph);
+    EXPECT_EQ(result, Error::Internal) << "a run that overlapped a global capture did not return Internal";
+    EXPECT_EQ(pending, cudaSuccess) << "the failed call left '" << cudaGetErrorString(pending)
+                                    << "' pending for the caller's next CUDA call to report";
+    EXPECT_EQ(mode_after, cudaStreamCaptureModeGlobal) << "the call did not restore the thread's capture mode";
+    const std::vector<float> output = engine.read_output();
+    ASSERT_EQ(output.size(), kElems);
+    if (fresh_thread) {
+      EXPECT_EQ(output[0], kSentinel)
+          << "the engine wrote its output, so the run did not stop at the failed context call";
+    } else {
+      EXPECT_GE(returned - queued, kHostWorkOnTheCallerStream)
+          << "execute() returned its error while the work it queued was still running";
+      EXPECT_NE(output[0], kSentinel) << "the run did not queue the engine before its synchronize was refused";
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -3312,8 +3399,7 @@ TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTh
     for (int i = 0; i < kConcurrentRunsPerThread; ++i) {
       // Rewritten every iteration, so a run whose enqueue never reached the engine
       // leaves the sentinel behind rather than the previous iteration's output.
-      // Finish the default-stream fill before inference on a non-blocking stream.
-      if (!engine.fill_output(kSentinel) || cudaStreamSynchronize(nullptr) != cudaSuccess) {
+      if (!engine.fill_output(kSentinel)) {
         failures.fetch_add(1);
       }
       submit_together(i);

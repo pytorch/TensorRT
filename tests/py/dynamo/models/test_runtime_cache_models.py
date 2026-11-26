@@ -50,7 +50,6 @@ class TestRuntimeCacheModels(TestCase):
             model,
             ir="dynamo",
             inputs=[torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
@@ -83,7 +82,6 @@ class TestRuntimeCacheModels(TestCase):
         compile_kwargs = {
             "ir": "dynamo",
             "inputs": [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            "use_python_runtime": True,
             "min_block_size": 1,
         }
         rs = RuntimeSettings(runtime_cache=self.cache_path)
@@ -126,7 +124,6 @@ class TestRuntimeCacheModels(TestCase):
             model,
             ir="dynamo",
             inputs=[torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
@@ -189,7 +186,6 @@ class TestRuntimeCacheDynamicShapes(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            use_python_runtime=True,
             min_block_size=1,
         )
         apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
@@ -242,7 +238,6 @@ class TestRuntimeCacheDynamicShapes(TestCase):
                     dtype=torch.float32,
                 )
             ],
-            "use_python_runtime": True,
             "min_block_size": 1,
         }
         rs = RuntimeSettings(runtime_cache=self.cache_path)
@@ -305,7 +300,6 @@ class TestRuntimeCachePerformance(TestCase):
         compile_kwargs = {
             "ir": "dynamo",
             "inputs": [torchtrt.Input(input_tensor.shape, dtype=torch.float32)],
-            "use_python_runtime": True,
             "min_block_size": 1,
         }
         rs = RuntimeSettings(runtime_cache=self.cache_path)

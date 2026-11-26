@@ -96,25 +96,42 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
  * to Module::load, which overrides everything else. Otherwise an explicit process
  * option of false refuses recording. Then the program's compile spec, b"1" or
  * b"0", overrides the process default, which is false unless set. Any other
- * compile spec value, or the key twice, fails the load. Engines with aliased
- * outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5
- * keep ordinary enqueueV3. A replay reads and writes the buffers it was recorded
- * on, so keep each input and output in the same device buffer from call to call,
- * and replays copy nothing. A graph goes on the caller's buffers once a call
- * brings the buffers of the call before it, and on buffers of its own until
- * then. When the buffers under a graph on the caller's buffers move, that call
- * records again on the new ones. When they move a second time, for any shapes,
- * that graph records on buffers of its own and copies the inputs in and the
- * outputs out on every call, also after the shapes or the optimization profile
- * change. The plain graph and the graph of each green context count their own
+ * compile spec value, or the key twice, fails the load. GPUs without
+ * stream-ordered memory and drivers older than CUDA 12.5 keep ordinary
+ * enqueueV3. A replay reads and writes the buffers it was recorded on, so keep
+ * each input and output in the same device buffer from call to call, and
+ * replays copy nothing, except an updated input that the engine also returns in
+ * a separate output tensor, which is copied into that tensor after every call.
+ * Each input and output goes on the caller's buffer once a call brings the same
+ * buffer for it as the call before it, and on a buffer of the graph's own until
+ * then. When a buffer the graph reads or writes in place moves, that call
+ * records again on the new one. When the same input or output moves a second
+ * time, for any shapes, that graph records it on a buffer of its own and copies
+ * it in or out on every call, also after the shapes or the optimization profile
+ * change. Buffers that change in the same call as the shapes or the profile are
+ * not counted as a move, since new shapes record again. The others stay in
+ * place, so inputs that never move, such as weights passed as inputs, are not
+ * copied. For an engine without aliased outputs, a recording for a call from
+ * another regular context puts every input and output of the plain graph on
+ * buffers of the graph's own until the shapes or the profile change. An aliased
+ * output, which updates an input in place, and that input never go on buffers
+ * of the graph's own: while their buffer moves, calls run without a graph, and
+ * the first call that repeats the previous call's buffer records again on it. A
+ * move to another buffer than the one of the last recording under the current
+ * shapes counts, and from the second one on the engine runs without a graph
+ * until 32 calls pass without another, which also starts its count of moves
+ * over. The plain graph and the graph of each green context count their own
  * moves. Host buffers on a GPU that does not read host memory directly, buffers
  * off a 256-byte boundary, inputs that are not row-major, and outputs that
- * share memory with an input are still copied on every call.
+ * share memory with an input they do not update in place are still copied on
+ * every call.
  * An engine on the shared activation scratch pool records again whenever the
  * pool hands it a different buffer. Streams of the current regular context,
  * green context streams of the engine's device, and calls with no caller stream
  * replay; the backend README covers the green context and other regular context
- * cases. The engine keeps the graphs it records on green contexts, so destroy
+ * cases; a call of an engine with aliased outputs from another regular context
+ * replays only on the buffers its graph was recorded on, and fails otherwise.
+ * The engine keeps the graphs it records on green contexts, so destroy
  * it before any green context it ran on. A stream of another device fails. An
  * engine on the shared activation scratch pool also fails on a stream of another
  * regular context; see kSharedActivationScratchKey.

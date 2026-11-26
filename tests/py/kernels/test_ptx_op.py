@@ -4,7 +4,6 @@
 """Tests for ptx_op (pre-compiled PTX registration path)."""
 
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 
@@ -146,7 +145,6 @@ class TestPtxOpIntegration:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=inputs,
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         for size in [128, 512, 2048]:

@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import collections.abc
 import copy
+import inspect
 import logging
 import operator
 import os
 import platform
-import warnings
 from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import sympy
@@ -98,6 +98,7 @@ from torch_tensorrt.dynamo.utils import (
     release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
+    validate_compiler_options,
     validate_optimization_profiles,
 )
 from torch_tensorrt.reporting import Stage
@@ -105,8 +106,18 @@ from torch_tensorrt.reporting import Stage
 logger = logging.getLogger(__name__)
 
 
+def validate_compiler_kwargs(kwargs: Dict[str, Any], api: Any) -> None:
+    """Reject removed, misspelled, or unsupported compiler options."""
+    valid_options = {
+        name
+        for name in inspect.signature(api).parameters
+        if name not in {"kwargs", "exported_program"}
+    }
+    validate_compiler_options(kwargs, valid_options, api.__name__)
+
+
 @needs_cross_compile  # type: ignore[misc]
-@with_compiler_lock
+@with_compiler_lock  # type: ignore[misc]
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -133,7 +144,6 @@ def cross_compile_for_windows(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -223,7 +233,6 @@ def cross_compile_for_windows(
         max_aux_stream (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -279,61 +288,7 @@ def cross_compile_for_windows(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
-    if kwargs.get("debug", False):
-        warnings.warn(
-            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "truncate_long_and_double" in kwargs.keys():
-        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
-            raise ValueError(
-                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
-            )
-        else:
-            truncate_double = kwargs["truncate_long_and_double"]
-            warnings.warn(
-                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-    if use_python_runtime:
-        warnings.warn(
-            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
-            "runtimes have been merged; the runtime is now selected automatically based "
-            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
-            "be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "refit" in kwargs.keys():
-        warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["refit"]
-
-    if "make_refittable" in kwargs.keys():
-        warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["make_refittable"]
+    validate_compiler_kwargs(kwargs, cross_compile_for_windows)
 
     if refit_identical_engine_weights:
         if immutable_weights:
@@ -505,7 +460,7 @@ def cross_compile_for_windows(
     return trt_gm
 
 
-@with_compiler_lock
+@with_compiler_lock  # type: ignore[misc]
 def compile(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -532,7 +487,6 @@ def compile(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -657,7 +611,6 @@ def compile(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -690,7 +643,7 @@ def compile(
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Needs autocast_calibration_dataloader. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Needs autocast_calibration_dataloader. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
-        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. So do regions whose values inlining would change, such as one that writes into a buffer in place, and regions inside a torch.no_grad() block when the model is exported with grad mode on. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
+        autocast_model_regions (str): What autocast does with the regions the model itself runs under torch.autocast. "keep" builds them with the precisions that PyTorch autocast gives them. "reclassify" removes their autocast, so that the autocast rules, exclusions and calibration of Torch-TensorRT choose the precision of every op in them too. Regions with enabled=False, which a model uses to keep ops in FP32, keep their autocast. "reclassify_all" removes theirs too, so that autocast can also run those ops in low precision, and the autocast exclusions and calibration choose which of them stay in FP32. "reclassify_all" does not tell apart a region that keeps ops in FP32 for correctness, such as rotary embeddings, and calibration may not catch one either, so add the path of the module that runs such a region, as named_modules() gives it, to autocast_excluded_nodes as a full match, such as "^rotary$". That keeps the ops the module runs directly in FP32, but not those of its submodules, so it works best when the region is the whole forward of a module. Without the "$", the pattern also matches its submodules and any other module whose path starts the same way. With "reclassify" or "reclassify_all", regions whose values inlining would change, such as one that writes into a buffer in place, regions inside a torch.no_grad() block when the model is exported with grad mode on, and regions nested in a region that keeps its autocast, keep their autocast. autocast_excluded_node_names also matches the names that ops have in the regions. Default is "keep".
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): With resource partitioning, the host memory in bytes the compilation may use: each TensorRT engine is sized to a quarter of what the process's resident memory leaves of it. Defaults to the available system memory.
         max_partition_size (Optional[int]): The weight bytes per TensorRT engine the resource partitioner splits to: a finer control than ``cpu_memory_budget``, which it replaces, so the two can't both be set. The size is then not derived from the budget and the process's resident memory, so the same model and size always give the same split. Setting it turns resource partitioning on.
@@ -738,75 +691,13 @@ def compile(
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
 
-    if kwargs.get("debug", False):
-        warnings.warn(
-            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "truncate_long_and_double" in kwargs.keys():
-        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
-            raise ValueError(
-                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
-            )
-        else:
-            truncate_double = kwargs["truncate_long_and_double"]
-            warnings.warn(
-                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-    if use_python_runtime:
-        warnings.warn(
-            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
-            "runtimes have been merged; the runtime is now selected automatically based "
-            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
-            "be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "refit" in kwargs.keys():
-        warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["refit"]
-
-    if "make_refittable" in kwargs.keys():
-        warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["make_refittable"]
+    validate_compiler_kwargs(kwargs, compile)
 
     if refit_identical_engine_weights:
         if immutable_weights:
             raise ValueError(
                 "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
             )
-
-    if (
-        "enable_cross_compile_for_windows" in kwargs.keys()
-        and kwargs["enable_cross_compile_for_windows"]
-    ):
-        raise ValueError(
-            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
-        )
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -1419,7 +1310,7 @@ def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
     return True
 
 
-@with_compiler_lock
+@with_compiler_lock  # type: ignore[misc]
 # Register the original function so Debugger can update its keyword defaults.
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
@@ -2196,7 +2087,7 @@ def _resolve_pytree_binding_names(
     return list(leaves)
 
 
-@with_compiler_lock
+@with_compiler_lock  # type: ignore[misc]
 def convert_exported_program_to_serialized_trt_engine(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -2223,7 +2114,6 @@ def convert_exported_program_to_serialized_trt_engine(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = False,  # Deprecated; setting True emits DeprecationWarning. Kept for backward compatibility.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -2334,7 +2224,6 @@ def convert_exported_program_to_serialized_trt_engine(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): **Deprecated**. Kept for backward compatibility; emits a ``DeprecationWarning`` when set to ``True``. The Python and C++ runtimes are now merged and the runtime is selected automatically based on whether the C++ Torch-TensorRT runtime is available.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -2387,75 +2276,13 @@ def convert_exported_program_to_serialized_trt_engine(
             silently never update.
     """
 
-    if kwargs.get("debug", False):
-        warnings.warn(
-            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "truncate_long_and_double" in kwargs.keys():
-        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
-            raise ValueError(
-                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
-            )
-        else:
-            truncate_double = kwargs["truncate_long_and_double"]
-            warnings.warn(
-                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-    if use_python_runtime:
-        warnings.warn(
-            "`use_python_runtime` is deprecated and has no effect. The Python and C++ "
-            "runtimes have been merged; the runtime is now selected automatically based "
-            "on whether the C++ Torch-TensorRT runtime is available. This argument will "
-            "be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-    if "refit" in kwargs.keys():
-        warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["refit"]
-
-    if "make_refittable" in kwargs.keys():
-        warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if immutable_weights:
-            raise ValueError(
-                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
-            )
-        else:
-            immutable_weights = not kwargs["make_refittable"]
+    validate_compiler_kwargs(kwargs, convert_exported_program_to_serialized_trt_engine)
 
     if refit_identical_engine_weights:
         if immutable_weights:
             raise ValueError(
                 "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
             )
-
-    if (
-        "enable_cross_compile_for_windows" in kwargs.keys()
-        and kwargs["enable_cross_compile_for_windows"]
-    ):
-        raise ValueError(
-            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
-        )
 
     engine_capability = EngineCapability._from(engine_capability)
 

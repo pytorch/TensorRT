@@ -283,7 +283,6 @@ def test_select_with_scalar_index_across_partition():
         exported,
         inputs=[values, positions],
         min_block_size=1,
-        enabled_precisions={torch.float32},
         truncate_double=True,
     )
     engines = [

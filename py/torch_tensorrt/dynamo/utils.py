@@ -4,16 +4,26 @@
 from __future__ import annotations
 
 import ctypes
+import difflib
 import functools
 import gc
 import logging
 import os
 import platform
 import sys
-import warnings
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import psutil
@@ -38,6 +48,66 @@ from packaging import version
 from .types import TRTDataType
 
 logger = logging.getLogger(__name__)
+
+# When a compiler setting is removed, add a tuple to this dict with the removed option as the key and the reason as the value.
+_REMOVED_COMPILER_KWARGS = {
+    "debug": (
+        "Use `with torch_tensorrt.dynamo.Debugger(...)` to wrap the compilation "
+        "call instead."
+    ),
+    "enable_cross_compile_for_windows": (
+        "Use `torch_tensorrt.dynamo.cross_compile_for_windows()` instead."
+    ),
+    "enabled_precisions": (
+        "Dynamo compilation is strongly typed and uses the precisions in the "
+        "model. Use the autocast options to change model precision."
+    ),
+    "make_refittable": ("Use `immutable_weights=False` to build a refittable engine."),
+    "refit": "Use `immutable_weights=False` to build a refittable engine.",
+    "truncate_long_and_double": (
+        "Use `truncate_double` instead; int64 is now natively supported."
+    ),
+    "use_explicit_typing": (
+        "Dynamo compilation is now always strongly typed, so this option is "
+        "no longer necessary."
+    ),
+    "use_python_runtime": (
+        "The Python and C++ runtimes have been merged; the runtime is selected "
+        "automatically based on whether the C++ Torch-TensorRT runtime is available."
+    ),
+}
+
+
+def validate_compiler_options(
+    kwargs: Dict[str, Any],
+    valid_options: Collection[str],
+    api_name: str,
+) -> None:
+    """Reject removed, misspelled, or unsupported compiler options."""
+    removed_options = _REMOVED_COMPILER_KWARGS.keys() & kwargs.keys()
+    if removed_options:
+        raise TypeError(
+            "The following compiler options have been removed:\n- "
+            + "\n- ".join(
+                f"`{option}` has been removed. {_REMOVED_COMPILER_KWARGS[option]}"
+                for option in sorted(removed_options)
+            )
+        )
+
+    unexpected_options = kwargs.keys() - set(valid_options)
+    if not unexpected_options:
+        return
+
+    option = sorted(unexpected_options)[0]
+    suggestion = difflib.get_close_matches(
+        option, sorted(valid_options), n=1, cutoff=0.6
+    )
+    suggestion_text = f" Did you mean '{suggestion[0]}'?" if suggestion else ""
+    raise TypeError(
+        f"{api_name}() got an unexpected keyword argument "
+        f"'{option}'.{suggestion_text}"
+    )
+
 
 COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
@@ -766,39 +836,9 @@ def parse_dynamo_kwargs(
         if "options" in kwargs and len(kwargs) == 1:
             kwargs = kwargs["options"]
 
-        if "use_python_runtime" in kwargs:
-            warnings.warn(
-                'torch.compile option "use_python_runtime" was removed; use '
-                "the Python runtime is now selected automatically when the C++ extension is unavailable.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            kwargs = {k: v for k, v in kwargs.items() if k != "use_python_runtime"}
-
-        if "truncate_long_and_double" in kwargs:
-            if (
-                "truncate_double" in kwargs
-                and kwargs["truncate_double"] is not _defaults.TRUNCATE_DOUBLE
-            ):
-                raise ValueError(
-                    'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double". '
-                    'Please only use "truncate_double".'
-                )
-            else:
-                kwargs["truncate_double"] = kwargs["truncate_long_and_double"]
-                warnings.warn(
-                    'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported. '
-                    "This option will be removed in the next version.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                del kwargs[
-                    "truncate_long_and_double"
-                ]  # Remove deprecated key after handling
-
         valid_attrs = {attr.name for attr in fields(settings)}
-        valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
-        settings = replace(settings, **valid_kwargs)
+        validate_compiler_options(kwargs, valid_attrs, "torch.compile")
+        settings = replace(settings, **kwargs)
 
     # Ensure device is a torch_tensorrt Device
     settings.device = to_torch_tensorrt_device(settings.device)

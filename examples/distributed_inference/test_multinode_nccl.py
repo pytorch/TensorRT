@@ -95,32 +95,30 @@ print(f"[Rank {rank}] PyTorch baseline OK, shape={python_result.shape}", flush=T
 PASSED = []
 FAILED = []
 
-for runtime, use_python in [("cpp", False), ("python", True)]:
-    dist.barrier()  # ensure both ranks enter each test together
-    try:
-        trt_model = torch.compile(
-            tp_model,
-            backend="torch_tensorrt",
-            options={
-                "truncate_long_and_double": True,
-                "use_python_runtime": use_python,
-                "min_block_size": 1,
-            },
+dist.barrier()  # ensure both ranks enter the test together
+try:
+    trt_model = torch.compile(
+        tp_model,
+        backend="torch_tensorrt",
+        options={
+            "truncate_double": True,
+            "min_block_size": 1,
+        },
+    )
+    output = trt_model(inp)
+    std = float((python_result - output).std())
+    if std < 0.01:
+        print(f"[Rank {rank}] PASS  compile  (std={std:.6f})", flush=True)
+        PASSED.append("compile")
+    else:
+        print(
+            f"[Rank {rank}] FAIL  compile  (std={std:.6f} >= 0.01)",
+            flush=True,
         )
-        output = trt_model(inp)
-        std = float((python_result - output).std())
-        if std < 0.01:
-            print(f"[Rank {rank}] PASS  {runtime} runtime  (std={std:.6f})", flush=True)
-            PASSED.append(runtime)
-        else:
-            print(
-                f"[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} >= 0.01)",
-                flush=True,
-            )
-            FAILED.append(runtime)
-    except Exception as e:
-        print(f"[Rank {rank}] ERROR {runtime} runtime: {e}", flush=True)
-        FAILED.append(runtime)
+        FAILED.append("compile")
+except Exception as e:
+    print(f"[Rank {rank}] ERROR compile: {e}", flush=True)
+    FAILED.append("compile")
 
 dist.destroy_process_group()
 

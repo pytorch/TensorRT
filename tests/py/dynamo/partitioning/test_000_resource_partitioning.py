@@ -3,6 +3,7 @@
 
 import operator
 import sys
+import unittest
 import unittest.mock as mock
 
 import torch
@@ -11,7 +12,7 @@ from torch.fx.passes.splitter_base import Subgraph
 from torch.ops import aten
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.conversion import CompilationSettings
+from torch_tensorrt.dynamo.conversion import CompilationSettings, impl
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -184,6 +185,43 @@ class TestResourcePartitioning(TestCase):
             set(subgraphs[1].nodes),
         )
         assert set(batch_norm.users) <= set(subgraphs[0].nodes)
+
+    @unittest.skipIf(
+        not impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS,
+        "torch.ao.quantization.fx._decomposed is not available",
+    )
+    def test_quantize_stays_with_its_dequantizes(self):
+        qd = torch.ops.quantized_decomposed
+
+        class QDQ(nn.Module):
+            def forward(self, x):
+                q = qd.quantize_per_tensor(x.relu(), 0.1, 0, -128, 127, torch.int8)
+                a = qd.dequantize_per_tensor(q, 0.1, 0, -128, 127, torch.int8) + 1
+                b = qd.dequantize_per_tensor(q, 0.1, 0, -128, 127, torch.int8) * 2
+                return a + b
+
+        gm = torch.export.export(QDQ(), (torch.randn(4),)).module(check_guards=False)
+        partitioner = ResourcePartitioner(
+            gm, cpu_memory_budget=None, submodule_name="m"
+        )
+        nodes = partitioner.put_nodes_into_subgraphs()[0].nodes
+        (quantize,) = [n for n in nodes if n.target == qd.quantize_per_tensor.default]
+        assert len(quantize.users) == 2
+        # Splits after the quantize and between its dequantizes would each make its int8
+        # values an engine input.
+        for cut in (nodes.index(quantize) + 1, nodes.index(quantize) + 2):
+            subgraphs = [
+                Subgraph(is_acc=True, nodes=nodes[:cut]),
+                Subgraph(is_acc=True, nodes=nodes[cut:]),
+            ]
+            leaf_node = partitioner.get_leaf_node(subgraphs[0].nodes)
+            assert partitioner.step_if_break_fusion(
+                subgraphs,
+                leaf_node,
+                set(subgraphs[0].nodes),
+                set(subgraphs[1].nodes),
+            )
+            assert set(quantize.users) <= set(subgraphs[0].nodes)
 
     def test_split_subgraphs_fit_the_budget(self):
         class TwoBranches(nn.Module):

@@ -641,6 +641,7 @@ def recompute_input_only_nodes(
     Returns:
         The subgraphs with the copies in them, without those left empty.
     """
+    from torch_tensorrt.dynamo.conversion.impl.quantize import quantize_read_by
     from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
         FOLDED_WITHOUT_PARAMETERS_META,
     )
@@ -673,8 +674,11 @@ def recompute_input_only_nodes(
         """Whether the node reads a graph input, so later subgraphs are passed its value rather than
         recomputing it: each input keeps a single reader."""
         # A getitem goes with its producer: copied alone, it would make the producer's engine
-        # output a tuple.
-        producer = node.args[0] if node.target is operator.getitem else None
+        # output a tuple. A dequantize goes with its quantize: copied alone, it would make the
+        # quantize's int8 values an engine input, which TensorRT-RTX cannot take.
+        producer = (
+            node.args[0] if node.target is operator.getitem else quantize_read_by(node)
+        )
         reads = (
             producer._input_nodes
             if isinstance(producer, torch.fx.Node)

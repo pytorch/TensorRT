@@ -31,7 +31,7 @@ Usage
        tensor_parallel_simple_example_torchrun.py
 
 Optional args:
-  --mode       jit_python | jit_cpp | export | load  (default: jit_python)
+  --mode       jit | export | load  (default: jit)
   --save-path  /tmp/tp_model.ep
   --precision  FP16 | BF16 | FP32  (default: FP16)
   --debug
@@ -121,14 +121,12 @@ def get_model(device_mesh):
     return model
 
 
-def compile_torchtrt(model, args):
+def compile_torchtrt(model, args, inp):
     model.eval()
 
     use_fp32_acc = args.precision == "FP16"
 
-    use_python_runtime = args.mode == "jit_python"
-
-    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    with torch_tensorrt.dynamo.Debugger() if args.debug else nullcontext():
         trt_model = torch.compile(
             model,
             backend="torch_tensorrt",
@@ -137,11 +135,10 @@ def compile_torchtrt(model, args):
                 "use_fp32_acc": use_fp32_acc,
                 "device": DEVICE,
                 "disable_tf32": True,
-                "use_python_runtime": use_python_runtime,
-                "debug": args.debug,
                 "min_block_size": 1,
             },
         )
+        _ = trt_model(inp)
     return trt_model
 
 
@@ -152,8 +149,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["jit_python", "jit_cpp", "export", "load"],
-        default="jit_python",
+        choices=["jit", "export", "load"],
+        default="jit",
     )
     parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
     parser.add_argument(
@@ -180,13 +177,11 @@ if __name__ == "__main__":
             assert (python_result - output).std() < 0.01, "Result mismatch"
             logger.info("Load successful!")
 
-        elif args.mode in ("jit_python", "jit_cpp"):
-            trt_model = compile_torchtrt(model, args)
-
+        elif args.mode == "jit":
             # Warmup: trigger engine build on all ranks, then barrier so no
             # rank races ahead to the next NCCL collective before others finish.
             logger.info("Warming up (triggering TRT engine build)...")
-            _ = trt_model(inp)
+            trt_model = compile_torchtrt(model, args, inp)
             dist.barrier()
             logger.info("All ranks compiled. Running inference...")
 
@@ -207,7 +202,6 @@ if __name__ == "__main__":
                 use_fp32_acc=True,
                 device=DEVICE,
                 disable_tf32=True,
-                use_python_runtime=False,
                 min_block_size=1,
                 use_distributed_mode_trace=True,
                 assume_dynamic_shape_support=True,

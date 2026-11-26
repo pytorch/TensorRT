@@ -2195,7 +2195,7 @@ def test_the_pin_check_runs_in_ci():
     """This file has to be invoked by something, or its assertions never execute.
 
     Two suites deselect it by name so it does not need an installed ExecuTorch on a GPU runner,
-    which leaves the lint job as the only path that runs it. Deleting that step is invisible
+    which leaves the CPU checks job as the only path that runs it. Deleting that step is invisible
     otherwise: every test here still passes locally while nothing runs them in CI.
     """
     # A sibling job's dependency installation cannot prepare this job.
@@ -2501,7 +2501,7 @@ def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shel
 def test_review_ci_guard_rejects_disabled_checks(monkeypatch, mutation, module):
     path = REPO_ROOT / ".github/workflows/linter.yml"
     workflow = yaml.safe_load(path.read_text())
-    steps = workflow["jobs"]["py-linting"]["steps"]
+    steps = workflow["jobs"]["executorch-cpu-checks"]["steps"]
     step = next(s for s in steps if module in s.get("run", ""))
     if mutation == "delete":
         steps.remove(step)
@@ -2811,7 +2811,7 @@ def test_ci_guard_requires_dependencies_in_the_owning_job(monkeypatch, mutation)
     metadata_path = REPO_ROOT / "pyproject.toml"
     workflow = yaml.safe_load(workflow_path.read_text())
     metadata = metadata_path.read_text()
-    steps = workflow["jobs"]["py-linting"]["steps"]
+    steps = workflow["jobs"]["executorch-cpu-checks"]["steps"]
     step = next(
         step for step in steps if "['dependency-groups']['lint']" in step.get("run", "")
     )

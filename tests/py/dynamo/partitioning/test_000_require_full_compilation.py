@@ -59,7 +59,6 @@ class TestRequireFullCompilation(TestCase):
             torch.export.export(module, tuple(inputs)),
             inputs=list(inputs),
             require_full_compilation=True,
-            enabled_precisions={torch.float32},
             truncate_double=True,
             **kwargs,
         )

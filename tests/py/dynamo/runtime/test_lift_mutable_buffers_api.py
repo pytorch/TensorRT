@@ -86,7 +86,6 @@ class TestLiftMutableBuffersAPI(TestCase):
         engine_bytes = convert_exported_program_to_serialized_trt_engine(
             ep,
             inputs=[x.clone()],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         inputs, outputs, aliased = _introspect_engine(engine_bytes)
@@ -114,7 +113,6 @@ class TestLiftMutableBuffersAPI(TestCase):
         engine_bytes = convert_exported_program_to_serialized_trt_engine(
             ep,
             inputs=[x.clone()],
-            enabled_precisions={torch.float32},
             min_block_size=1,
             lift_mutable_buffers=True,
         )
@@ -147,7 +145,6 @@ class TestLiftMutableBuffersAPI(TestCase):
         engine_bytes = convert_exported_program_to_serialized_trt_engine(
             export(M().cuda(), (x.clone(),)),
             inputs=[x.clone()],
-            enabled_precisions={torch.float32},
             min_block_size=1,
             lift_mutable_buffers=True,
         )
@@ -176,7 +173,6 @@ class TestLiftMutableBuffersAPI(TestCase):
         engine_bytes = convert_exported_program_to_serialized_trt_engine(
             ep,
             inputs=[x_sample.clone()],
-            enabled_precisions={torch.float32},
             min_block_size=1,
             lift_mutable_buffers=True,
         )
@@ -223,7 +219,6 @@ class TestLiftMutableBuffersAPI(TestCase):
         engine_bytes = convert_exported_program_to_serialized_trt_engine(
             ep,
             inputs=[x_sample.clone()],
-            enabled_precisions={torch.float32},
             min_block_size=1,
             lift_mutable_buffers=True,
         )

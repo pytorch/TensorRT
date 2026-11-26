@@ -44,7 +44,6 @@ def _compile_dynamic_conv(strategy):
         model,
         ir="dynamo",
         inputs=[inp],
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
     torch._dynamo.reset()

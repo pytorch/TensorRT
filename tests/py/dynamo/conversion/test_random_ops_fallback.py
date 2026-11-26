@@ -34,7 +34,6 @@ class TestRandomOperatorsFallBack(TestCase):
         compiled = torch_tensorrt.dynamo.compile(
             torch.export.export(module, tuple(inputs)),
             inputs=list(inputs),
-            enabled_precisions={torch.float32},
             truncate_double=True,
         )
         first = compiled(*inputs).clone()
@@ -67,7 +66,6 @@ class TestRandomOperatorsFallBack(TestCase):
         compiled = torch_tensorrt.dynamo.compile(
             torch.export.export(module, tuple(inputs)),
             inputs=list(inputs),
-            enabled_precisions={torch.float32},
             truncate_double=True,
         )
         torch.manual_seed(0)
@@ -90,7 +88,6 @@ class TestRandomOperatorsFallBack(TestCase):
             torch.export.export(module, tuple(inputs)),
             inputs=list(inputs),
             min_block_size=1,
-            enabled_precisions={torch.float32},
             truncate_double=True,
         )
         out = compiled(*inputs)
