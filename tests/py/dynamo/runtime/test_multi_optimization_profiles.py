@@ -12,6 +12,8 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModu
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.runtime import optimization_profile
 
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
+
 # Profiles are an ordered list; the list index is the optimization-profile
 # index selected at runtime. Order matters on a rescan: the decode profile
 # ([1, 1]) and prefill profile ([1, 64]) overlap at seq=1, and a rescan takes the
@@ -538,6 +540,309 @@ class TestMultiProfileGraphBreak(TestCase):
                 self.assertEqual(e._active_profile_index, PREFILL_IDX)
         self.assertTrue(torch.allclose(out_d, model(decode_in), atol=1e-2))
         self.assertTrue(torch.allclose(out_p, model(prefill_in), atol=1e-2))
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+class TestProfilesWholeGraph(TestCase):
+    """require_full_compilation converts a fully supported graph as one engine
+    without partitioning."""
+
+    def setUp(self):
+        self.model = MLP().eval().cuda().half()
+        example = torch.randn(4, 48, 16, dtype=torch.float16, device="cuda")
+        self.ep = torch.export.export(
+            self.model,
+            (example,),
+            dynamic_shapes=({1: torch.export.Dim("seq", min=1, max=64)},),
+        )
+
+    def _compile(self, profiles):
+        trt_mod = torch_tensorrt.dynamo.compile(
+            self.ep,
+            arg_inputs=[Input(dtype=torch.float16, profiles=profiles)],
+            min_block_size=1,
+            enabled_precisions={torch.float16},
+            require_full_compilation=True,
+        )
+        self.assertIsInstance(trt_mod, TorchTensorRTModule)
+        engine = trt.Runtime(trt.Logger(trt.Logger.WARNING)).deserialize_cuda_engine(
+            bytes(trt_mod.serialized_engine)
+        )
+        return trt_mod, engine
+
+    def test_single_profile_sets_engine_profile(self):
+        profile = {
+            "min_shape": (4, 1, 16),
+            "opt_shape": (4, 1, 16),
+            "max_shape": (4, 64, 16),
+        }
+        trt_mod, engine = self._compile([profile])
+        self.assertEqual(engine.num_optimization_profiles, 1)
+        self.assertEqual(
+            [tuple(s) for s in engine.get_tensor_profile_shape("x", 0)],
+            [profile["min_shape"], profile["opt_shape"], profile["max_shape"]],
+        )
+        decode_in = torch.randn(4, 1, 16, dtype=torch.float16, device="cuda")
+        self.assertTrue(
+            torch.allclose(trt_mod(decode_in), self.model(decode_in), atol=1e-2)
+        )
+
+    def test_several_profiles_set_engine_profiles(self):
+        decode = {
+            "min_shape": (4, 1, 16),
+            "opt_shape": (4, 1, 16),
+            "max_shape": (4, 8, 16),
+        }
+        prefill = {
+            "min_shape": (4, 16, 16),
+            "opt_shape": (4, 32, 16),
+            "max_shape": (4, 64, 16),
+        }
+        trt_mod, engine = self._compile([decode, prefill])
+        self.assertEqual(engine.num_optimization_profiles, 2)
+        for idx, profile in enumerate((decode, prefill)):
+            self.assertEqual(
+                [tuple(s) for s in engine.get_tensor_profile_shape("x", idx)],
+                [profile["min_shape"], profile["opt_shape"], profile["max_shape"]],
+            )
+            inp = torch.randn(profile["opt_shape"], dtype=torch.float16, device="cuda")
+            with optimization_profile(trt_mod, idx):
+                self.assertTrue(
+                    torch.allclose(trt_mod(inp), self.model(inp), atol=1e-2)
+                )
+
+    def _check_both_paths(self, ep, arg_inputs, kwarg_inputs, args, kwargs, model):
+        expected = model(*args, **kwargs)
+        flat_args = torch.utils._pytree.tree_leaves((args, kwargs))
+        for require_full_compilation in (True, False):
+            with self.subTest(require_full_compilation=require_full_compilation):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    ep,
+                    arg_inputs=arg_inputs,
+                    kwarg_inputs=kwarg_inputs,
+                    min_block_size=1,
+                    enabled_precisions={torch.float16},
+                    require_full_compilation=require_full_compilation,
+                )
+                if require_full_compilation:
+                    # The single engine module takes the flat inputs in export order.
+                    self.assertIsInstance(trt_mod, TorchTensorRTModule)
+                    out = trt_mod(*flat_args)
+                else:
+                    self.assertNotIsInstance(trt_mod, TorchTensorRTModule)
+                    out = trt_mod(*args, **kwargs)
+                self.assertTrue(torch.allclose(out, expected, atol=1e-2))
+
+    def test_profiles_follow_kwarg_names(self):
+        class TwoMLPs(torch.nn.Module):
+            def __init__(self, mlp):
+                super().__init__()
+                self.mlp = mlp
+
+            def forward(self, a, b):
+                return self.mlp(a).mean(1) + self.mlp(b).mean(1)
+
+        model = TwoMLPs(self.model)
+        a = torch.randn(4, 32, 16, dtype=torch.float16, device="cuda")
+        b = torch.randn(4, 4, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(
+            model,
+            (),
+            {"a": a, "b": b},
+            dynamic_shapes={
+                "a": {1: torch.export.Dim("sa", min=1, max=64)},
+                "b": {1: torch.export.Dim("sb", min=1, max=64)},
+            },
+        )
+        a_profile = {
+            "min_shape": (4, 16, 16),
+            "opt_shape": (4, 32, 16),
+            "max_shape": (4, 64, 16),
+        }
+        b_profile = {
+            "min_shape": (4, 2, 16),
+            "opt_shape": (4, 4, 16),
+            "max_shape": (4, 8, 16),
+        }
+        # Passed in a different order than at export.
+        kwarg_inputs = {
+            "b": Input(dtype=torch.float16, profiles=[b_profile]),
+            "a": Input(dtype=torch.float16, profiles=[a_profile]),
+        }
+        self._check_both_paths(ep, [], kwarg_inputs, (), {"a": a, "b": b}, model)
+
+    def test_profiles_follow_inputs_after_a_tuple(self):
+        class PairThenY(torch.nn.Module):
+            def __init__(self, mlp):
+                super().__init__()
+                self.mlp = mlp
+
+            def forward(self, pair, y):
+                p, q = pair
+                return self.mlp(p).mean(1) + self.mlp(q).mean(1) + self.mlp(y).mean(1)
+
+        model = PairThenY(self.model)
+        p = torch.randn(4, 4, 16, dtype=torch.float16, device="cuda")
+        q = torch.randn(4, 4, 16, dtype=torch.float16, device="cuda")
+        y = torch.randn(4, 32, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(
+            model,
+            ((p, q), y),
+            dynamic_shapes=(
+                (
+                    {1: torch.export.Dim("sp", min=1, max=64)},
+                    {1: torch.export.Dim("sq", min=1, max=64)},
+                ),
+                {1: torch.export.Dim("sy", min=1, max=64)},
+            ),
+        )
+        plain = Input(
+            min_shape=(4, 1, 16),
+            opt_shape=(4, 4, 16),
+            max_shape=(4, 64, 16),
+            dtype=torch.float16,
+        )
+        y_profile = {
+            "min_shape": (4, 16, 16),
+            "opt_shape": (4, 32, 16),
+            "max_shape": (4, 64, 16),
+        }
+        arg_inputs = [(plain, plain), Input(dtype=torch.float16, profiles=[y_profile])]
+        self._check_both_paths(ep, arg_inputs, None, ((p, q), y), {}, model)
+
+    def test_profiles_follow_kwarg_names_with_a_mutated_buffer(self):
+        class CountingMLP(torch.nn.Module):
+            def __init__(self, mlp):
+                super().__init__()
+                self.mlp = mlp
+                self.register_buffer("calls", torch.zeros(1, device="cuda"))
+
+            def forward(self, a, b):
+                self.calls.add_(1)
+                return self.mlp(a).sum(1) + self.mlp(b).sum(1)
+
+        model = CountingMLP(self.model)
+        a = torch.randn(4, 32, 16, dtype=torch.float16, device="cuda")
+        b = torch.randn(4, 4, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(
+            model,
+            (),
+            {"a": a, "b": b},
+            dynamic_shapes={
+                "a": {1: torch.export.Dim("sa", min=1, max=64)},
+                "b": {1: torch.export.Dim("sb", min=1, max=64)},
+            },
+        )
+        decode = {
+            "min_shape": (4, 1, 16),
+            "opt_shape": (4, 1, 16),
+            "max_shape": (4, 8, 16),
+        }
+        prefill = {
+            "min_shape": (4, 16, 16),
+            "opt_shape": (4, 32, 16),
+            "max_shape": (4, 64, 16),
+        }
+        # The lifted buffer drops the input spec, so the kwargs are matched by name.
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep,
+            arg_inputs=[],
+            kwarg_inputs={
+                "b": Input(dtype=torch.float16, profiles=[decode, decode]),
+                "a": Input(dtype=torch.float16, profiles=[decode, prefill]),
+            },
+            min_block_size=1,
+            enabled_precisions={torch.float16},
+        )
+        (engine_mod,) = [
+            m for m in trt_mod.modules() if isinstance(m, TorchTensorRTModule)
+        ]
+        engine = trt.Runtime(trt.Logger(trt.Logger.WARNING)).deserialize_cuda_engine(
+            bytes(engine_mod.serialized_engine)
+        )
+        self.assertEqual(engine.num_optimization_profiles, 2)
+        for name, profile in (("a", prefill), ("b", decode)):
+            self.assertEqual(
+                [tuple(s) for s in engine.get_tensor_profile_shape(name, 1)],
+                [profile["min_shape"], profile["opt_shape"], profile["max_shape"]],
+            )
+
+    def test_profiles_of_an_argument_export_renames(self):
+        class Upper(torch.nn.Module):
+            def __init__(self, mlp):
+                super().__init__()
+                self.mlp = mlp
+
+            def forward(self, X):
+                return self.mlp(X)
+
+        X = torch.randn(4, 48, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(
+            Upper(self.model),
+            (X,),
+            dynamic_shapes=({1: torch.export.Dim("seq", min=1, max=64)},),
+        )
+        decode = {
+            "min_shape": (4, 1, 16),
+            "opt_shape": (4, 1, 16),
+            "max_shape": (4, 8, 16),
+        }
+        prefill = {
+            "min_shape": (4, 16, 16),
+            "opt_shape": (4, 32, 16),
+            "max_shape": (4, 64, 16),
+        }
+        # Export names the placeholder x, so the kwarg X is matched by position.
+        for require_full_compilation in (True, False):
+            with self.subTest(require_full_compilation=require_full_compilation):
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    ep,
+                    arg_inputs=[],
+                    kwarg_inputs={
+                        "X": Input(dtype=torch.float16, profiles=[decode, prefill])
+                    },
+                    min_block_size=1,
+                    enabled_precisions={torch.float16},
+                    require_full_compilation=require_full_compilation,
+                )
+                (engine_mod,) = [
+                    m for m in trt_mod.modules() if isinstance(m, TorchTensorRTModule)
+                ]
+                engine = trt.Runtime(
+                    trt.Logger(trt.Logger.WARNING)
+                ).deserialize_cuda_engine(bytes(engine_mod.serialized_engine))
+                self.assertEqual(engine.num_optimization_profiles, 2)
+
+    def test_different_profile_counts_raise(self):
+        class AddMLP(torch.nn.Module):
+            def __init__(self, mlp):
+                super().__init__()
+                self.mlp = mlp
+
+            def forward(self, x, y):
+                return self.mlp(x) + y
+
+        seq = torch.export.Dim("seq", min=1, max=64)
+        example = torch.randn(4, 48, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(
+            AddMLP(self.model), (example, example), dynamic_shapes=({1: seq}, {1: seq})
+        )
+        profile = {
+            "min_shape": (4, 1, 16),
+            "opt_shape": (4, 48, 16),
+            "max_shape": (4, 64, 16),
+        }
+        with self.assertRaisesRegex(ValueError, "same number of profiles"):
+            torch_tensorrt.dynamo.compile(
+                ep,
+                arg_inputs=[
+                    Input(dtype=torch.float16, profiles=[profile, profile]),
+                    Input(dtype=torch.float16, profiles=[profile]),
+                ],
+                min_block_size=1,
+                enabled_precisions={torch.float16},
+                require_full_compilation=True,
+            )
 
 
 if __name__ == "__main__":

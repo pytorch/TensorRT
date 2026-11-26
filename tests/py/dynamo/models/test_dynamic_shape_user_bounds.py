@@ -220,7 +220,7 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
         max_shape=(8, 8),
         dtype=torch.float32,
     )
-    bounds = _build_user_symbol_bounds(
+    bounds, _ = _build_user_symbol_bounds(
         ep.module(), [dynamic_input], {}, ep.graph_signature
     )
     assert len(bounds) == 1
@@ -230,23 +230,22 @@ def test_build_user_symbol_bounds_uses_dynamic_inputs_only():
 
     # Static input -> empty map.
     static_input = Input(shape=(2, 8), dtype=torch.float32)
-    assert (
-        _build_user_symbol_bounds(ep.module(), [static_input], {}, ep.graph_signature)
-        == {}
-    )
+    assert _build_user_symbol_bounds(
+        ep.module(), [static_input], {}, ep.graph_signature
+    ) == ({}, [])
 
 
 @pytest.mark.unit
-def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
-    """``user_min=1, exp_min=2`` is the 0/1 specialization artifact -- warn,
-    don't raise."""
+def test_build_user_symbol_bounds_accepts_01_specialization(caplog):
+    """``user_min=1, exp_min=2`` is the 0/1 specialization artifact. The engine
+    keeps min 1, so neither raise nor warn."""
 
     model = _SmallLinear().eval().cuda()
-    sample = torch.randn(2, 8, device="cuda")
+    sample = torch.randn(4, 8, device="cuda")
     ep = torch.export.export(
         model,
         (sample,),
-        dynamic_shapes=({0: torch.export.Dim.DYNAMIC},),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=1, max=8)},),
         strict=False,
     )
     input_min1 = Input(
@@ -258,12 +257,16 @@ def test_build_user_symbol_bounds_warns_on_01_specialization(caplog):
 
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
-        _build_user_symbol_bounds(ep.module(), [input_min1], {}, ep.graph_signature)
+    with caplog.at_level(logging.DEBUG, logger="torch_tensorrt.dynamo._compiler"):
+        bounds, _ = _build_user_symbol_bounds(
+            ep.module(), [input_min1], {}, ep.graph_signature
+        )
 
+    assert any("0/1 specialization" in r.message for r in caplog.records)
     msgs = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
-    if msgs:
-        assert "0/1 specialization" in "\n".join(msgs)
+    assert not msgs, msgs
+    _, sym_dim = _first_sym_placeholder(ep, sym_dim=0)
+    assert extract_var_range_info(sym_dim, user_symbol_bounds=bounds)["min"] == 1
 
 
 @pytest.mark.unit
@@ -369,7 +372,7 @@ def test_build_user_symbol_bounds_narrows_to_user_on_subset(caplog):
     import logging
 
     with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._compiler"):
-        bounds = _build_user_symbol_bounds(
+        bounds, _ = _build_user_symbol_bounds(
             ep.module(), [subset_input], {}, ep.graph_signature
         )
 
@@ -418,12 +421,84 @@ def test_build_user_symbol_bounds_no_warning_on_dim_dynamic(caplog):
     with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
         _build_user_symbol_bounds(ep.module(), [fill_input], {}, ep.graph_signature)
 
-    mismatch_warnings = [
-        rec.message
-        for rec in caplog.records
-        if rec.levelno >= logging.WARNING and "differ from the exporter" in rec.message
+    warning_messages = [
+        rec.message for rec in caplog.records if rec.levelno >= logging.WARNING
     ]
-    assert not mismatch_warnings, f"unexpected mismatch warnings: {mismatch_warnings}"
+    assert not warning_messages, f"unexpected warnings: {warning_messages}"
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_reports_opt_that_is_not_the_export_example():
+    """A plain Input's opt_shape does not reach the engine of an exported
+    program, so a different opt_shape is reported. A profile's opt does reach
+    it, also for a plain Input on the same dimension."""
+
+    class SumBoth(torch.nn.Module):
+        def forward(self, x, y):
+            return x.sum(0) + y.sum(0)
+
+    def export(dims):
+        return torch.export.export(
+            SumBoth(),
+            (torch.randn(16, 8), torch.randn(16, 8)),
+            dynamic_shapes=({0: dims[0]}, {0: dims[1]}),
+            strict=False,
+        )
+
+    batch = torch.export.Dim("batch", min=2, max=32)
+    shared = export((batch, batch))
+    separate = export((batch, torch.export.Dim("seq", min=2, max=32)))
+    shapes = {"min_shape": (2, 8), "opt_shape": (4, 8), "max_shape": (32, 8)}
+    plain = Input(dtype=torch.float32, **shapes)
+    profiled = Input(dtype=torch.float32, profiles=[shapes])
+    below_example = Input(
+        min_shape=(2, 8), opt_shape=(4, 8), max_shape=(8, 8), dtype=torch.float32
+    )
+
+    def reported(ep, inputs):
+        return _build_user_symbol_bounds(ep.module(), inputs, {}, ep.graph_signature)[1]
+
+    x_dim = "'x' dim 0 (opt_shape 4, export example 16)"
+    y_dim = "'y' dim 0 (opt_shape 4, export example 16)"
+    assert reported(shared, [plain, plain]) == [x_dim, y_dim]
+    assert not reported(shared, [plain, profiled])
+    assert reported(separate, [profiled, plain]) == [y_dim]
+    # An example outside the Input range fails the build with its own error.
+    assert reported(separate, [plain, below_example]) == [x_dim]
+
+
+@pytest.mark.unit
+def test_opt_warning_only_when_tensorrt_gets_part_of_the_graph(caplog):
+    """The opt warning describes the engine, so a compile where TensorRT gets
+    no part of the graph stays silent."""
+    import logging
+
+    model = _SmallLinear().eval().cuda()
+    ep = torch.export.export(
+        model,
+        (torch.randn(16, 8, device="cuda"),),
+        dynamic_shapes=({0: torch.export.Dim("batch", min=2, max=32)},),
+        strict=False,
+    )
+    plain = Input(
+        min_shape=(2, 8), opt_shape=(4, 8), max_shape=(32, 8), dtype=torch.float32
+    )
+
+    def opt_warnings(min_block_size, dryrun=False):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="torch_tensorrt.dynamo._compiler"):
+            torchtrt.dynamo.compile(
+                ep, arg_inputs=[plain], min_block_size=min_block_size, dryrun=dryrun
+            )
+        return [r.message for r in caplog.records if "Input.opt_shape" in r.message]
+
+    msgs = opt_warnings(1)
+    assert len(msgs) == 1, msgs
+    assert "'x' dim 0 (opt_shape 4, export example 16)" in msgs[0], msgs
+    assert "profiles=" in msgs[0] and "export the program" in msgs[0], msgs
+    assert not opt_warnings(100)
+    # dryrun partitions even below min_block_size, and gets no TensorRT part here.
+    assert not opt_warnings(100, dryrun=True)
 
 
 @pytest.mark.unit
@@ -467,7 +542,7 @@ def test_build_user_symbol_bounds_mixed_tensor_and_symint():
         dtype=torch.int64,
     )
 
-    bounds = _build_user_symbol_bounds(
+    bounds, _ = _build_user_symbol_bounds(
         ep.module(), [tensor_input, scalar_input], {}, ep.graph_signature
     )
     assert len(bounds) == 1, bounds
@@ -518,7 +593,7 @@ def test_build_user_symbol_bounds_mixed_arg_and_kwarg():
         dtype=torch.float32,
     )
 
-    bounds = _build_user_symbol_bounds(
+    bounds, _ = _build_user_symbol_bounds(
         ep.module(),
         sample_arg_inputs=[x_input],
         sample_kwarg_inputs={"y": y_input},
@@ -598,6 +673,27 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     too_big = torch.randn(16, 8, device="cuda")
     with assertions.assertRaises(Exception):
         trt_module(too_big)
+
+
+@pytest.mark.unit
+def test_build_user_symbol_bounds_accepts_a_short_opt_shape():
+    """Input does not check the rank of opt_shape, and the engine of an
+    exported program does not use it, so a short one must not fail."""
+
+    class SumCols(torch.nn.Module):
+        def forward(self, x):
+            return x.sum(1)
+
+    ep = torch.export.export(
+        SumCols(),
+        (torch.randn(8, 16),),
+        dynamic_shapes=({1: torch.export.Dim("cols", min=2, max=32)},),
+        strict=False,
+    )
+    short_opt = Input(
+        min_shape=(8, 2), opt_shape=(8,), max_shape=(8, 32), dtype=torch.float32
+    )
+    _build_user_symbol_bounds(ep.module(), [short_opt], {}, ep.graph_signature)
 
 
 @pytest.mark.unit
