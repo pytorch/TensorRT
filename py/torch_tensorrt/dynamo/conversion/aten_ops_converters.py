@@ -5156,12 +5156,26 @@ def aten_ops_upsample_antialias(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    meta = ctx.current_node.args[0].meta if ctx.current_node is not None else {}
+    input_val = meta.get("val", meta.get("tensor_meta"))
+    input = args[0]
+    # The weights come from the static height and width the validator checked. TensorRT
+    # can still see -1 for a size it cannot infer, such as a crop of a dynamic axis.
+    if any(size == -1 for size in input.shape[-2:]):
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - 2) + list(input_val.shape[-2:]),
+        )
     return impl.upsample.upsample_antialias(
         ctx,
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input,
         size=args[1],
         align_corners=args[2],
         scales=(args_bounds_check(args, 3), args_bounds_check(args, 4)),
@@ -5170,6 +5184,8 @@ def aten_ops_upsample_antialias(
             if target == torch.ops.aten._upsample_bilinear2d_aa.default
             else "bicubic"
         ),
+        # A float64 input arrives here truncated to float32, but ATen weighs it in float64.
+        float64_weights=getattr(input_val, "dtype", None) == torch.float64,
     )
 
 
