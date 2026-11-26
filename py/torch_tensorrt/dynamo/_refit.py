@@ -34,6 +34,9 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
     remove_alias_from_exported_program,
 )
+from torch_tensorrt.dynamo.lowering.passes.pointwise_in_float32 import (
+    pointwise_in_float32,
+)
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
@@ -430,6 +433,8 @@ def refit_module_weights(
                 to_torch_device(settings.device),
                 name,
             )
+        # The engine was built from the rewritten graph, so its layers come from it too.
+        new_submodule = pointwise_in_float32(new_submodule, settings)
         _refit_single_trt_engine_with_gm(
             new_gm=new_submodule,
             old_engine=engine,

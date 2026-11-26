@@ -148,6 +148,21 @@ Precision and Typing
        decomposed FP16 scaled dot product attention calculation runs in FP32 and only
        its final output is cast back to FP16. This option has no effect on FP32 or
        BF16 inputs and may increase memory use or reduce throughput.
+   * - ``pointwise_in_float32``
+     - ``False``
+     - Compute common FP16 and BF16 pointwise math inside each TensorRT engine in
+       FP32, such as residual adds, an RMSNorm built from pointwise ops and a
+       reduction, or a GELU. A value is rounded to 16 bits only where it leaves such
+       a region, not after each op, and a cast to 16 bits inside a region becomes a
+       cast to FP32. A matrix multiply, an attention, a softmax, a layer norm or any
+       other op ends a region and gets 16-bit inputs, as without this setting. Code
+       that runs in PyTorch is not changed, and values passed between an engine and
+       PyTorch keep their 16-bit dtype. Results are usually closer to an FP32 run
+       than those of a 16-bit PyTorch run, but measure it. TensorRT may not fuse the
+       added casts, and a cast between a matrix multiply and the add after it can
+       stop TensorRT from fusing the two, mostly for long inputs, so run time and
+       memory can grow. Weights read by region math are also stored in FP32 in the
+       engine.
 
 ----
 
@@ -576,7 +591,8 @@ rebuilt from scratch:
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
+``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``,
+``pointwise_in_float32``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``dryrun`` and ``pass_through_build_failures``)
