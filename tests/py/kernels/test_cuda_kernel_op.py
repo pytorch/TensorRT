@@ -5,7 +5,6 @@
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels._derive import _torch_output_shape_dtype
@@ -149,7 +148,6 @@ class TestFlat:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         with torch.no_grad():
@@ -190,7 +188,6 @@ class TestND:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         with torch.no_grad():
@@ -261,7 +258,6 @@ class TestReduction:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         with torch.no_grad():
@@ -341,7 +337,6 @@ class TestScalarInput:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         with torch.no_grad():
@@ -396,7 +391,6 @@ def test_custom_geometry_aot_path_only():
     trt = torch_tensorrt.compile(
         M().cuda().eval(),
         inputs=[x],
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
     with torch.no_grad():
@@ -455,7 +449,6 @@ class TestMultiOutput:
         trt = torch_tensorrt.compile(
             M().cuda().eval(),
             inputs=[x],
-            enabled_precisions={torch.float32},
             min_block_size=1,
         )
         with torch.no_grad():

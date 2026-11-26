@@ -89,11 +89,9 @@ class TestInputLifetime(TestCase):
             "dynamo",
             [torch_tensorrt.Input(shape=(B, S, H), dtype=torch.bfloat16)],
             truncate_double=True,
-            enabled_precisions={torch.float, torch.half, torch.bfloat16},
             min_block_size=1,
             optimization_level=1,
             enable_resource_partitioning=True,
-            use_python_runtime=False,
         )
 
         with torch.inference_mode():

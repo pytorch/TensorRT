@@ -55,12 +55,11 @@ names maps 1:1 to FX's flattened placeholder / output order — no runtime
 queue, no in-band validation, just an up-front structural check.
 """
 
+# %%
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo._compiler import BindingNameMismatchError
-
-# %%
-import tensorrt as trt
 
 DEVICE = torch.device("cuda", 0)
 
@@ -156,7 +155,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names=("relu_out", "tanh_out"),
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -205,7 +203,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names="combined",
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -268,7 +265,6 @@ engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_
     output_binding_names={"primary": "p_feats", "secondary": "s_feats"},
     require_full_compilation=True,
     min_block_size=1,
-    use_python_runtime=False,
     immutable_weights=True,
 )
 engine = deserialize(engine_bytes)
@@ -311,7 +307,6 @@ try:
         output_binding_names=("only_one",),  # wrong arity for the 2-tuple return
         require_full_compilation=True,
         min_block_size=1,
-        use_python_runtime=False,
         immutable_weights=True,
     )
 except BindingNameMismatchError as err:

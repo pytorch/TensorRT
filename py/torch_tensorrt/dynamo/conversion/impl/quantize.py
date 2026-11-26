@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Optional, Sequence, Union
+import logging
+from typing import FrozenSet, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
@@ -20,6 +21,65 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
     to_trt_weights,
 )
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# The quantized_decomposed ops that PT2E quantization emits. Their converters keep the integer
+# results of a quantize in float32, where every int8 and uint8 value is exact. That is only
+# correct while those values stay inside one engine and reach a dequantize or an engine
+# output, which TRTInterpreter casts back to the op's dtype using its output_dtypes. Code
+# that relies on this: quantized_decomposed_validator, makes_uint8_tensor, the torch.cond
+# subgraph check, and the partitioners, which keep a quantize with its dequantizes (see
+# quantize_read_by).
+QUANTIZED_DECOMPOSED_QUANTIZE_OPS: FrozenSet[torch._ops.OpOverload] = frozenset()
+QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS: FrozenSet[torch._ops.OpOverload] = frozenset()
+QUANTIZED_DECOMPOSED_PER_CHANNEL_OPS: FrozenSet[torch._ops.OpOverload] = frozenset()
+try:
+    # Importing the module registers the ops. It lives in torch.ao.quantization, which PyTorch
+    # is moving out to torchao, so any failure here only leaves the ops unconverted.
+    import torch.ao.quantization.fx._decomposed  # noqa: F401
+
+    _qd = torch.ops.quantized_decomposed
+    (
+        QUANTIZED_DECOMPOSED_QUANTIZE_OPS,
+        QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS,
+        QUANTIZED_DECOMPOSED_PER_CHANNEL_OPS,
+    ) = (
+        frozenset(
+            {
+                _qd.quantize_per_tensor.default,
+                _qd.quantize_per_tensor.tensor,
+                _qd.quantize_per_channel.default,
+            }
+        ),
+        frozenset(
+            {
+                _qd.dequantize_per_tensor.default,
+                _qd.dequantize_per_tensor.tensor,
+                _qd.dequantize_per_channel.default,
+            }
+        ),
+        frozenset(
+            {_qd.quantize_per_channel.default, _qd.dequantize_per_channel.default}
+        ),
+    )
+except Exception as e:
+    _LOGGER.debug(
+        f"quantized_decomposed ops are not available, so PyTorch runs them: {e}"
+    )
+
+
+def quantize_read_by(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """Return the quantize whose result the dequantize node reads, or None."""
+    if node.target not in QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS:
+        return None
+    source = node.args[0]
+    if (
+        isinstance(source, torch.fx.Node)
+        and source.target in QUANTIZED_DECOMPOSED_QUANTIZE_OPS
+    ):
+        return source
+    return None
 
 
 def get_ir(target: Target) -> SourceIR:
@@ -586,3 +646,183 @@ def dequantize_affine_float8(
         dequantize_layer.axis = axis
     set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
     return dequantize_layer.get_output(0)
+
+
+def _affine_constants(
+    scale: Union[float, torch.Tensor],
+    zero_point: Union[int, torch.Tensor, None],
+    axis: Optional[int],
+    rank: int,
+    reciprocal: bool,
+) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    """Return the float32 scale, or its reciprocal, and zero point of a quantized_decomposed op,
+    shaped to broadcast against its input, rounded to float32 the way PyTorch rounds them.
+    """
+    with unset_fake_temporarily():
+        if axis is None:
+            # The .tensor overloads read their one value with item(), as PyTorch does.
+            scale_value = scale.item() if isinstance(scale, torch.Tensor) else scale
+            zero_point_value = (
+                zero_point.item()
+                if isinstance(zero_point, torch.Tensor)
+                else zero_point
+            )
+            return torch.tensor(
+                1.0 / scale_value if reciprocal else scale_value, dtype=torch.float32
+            ), torch.tensor(zero_point_value, dtype=torch.float32)
+        assert isinstance(scale, torch.Tensor)
+        shape = [1] * rank
+        shape[axis] = -1
+        # PyTorch computes 1.0 / scales in the dtype of the scales, which the validator
+        # requires to be float32.
+        scale_tensor = 1.0 / scale if reciprocal else scale
+        zero_point_tensor = (
+            None
+            if zero_point is None
+            else torch.as_tensor(zero_point).to(torch.float32).reshape(shape)
+        )
+        return scale_tensor.reshape(shape), zero_point_tensor
+
+
+def quantize_decomposed(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: Union[torch.Tensor, TRTTensor],
+    scale: Union[float, torch.Tensor],
+    zero_point: Union[int, torch.Tensor],
+    quant_min: int,
+    quant_max: int,
+    axis: Optional[int] = None,
+) -> TRTTensor:
+    """Lower quantized_decomposed.quantize_per_tensor and quantize_per_channel to their
+    definition, clamp(round(x * (1 / scale)) + zero_point, quant_min, quant_max).
+
+    TensorRT's quantize layer is symmetric and has no uint8 output, so it cannot express the
+    asymmetric uint8 quantization PT2E often uses. The result keeps the integer values in
+    float32, where every int8 and uint8 value is exact; it is the value PyTorch's final cast
+    gives. A result that leaves the engine is cast to the op's dtype there.
+
+    When a dequantize follows in the same engine, TensorRT can fuse the two and multiply by the
+    scalar scale constant one unit in the last place off, so a value that close to a halfway
+    point can round to the neighboring integer. A quantize alone matched PyTorch exactly in
+    testing.
+
+    A NaN input gives 0, the value PyTorch's cast to int8 or uint8 gives it on CPU and CUDA,
+    although C++ leaves that cast undefined. That select also keeps a version compatible
+    engine buildable: TensorRT 11.4 cannot cast a clamp's result to an int8 engine output.
+    """
+    input_trt = get_trt_tensor(ctx, input_val, f"{name}_input")
+    # PyTorch quantizes float16 and bfloat16 inputs in float32.
+    x = cast_trt_tensor(
+        ctx, input_trt, trt.float32, f"{name}_input_float32", target, source_ir
+    )
+    inv_scale, zero_point_float = _affine_constants(
+        scale, zero_point, axis, len(x.shape), reciprocal=True
+    )
+    x = impl.elementwise.mul(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_mul_inv_scale",
+        x,
+        get_trt_tensor(ctx, inv_scale, f"{name}_inv_scale"),
+    )
+    # Like torch.round, TensorRT's ROUND rounds halfway values to the nearest even integer.
+    x = impl.unary.round(ctx, target, source_ir, f"{name}_round", x)
+    assert zero_point_float is not None
+    x = impl.elementwise.add(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_add_zero_point",
+        x,
+        get_trt_tensor(ctx, zero_point_float, f"{name}_zero_point"),
+    )
+    x = impl.elementwise.clamp(
+        ctx, target, source_ir, f"{name}_clamp", x, float(quant_min), float(quant_max)
+    )
+    return impl.condition.where(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_nan_to_zero",
+        x,
+        get_trt_tensor(ctx, 0.0, f"{name}_nan_value", torch.float32, min_rank=0),
+        impl.elementwise.eq(ctx, target, source_ir, f"{name}_not_nan", x, x),
+    )
+
+
+def _quantized_values_as_float32(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: Union[torch.Tensor, TRTTensor],
+) -> TRTTensor:
+    """Return the integer values a dequantize reads as a float32 tensor."""
+    if not isinstance(input_val, TRTTensor):
+        with unset_fake_temporarily():
+            return get_trt_tensor(ctx, input_val.to(torch.float32), name)
+    if input_val.dtype == trt.int8:
+        # TensorRT reads an int8 tensor only through a dequantize layer. A scale of 1 keeps
+        # the values exact.
+        one = get_trt_tensor(ctx, 1.0, f"{name}_unit_scale", torch.float32, min_rank=0)
+        layer = ctx.net.add_dequantize(input_val, one, output_type=trt.float32)
+        set_layer_name(layer, target, f"{name}_dequantize", source_ir)
+        return layer.get_output(0)
+    # A converted quantize already gives float32; an engine input may be uint8.
+    return cast_trt_tensor(ctx, input_val, trt.float32, name, target, source_ir)
+
+
+def dequantize_decomposed(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: Union[torch.Tensor, TRTTensor],
+    scale: Union[float, torch.Tensor],
+    zero_point: Union[int, torch.Tensor, None],
+    out_dtype: Optional[torch.dtype],
+    axis: Optional[int] = None,
+) -> TRTTensor:
+    """Lower quantized_decomposed.dequantize_per_tensor and dequantize_per_channel to their
+    definition, (q - zero_point) * scale, computed in float32 and cast to out_dtype. Like
+    PyTorch, the per-tensor op first rounds q - zero_point to out_dtype.
+
+    The input is the float32 result of a converted quantize, an int8 or uint8 engine input,
+    or a constant.
+    """
+    out_dtype = out_dtype or torch.float32
+    x = _quantized_values_as_float32(ctx, target, source_ir, f"{name}_q", input_val)
+    scale_float, zero_point_float = _affine_constants(
+        scale, zero_point, axis, len(x.shape), reciprocal=False
+    )
+    if zero_point_float is not None:
+        x = impl.elementwise.sub(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_sub_zero_point",
+            x,
+            get_trt_tensor(ctx, zero_point_float, f"{name}_zero_point"),
+        )
+    if axis is None and out_dtype != torch.float32:
+        # The per-tensor op subtracts in out_dtype and rounds there before it multiplies by the
+        # float32 scale; the per-channel op computes in float32 and casts at the end.
+        x = cast_trt_tensor(
+            ctx, x, out_dtype, f"{name}_round_to_out_dtype", target, source_ir
+        )
+        x = cast_trt_tensor(
+            ctx, x, trt.float32, f"{name}_back_to_float32", target, source_ir
+        )
+    x = impl.elementwise.mul(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_mul_scale",
+        x,
+        get_trt_tensor(ctx, scale_float, f"{name}_scale"),
+    )
+    return cast_trt_tensor(ctx, x, out_dtype, f"{name}_out", target, source_ir)

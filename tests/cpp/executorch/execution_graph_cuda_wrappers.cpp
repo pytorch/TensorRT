@@ -80,6 +80,56 @@ CUresult failing_write_value(CUstream stream, CUdeviceptr address, cuuint64_t va
   }
   return real_write_value(stream, address, value, flags);
 }
+
+PFN_cuPointerGetAttributes_v7000 real_pointer_attributes = nullptr;
+
+CUresult counting_pointer_attributes(
+    unsigned int count,
+    CUpointer_attribute* attributes,
+    void** data,
+    CUdeviceptr pointer) {
+  CudaCalls* const calls = active_calls;
+  if (calls) {
+    ++calls->pointer_queries;
+  }
+  const CUresult result = real_pointer_attributes(count, attributes, data, pointer);
+  if (result != CUDA_SUCCESS || calls == nullptr) {
+    return result;
+  }
+  if (calls->report_managed_as_host) {
+    // Asked here, not read from the caller's answers, so managed memory reads as host memory even when the caller
+    // leaves out the managed flag.
+    CUpointer_attribute is_managed = CU_POINTER_ATTRIBUTE_IS_MANAGED;
+    unsigned int managed = 0;
+    void* managed_value = &managed;
+    if (real_pointer_attributes(1, &is_managed, &managed_value, pointer) == CUDA_SUCCESS && managed != 0) {
+      for (unsigned int i = 0; i < count; ++i) {
+        if (attributes[i] == CU_POINTER_ATTRIBUTE_MEMORY_TYPE) {
+          *static_cast<unsigned int*>(data[i]) = CU_MEMORYTYPE_HOST;
+        }
+      }
+    }
+  }
+  const void* const address = reinterpret_cast<const void*>(pointer);
+  if (address == nullptr ||
+      (address != calls->report_on_another_device && address != calls->report_reachable_on_another_device)) {
+    return result;
+  }
+  const bool reachable = address == calls->report_reachable_on_another_device;
+  for (unsigned int i = 0; i < count; ++i) {
+    if (attributes[i] == CU_POINTER_ATTRIBUTE_MEMORY_TYPE) {
+      *static_cast<unsigned int*>(data[i]) = CU_MEMORYTYPE_DEVICE;
+    } else if (attributes[i] == CU_POINTER_ATTRIBUTE_IS_MANAGED) {
+      *static_cast<unsigned int*>(data[i]) = 0;
+    } else if (attributes[i] == CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL) {
+      *static_cast<int*>(data[i]) += 1;
+    } else if (attributes[i] == CU_POINTER_ATTRIBUTE_DEVICE_POINTER && !reachable) {
+      // A reachable buffer keeps the driver's own answer, which has no address without a current context.
+      *static_cast<CUdeviceptr*>(data[i]) = 0;
+    }
+  }
+  return result;
+}
 } // namespace
 
 // Far above any id the driver hands out in one process, since it counts them up from 1.
@@ -172,6 +222,9 @@ cudaError_t __wrap_cudaGetDriverEntryPointByVersion(
   } else if (std::strcmp(name, "cuStreamWriteValue64") == 0) {
     real_write_value = reinterpret_cast<PFN_cuStreamWriteValue64_v11070>(*entry);
     *entry = reinterpret_cast<void*>(&failing_write_value);
+  } else if (std::strcmp(name, "cuPointerGetAttributes") == 0) {
+    real_pointer_attributes = reinterpret_cast<PFN_cuPointerGetAttributes_v7000>(*entry);
+    *entry = reinterpret_cast<void*>(&counting_pointer_attributes);
   }
   return result;
 }
@@ -220,8 +273,13 @@ cudaError_t __wrap_cudaMalloc(void** pointer, size_t bytes) {
 }
 
 cudaError_t __wrap_cudaFree(void* pointer) {
-  if (active_calls && pointer) {
-    ++active_calls->free_calls;
+  if (active_calls) {
+    if (pointer) {
+      ++active_calls->free_calls;
+      active_calls->frees.push_back(pointer);
+    } else {
+      ++active_calls->context_calls;
+    }
   }
   return __real_cudaFree(pointer);
 }

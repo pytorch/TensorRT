@@ -379,7 +379,14 @@ class StreamDrainOnEarlyReturn {
   StreamDrainOnEarlyReturn& operator=(const StreamDrainOnEarlyReturn&) = delete;
   ~StreamDrainOnEarlyReturn() {
     if (armed_) {
+      // Relaxed, so a global capture on another thread cannot refuse this wait and leave the call's work running. On
+      // the legacy default stream the capture refuses it in every mode.
+      cudaStreamCaptureMode mode = cudaStreamCaptureModeRelaxed;
+      const bool relaxed = cudaThreadExchangeStreamCaptureMode(&mode) == cudaSuccess;
       (void)cudaStreamSynchronize(stream_);
+      if (relaxed) {
+        (void)cudaThreadExchangeStreamCaptureMode(&mode);
+      }
       cudaGetLastError();
     }
   }
@@ -738,13 +745,8 @@ Error initialize_engine_io(EngineHandle& handle) {
   return Error::Ok;
 }
 
-// Called once the aliased outputs are known. Each reason replay stays off is logged, because a caller
-// who turned it on expects it.
+// Each reason replay stays off is logged, because a caller who turned it on expects it.
 void enable_cuda_graphs(EngineHandle& handle) {
-  if (handle.num_aliased_outputs > 0) {
-    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine with aliased outputs");
-    return;
-  }
   int memory_pools_supported = 0;
   if (cudaDeviceGetAttribute(&memory_pools_supported, cudaDevAttrMemoryPoolsSupported, handle.device_id) !=
       cudaSuccess) {
@@ -965,7 +967,8 @@ cudaError_t copy_to_row_major(void* dst, const exec_aten::Tensor& src, cudaStrea
   return cudaSuccess;
 }
 
-// What execute() needs to know about a buffer, from one cudaPointerGetAttributes per buffer.
+// What execute() needs to know about a buffer, from one cuPointerGetAttributes per buffer, or two for a buffer on
+// another GPU asked from a thread with no current context.
 struct BufferPlacement {
   // Device or managed memory.
   bool cuda_accessible = false;
@@ -973,26 +976,59 @@ struct BufferPlacement {
   int foreign_device = -1;
 };
 
-BufferPlacement placement_of(const void* ptr, int engine_device) {
+// Asks the driver for only these 4 attributes, which costs less than a cudaPointerGetAttributes and gives the same
+// answers, except on a thread with no current context: there a peer-mapped buffer on another GPU gets an address from
+// the engine's context and is accepted, where cudaPointerGetAttributes gives none. Plain host memory is not an error
+// here: it reads as memory type 0.
+BufferPlacement placement_of(const void* ptr, int engine_device, CUcontext engine_context) {
+  static const auto get_attributes =
+      driver_entry_point<PFN_cuPointerGetAttributes_v7000>("cuPointerGetAttributes", 7000);
   BufferPlacement placement;
-  if (ptr == nullptr) {
+  if (ptr == nullptr || get_attributes == nullptr) {
     return placement;
   }
-  cudaPointerAttributes attrs{};
-  // Let through: an older runtime reports plain host memory as an outright failure.
-  if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
-    cudaGetLastError();
+  unsigned int type = 0;
+  unsigned int managed = 0;
+  int device = -1;
+  CUdeviceptr device_pointer = 0;
+  CUpointer_attribute attributes[] = {
+      CU_POINTER_ATTRIBUTE_MEMORY_TYPE,
+      CU_POINTER_ATTRIBUTE_IS_MANAGED,
+      CU_POINTER_ATTRIBUTE_DEVICE_ORDINAL,
+      CU_POINTER_ATTRIBUTE_DEVICE_POINTER};
+  void* values[] = {&type, &managed, &device, &device_pointer};
+  if (get_attributes(4, attributes, values, reinterpret_cast<CUdeviceptr>(ptr)) != CUDA_SUCCESS) {
     return placement;
   }
-  placement.cuda_accessible = attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
-  // A non-null devicePointer is an address usable from here, which is the question. Asking instead
+  // Managed memory reads as device memory on most GPUs, and as host memory on a Jetson Orin.
+  placement.cuda_accessible = type == CU_MEMORYTYPE_DEVICE || managed != 0;
+  // A non-null device pointer is an address usable from here, which is the question. Asking instead
   // whether the two cards CAN reach each other answered yes on every pair measured and still faulted,
   // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
-  // once it is.
-  if (attrs.type == cudaMemoryTypeDevice && attrs.device != engine_device && attrs.devicePointer == nullptr) {
-    placement.foreign_device = attrs.device;
+  // once it is. Managed memory is never refused.
+  if (type == CU_MEMORYTYPE_DEVICE && managed == 0 && device != engine_device && device_pointer == 0) {
+    // The driver gives no address while no context is current, as on a thread that has made no CUDA call yet. So
+    // that case asks again from the engine's context, which is where a mapping to the other card is enabled.
+    static const auto get_current = driver_entry_point<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+    CUcontext current = nullptr;
+    if (engine_context != nullptr && get_current != nullptr && get_current(&current) == CUDA_SUCCESS &&
+        current == nullptr) {
+      ContextScope scope(engine_context, true);
+      CUpointer_attribute attribute = CU_POINTER_ATTRIBUTE_DEVICE_POINTER;
+      void* value = &device_pointer;
+      if (!scope.ok() || get_attributes(1, &attribute, &value, reinterpret_cast<CUdeviceptr>(ptr)) != CUDA_SUCCESS) {
+        device_pointer = 0;
+      }
+    }
+    if (device_pointer == 0) {
+      placement.foreign_device = device;
+    }
   }
   return placement;
+}
+
+bool has_sizes(const exec_aten::Tensor& tensor, const nvinfer1::Dims& dims) {
+  return tensor.dim() == dims.nbDims && std::equal(tensor.sizes().begin(), tensor.sizes().end(), dims.d);
 }
 
 // A caller's hold on one device's shared scratch: the device lock, plus the
@@ -2237,7 +2273,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
-    input_placements[i] = placement_of(et_in.const_data_ptr(), engine->device_id);
+    input_placements[i] = placement_of(et_in.const_data_ptr(), engine->device_id, engine->context);
     const int input_device = input_placements[i].foreign_device;
     if (input_device >= 0) {
       ET_LOG(
@@ -2296,8 +2332,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return profile_err;
   }
   // A new thread has no current context, and the device guard sets one only when it switches devices.
-  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set.
+  // cudaFree(nullptr) makes the primary context current. Graph replay, default streams and profile switches need
+  // a context on every call, and cuCtxGetCurrent costs a fraction of cudaFree(nullptr), so that runs only when
+  // cuCtxGetCurrent finds none.
   const auto make_context_current = [&engine]() -> Error {
+    static const auto get_current = driver_entry_point<PFN_cuCtxGetCurrent_v4000>("cuCtxGetCurrent", 4000);
+    CUcontext current = nullptr;
+    if (get_current != nullptr && get_current(&current) == CUDA_SUCCESS && current != nullptr) {
+      return Error::Ok;
+    }
     const cudaError_t err = cudaFree(nullptr);
     if (err == cudaSuccess) {
       return Error::Ok;
@@ -2448,6 +2491,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: inferShapes could not resolve %d tensor(s)", n_unresolved);
       return Error::InvalidState;
     }
+    engine->output_dims.resize(num_outputs);
+    for (size_t o = 0; o < num_outputs; ++o) {
+      engine->output_dims[o] = ctx->getTensorShape(engine->output_binding_names[o].c_str());
+    }
     engine->shapes_inferred = true;
   }
 
@@ -2520,7 +2567,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       // nbytes() below sizes both the reflect copy and ExecuTorch's write-back, so
       // the tensor has to carry the shape TRT inferred before either of them reads it.
-      nvinfer1::Dims a_dims = ctx->getTensorShape(name.c_str());
+      const nvinfer1::Dims& a_dims = engine->output_dims[o];
       if (a_dims.nbDims < 0 || a_dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
         ET_LOG(Error, "TensorRTBackend::execute: invalid rank for aliased output '%s'", name.c_str());
         return Error::InvalidState;
@@ -2529,11 +2576,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       for (int d = 0; d < a_dims.nbDims; ++d) {
         a_sizes[d] = static_cast<SizesType>(a_dims.d[d]);
       }
-      Error a_resize_err =
-          executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
-      if (a_resize_err != Error::Ok) {
-        ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
-        return a_resize_err;
+      if (!has_sizes(et_alias_out, a_dims)) {
+        Error a_resize_err =
+            executorch::runtime::resize_tensor(et_alias_out, {a_sizes, static_cast<size_t>(a_dims.nbDims)});
+        if (a_resize_err != Error::Ok) {
+          ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
+          return a_resize_err;
+        }
       }
       // Nothing to copy when the slot holds no bytes, which is a shape TensorRT inferred as empty
       // rather than a mistake, so it is skipped rather than refused.
@@ -2554,7 +2603,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       // The ordinary output path asks this and the aliased one did not, so a buffer on a card
       // this engine cannot reach was copied into rather than refused.
-      const int foreign_alias_device = placement_of(dst, engine->device_id).foreign_device;
+      const int foreign_alias_device = placement_of(dst, engine->device_id, engine->context).foreign_device;
       if (foreign_alias_device >= 0) {
         ET_LOG(
             Error,
@@ -2587,7 +2636,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidProgram;
     }
     // Asked separately, because an output address comes from the caller rather than the engine.
-    const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id);
+    const BufferPlacement output_placement = placement_of(et_out.const_data_ptr(), engine->device_id, engine->context);
     const int output_device = output_placement.foreign_device;
     if (output_device >= 0) {
       ET_LOG(
@@ -2602,8 +2651,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     // Update the ExecuTorch tensor shape to the actual TRT output shape.
-    // getTensorShape() is valid after inferShapes() has been called.
-    nvinfer1::Dims actual_dims = ctx->getTensorShape(name.c_str());
+    const nvinfer1::Dims& actual_dims = engine->output_dims[o];
     if (actual_dims.nbDims < 0 || actual_dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(Error, "TensorRTBackend::execute: invalid output rank for '%s'", name.c_str());
       return Error::InvalidState;
@@ -2616,7 +2664,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // 1-element 1-D shape, so resizing would be rejected. Skip it when the
     // element count already agrees.
     const bool scalar_output = et_out.dim() == 0 && actual_dims.nbDims == 1 && actual_dims.d[0] == 1;
-    if (!scalar_output) {
+    if (!scalar_output && !has_sizes(et_out, actual_dims)) {
       Error resize_err =
           executorch::runtime::resize_tensor(et_out, {new_sizes, static_cast<size_t>(actual_dims.nbDims)});
       if (resize_err != Error::Ok) {
@@ -2662,9 +2710,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   // TensorRT's enqueue can look up a default stream's context through the driver, and graph replay compares the
   // stream's context with the current one, and both fail while no context is current. Outside
-  // cudaStreamCaptureModeRelaxed a capture cannot take make_context_current, so it runs after the pooled capture
-  // refusal and the argument checks. Any earlier, it would fail first under a capture, hiding their error and
-  // invalidating the capture.
+  // cudaStreamCaptureModeRelaxed a capture cannot take the cudaFree(nullptr) that make_context_current makes on a
+  // thread with no current context, so it runs after the pooled capture refusal and the argument checks. Any
+  // earlier, it would fail first under a capture, hiding their error and invalidating the capture.
   if (engine->execution_graph || stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
     const Error context_err = make_context_current();
     if (context_err != Error::Ok) {
@@ -2811,12 +2859,16 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Returning with the guard still armed, so its destructor waits: a failed drain says nothing
     // about whether the work finished, and the staging buffers it may still be writing outlive
     // this call.
+    // Two lines, since ExecuTorch prints only the first 255 characters of each.
     ET_LOG(
         Error,
-        "TensorRTBackend::execute: the device reported '%s' while finishing this call. Usual causes, "
-        "in order: an input buffer shorter than its shape, storage freed while the call was running, "
-        "and an output address that is not writable.",
+        "TensorRTBackend::execute: the device reported '%s' while finishing this call.",
         cudaGetErrorString(cuda_err));
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: usual causes, in order: an input buffer shorter than its shape, storage freed "
+        "while the call was running, an output address that is not writable, and a CUDA graph capture on another "
+        "thread.");
     return Error::Internal;
   }
   if (hold_claim_until_finished && !scratch_claim.release()) {

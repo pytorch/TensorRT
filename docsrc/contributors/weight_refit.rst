@@ -50,20 +50,20 @@ efficiently copy new weights without traversing the full graph again.
 Compilation Modes
 ------------------
 
-Three engine modes are supported (controlled by ``make_refittable`` and
+Three engine modes are supported (controlled by ``immutable_weights`` and
 ``strip_engine_weights``):
 
 1. **Weightless + refittable** (``strip_engine_weights=True``,
-   ``make_refittable=True``) — engine stores only the computation graph;
+   ``immutable_weights=False``) — engine stores only the computation graph;
    weights are supplied at runtime via refit. Cache-friendly: the engine file
    is much smaller, and any engine is cacheable regardless of weight values.
 
-2. **Refittable with embedded weights** (``make_refittable=True``) — engine
+2. **Refittable with embedded weights** (``immutable_weights=False``) — engine
    stores both the computation graph and current weights. Refit replaces the
    embedded weights in-place (``kREFIT_IDENTICAL`` semantic in TensorRT).
 
-3. **Non-refittable** (legacy default) — weights are baked into the engine at
-   build time; no post-build updates are possible.
+3. **Non-refittable** (``immutable_weights=True``, the default) — weights are
+   baked into the engine at build time; no post-build updates are possible.
 
 User-Facing API
 ----------------
@@ -80,7 +80,11 @@ Refit a compiled ``torch.fx.GraphModule`` with weights from a new exported progr
 
     # Compile once
     exp_program = torch.export.export(model, inputs)
-    trt_gm = torch_tensorrt.dynamo.compile(exp_program, inputs=inputs)
+    trt_gm = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=inputs,
+        immutable_weights=False,
+    )
 
     # Later: update weights (e.g. different LoRA applied to model)
     new_model = MyModel()   # same architecture, different weights
@@ -158,7 +162,7 @@ Some ops cannot be refitted because TensorRT embeds their outputs as constants
 (e.g. ``aten.cumsum``, ``aten.embedding_bag``). Two options are available:
 
 * Keep engines refittable and fall back those ops to PyTorch.
-* Set ``make_refittable=False`` and rebuild the engine when weights change.
+* Set ``immutable_weights=True`` and rebuild the engine when weights change.
 
 Refit Caching Shortcut
 ^^^^^^^^^^^^^^^^^^^^^^^

@@ -266,7 +266,6 @@ def test_complex_partial_lowering_with_graph_break(use_decomp: bool) -> None:
         inputs=inputs,
         min_block_size=1,
         pass_through_build_failures=True,
-        use_python_runtime=True,
         use_complex_decomposition=use_decomp,
     )
     py_out = model(*inputs)

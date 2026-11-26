@@ -42,7 +42,7 @@ class TestEnableTRTFlags(TestCase):
             pass_through_build_failures=True,
             disable_tf32=True,
             sparse_weights=True,
-            refit=True,
+            immutable_weights=False,
             num_avg_timing_iters=5,
             workspace_size=1 << 10,
             truncate_double=True,

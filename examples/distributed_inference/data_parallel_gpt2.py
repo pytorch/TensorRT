@@ -42,7 +42,7 @@ model.forward = torch.compile(
     model.forward,
     backend="torch_tensorrt",
     options={
-        "truncate_long_and_double": True,
+        "truncate_double": True,
     },
     dynamic=False,
 )

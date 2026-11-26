@@ -69,9 +69,7 @@ compiled = torch_tensorrt.compile(
     ep,
     ir="dynamo",
     inputs=[cache_proto.clone(), update_proto.clone()],
-    enabled_precisions={torch.float32},
     min_block_size=1,
-    use_python_runtime=False,  # aliased I/O requires the C++ runtime
 )
 
 # %%

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import functools
 import importlib
 import os
 import sys
@@ -195,6 +196,7 @@ def needs_refit(f: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
+    @functools.wraps(f)
     def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
         if ENABLED_FEATURES.windows_cross_compile:
             return f(*args, **kwargs)

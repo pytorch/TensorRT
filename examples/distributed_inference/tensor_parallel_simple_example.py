@@ -19,11 +19,8 @@ Usage
 -----
 .. code-block:: bash
 
-   # JIT mode python runtime
-   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_cpp
-
-   # JIT mode cpp runtime
-   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit_python
+   # JIT mode
+   mpirun -n 2 python tensor_parallel_simple_example.py --mode jit
 
    WIP: Export and load mode
     mpirun -n 2 python tensor_parallel_simple_example.py --mode export --save-path /tmp/tp_model.ep
@@ -51,8 +48,8 @@ parser = argparse.ArgumentParser(description="Tensor Parallel Simple Example")
 parser.add_argument(
     "--mode",
     type=str,
-    choices=["jit_python", "jit_cpp", "export", "load"],
-    default="jit_python",
+    choices=["jit", "export", "load"],
+    default="jit",
 )
 parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
 args = parser.parse_args()
@@ -128,29 +125,12 @@ if args.mode == "load":
     assert (python_result - output).std() < 0.01, "Result mismatch"
     logger.info("Load successful!")
 
-elif args.mode == "jit_python":
+elif args.mode == "jit":
     trt_model = torch.compile(
         tp_model,
         backend="torch_tensorrt",
         options={
-            "truncate_long_and_double": True,
-            "use_python_runtime": True,
-            "min_block_size": 1,
-        },
-    )
-    output = trt_model(inp)
-    dist.barrier()
-
-    assert (python_result - output).std() < 0.01, "Result mismatch"
-    logger.info("JIT compile successful!")
-
-elif args.mode == "jit_cpp":
-    trt_model = torch.compile(
-        tp_model,
-        backend="torch_tensorrt",
-        options={
-            "truncate_long_and_double": True,
-            "use_python_runtime": False,
+            "truncate_double": True,
             "min_block_size": 1,
         },
     )
@@ -166,7 +146,6 @@ elif args.mode == "export":
         exported_program,
         inputs=[inp],
         truncate_double=True,
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
     )

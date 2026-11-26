@@ -45,7 +45,6 @@ class TestScalarEngineOutputs(TestCase):
             inputs=inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=False,
         )
         engines = [
             module for module in gm.modules() if isinstance(module, TorchTensorRTModule)

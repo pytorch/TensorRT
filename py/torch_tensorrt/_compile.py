@@ -61,6 +61,9 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo._compiler import (
         save_cross_compiled_exported_program as dynamo_save_cross_compiled_exported_program,
     )
+    from torch_tensorrt.dynamo._compiler import (
+        validate_compiler_kwargs,
+    )
     from torch_tensorrt.dynamo._defaults import default_device
     from torch_tensorrt.dynamo._tracer import (
         build_dim_registry,
@@ -85,6 +88,31 @@ __all__ = [
     "save",
     "load",
 ]
+
+
+def _reject_enabled_precisions_for_dynamo(
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]],
+) -> None:
+    if enabled_precisions is not None:
+        raise TypeError(
+            "`enabled_precisions` has been removed from Dynamo compilation. "
+            "Dynamo compilation is strongly typed and uses the "
+            "precisions in the model. Use the autocast options to change model "
+            "precision."
+        )
+
+
+def _prepare_dynamo_compiler_kwargs(
+    kwargs: Dict[str, Any],
+    compiler: Callable[..., Any],
+    *,
+    strip_strict: bool,
+) -> Dict[str, Any]:
+    compiler_kwargs = (
+        {k: v for k, v in kwargs.items() if k != "strict"} if strip_strict else kwargs
+    )
+    validate_compiler_kwargs(compiler_kwargs, compiler)
+    return compiler_kwargs
 
 
 def _has_executorch_exir() -> bool:
@@ -221,7 +249,7 @@ def compile(
                 ]
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
-        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Legacy FX-only option specifying the datatypes TensorRT may use when selecting kernels. Dynamo and ``torch_compile`` reject this option; express precision in the model or use the Dynamo autocast options instead.
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
@@ -250,12 +278,12 @@ def compile(
 
         if (
             torch.float16 in enabled_precisions_set
-            or torch_tensorrt.dtype.half in enabled_precisions_set
+            or dtype.half in enabled_precisions_set
         ):
             lower_precision = LowerPrecision.FP16
         elif (
             torch.float32 in enabled_precisions_set
-            or torch_tensorrt.dtype.float in enabled_precisions_set
+            or dtype.float in enabled_precisions_set
         ):
             lower_precision = LowerPrecision.FP32
         else:
@@ -277,6 +305,13 @@ def compile(
         )
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
+        _reject_enabled_precisions_for_dynamo(enabled_precisions)
+        compiler_kwargs = _prepare_dynamo_compiler_kwargs(
+            kwargs,
+            dynamo_compile,
+            strip_strict=module_type != _ModuleType.ep,
+        )
+
         # Prepare torch and torchtrt inputs
         if arg_inputs is None and inputs is None and not kwarg_inputs:
             raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
@@ -317,16 +352,17 @@ def compile(
         trt_graph_module = dynamo_compile(
             exp_program,
             arg_inputs=torchtrt_arg_inputs,
-            **kwargs,
+            **compiler_kwargs,
         )
         return trt_graph_module
     elif target_ir == _IRType.torch_compile:
+        _reject_enabled_precisions_for_dynamo(enabled_precisions)
         return torch_compile(module, **kwargs)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-@needs_cross_compile  # type: ignore[misc]
+@needs_cross_compile
 def cross_compile_for_windows(
     module: torch.nn.Module,
     file_path: str,
@@ -367,10 +403,17 @@ def cross_compile_for_windows(
                 ]
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
-        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Removed from the Dynamo frontend used by cross-compilation. Passing this option raises ``TypeError``; express precision in the model or use the Dynamo autocast options instead.
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     """
+
+    _reject_enabled_precisions_for_dynamo(enabled_precisions)
+    compiler_kwargs = _prepare_dynamo_compiler_kwargs(
+        kwargs,
+        dynamo_cross_compile_for_windows,
+        strip_strict=True,
+    )
 
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise RuntimeError(
@@ -414,7 +457,7 @@ def cross_compile_for_windows(
     trt_gm = dynamo_cross_compile_for_windows(
         exp_program,
         arg_inputs=torchtrt_arg_inputs,
-        **kwargs,
+        **compiler_kwargs,
     )
 
     dynamo_save_cross_compiled_exported_program(trt_gm, file_path)
@@ -473,7 +516,7 @@ def convert_method_to_trt_engine(
 
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
-        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Removed option. The Dynamo path rejects this option; express precision in the model or use the Dynamo autocast options instead.
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
     Returns:
@@ -499,6 +542,13 @@ def convert_method_to_trt_engine(
             "convert_method_to_trt_engine call is not supported for ir=fx"
         )
     elif target_ir == _IRType.dynamo:
+        _reject_enabled_precisions_for_dynamo(enabled_precisions)
+        compiler_kwargs = _prepare_dynamo_compiler_kwargs(
+            kwargs,
+            dynamo_convert_exported_program_to_serialized_trt_engine,
+            strip_strict=True,
+        )
+
         # Prepare torch and torchtrt inputs
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -529,7 +579,7 @@ def convert_method_to_trt_engine(
                 exp_program,
                 arg_inputs=tuple(normalized_arg_inputs),
                 kwarg_inputs=torchtrt_kwarg_inputs,
-                **kwargs,
+                **compiler_kwargs,
             ),
         )
     elif target_ir == _IRType.torch_compile:
@@ -983,8 +1033,11 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
+        assert arg_inputs is not None
         arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
+        kwarg_tensors = cast(
+            Dict[str, Any], get_torch_inputs(kwarg_inputs, default_device())
+        )
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects

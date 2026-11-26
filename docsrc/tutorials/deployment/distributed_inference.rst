@@ -206,9 +206,7 @@ Step 1: Export and Save
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=[input_ids],
-        use_explicit_typing=True,
         use_fp32_acc=True,
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
     )
@@ -587,7 +585,8 @@ Both APIs handle three engine storage patterns:
 * **torch.compile engines** — engines inside dynamo's code cache, tracked via
   a thread-local registry populated at engine creation time.
 
-For ``PythonTorchTensorRTModule`` (``use_python_runtime=True``), the group is
+When the automatically selected runtime produces a ``PythonTorchTensorRTModule``,
+the group is
 read lazily from the active context on the first forward call, so
 ``distributed_context`` (without the *module* argument) is sufficient — keep the
 context manager active for the duration of inference.
@@ -629,15 +628,6 @@ Compilation Settings for Distributed Workloads
        **Auto-enabled** for ``torch.compile`` when ``dist.is_initialized()`` and
        ``world_size > 1`` — no explicit flag needed. Must be set manually when using
        ``torch_tensorrt.dynamo.compile()`` directly (e.g. AOT export workflows).
-     - ``None`` (auto)
-     - ``False`` (C++ runtime) is recommended for production. The C++ runtime handles
-       NCCL via TRT's native ``DistCollective`` layers. The Python runtime uses
-       Python-level NCCL wrappers.
-   * - ``use_explicit_typing``
-     - ``True``
-     - Respect dtypes set in model/inputs (recommended). Use ``model.half()`` or
-       ``enable_autocast=True`` for lower-precision workloads. ``enabled_precisions``
-       is **deprecated** and must not be used alongside ``use_explicit_typing``.
    * - ``assume_dynamic_shape_support``
      - ``False``
      - Set to ``True`` for dynamic sequence lengths in LLM generation loops.
@@ -646,6 +636,9 @@ Compilation Settings for Distributed Workloads
      - Use FP32 accumulation for FP16 matmul layers. With
        ``decompose_attention=True``, keep the complete decomposed FP16 attention
        calculation in FP32 and cast only its final output back to FP16.
+
+The Dynamo path is always strongly typed: set precision through model/input dtypes
+(for example, ``model.half()``) or autocast. Runtime selection is automatic.
 
 ----
 
