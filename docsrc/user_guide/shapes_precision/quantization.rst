@@ -3,8 +3,8 @@
 Quantization (INT8 / FP8 / FP4)
 =================================
 
-Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**, and
-**FP4** precisions via NVIDIA's
+Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**,
+**FP4**, and **INT4 weight-only** precisions via NVIDIA's
 `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library, and
 **FP8 weight-only**, **static FP8**, **INT4 weight-only**, **NVFP4
 weight-only**, and **MXFP4** (``MXDynamicActivationMXWeightConfig``) via
@@ -365,7 +365,9 @@ When Torch-TensorRT encounters ``torch.ops.tensorrt.quantize_op.default`` nodes 
 graph (inserted by ModelOpt), the
 ``aten_ops_quantize_op`` converter maps them to TRT ``IQuantizeLayer`` /
 ``IDequantizeLayer`` pairs. The TRT builder then fuses these with adjacent compute layers
-(e.g. Conv, Linear) to produce INT8 or FP8 kernel variants.
+(e.g. Conv, Linear) to produce INT8 or FP8 kernel variants. An INT4 ``quantize_op`` on a
+constant matmul weight (ModelOpt INT4 weight-only) is quantized at build time instead, and
+becomes an INT4 constant with only an ``IDequantizeLayer``.
 
 For TorchAO weight-only graphs, ``torch.ops.torchao.dequantize_affine.default`` is
 mapped to ``IDequantizeLayer`` (weight constant stays FP8 or INT4, activations stay
