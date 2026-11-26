@@ -73,7 +73,7 @@ def quantize_read_by(node: torch.fx.Node) -> Optional[torch.fx.Node]:
     """Return the quantize whose result the dequantize node reads, or None."""
     if node.target not in QUANTIZED_DECOMPOSED_DEQUANTIZE_OPS:
         return None
-    source = node.args[0]
+    source = node.args[0] if node.args else node.kwargs.get("input")
     if (
         isinstance(source, torch.fx.Node)
         and source.target in QUANTIZED_DECOMPOSED_QUANTIZE_OPS

@@ -408,6 +408,46 @@ class TestHierarchicalAdjacencyPartitioning(TestCase):
             in_graph_order[qd.dequantize_per_tensor.default],
         )
 
+    @unittest.skipIf(
+        not impl.quantize.QUANTIZED_DECOMPOSED_QUANTIZE_OPS,
+        "torch.ao.quantization.fx._decomposed is not available",
+    )
+    def test_dequantize_with_its_input_as_a_keyword_runs_in_pytorch(self):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_CONVERTERS as CONVERTERS,
+        )
+
+        qd = torch.ops.quantized_decomposed
+
+        class KeywordDequantize(torch.nn.Module):
+            def forward(self, x):
+                q = qd.quantize_per_tensor.default(x, 0.1, 0, -128, 127, torch.int8)
+                return qd.dequantize_per_tensor.default(
+                    input=q,
+                    scale=0.1,
+                    zero_point=0,
+                    quant_min=-128,
+                    quant_max=127,
+                    dtype=torch.int8,
+                )
+
+        # torch.fx.symbolic_trace keeps the keywords, which the converters do not read.
+        CONVERTERS.set_compilation_settings(CompilationSettings())
+        partitioned_graph, _ = partitioning.hierarchical_adjacency_partition(
+            torch.fx.symbolic_trace(KeywordDequantize()), min_block_size=1
+        )
+        blocks = {
+            node.target: name
+            for name, block in partitioned_graph.named_children()
+            for node in block.graph.nodes
+        }
+        self.assertIn("_run_on_gpu", blocks[qd.dequantize_per_tensor.default])
+        self.assertEqual(
+            blocks[qd.quantize_per_tensor.default],
+            blocks[qd.dequantize_per_tensor.default],
+        )
+
 
 if __name__ == "__main__":
     run_tests()
