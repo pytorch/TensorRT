@@ -328,16 +328,10 @@ def pre_export_lowering(
         # Autocast inserts casts and changes the dtypes of nodes, so it works on a
         # copy, and the caller's program stays as it was.
         ep = _copy_program(ep)
-        # Refit reuses the precisions that the weights chose at compile time.
-        if (
-            settings.autocast_low_precision_type is not None
-            and settings._autocast_constant_range_nodes is None
-        ):
-            record_weight_magnitudes(ep)
         # Without a low precision type autocast changes nothing, so the regions keep
-        # theirs. Inlining comes before calibration, so that it records the values of
-        # the inlined ops. Like inlining, the message about kept regions reads the graph
-        # before the later passes change it.
+        # theirs. Inlining comes before calibration and the weight magnitudes, so that
+        # they cover the inlined ops. Like inlining, the message about kept regions
+        # reads the graph before the later passes change it.
         low_precision_type = settings.autocast_low_precision_type
         if isinstance(low_precision_type, dtype):
             low_precision_type = low_precision_type.to(torch.dtype)
@@ -350,6 +344,12 @@ def pre_export_lowering(
                 include_disabled=mode == "reclassify_all",
                 low_precision_type=low_precision_type,
             )
+        # Refit reuses the precisions that the weights chose at compile time.
+        if (
+            settings.autocast_low_precision_type is not None
+            and settings._autocast_constant_range_nodes is None
+        ):
+            record_weight_magnitudes(ep)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "

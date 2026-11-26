@@ -10,6 +10,7 @@ import re
 from typing import Any, Collection, Iterator, Optional
 
 import torch
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
@@ -30,7 +31,8 @@ from .pass_utils import (
 
 logger = logging.getLogger(__name__)
 
-# The largest magnitude of the finite values of a weight, on its placeholder.
+# The largest magnitude of the finite values of a weight, on its placeholder, or of a
+# value that the graph computes from weights, on its node.
 WEIGHT_MAGNITUDE = "_torch_tensorrt_weight_magnitude"
 # When that magnitude is the limit of its type, as for an attention mask of
 # torch.finfo(torch.float32).min, the largest magnitude of the other finite values.
@@ -55,6 +57,25 @@ _PLACED_ARGUMENTS = {
     torch.ops.aten.copy_.default: ("src",),
     torch.ops.aten.scaled_dot_product_attention.default: ("attn_mask",),
 }
+
+_FILLS = (
+    torch.ops.aten.full.default,
+    torch.ops.aten.full_like.default,
+    torch.ops.aten.new_full.default,
+)
+
+# Ops whose values are uninitialized memory, so they cannot be measured.
+_EMPTIES = (
+    torch.ops.aten.empty,
+    torch.ops.aten.empty_like,
+    torch.ops.aten.empty_permuted,
+    torch.ops.aten.empty_strided,
+    torch.ops.aten.new_empty,
+    torch.ops.aten.new_empty_strided,
+)
+
+# The floating point types whose values can be above the float16 range.
+_WIDE_TYPES = (torch.bfloat16, torch.float32, torch.float64)
 
 
 def _dtype(node: torch.fx.Node) -> Optional[torch.dtype]:
@@ -150,6 +171,45 @@ def _is_written(nodes: list[torch.fx.Node], by_several: bool = False) -> bool:
     )
 
 
+def _overflow(dtype: torch.dtype) -> float:
+    """The smallest magnitude that rounds to inf in dtype: half a unit in the last place
+    above its largest value, 65520 for float16."""
+    finfo = torch.finfo(dtype)
+    return finfo.max + 2 ** (math.frexp(finfo.max)[1] - 2) * finfo.eps
+
+
+def _numbers(node: torch.fx.Node) -> Iterator[tuple[str, float]]:
+    """The numbers node is given for a Tensor or a Scalar, such as the 1e6 of x / 1e6,
+    and not ints such as a dim or the end of a slice."""
+    if not isinstance(node.target, torch._ops.OpOverload):
+        return
+    for i, arg in enumerate(node.target._schema.arguments):
+        value = node.args[i] if i < len(node.args) else node.kwargs.get(arg.name)
+        arg_type = arg.type
+        if isinstance(arg_type, torch.OptionalType):
+            arg_type = arg_type.getElementType()
+        if (
+            isinstance(arg_type, (torch.TensorType, torch.NumberType))
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ):
+            yield arg.name, value
+
+
+def _largest_finite_magnitude(tensor: torch.Tensor) -> Optional[float]:
+    # aminmax reads the tensor once without a copy, but gives NaN for a tensor with a
+    # NaN and inf for one with an inf, which do not overflow.
+    low, high = torch.aminmax(tensor.detach())
+    magnitude = torch.maximum(-low, high).item()
+    if not math.isfinite(magnitude):
+        finite = tensor.detach()[tensor.detach().isfinite()]
+        if not finite.numel():
+            return None
+        low, high = torch.aminmax(finite)
+        magnitude = torch.maximum(-low, high).item()
+    return magnitude
+
+
 def _unmasked_magnitude(tensor: torch.Tensor) -> float:
     """The largest magnitude of the finite values of tensor below the limit of its type,
     or 0."""
@@ -158,10 +218,30 @@ def _unmasked_magnitude(tensor: torch.Tensor) -> float:
     return magnitudes.max().item() if magnitudes.numel() else 0.0
 
 
+def _is_computable(node: torch.fx.Node) -> bool:
+    """Whether node is an ATen op that makes one nonempty tensor of a type in _WIDE_TYPES
+    from its inputs alone, without writing into them, drawing random numbers or leaving
+    memory uninitialized."""
+    return (
+        isinstance(node.target, torch._ops.OpOverload)
+        and node.target.namespace == "aten"
+        and node.target.overloadpacket not in _EMPTIES
+        and not node.target._schema.is_mutable
+        and torch.Tag.maybe_aliasing_or_mutating not in node.target.tags
+        and torch.Tag.nondeterministic_seeded not in node.target.tags
+        and isinstance(node.meta.get("val"), torch.Tensor)
+        and node.meta["val"].dtype in _WIDE_TYPES
+        and statically_known_true(node.meta["val"].numel() > 0)
+    )
+
+
 def record_weight_magnitudes(ep: torch.export.ExportedProgram) -> None:
     """Record the largest magnitude of the finite values of each weight on its
     placeholder, for ConstantRangeRule. Only bfloat16, float32 and float64 weights
-    count. A buffer that the program writes into is not a constant."""
+    count. A buffer that the program writes into is not a constant. Values that the
+    graph computes from weights and numbers alone are constants too, and the magnitude
+    of those with an input or a number above the float16 range is recorded on their
+    node."""
     signature = ep.graph_signature
     names = {
         **signature.inputs_to_parameters,
@@ -169,6 +249,7 @@ def record_weight_magnitudes(ep: torch.export.ExportedProgram) -> None:
         **signature.inputs_to_lifted_tensor_constants,
     }
     written = set(signature.buffers_to_mutate.values())
+    values: dict[torch.fx.Node, torch.Tensor] = {}
     for node in ep.graph.find_nodes(op="placeholder"):
         name = names.get(node.name)
         tensor = ep.state_dict.get(name, ep.constants.get(name))
@@ -178,26 +259,69 @@ def record_weight_magnitudes(ep: torch.export.ExportedProgram) -> None:
             not node.users
             or name in written
             or type(tensor) not in (torch.Tensor, torch.nn.Parameter)
-            or tensor.dtype not in (torch.bfloat16, torch.float32, torch.float64)
+            or tensor.dtype not in _WIDE_TYPES
             or tensor.layout != torch.strided
             or tensor.is_meta
             or not tensor.numel()
             or _is_written(_sharing(node))
         ):
             continue
-        # aminmax reads the weight once without a copy, but gives NaN for a weight
-        # with a NaN and inf for one with an inf, which do not overflow.
-        low, high = torch.aminmax(tensor.detach())
-        magnitude = torch.maximum(-low, high).item()
-        if not math.isfinite(magnitude):
-            finite = tensor.detach()[tensor.detach().isfinite()]
-            if not finite.numel():
+        values[node] = tensor.detach()
+        magnitude = _largest_finite_magnitude(tensor)
+        if magnitude is not None:
+            node.meta[WEIGHT_MAGNITUDE] = magnitude
+            if magnitude >= torch.finfo(tensor.dtype).max:
+                node.meta[UNMASKED_MAGNITUDE] = _unmasked_magnitude(tensor)
+
+    # A value such as the running_var + eps of torchvision's FrozenBatchNorm2d, or
+    # torch.full((), 1e6), is above the range even when the op that makes it runs in
+    # FP32, so its users, such as the rsqrt, need its magnitude too.
+    # constant_fold folds these values later, so computing them here costs no runtime.
+    def value(node: torch.fx.Node) -> Any:
+        if node not in values:
+            values[node] = node.target(
+                *torch.fx.node.map_arg(node.args, value),
+                **torch.fx.node.map_arg(node.kwargs, value),
+            )
+        return values[node]
+
+    overflow = _overflow(torch.float16)
+    constants = set(values)
+    for node in ep.graph.nodes:
+        if node.target in _FILLS and _is_computable(node):
+            # The magnitude of a fill is its value, so it is not computed itself. That
+            # also covers torch.full_like(x, 1e6) and a torch.full of a dynamic size.
+            for _, fill_value in _numbers(node):
+                if math.isfinite(fill_value):
+                    node.meta[WEIGHT_MAGNITUDE] = abs(fill_value)
+        if (
+            node.op != "call_function"
+            or not _is_computable(node)
+            or not all(n in constants for n in node.all_input_nodes)
+            or _is_written(_sharing(node))
+        ):
+            continue
+        constants.add(node)
+        if WEIGHT_MAGNITUDE not in node.meta and (
+            any(
+                n.meta.get(WEIGHT_MAGNITUDE, 0) >= overflow
+                for n in node.all_input_nodes
+            )
+            or any(math.isfinite(v) and abs(v) >= overflow for _, v in _numbers(node))
+        ):
+            try:
+                with torch.no_grad():
+                    tensor = value(node)
+                    magnitude = _largest_finite_magnitude(tensor)
+            except (RuntimeError, NotImplementedError) as e:
+                # The check must not fail a compile, for example when a weight was
+                # moved to another device than a factory op in the graph.
+                logger.warning(f"Cannot compute {node.name} to check its users: {e}")
                 continue
-            low, high = torch.aminmax(finite)
-            magnitude = torch.maximum(-low, high).item()
-        node.meta[WEIGHT_MAGNITUDE] = magnitude
-        if magnitude >= torch.finfo(tensor.dtype).max:
-            node.meta[UNMASKED_MAGNITUDE] = _unmasked_magnitude(tensor)
+            if magnitude is not None:
+                node.meta[WEIGHT_MAGNITUDE] = magnitude
+                if magnitude >= torch.finfo(tensor.dtype).max:
+                    node.meta[UNMASKED_MAGNITUDE] = _unmasked_magnitude(tensor)
 
 
 class NodeRuleBase:
@@ -371,10 +495,7 @@ class ConstantRangeRule(NodeRuleBase):
         Args:
             low_precision_type: The type that autocast would cast the constants to.
         """
-        finfo = torch.finfo(low_precision_type)
-        # Half a unit in the last place above the largest value: the smallest magnitude
-        # that rounds to inf, 65520 for float16.
-        self.overflow = finfo.max + 2 ** (math.frexp(finfo.max)[1] - 2) * finfo.eps
+        self.overflow = _overflow(low_precision_type)
         self.low_precision_type = low_precision_type
         self.constant: Optional[tuple[str, float]] = None
         self.kept: set[str] = set()
@@ -395,11 +516,13 @@ class ConstantRangeRule(NodeRuleBase):
         for n in node.all_input_nodes:
             is_placed = n in placed
             # A view such as weight.t(), a chunk of a weight, and a copy such as the
-            # lift_fresh_copy of torch.tensor(1e6), have the values of the weight. A
-            # cast that changes the type, such as mask.half(), makes a copy in that
+            # lift_fresh_copy of torch.tensor(1e6), have the values of the weight,
+            # unless the magnitude of their own values was computed, as for a slice.
+            # A cast that changes the type, such as mask.half(), makes a copy in that
             # type, so a write into it must not run in FP32.
             while (
-                (_shares_an_input(n) or n.target in (operator.getitem, *_COPIES))
+                WEIGHT_MAGNITUDE not in n.meta
+                and (_shares_an_input(n) or n.target in (operator.getitem, *_COPIES))
                 and isinstance(n.args[0], torch.fx.Node)
                 and _dtype(n.args[0]) == _dtype(n)
             ):
@@ -413,21 +536,7 @@ class ConstantRangeRule(NodeRuleBase):
                 magnitude = n.meta.get(UNMASKED_MAGNITUDE)
             if magnitude is not None:
                 yield n.name, magnitude
-        if not isinstance(node.target, torch._ops.OpOverload):
-            return
-        for i, arg in enumerate(node.target._schema.arguments):
-            value = node.args[i] if i < len(node.args) else node.kwargs.get(arg.name)
-            arg_type = arg.type
-            if isinstance(arg_type, torch.OptionalType):
-                arg_type = arg_type.getElementType()
-            # A number given for a Tensor or a Scalar, not an int such as a dim or the
-            # end of a slice.
-            if (
-                isinstance(arg_type, (torch.TensorType, torch.NumberType))
-                and isinstance(value, (int, float))
-                and not isinstance(value, bool)
-            ):
-                yield arg.name, value
+        yield from _numbers(node)
 
     def _first_constant(
         self, nodes: list[torch.fx.Node]
@@ -511,6 +620,10 @@ class ConstantRangeRule(NodeRuleBase):
             # that keeps a node, so this rule does not see an op that another rule
             # keeps in FP32. A factory op such as torch.full, or an op given a dtype
             # such as w.float(), is never cast.
+            return False
+        if not _reads_tensors(node):
+            # Autocast does not cast a factory op such as torch.full((), 1e6), and its
+            # users read the value it makes.
             return False
         if (
             _has_no_floating_point_tensors(node)

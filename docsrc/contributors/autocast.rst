@@ -78,10 +78,13 @@ following rules fire:
 * It reads a floating point weight or a number such as the ``1e6`` of ``x / 1e6``,
   with a finite value that becomes ``inf`` in the low precision type, such as a
   BatchNorm running variance of ``1e6`` in fp16. ``NaN`` and ``inf`` constants
-  stay as they are, so they do not count.
-  A mask tensor whose largest finite magnitude is the limit of its type, such
-  as ``torch.finfo(torch.float32).min``, does not count when an op only
-  places it in its output, as ``torch.where``, ``masked_fill``,
+  stay as they are, so they do not count. A value that the graph computes from
+  constants alone, with an input or a number above the float16 range, is a
+  constant too, such as the ``(running_var + eps).rsqrt()`` of a frozen
+  BatchNorm, and so is ``torch.full_like(x, 1e6)``, which reads only the shape
+  of ``x``. A mask tensor whose largest finite magnitude is the limit of its
+  type, such as ``torch.finfo(torch.float32).min``, does not count when an op
+  only places it in its output, as ``torch.where``, ``masked_fill``,
   ``index_put`` without ``accumulate=True``, ``fill_`` and ``copy_`` do, or
   when ``scaled_dot_product_attention`` adds it to its scores as
   ``attn_mask``: such a value stands for infinity and becomes ``-inf``, as it
@@ -125,7 +128,11 @@ following rules fire:
   type for all the tensors it takes, so this rule does not keep an op that
   such a block may write into while it also takes other tensors.
   Not covered yet: an integer weight, such as an int64 buffer of ``100000``; a
-  number or a computed value used inside a ``torch.no_grad()`` block, which
+  value computed from constants that all fit, such as ``x / w.sum()`` with 1000
+  weights of ``100``; a value computed from a chunk of a constant, such as
+  ``(var + eps).rsqrt()`` after ``mean, var = stats.unbind(0)``, or from a fill
+  that reads a tensor or a dynamic size, such as ``torch.full_like(x, 1e6) + 1``;
+  a number or a computed value used inside a ``torch.no_grad()`` block, which
   export keeps as one node; a view of an op that another rule keeps in fp32; a
   list writer such as ``_foreach_mul_`` that writes into a float16 tensor and
   reads such a constant, which it gets in float16; a list of numbers, such as
