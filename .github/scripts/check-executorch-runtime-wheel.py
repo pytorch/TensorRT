@@ -34,18 +34,21 @@ _UNPINNED_DISTRIBUTIONS = ("torch",)
 # exact build, so the comparison is on the leading release components the pin actually spells.
 _REPOSITORY_PIN = {
     "tensorrt-cu13": "__tensorrt_version__",
+    "tensorrt-rtx-cu13": "__tensorrt_rtx_version__",
     "nvidia-cuda-runtime": "__cuda_version__",
 }
 
 
-def check_windows_dependencies(native: Path) -> None:
+def check_windows_dependencies(
+    native: Path, engine_dll: str = "nvinfer_11.dll"
+) -> None:
     direct = subprocess.check_output(
         ["dumpbin", "/DEPENDENTS", str(native)], text=True
     ).lower()
     required = (
         "executorch.dll",
         "executorch_extension_cuda.dll",
-        "nvinfer_11.dll",
+        engine_dll,
     )
     for dependency in required:
         if dependency not in direct:
@@ -78,20 +81,33 @@ def main() -> None:
             getattr(target, "id", None) == "DELEGATE_LIBRARY" for target in node.targets
         )
     ]
+    wheel_name = parse_wheel_filename(args.wheel.name)[0]
+    rtx = wheel_name == "torch-tensorrt-executorch-rtx-runtime"
+    package = (
+        "torch_tensorrt_executorch_rtx_runtime"
+        if rtx
+        else "torch_tensorrt_executorch_runtime"
+    )
+    cmake_package = (
+        "executorch_backend_tensorrt_rtx" if rtx else "executorch_backend_tensorrt"
+    )
+    engine_distribution = "tensorrt-rtx-cu13" if rtx else "tensorrt-cu13"
     windows = args.platform == "windows"
     if windows:
         if args.architecture != "x86_64":
             reject("Windows ExecuTorch supports x86_64 only")
         library = "executorch_backend_tensorrt.dll"
-    linked_distributions = (
-        ("executorch", "tensorrt-cu13") if windows else _LINKED_DISTRIBUTIONS
-    )
+    if rtx:
+        library = library.replace("tensorrt", "tensorrt_rtx")
+    linked_distributions: tuple[str, ...] = ("executorch", engine_distribution)
+    if not windows:
+        linked_distributions += ("nvidia-cuda-runtime",)
     with WheelFile(args.wheel) as archive:
         names = archive.namelist()
         objects = sorted(
             name for name in names if re.search(r"\.(?:so(?:\.\d+)*|dll|pyd)$", name)
         )
-        expected = f"torch_tensorrt_executorch_runtime/lib/{library}"
+        expected = f"{package}/lib/{library}"
         if objects != [expected]:
             reject(f"expected {expected} and no other shared libraries, got {objects}")
         # The platform tag is a claim about the payload, and until now nothing read the payload
@@ -110,16 +126,21 @@ def main() -> None:
             machine = int.from_bytes(payload[pe_offset + 4 : pe_offset + 6], "little")
             if machine != 0x8664:
                 reject(f"{expected} has PE machine {hex(machine)}, expected x86_64")
-            import_library = (
-                "torch_tensorrt_executorch_runtime/lib/executorch_backend_tensorrt.lib"
-            )
+            import_library = f"{package}/lib/{cmake_package}.lib"
             imports = sorted(name for name in names if name.endswith(".lib"))
             if imports != [import_library]:
                 reject(f"expected only the delegate import library, got {imports}")
             with tempfile.TemporaryDirectory() as directory:
                 native = Path(directory) / library
                 native.write_bytes(payload)
-                check_windows_dependencies(native)
+                engine_dll = "nvinfer_11.dll"
+                if rtx:
+                    pin = yaml.safe_load((root / "dev_dep_versions.yml").read_text())[
+                        "__tensorrt_rtx_version__"
+                    ]
+                    major, minor = str(pin).split(".")[:2]
+                    engine_dll = f"tensorrt_rtx_{major}_{minor}.dll"
+                check_windows_dependencies(native, engine_dll)
                 exports = subprocess.check_output(
                     ["dumpbin", "/EXPORTS", str(native)], text=True
                 )
@@ -142,13 +163,10 @@ def main() -> None:
                 f"{args.architecture}"
             )
         for filename in (
-            "executorch_backend_tensorrt-config.cmake",
-            "executorch_backend_tensorrt-config-version.cmake",
+            f"{cmake_package}-config.cmake",
+            f"{cmake_package}-config-version.cmake",
         ):
-            if (
-                f"torch_tensorrt_executorch_runtime/lib/cmake/executorch_backend_tensorrt/{filename}"
-                not in names
-            ):
+            if f"{package}/lib/cmake/{cmake_package}/{filename}" not in names:
                 reject(f"the wheel ships no CMake package: {filename} is missing")
         forbidden = [
             name
@@ -167,7 +185,11 @@ def main() -> None:
             reject(f"the wheel ships ExecuTorch runtime components: {forbidden}")
 
         name, version, _, tags = parse_wheel_filename(args.wheel.name)
-        if name != "torch-tensorrt-executorch-runtime":
+        if name != (
+            "torch-tensorrt-executorch-rtx-runtime"
+            if rtx
+            else "torch-tensorrt-executorch-runtime"
+        ):
             reject(f"unexpected distribution: {name}")
         # The floors differ by architecture. The Arm build container carries no devtoolset, so the
         # C++ runtime symbols the delegate references are not absorbed statically the way they are
@@ -211,7 +233,7 @@ def main() -> None:
                     f"the wheel pins {matched[0]}, but {name} is required unbounded so the user "
                     "chooses it"
                 )
-        for forbidden_distribution in ("torch-tensorrt",):
+        for forbidden_distribution in ("torch-tensorrt", "torch-tensorrt-rtx"):
             present = [
                 r
                 for r in requirements

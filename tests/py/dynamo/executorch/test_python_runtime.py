@@ -974,3 +974,20 @@ def test_the_documented_path_recipes_run_without_a_loadable_delegate(tmp_path):
         )
         assert plain.returncode != 0, plain.stdout
         assert "DelegateCompatibilityError" in plain.stderr, plain.stderr
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_rtx_package_has_distinct_registration_and_library(monkeypatch, platform):
+    monkeypatch.setenv(SKIP_ENV, "1")
+    monkeypatch.setattr(sys, "platform", platform)
+    spec = importlib.util.spec_from_file_location(
+        "torch_tensorrt_executorch_rtx_runtime", DELEGATE_PATH
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.BACKEND_NAME == "TensorRTRTXBackend"
+    assert module._DELEGATE_LIBRARY == (
+        "executorch_backend_tensorrt_rtx.dll"
+        if platform == "win32"
+        else "libexecutorch_backend_tensorrt_rtx.so"
+    )

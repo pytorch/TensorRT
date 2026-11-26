@@ -126,6 +126,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
       use-rtx: true
+      build-executorch-runtime: true
       is-release-wheel: true
       architecture: "aarch64"
 

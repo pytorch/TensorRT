@@ -125,6 +125,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
       use-rtx: true
+      build-executorch-runtime: true
       is-release-wheel: true
 concurrency:
   group: ${{ github.workflow }}-x86_64-release-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}-rtx

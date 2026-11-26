@@ -1033,7 +1033,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     # setup.py has to actually ship both files, and put the library where the config looks.
     setup_text = (package_dir / "setup.py").read_text(encoding="utf-8")
     for fragment in (
-        "lib/cmake/executorch_backend_tensorrt/*.cmake",
+        "lib/cmake/{CMAKE_PACKAGE}/*.cmake",
         "lib/{DELEGATE_LIBRARY}",
     ):
         assert (
@@ -1045,14 +1045,14 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     # consumer fails at find_package. Asserting the path components rather than a joined string,
     # since setup.py builds it with pathlib.
     assert re.search(
-        r'cmake_dir\s*=\s*package_dir\s*/\s*"lib"\s*/\s*"cmake"\s*/\s*"executorch_backend_tensorrt"',
+        r'cmake_dir\s*=\s*package_dir\s*/\s*"lib"\s*/\s*"cmake"\s*/\s*CMAKE_PACKAGE',
         setup_text,
     ), (
         "setup.py writes the CMake package somewhere other than lib/cmake/executorch_backend_tensorrt, so "
         "it no longer agrees with the path package_data collects and the wheel would ship no "
         "CMake package"
     )
-    assert "executorch_backend_tensorrt-config-version.cmake" in setup_text, (
+    assert "{CMAKE_PACKAGE}-config-version.cmake" in setup_text, (
         "setup.py writes no version file, so find_package(executorch_backend_tensorrt 2.15) would match "
         "any version at all"
     )
@@ -2134,6 +2134,8 @@ def test_cmake_version_uses_the_companion_distribution(tmp_path, requested):
     )
     namespace = {
         "build_py": object,
+        "CMAKE_PACKAGE": "executorch_backend_tensorrt",
+        "USE_RTX": False,
         "pathlib": pathlib,
         "shutil": shutil,
         "re": re,
@@ -3218,6 +3220,8 @@ def _elf_object(architecture: str) -> bytes:
     "case,should_pass",
     [
         ("well_formed", True),
+        ("well_formed_rtx", True),
+        ("rtx_with_standard_dependency", False),
         ("aarch64_tag", True),
         # A wheel for PyPI has no label, and its ExecuTorch requirement must not have one either.
         ("pypi_release", True),
@@ -3499,6 +3503,45 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
                 + f"Version: {wheel_version}\n"
                 + "".join(f"Requires-Dist: {r}\n" for r in requires),
             )
+
+    if case in {"well_formed_rtx", "rtx_with_standard_dependency"}:
+        import zipfile
+
+        rtx_version = _pin("__tensorrt_rtx_version__")
+        info = tmp_path / f"tensorrt_rtx_cu13-{rtx_version}.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: tensorrt-rtx-cu13\nVersion: {rtx_version}\n"
+        )
+        rtx_wheel = wheel.with_name(
+            wheel.name.replace("executorch_runtime", "executorch_rtx_runtime")
+        )
+        with zipfile.ZipFile(wheel) as source, WheelFile(rtx_wheel, "w") as destination:
+            for filename in source.namelist():
+                if filename.endswith("/RECORD"):
+                    continue
+                data = source.read(filename)
+                if filename.endswith("/METADATA"):
+                    text = data.decode().replace(
+                        "torch-tensorrt-executorch-runtime",
+                        "torch-tensorrt-executorch-rtx-runtime",
+                    )
+                    if case == "well_formed_rtx":
+                        text = re.sub(
+                            r"tensorrt-cu13==[^\n]+",
+                            f"tensorrt-rtx-cu13=={rtx_version}",
+                            text,
+                        )
+                    data = text.encode()
+                filename = filename.replace(
+                    "torch_tensorrt_executorch_runtime",
+                    "torch_tensorrt_executorch_rtx_runtime",
+                )
+                filename = filename.replace(
+                    "executorch_backend_tensorrt", "executorch_backend_tensorrt_rtx"
+                )
+                destination.writestr(filename, data)
+        wheel = rtx_wheel
 
     completed = subprocess.run(
         [sys.executable, str(checker), str(wheel), "--architecture", arch],

@@ -578,6 +578,7 @@ def _published_extras(
     release: bool = True,
     channel: str | None = "nightly",
     executorch_version: str | None = None,
+    rtx: bool = False,
 ) -> dict:
     """Run setup.py's companion requirement block with what the workflow named.
 
@@ -606,6 +607,7 @@ def _published_extras(
         "__executorch_version__": executorch_version
         or _versions()["__executorch_version__"],
         "RELEASE": release,
+        "USE_TRT_RTX": rtx,
         "EXECUTORCH_REQUIREMENT": requirement,
         "EXTRAS_REQUIRE": {"executorch": [requirement], "all": [requirement]},
     }
@@ -1165,6 +1167,7 @@ def _utils_namespace(
     platform: str = "linux",
     machine: str = "x86_64",
     recorded: dict | None = None,
+    rtx: bool = False,
 ) -> dict:
     """Execute the real helpers without importing their torch and TensorRT dependencies.
 
@@ -1175,6 +1178,8 @@ def _utils_namespace(
     wanted = {
         "_build_record",
         "_executorch_index_options",
+        "_executorch_uses_rtx",
+        "_executorch_companion_distribution",
         "executorch_install_channel",
         "executorch_install_command",
         "executorch_runtime_install_command",
@@ -1213,7 +1218,14 @@ def _utils_namespace(
     namespace: dict[str, object] = {
         "torch": type("torch", (), {"version": _Version}),
         # Match the platform and architecture consulted by the support helper.
-        "sys": type("sys", (), {"platform": platform}),
+        "sys": types.SimpleNamespace(
+            platform=platform,
+            modules={
+                "torch_tensorrt._features": types.SimpleNamespace(
+                    ENABLED_FEATURES=types.SimpleNamespace(tensorrt_rtx=rtx)
+                )
+            },
+        ),
         "platform": types.SimpleNamespace(
             system=lambda: {"linux": "Linux", "win32": "Windows", "darwin": "Darwin"}[
                 platform
@@ -3372,3 +3384,30 @@ def test_every_requirement_file_install_names_both_executorch_channels():
     assert _git(
         "grep", "-lI", "-e", "-r packaging/executorch_"
     ).strip(), "no requirement-file install found, so this test is not looking"
+
+
+@pytest.mark.unit
+def test_rtx_install_guidance_names_matching_companion():
+    namespace = _utils_namespace(
+        "13.4",
+        rtx=True,
+        recorded={"__executorch_runtime_version__": "0.3.0+cu134"},
+    )
+    command = namespace["executorch_runtime_install_command"]()
+    assert "torch-tensorrt-executorch-rtx-runtime==0.3.0+cu134" in command
+    command = namespace["executorch_install_command"]()
+    assert "torch_tensorrt_rtx[executorch]" in command
+    assert "torch-tensorrt-executorch-rtx-runtime==0.3.0+cu134" in command
+
+
+@pytest.mark.unit
+def test_rtx_published_extra_requires_matching_companion(monkeypatch):
+    extras = _published_extras(monkeypatch, "0.3.0.dev20261126+cu134", rtx=True)
+    for requirements in extras.values():
+        assert any(
+            r.startswith("torch-tensorrt-executorch-rtx-runtime==")
+            for r in requirements
+        )
+        assert not any(
+            r.startswith("torch-tensorrt-executorch-runtime==") for r in requirements
+        )

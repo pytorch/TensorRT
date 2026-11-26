@@ -19,7 +19,7 @@ import uuid
 
 import torch
 import yaml
-from setuptools import Distribution, find_packages, setup
+from setuptools import Distribution, setup
 from setuptools.command.build_py import build_py
 
 try:
@@ -43,6 +43,23 @@ DELEGATE_IMPORT_LIBRARY = "executorch_backend_tensorrt.lib"
 # Checked in rather than generated: it has no build-time inputs. Only the companion version file is
 # written at build time, because the version is not known until then.
 _CMAKE_CONFIG_SOURCE = HERE / "cmake" / "executorch_backend_tensorrt-config.cmake"
+USE_RTX = os.getenv("TORCH_TENSORRT_EXECUTORCH_USE_RTX", "").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+PACKAGE_NAME = "torch_tensorrt_executorch_runtime"
+PROJECT_NAME = "torch-tensorrt-executorch-runtime"
+CMAKE_PACKAGE = "executorch_backend_tensorrt"
+if USE_RTX:
+    PACKAGE_NAME = "torch_tensorrt_executorch_rtx_runtime"
+    PROJECT_NAME = "torch-tensorrt-executorch-rtx-runtime"
+    CMAKE_PACKAGE = "executorch_backend_tensorrt_rtx"
+    DELEGATE_LIBRARY = DELEGATE_LIBRARY.replace("tensorrt", "tensorrt_rtx")
+    DELEGATE_IMPORT_LIBRARY = DELEGATE_IMPORT_LIBRARY.replace(
+        "tensorrt", "tensorrt_rtx"
+    )
 
 
 def pinned_executorch_version() -> str:
@@ -174,11 +191,11 @@ class BazelBuild(build_py):
     """
 
     def _generated_output_mapping(self) -> dict[str, str]:
-        package = "torch_tensorrt_executorch_runtime"
+        package = PACKAGE_NAME
         filenames = [
             f"lib/{DELEGATE_LIBRARY}",
-            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
-            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
+            f"lib/cmake/{CMAKE_PACKAGE}/{CMAKE_PACKAGE}-config.cmake",
+            f"lib/cmake/{CMAKE_PACKAGE}/{CMAKE_PACKAGE}-config-version.cmake",
         ]
         if sys.platform == "win32":
             filenames.append(f"lib/{DELEGATE_IMPORT_LIBRARY}")
@@ -251,6 +268,8 @@ class BazelBuild(build_py):
             f"--action_env=EXECUTORCH_CMAKE_PREFIX_PATH={executorch_cmake_prefix_path()}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
+        if USE_RTX:
+            command.append("--config=rtx")
         dist_dir_arch = (
             "aarch64-linux-gnu"
             if platform.machine() in {"aarch64", "arm64"}
@@ -326,6 +345,12 @@ class BazelBuild(build_py):
             f"-DTORCH_TENSORRT_SOURCE_DIR={REPO_ROOT.as_posix()}",
             f"-DCMAKE_PREFIX_PATH={pathlib.Path(executorch_cmake_prefix_path()).as_posix()}",
         ]
+        if USE_RTX:
+            command.append("-DTORCH_TENSORRT_EXECUTORCH_USE_RTX=ON")
+            if rtx_root := os.getenv("TensorRTRTX_ROOT"):
+                command.append(
+                    f"-DTensorRTRTX_ROOT={pathlib.Path(rtx_root).as_posix()}"
+                )
         # The main build already fetched the TensorRT SDK. Its import libraries
         # and headers are needed here; the installed TensorRT wheel supplies DLLs.
         if root := os.getenv("TensorRT_ROOT") or os.getenv("TENSORRT_ROOT"):
@@ -346,7 +371,7 @@ class BazelBuild(build_py):
         for artifact in (built, import_library):
             if artifact is not None and not artifact.is_file():
                 raise RuntimeError(f"Native build did not produce {artifact}")
-        package = "torch_tensorrt_executorch_runtime"
+        package = PACKAGE_NAME
         # Editable build_lib is temporary; generated package data must survive its removal.
         package_root = (
             pathlib.Path(self.get_package_dir(package))
@@ -401,9 +426,22 @@ class BazelBuild(build_py):
         The config is checked in; only the version file is generated, because the version is not
         known until the wheel is built.
         """
-        cmake_dir = package_dir / "lib" / "cmake" / "executorch_backend_tensorrt"
+        cmake_dir = package_dir / "lib" / "cmake" / CMAKE_PACKAGE
         cmake_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(_CMAKE_CONFIG_SOURCE, cmake_dir / _CMAKE_CONFIG_SOURCE.name)
+        config = _CMAKE_CONFIG_SOURCE.read_text()
+        if USE_RTX:
+            config = (
+                config.replace("backend_tensorrt", "backend_tensorrt_rtx")
+                .replace("BACKEND_TENSORRT", "BACKEND_TENSORRT_RTX")
+                .replace("torch_tensorrt_executorch_runtime", PACKAGE_NAME)
+                .replace(
+                    "torchtrt::executorch_backend", "torchtrt::executorch_rtx_backend"
+                )
+                .replace(
+                    "torchtrt_executorch_backend", "torchtrt_executorch_rtx_backend"
+                )
+            )
+        (cmake_dir / f"{CMAKE_PACKAGE}-config.cmake").write_text(config)
         version = self.distribution.get_version()
         # find_package compares dotted integers, so a dev suffix has to be dropped from the value
         # it reads while the full version stays visible for a human.
@@ -413,10 +451,10 @@ class BazelBuild(build_py):
         # one, so it is baked in here where it is known.
         major = public.split(".")[0]
         # SameMajorVersion bounds both endpoints, allowing only an exclusive next-major boundary.
-        (cmake_dir / "executorch_backend_tensorrt-config-version.cmake").write_text(
+        (cmake_dir / f"{CMAKE_PACKAGE}-config-version.cmake").write_text(
             "# Generated by setup.py. The version is only known when the wheel is built.\n"
             f'set(PACKAGE_VERSION "{public}")\n'
-            f'set(EXECUTORCH_BACKEND_TENSORRT_FULL_VERSION "{version}")\n'
+            f'set(EXECUTORCH_BACKEND_TENSORRT{"_RTX" if USE_RTX else ""}_FULL_VERSION "{version}")\n'
             "\n"
             f'if(PACKAGE_FIND_VERSION_MAJOR STREQUAL "{major}")\n'
             "  if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)\n"
@@ -456,6 +494,8 @@ class BazelBuild(build_py):
 
 
 TENSORRT_DISTRIBUTION = "tensorrt-cu13"
+if USE_RTX:
+    TENSORRT_DISTRIBUTION = "tensorrt-rtx-cu13"
 
 
 class WheelTag(bdist_wheel):
@@ -504,16 +544,17 @@ if sys.platform != "win32":
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}"
     ]
 setup(
-    name="torch-tensorrt-executorch-runtime",
+    name=PROJECT_NAME,
     version=runtime_version,
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
-    packages=find_packages(),
+    packages=[PACKAGE_NAME],
+    package_dir={PACKAGE_NAME: "torch_tensorrt_executorch_runtime"},
     distclass=PlatformDistribution,
     package_data={
-        "torch_tensorrt_executorch_runtime": [
+        PACKAGE_NAME: [
             f"lib/{DELEGATE_LIBRARY}",
             *([f"lib/{DELEGATE_IMPORT_LIBRARY}"] if sys.platform == "win32" else []),
-            "lib/cmake/executorch_backend_tensorrt/*.cmake",
+            f"lib/cmake/{CMAKE_PACKAGE}/*.cmake",
         ]
     },
     cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},

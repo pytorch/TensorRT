@@ -93,6 +93,21 @@ def _executorch_index_options(cuda: str) -> str:
     )
 
 
+def _executorch_uses_rtx() -> bool:
+    features = getattr(
+        sys.modules.get("torch_tensorrt._features"), "ENABLED_FEATURES", None
+    )
+    return bool(getattr(features, "tensorrt_rtx", False))
+
+
+def _executorch_companion_distribution() -> str:
+    return (
+        "torch-tensorrt-executorch-rtx-runtime"
+        if _executorch_uses_rtx()
+        else "torch-tensorrt-executorch-runtime"
+    )
+
+
 def executorch_install_command() -> str:
     """Return an install command, or guidance for an unsupported CUDA build.
 
@@ -111,9 +126,10 @@ def executorch_install_command() -> str:
     delegate = _build_record("__executorch_runtime_version__")
     # The extra may require the delegate built for this wheel's CUDA channel, not torch's.
     cuda = delegate.partition("+")[2] or channel
-    requirements = f'"torch_tensorrt[executorch]=={_build_record("__version__")}" '
+    project = "torch_tensorrt_rtx" if _executorch_uses_rtx() else "torch_tensorrt"
+    requirements = f'"{project}[executorch]=={_build_record("__version__")}" '
     if delegate:
-        requirements += f'"torch-tensorrt-executorch-runtime=={delegate}" '
+        requirements += f'"{_executorch_companion_distribution()}=={delegate}" '
     return f"pip install --pre {requirements}" + _executorch_index_options(cuda)
 
 
@@ -128,7 +144,8 @@ def executorch_runtime_install_command() -> str:
         return (
             "This Torch-TensorRT build has no matching delegate. The standard CUDA "
             f"{EXECUTORCH_CUDA_MAJOR} wheels for Linux (x86-64 and aarch64) and Windows x86-64 "
-            "have one; TensorRT-RTX, Python-only and JetPack builds do not. To build it from "
+            "have one; other builds require a source-built delegate. For TensorRT-RTX, set "
+            "TORCH_TENSORRT_EXECUTORCH_USE_RTX=1 when building the companion. To build it from "
             "source, see py/torch-tensorrt-executorch-runtime/README.md in the Torch-TensorRT "
             "repository."
         )
@@ -136,7 +153,7 @@ def executorch_runtime_install_command() -> str:
     if cuda is None:
         return executorch_install_command()
     return (
-        f'pip install "torch-tensorrt-executorch-runtime=={version}" '
+        f'pip install "{_executorch_companion_distribution()}=={version}" '
         + _executorch_index_options(cuda)
     )
 
