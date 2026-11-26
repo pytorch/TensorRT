@@ -19,6 +19,7 @@ from .conftest import skip_no_qdp
         "_generic_plugin_desc",
         "_generic_plugin_impl",
         "_user_aot_fn",
+        "_check_shared_mem",
         "_kernel_name",
         "_ptx_str",
         "_trtp",

@@ -461,6 +461,49 @@ Graph Partitioning
        ``antialias=True``) in TensorRT instead of PyTorch, so it does not split the
        graph. Only static input and output heights and widths and floating-point
        inputs are converted. Some sizes run slower than in PyTorch, so measure it.
+   * - ``grouped_mm_kernel``
+     - ``False``
+     - Run ``aten._grouped_mm``, the grouped matrix multiply of mixture-of-experts
+       layers, in TensorRT with a grouped GEMM kernel that computes only each row's own
+       group. Large layers then skip the dense lowering's extra work, and a dynamic
+       row count stays in TensorRT instead of splitting the graph, so a
+       mixture-of-experts program can build as one engine.
+       The cost: the kernel is a TensorRT plugin compiled with Triton when the engine
+       is built, and its PTX is stored in the engine, so the engine needs a CUDA driver
+       at least as new as the build machine's. It takes ops with bfloat16 or float16
+       matrices, int32 offsets, no bias, ``out_dtype`` unset or equal to the input
+       dtype, more than one group or a dynamic row count, and static K, N and group
+       count, on GPUs with compute capability 8.0 or newer, with TensorRT
+       plugins, Triton 3.5 or newer (3.7 or newer at compute capability 11.0, Jetson
+       Thor, whose code the ptxas of older releases cannot build) and cuda-python
+       installed (cuda-python reads the driver's PTX limit). It is not used for hardware-compatible engines or when cross-compiling for Windows. When the
+       GPU, the installed packages or these settings rule it out, a warning says why.
+       On GPUs with compute capability 10.0 or newer it uses sm_80 instructions, except
+       at compute capability 11.0 (Jetson Thor), where it uses the GPU's own ``tcgen05``
+       instructions. It can be slower than PyTorch's grouped matrix multiply at large
+       row counts, so measure it. Other ops use the dense lowering and
+       ``grouped_mm_dense_max_macs``.
+   * - ``grouped_mm_dense_max_macs``
+     - ``None``
+     - Leave ``aten._grouped_mm``, the grouped matrix multiply of mixture-of-experts
+       layers, to PyTorch when its TensorRT lowering would do more than this many
+       multiply-adds (groups * rows * K * N). That lowering multiplies every row by
+       every group's weight, while PyTorch computes only each row's own group.
+       It applies only to ops the grouped GEMM kernel does not take (see
+       ``grouped_mm_kernel``).
+       ``None`` turns the limit off. The limit does not apply to an op with one group,
+       under ``require_full_compilation=True``, or in
+       ``convert_exported_program_to_serialized_trt_engine``, which cannot leave an
+       operator to PyTorch. ``torch.compile`` turns ``require_full_compilation`` off, so
+       there only ``None`` keeps such an op in TensorRT. The dense lowering handles
+       static shapes only, so such an op with a dynamic row count runs in PyTorch
+       whatever this is. Keep ``None``
+       where the op cannot run outside TensorRT: an ExecuTorch save without a
+       partitioner that takes it (such as the CUDA partitioner) stops with a missing
+       out variant, and where PyTorch has no fast kernel for it (such as float32, or
+       bfloat16 on an A100) it copies the group offsets to the host,
+       so the module cannot be captured whole by CUDA graphs. Above ``2**38`` the
+       dense lowering was slower than PyTorch in every case measured on H100 and A100.
    * - ``replace_interleave_stack_with_cat``
      - ``False``
      - Write a stack whose only user is a reshape that merges the new axis into a
@@ -576,7 +619,8 @@ rebuilt from scratch:
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
 ``fallback_pytorch_plugin_ops``, ``collapse_high_rank_permutes``,
-``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
+``convert_antialiased_resize``, ``grouped_mm_kernel``, ``grouped_mm_dense_max_macs``,
+``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
 Settings not in this list (e.g., ``dryrun`` and ``pass_through_build_failures``)
