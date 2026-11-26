@@ -174,8 +174,17 @@ def rule_based_autocast(
         )
 
     # Refit cannot change the engine's precisions, so it reuses the nodes that the
-    # weights of the compiled program kept in high precision.
+    # weights of the compiled program kept in high precision. An engine saved by an
+    # earlier version that recorded such nodes needs them too, so it gets this check.
     constant_nodes = settings._autocast_constant_range_nodes
+    if constant_nodes is not None:
+        missing = constant_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions that the constants chose, because "
+                f"these nodes are not in the graph: {sorted(missing)}. Compile the model "
+                "again."
+            )
     constant_rule = (
         ConstantRangeRule(autocast_low_precision_type)
         if constant_nodes is None
@@ -300,6 +309,33 @@ def rule_based_autocast(
             ):
                 kept.update(nodes)
     owners = {n for n in kept if not _returns_its_input(n) and n in traced_dtypes}
+    if (
+        not isinstance(constant_rule, ConstantRangeRule)
+        and not settings._autocast_checks_constant_range
+    ):
+        logger.warning(
+            "This engine was built by an earlier version of Torch-TensorRT, so refit "
+            "does not check whether the new weights hold values that become inf in "
+            f"{autocast_low_precision_type}, and the results can differ from a new "
+            "compile. Compile the model again to check them."
+        )
+    elif not isinstance(constant_rule, ConstantRangeRule):
+        check = ConstantRangeRule(autocast_low_precision_type)
+        # An owner of memory that a view(dtype) writes into runs in its traced dtype.
+        low = set(low_precision_nodes) - {
+            n.name for n in owners if traced_dtypes[n] != autocast_low_precision_type
+        }
+        overflowing = [
+            n.name for n in gm.graph.nodes if n.name in low and check._check_inner(n)
+        ]
+        if overflowing:
+            raise RuntimeError(
+                "Refit cannot change the precisions of the engine, and these nodes run "
+                f"in {autocast_low_precision_type} but read constants with values "
+                "that become inf in it, or share memory with nodes that do: "
+                f"{overflowing}. Compile the model again to keep them in "
+                f"{autocast_high_precision_type}."
+            )
     wait_tensor = _wait_tensor_op()
     for node in list(gm.graph.nodes):
         if node.op == "call_function":

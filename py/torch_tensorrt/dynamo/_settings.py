@@ -297,6 +297,9 @@ class CompilationSettings:
     _autocast_constant_range_nodes: Optional[FrozenSet[str]] = field(
         default=None, repr=False
     )
+    # False for an engine built before refit checked the constants of the new weights.
+    # Its refit does not check them, as before.
+    _autocast_checks_constant_range: bool = field(default=True, repr=False)
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     max_partition_size: Optional[int] = MAX_PARTITION_SIZE
@@ -423,7 +426,11 @@ class CompilationSettings:
         state.setdefault("autocast_excluded_node_names", AUTOCAST_EXCLUDED_NODE_NAMES)
         state.setdefault("autocast_model_regions", AUTOCAST_MODEL_REGIONS)
         state.setdefault("_autocast_calibrated_high_precision_nodes", None)
-        state.setdefault("_autocast_constant_range_nodes", None)
+        # The engine was built before refit checked the constants of new weights, and
+        # maybe before autocast kept nodes for them.
+        if "_autocast_checks_constant_range" not in state:
+            state.setdefault("_autocast_constant_range_nodes", frozenset())
+            state["_autocast_checks_constant_range"] = False
         self.__dict__.update(state)
 
 

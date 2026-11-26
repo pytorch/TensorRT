@@ -4293,6 +4293,204 @@ def test_autocast_refit_keeps_the_precisions_the_constants_chose(monkeypatch):
     )
 
 
+@pytest.mark.unit
+def test_autocast_refit_reuses_and_checks_the_constant_range_nodes(caplog):
+    class Model(nn.Module):
+        def __init__(self, running_var):
+            super().__init__()
+            self.bn = nn.BatchNorm1d(8)
+            with torch.no_grad():
+                self.bn.running_var.fill_(running_var)
+
+        def forward(self, x):
+            return self.bn(x)
+
+    x = torch.randn(4, 8)
+
+    def batch_norm_dtype(running_var, settings):
+        ep = pre_export_lowering(
+            torch.export.export(Model(running_var).eval(), (x,)), settings
+        )
+        (bn,) = ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.batch_norm.default
+        )
+        return bn.name, bn.meta["val"].dtype
+
+    def settings():
+        return CompilationSettings(
+            enable_autocast=True, autocast_low_precision_type=torch.float16
+        )
+
+    compiled = settings()
+    name, dtype = batch_norm_dtype(1e6, compiled)
+    assert dtype == torch.float32
+    assert compiled._autocast_constant_range_nodes == {name}
+    # Refit keeps the BatchNorm in float32, although the new running variance fits,
+    # and accepts a larger one, which it reads in float32.
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float32)
+    assert batch_norm_dtype(2e6, compiled) == (name, torch.float32)
+
+    compiled = settings()
+    assert batch_norm_dtype(1.0, compiled) == (name, torch.float16)
+    # Refit cannot move the BatchNorm out of float16, where the new running variance
+    # becomes inf, also for an engine that was saved and loaded.
+    compiled = pickle.loads(pickle.dumps(compiled))
+    with pytest.raises(RuntimeError, match=f"{name}.*Compile the model again"):
+        batch_norm_dtype(1e6, compiled)
+
+    compiled = settings()
+    compiled._autocast_constant_range_nodes = frozenset({"not_a_node"})
+    with pytest.raises(RuntimeError, match="not_a_node"):
+        batch_norm_dtype(1e6, compiled)
+
+    # An engine saved before refit checked the new weights keeps its precisions
+    # without checking them, as before, and refit warns. One saved before autocast
+    # kept nodes for their constants has none.
+    earlier = settings()
+    batch_norm_dtype(1e6, earlier)
+    old = settings()
+    for saved, nodes in ((earlier, {name}), (old, frozenset())):
+        del saved.__dict__["_autocast_checks_constant_range"]
+        if not nodes:
+            del saved.__dict__["_autocast_constant_range_nodes"]
+        loaded = pickle.loads(pickle.dumps(saved))
+        assert loaded._autocast_constant_range_nodes == nodes
+        caplog.clear()
+        with caplog.at_level(
+            logging.WARNING,
+            logger="torch_tensorrt.dynamo.lowering.passes.rule_based_autocast",
+        ):
+            assert batch_norm_dtype(1e6, loaded) == (
+                name,
+                torch.float32 if nodes else torch.float16,
+            )
+        assert any("Compile the model again" in r.message for r in caplog.records)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("op", ["bucketize", "cumsum"])
+def test_autocast_refit_skips_ops_that_autocast_does_not_cast(op):
+    class Model(nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            self.register_buffer("values", torch.tensor([0.0, value]))
+
+        def forward(self, x):
+            # bucketize makes integers, and cumsum is given a dtype, so autocast never
+            # casts the values they read.
+            if op == "bucketize":
+                return torch.bucketize(x, self.values)
+            return x * 2, torch.cumsum(self.values, 0, dtype=torch.float32)
+
+    x = torch.randn(4, 8)
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    pre_export_lowering(torch.export.export(Model(1.0).eval(), (x,)), settings)
+    ep = pre_export_lowering(torch.export.export(Model(1e6).eval(), (x,)), settings)
+    target, dtype = {
+        "bucketize": (torch.ops.aten.bucketize.Tensor, torch.int64),
+        "cumsum": (torch.ops.aten.cumsum.default, torch.float32),
+    }[op]
+    (node,) = ep.graph.find_nodes(op="call_function", target=target)
+    assert node.meta["val"].dtype == dtype
+
+
+@pytest.mark.unit
+def test_autocast_refit_checks_the_dtype_an_op_runs_in():
+    class Model(nn.Module):
+        def __init__(self, scale):
+            super().__init__()
+            self.register_buffer("scale", torch.full((8,), scale))
+
+        def forward(self, x):
+            h = x * self.scale
+            # The write through a view(dtype) makes the mul run in float32.
+            h.view(torch.int32).bitwise_or_(1)
+            return h
+
+    x = torch.randn(4, 8)
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    pre_export_lowering(torch.export.export(Model(1.0).eval(), (x,)), settings)
+    # So refit to a scale that is inf in float16 is no error.
+    ep = pre_export_lowering(torch.export.export(Model(1e6).eval(), (x,)), settings)
+    (mul,) = ep.graph.find_nodes(op="call_function", target=torch.ops.aten.mul.Tensor)
+    assert mul.meta["val"].dtype == torch.float32
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+def test_autocast_refit_rejects_constants_that_become_inf():
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 8, 3)
+            self.bn = nn.BatchNorm2d(8)
+
+        def forward(self, x):
+            return self.bn(self.conv(x))
+
+    x = torch.randn(2, 3, 16, 16, device="cuda")
+    model = Model().cuda().eval()
+    settings = dict(
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        immutable_weights=False,
+    )
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], **settings
+    )
+    new_model = copy.deepcopy(model)
+    with torch.no_grad():
+        new_model.bn.running_var.fill_(1e6)
+    # The engine runs the BatchNorm in float16, where the new running variance is inf.
+    with pytest.raises(RuntimeError, match="batch_norm.*Compile the model again"):
+        torch_tensorrt.dynamo.refit_module_weights(
+            trt_model, torch.export.export(new_model, (x,)), arg_inputs=[x]
+        )
+    # MutableTorchTensorRTModule then compiles the model again.
+    mutable = torch_tensorrt.MutableTorchTensorRTModule(model, **settings)
+    mutable(x)
+    mutable.load_state_dict(new_model.state_dict())
+    ref = new_model(x)
+    torch.testing.assert_close(
+        mutable(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+def test_autocast_refit_checks_the_other_values_of_a_mask():
+    class Model(nn.Module):
+        def __init__(self, value):
+            super().__init__()
+            table = torch.tensor([torch.finfo(torch.float32).min, value])
+            self.table = nn.Parameter(table, requires_grad=False)
+
+        def forward(self, x):
+            return torch.where(x > 0, self.table, x) / 1e6
+
+    x = torch.tensor([-1.0, 1.0], device="cuda")
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(Model(1.0).cuda().eval(), (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        immutable_weights=False,
+    )
+    # The where runs in float16, where the new 1e6 is inf, although the other value of
+    # the table is a mask value.
+    with pytest.raises(RuntimeError, match="where.*Compile the model again"):
+        torch_tensorrt.dynamo.refit_module_weights(
+            trt_model,
+            torch.export.export(Model(1e6).cuda().eval(), (x,)),
+            arg_inputs=[x],
+        )
+
+
 _FLOAT32_MAX = torch.finfo(torch.float32).max
 
 
@@ -4346,8 +4544,11 @@ def test_autocast_constant_range_reads_through_ops_that_return_their_input(op):
 
         def forward(self, x):
             if op == "type_as":
-                return x * self.weight.type_as(x)
-            return x * nn.functional.dropout(self.weight, 0.5, training=False)
+                y = x * self.weight.type_as(x)
+            else:
+                y = x * nn.functional.dropout(self.weight, 0.5, training=False)
+            # Refit checks this float16 type_as with the rule.
+            return y + (x + 1).type_as(x)
 
     from torch_tensorrt.dynamo.lowering.passes.inline_autocast_regions import (
         _RAN_AGAIN,
@@ -4356,11 +4557,14 @@ def test_autocast_constant_range_reads_through_ops_that_return_their_input(op):
     settings = CompilationSettings(
         enable_autocast=True, autocast_low_precision_type=torch.float16
     )
-    ep = torch.export.export(Model().eval(), (torch.randn(4, 1),))
-    ep = pre_export_lowering(ep, settings)
+    x = torch.randn(4, 1)
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
     (mul,) = ep.graph.find_nodes(op="call_function", target=torch.ops.aten.mul.Tensor)
     assert mul.meta["val"].dtype == torch.float32
-    # The results of the ops that the rule ran again do not stay in the graph.
+    # The results of the ops that the rule ran again do not stay in the graph, also
+    # at refit.
+    assert not any(_RAN_AGAIN in n.meta for n in ep.graph.nodes)
+    ep = pre_export_lowering(torch.export.export(Model().eval(), (x,)), settings)
     assert not any(_RAN_AGAIN in n.meta for n in ep.graph.nodes)
 
 

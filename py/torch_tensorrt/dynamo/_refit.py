@@ -153,6 +153,13 @@ def refit_module_weights(
         verify_output: whether to verify output of refitted module
     Returns:
         A new compiled TensorRT module that has the updated weights.
+    Raises:
+        RuntimeError: if autocast compiled the module and the new weights need ops in
+            FP32 that the engine runs in the low precision type, or the new graph lacks
+            ops that autocast kept in FP32 for their constants. Compile the model again.
+            For an engine saved by an earlier version, the new weights are not
+            checked, but if it recorded kept ops, one missing from the new graph
+            still raises.
     """
     inline_module = False
     if isinstance(compiled_module, ExportedProgram):
