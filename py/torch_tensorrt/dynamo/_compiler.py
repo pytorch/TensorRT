@@ -560,10 +560,10 @@ def compile(
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
 
-    Takes a existing TorchScript module and a set of settings to configure the compiler
+    Takes a PyTorch module and a set of settings to configure the compiler
     and will convert methods to JIT Graphs which call equivalent TensorRT engines
 
-    Converts specifically the forward method of a TorchScript Module
+    Converts specifically the forward method of a PyTorch module
 
     Arguments:
         exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
@@ -2583,7 +2583,6 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
 
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
-        # TODO: think about how to handle the torch.jit.load route?
         exp_program = torch.export.load(file_path)
     except Exception as e:
         logger.info(

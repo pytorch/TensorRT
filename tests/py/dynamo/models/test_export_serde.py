@@ -636,54 +636,6 @@ def test_arange_export(ir, tmpdir):
 
 
 @pytest.mark.unit
-def test_save_load_ts(ir, tmp_path):
-    """
-    This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
-    """
-
-    class MyModule(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
-            self.relu = torch.nn.ReLU()
-
-        def forward(self, x):
-            conv = self.conv(x)
-            relu = self.relu(conv)
-            mul = relu * 0.5
-            return mul
-
-    model = MyModule().eval().cuda()
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
-
-    trt_gm = torchtrt.compile(
-        model,
-        ir=ir,
-        inputs=[input],
-        min_block_size=1,
-        cache_built_engines=False,
-        reuse_cached_engines=False,
-    )
-    assertions.assertTrue(
-        isinstance(trt_gm, torch.fx.GraphModule),
-        msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
-    )
-    outputs_trt = trt_gm(input)
-    # Save it as torchscript representation
-    trt_file = tmp_path / "trt.ts"
-    torchtrt.save(trt_gm, trt_file, output_format="torchscript", inputs=[input])
-
-    trt_ts_module = torchtrt.load(trt_file)
-    outputs_trt_deser = trt_ts_module(input)
-
-    cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
-    assertions.assertTrue(
-        cos_sim > COSINE_THRESHOLD,
-        msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-    )
-
-
-@pytest.mark.unit
 @unittest.skipIf(
     platform.system() != "Linux",
     "Save and load in AOT Inductor format is only supported on Linux",
@@ -718,7 +670,7 @@ def test_save_load_aoti(ir, tmp_path):
     )
     assertions.assertTrue(
         isinstance(trt_gm, torch.fx.GraphModule),
-        msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
+        msg=f"test_save_load_extra_files output type does not match with torch.fx.GraphModule",
     )
     outputs_trt = trt_gm(input)
     print(f"{tmp_path}/trt.pt2")
@@ -736,14 +688,14 @@ def test_save_load_aoti(ir, tmp_path):
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"test_save_load_extra_files TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
 
 
 @pytest.mark.unit
 def test_save_load_extra_files(ir, tmpdir):
     """
-    This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
+    This tests save/load API with extra files in ExportedProgram format
     """
 
     class MyModule(torch.nn.Module):
@@ -772,10 +724,10 @@ def test_save_load_extra_files(ir, tmpdir):
     )
     assertions.assertTrue(
         isinstance(trt_gm, torch.fx.GraphModule),
-        msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
+        msg=f"test_save_load_extra_files output type does not match with torch.fx.GraphModule",
     )
     outputs_trt = trt_gm(input)
-    # Save it as torchscript representation
+    # Save it as an ExportedProgram
     torchtrt.save(
         trt_gm,
         ep_path,
@@ -795,5 +747,5 @@ def test_save_load_extra_files(ir, tmpdir):
     )
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
-        msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        msg=f"test_save_load_extra_files TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )

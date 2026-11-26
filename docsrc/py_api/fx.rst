@@ -5,9 +5,6 @@ torch_tensorrt.fx
 
 .. currentmodule:: torch_tensorrt.fx
 
-.. automodule torch_tensorrt.ts
-   :undoc-members:
-
 .. automodule:: torch_tensorrt.fx
    :members:
    :undoc-members:

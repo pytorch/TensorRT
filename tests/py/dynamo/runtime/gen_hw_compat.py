@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-# This script is used to generate hw_compat.ts file that's used in test_hw_compat.py
+# This script is used to generate hw_compat.ep file that's used in test_hw_compat.py
 # Generate the model on a different hardware compared to the one you're testing on to
 # verify HW compatibility feature.
 
@@ -32,5 +32,4 @@ trt_gm = torch_tensorrt.compile(
     hardware_compatible=True,
     version_compatible=True,
 )
-trt_script_model = torch.jit.trace(trt_gm, inputs)
-torch.jit.save(trt_script_model, "hw_compat.ts")
+torch_tensorrt.save(trt_gm, "hw_compat.ep", inputs=[inputs])

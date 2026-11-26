@@ -15,7 +15,6 @@ Core
    runtime
    kernels
    executorch
-   ../cli/torchtrtc
    ../indices/supported_ops
 
 Legacy
@@ -23,12 +22,10 @@ Legacy
 
 .. note::
 
-   The ``ts``, ``ptq``, and ``fx`` modules are in maintenance mode — for new
+   The ``fx`` module is in maintenance mode — for new
    projects use the Dynamo frontend (``torch.compile`` or ``torch.export``).
 
 .. toctree::
    :maxdepth: 1
 
-   ts
-   ptq
    fx

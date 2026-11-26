@@ -59,21 +59,8 @@ As there has been a number of compiler technologies in the PyTorch ecosystem ove
 Torch-TensorRT has some legacy features targeting them.
 
 
-TorchScript (`torch_tensorrt.ts.compile`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The TorchScript frontend was the original default frontend for Torch-TensorRT and targets models in the TorchScript format. The graph provided will be partitioned into supported and unsupported
-blocks. Supported blocks will be lowered to TensorRT and unsupported blocks will remain to run with LibTorch. The resultant graph is returned back to the user as a ``ScriptModule`` that can be loaded and saved
-with the Torch-TensorRT PyTorch runtime extension.
-
-Accepted Formats
-...................
-- TorchScript Module (``torch.jit.ScriptModule``)
-- PyTorch Module (``torch.nn.Module``) (via ``torch.jit.script`` or ``torch.jit.trace``)
-
-Returns
-...................
-- TorchScript Module (``torch.jit.ScriptModule``)
+TorchScript compilation and serialization have been removed. Use the Dynamo frontend
+and export with ``torch.export``, AOTInductor, or ExecuTorch.
 
 
 FX Graph Modules (`torch_tensorrt.fx.compile`)
@@ -103,5 +90,4 @@ Torch-TensorRT to try to lower the provided model through a specific intermediat
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - ``torch_compile``: Use the ``torch.compile`` system. Immediately returns a boxed-function that will compile on first call
 - ``dynamo``: Run the graph through the ``torch.export``/ torchdynamo stack. If the input module is a ``torch.nn.Module``, it must be "export-traceable" as the module will be traced with ``torch.export.export``. Returns a ``torch.fx.GraphModule`` which can be run immediately or saved via ``torch.export.export`` or ``torch_tensorrt.save``
-- ``torchscript`` or ``ts``: Run graph through the TorchScript stack. If the input module is a ``torch.nn.Module``, it must be "scriptable" as the module will be compiled with ``torch.jit.script``. Returns a ``torch.jit.ScriptModule`` which can be run immediately or saved via ``torch.save`` or ``torch_tensorrt.save``
 - ``fx``: Run graph through the ``torch.fx`` stack. If the input module is a ``torch.nn.Module``, it will be traced with ``torch.fx.trace`` and subject to its limitations.

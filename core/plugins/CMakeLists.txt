@@ -9,7 +9,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/normalize_plugin.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/scatter_add_plugin.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/register_plugins.cpp"
-    PUBLIC  $<TARGET_OBJECTS:core_util>
+    PUBLIC  "$<BUILD_INTERFACE:$<TARGET_OBJECTS:core_util>>"
 )
 
 set(HEADER_FILES

@@ -52,7 +52,7 @@ Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be
 
 .. _bin-dist:
 
-C++ Precompiled Binaries (TorchScript Only)
+C++ Runtime Precompiled Binaries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Precompiled tarballs for releases are provided here: https://github.com/pytorch/TensorRT/releases
@@ -178,8 +178,8 @@ Some features in the library are optional and allow builds to be lighter or more
 Python Only Distribution
 ............................
 
-There are multiple features of the library which require C++ components to be enabled. This includes both the TorchScript frontend which accepts TorchScript modules for compilation
-and the Torch-TensorRT runtime, the default executor for modules compiled with Torch-TensorRT, be it with the TorchScript or Dynamo frontend.
+The Torch-TensorRT C++ runtime is the default executor for modules compiled with the Dynamo frontend.
+TorchScript compilation and serialization have been removed.
 
 In the case you may want a build which does not require C++ you can disable these features and avoid building these components. As a result, the only available runtime will be the Python based on
 which has implications for features like serialization.
@@ -189,18 +189,7 @@ which has implications for features like serialization.
     PYTHON_ONLY=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
-No TorchScript Frontend
-............................
-
-The TorchScript frontend is a legacy feature of Torch-TensorRT which is now in maintenance as TorchDynamo has become the preferred compiler technology for this project. It contains quite a bit
-of C++ code that is no longer necessary for most users. Therefore you can exclude this component from your build to speed up build times. The C++ based runtime will still be available to use.
-
-.. code-block:: sh
-
-    NO_TORCHSCRIPT=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132
-
-
-Building the C++ Library Standalone (TorchScript Only)
+Building the C++ Runtime Library Standalone
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Release Build
@@ -298,10 +287,10 @@ Local versions of these packages can also be used on Windows. See ``toolchains\\
 Alternative Build Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Building with CMake (TorchScript Only)
+Building the C++ Runtime with CMake
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-It is possible to build the API libraries (in cpp/) and the torchtrtc executable using CMake instead of Bazel.
+It is possible to build the runtime libraries using CMake instead of Bazel.
 Currently, the python API and the tests cannot be built with CMake.
 Begin by installing CMake.
 
@@ -363,7 +352,7 @@ To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` wit
     )
 
 
-Compile C++ Library and Compiler CLI
+Compile C++ Runtime Library
 ........................................................
 
     NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version

@@ -5,8 +5,8 @@
 cmake_minimum_required(VERSION 3.17)
 project(Torch-TensorRT LANGUAGES CXX)
 
-# use c++17 like PyTorch
-set(CMAKE_CXX_STANDARD 17)
+# Match the current PyTorch toolchain.
+set(CMAKE_CXX_STANDARD 20)
 
 # Build the libraries with -fPIC
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,6 +27,9 @@ endif()
 # -----------------------------------------
 #  compilation
 # -----------------------------------------
+if(WITH_TESTS)
+  enable_testing()
+endif()
 add_subdirectory(core)
 add_subdirectory(cpp)
 

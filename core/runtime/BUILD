@@ -138,6 +138,7 @@ cc_library(
         "execute_engine.cpp",
         "runtime.cpp",
         "runtime_utils.cpp",
+        "torch_tensorrt.cpp",
     ],
     hdrs = [
         "Platform.h",
@@ -171,6 +172,7 @@ cc_library(
         ":tensorrt_binding_names",
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
+        "//cpp:api_headers",
     ] + if_torch_nccl(["@torch_nccl//:nccl_headers"]) + select({
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
         ":rtx_sbsa": ["@tensorrt_rtx_sbsa//:nvinfer"],

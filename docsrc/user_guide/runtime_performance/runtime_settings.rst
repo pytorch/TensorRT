@@ -340,10 +340,8 @@ directly, which is equivalent to passing ``ep.module()``:
 
 .. note::
 
-   TorchScript artifacts are not supported. When :func:`torch_tensorrt.load`
-   returns a :class:`torch.jit.ScriptModule`, :func:`apply_runtime_settings`,
-   ``runtime_config(...)`` and ``runtime_cache(...)`` raise :exc:`TypeError`.
-   Save the compiled model with ``output_format="exported_program"`` instead.
+   Load an ExportedProgram with :func:`torch_tensorrt.load` and apply runtime
+   settings to the program or its ``.module()``.
 
 .. note::
 

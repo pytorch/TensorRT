@@ -2,8 +2,55 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 
 package(default_visibility = ["//visibility:public"])
+
+# Header-only so core/runtime can implement the public API without depending
+# on the logging wrapper or reintroducing the TorchScript compiler.
+cc_library(
+    name = "api_headers",
+    hdrs = [
+        "include/torch_tensorrt/logging.h",
+        "include/torch_tensorrt/macros.h",
+        "include/torch_tensorrt/torch_tensorrt.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
+    name = "torch_tensorrt",
+    srcs = ["src/logging.cpp"],
+    deps = [
+        ":api_headers",
+        "//core/runtime",
+        "//core/util/logging",
+    ],
+    alwayslink = True,
+)
+
+filegroup(
+    name = "api_header_files",
+    srcs = [
+        "include/torch_tensorrt/logging.h",
+        "include/torch_tensorrt/macros.h",
+        "include/torch_tensorrt/torch_tensorrt.h",
+    ],
+)
+
+pkg_tar(
+    name = "include",
+    srcs = [":api_header_files"],
+    strip_prefix = "include/torch_tensorrt",
+)
+
+pkg_files(
+    name = "include_pkg_files",
+    srcs = [":api_header_files"],
+    prefix = "include",
+    strip_prefix = "include",
+)
 
 config_setting(
     name = "linux_x86_64",
@@ -86,29 +133,6 @@ config_setting(
     flag_values = {
         "//toolchains/dep_collection:compute_libs": "rtx",
     },
-)
-
-cc_library(
-    name = "torch_tensorrt",
-    srcs = [
-        "src/compile_spec.cpp",
-        "src/logging.cpp",
-        "src/torch_tensorrt.cpp",
-        "src/types.cpp",
-    ],
-    hdrs = [
-        "include/torch_tensorrt/logging.h",
-        "include/torch_tensorrt/macros.h",
-        "include/torch_tensorrt/torch_tensorrt.h",
-    ],
-    linkstatic = True,
-    strip_include_prefix = "include/",
-    deps = [
-        "//core",
-        "//core/ir",
-        "//core/util:prelude",
-    ],
-    alwayslink = True,
 )
 
 cc_library(
@@ -463,16 +487,6 @@ filegroup(
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
     ],
-)
-
-filegroup(
-    name = "api_headers",
-    srcs = glob(
-        ["include/**/*.h"],
-        exclude = [
-            "include/torch_tensorrt/executorch/**/*.h",
-        ],
-    ),
 )
 
 filegroup(

@@ -12,7 +12,6 @@ understanding the system architecture, and managing resources.
    contributors/phases
    contributors/lowering_passes
    contributors/observer
-   contributors/ts_converters
    contributors/useful_links
 
 .. toctree::
