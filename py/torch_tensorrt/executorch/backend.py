@@ -699,7 +699,9 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
 
         engine_data: Any
         if engine_file is not None:
-            engine_data = FileBackedData(engine_file)
+            # compile_and_save deletes the file after the save, so the data can own it, which lets
+            # a consuming write move the engine into the program instead of copying it.
+            engine_data = FileBackedData(engine_file, cleanup=True)
             engine_data_sha256 = engine_data.sha256()
         else:
             assert isinstance(engine_bytes, bytes)

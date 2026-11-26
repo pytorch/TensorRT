@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import ast
+import errno
 import importlib
 import importlib.metadata
 import importlib.util
@@ -2824,30 +2825,89 @@ def test_lift_keeps_parameter_for_any_dtype(dtype, requires_grad):
 # next to the .pte.
 
 
-def _patch_executorch_lowering(monkeypatch, captured):
+def _patch_executorch_lowering(
+    monkeypatch,
+    captured,
+    log=None,
+    supports_consume=True,
+    sources=(),
+    move=None,
+    free=0,
+):
     """Spy the seams _save_as_executorch delegates to after #4440, without running a
     real TRT lowering. Records the kwargs forwarded into
     torch_tensorrt.executorch.export() (captured["export_kwargs"]); lets the real
-    export() run against an engine-free program while stubbing only the innermost
+    export() run so its defaults apply, but replaces the innermost
     ExecuTorch lowering, so the kwargs export() finally hands that lowering --
     including the get_edge_compile_config() it substitutes for an omitted
     compile_config -- land in `captured`; and records backend_config from
-    to_executorch(). Fills `captured`; returns nothing."""
+    to_executorch(). Fills `captured`; returns nothing. With `log`, records the order of
+    the ETRecord, program and .ptd writes, and whether each program and .ptd write
+    consumes. With `supports_consume=False`, the program is like one from an ExecuTorch
+    release before the move: its writes take no consume argument and its data has no
+    file_backed_buffers. `sources` are the files the program's data owns, and `move(path)`
+    runs in each consuming write, in place of ExecuTorch's move. `free` is the free disk
+    space the save sees; by default a copy doesn't fit."""
     import executorch.exir as exir
     import torch_tensorrt._compile as tc
     import torch_tensorrt.executorch as tte
 
     class _FakeETRecord:
         def save(self, path):
+            if log is not None:
+                log.append("etrecord")
             with open(path, "wb") as fh:
                 fh.write(b"etrecord")
 
+    class _FakeData:
+        def __init__(self, path):
+            self.path = str(path)
+            self._size = os.path.getsize(path)
+
+        def __len__(self):
+            return self._size
+
+    class _FakeCord(bytes):
+        def file_backed_buffers(self):
+            return [_FakeData(path) for path in sources]
+
     class _FakeExec:
+        _pte_data = _FakeCord(b"program")
+        _tensor_data = {"model": _FakeCord()}
+
+        def save(self, path, *, consume=False):
+            if log is not None:
+                log.append(("program", consume))
+            if consume and move is not None:
+                move(path)
+            with open(path, "wb") as fh:
+                fh.write(b"program")
+
         def write_to_file(self, f):
-            f.write(b"")
+            if log is not None:
+                log.append(("program", False))
+            f.write(b"program")
+
+        def write_tensor_data_to_file(self, outdir, *, consume=False):
+            if log is not None:
+                log.append(("ptd", consume))
+            if consume and move is not None:
+                move(os.path.join(outdir, "model.ptd"))
 
         def get_etrecord(self):
             return _FakeETRecord()
+
+    class _OldExec(_FakeExec):
+        _pte_data = b"program"
+        _tensor_data = {"model": b""}
+
+        def save(self, path):
+            # A released save logs a failed write and returns, so the copy must not use it.
+            if log is not None:
+                log.append("save")
+
+        def write_tensor_data_to_file(self, outdir):
+            super().write_tensor_data_to_file(outdir)
 
     class _FakeEdge:
         # export() reorders each method's mutations after lowering, over every
@@ -2856,7 +2916,7 @@ def _patch_executorch_lowering(monkeypatch, captured):
 
         def to_executorch(self, config=None):
             captured["backend_config"] = config
-            return _FakeExec()
+            return _FakeExec() if supports_consume else _OldExec()
 
     # Innermost real lowering seam, called inside export(): capture the kwargs it
     # receives, notably compile_config already resolved to its default when omitted.
@@ -2865,6 +2925,9 @@ def _patch_executorch_lowering(monkeypatch, captured):
         return _FakeEdge()
 
     monkeypatch.setattr(exir, "to_edge_transform_and_lower", _fake_lower)
+    monkeypatch.setattr(
+        tc.shutil, "disk_usage", lambda path: types.SimpleNamespace(free=free)
+    )
 
     # Record what _save_as_executorch forwards into export(), then run the real
     # export() so its default-application and graph staging still execute.
@@ -2875,7 +2938,6 @@ def _patch_executorch_lowering(monkeypatch, captured):
         return real_export(source, **kw)
 
     monkeypatch.setattr(tte, "export", _spy_export)
-    monkeypatch.setattr(tc, "_write_external_tensor_data", lambda prog, path: None)
     # ENABLED_FEATURES is an immutable namedtuple; swap the whole module attribute.
     monkeypatch.setattr(
         tc, "ENABLED_FEATURES", types.SimpleNamespace(torch_tensorrt_runtime=True)
@@ -2931,6 +2993,138 @@ def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     assert ExecutorchBackendConfig().memory_planning_pass.alignment == default_alignment
     # ETRecord persisted next to the .pte per ET's "<base>_etrecord.bin" convention.
     assert (tmp_path / "model_etrecord.bin").exists()
+
+
+@pytest.mark.unit
+def test_save_executorch_does_not_consume(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+
+    log = []
+    _patch_executorch_lowering(monkeypatch, {}, log=log)
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    tc._save_as_executorch(ep, str(tmp_path / "model.pte"))
+
+    assert log == [("program", False), ("ptd", False)]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "free, old_output, moves",
+    [(0, 0, True), (2**40, 0, False), (0, 64, False)],  # the old output is replaced
+)
+def test_save_in_the_offload_block_moves_the_engines_when_a_copy_does_not_fit(
+    monkeypatch, tmp_path, free, old_output, moves
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
+
+    log = []
+    _patch_executorch_lowering(monkeypatch, {}, log=log, free=free)
+    if old_output:
+        (tmp_path / "model.pte").write_bytes(b"p" * old_output)
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    # The block compile_and_save saves in, where the engine files are deleted after the save.
+    with offload_engines_to_disk():
+        tc._save_as_executorch(ep, tmp_path / "model.pte")
+
+    assert log == [("program", moves), ("ptd", moves)]
+
+
+@pytest.mark.unit
+def test_save_in_the_offload_block_warns_when_the_program_name_blocks_the_move(
+    monkeypatch, tmp_path, caplog
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
+
+    engine = tmp_path / "a.engine"
+    engine.write_bytes(b"e" * 64)
+    log = []
+    _patch_executorch_lowering(monkeypatch, {}, log=log, sources=[engine])
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    caplog.set_level("WARNING", logger=tc.logger.name)
+    # ExecuTorch's save takes only a .pte path; its .ptd write moves data for any name.
+    with offload_engines_to_disk():
+        tc._save_as_executorch(ep, str(tmp_path / "model.bin"))
+
+    assert log == [("program", False), ("ptd", True)]
+    assert "ends with .pte" in caplog.text
+
+
+@pytest.mark.unit
+def test_save_in_the_offload_block_copies_with_an_executorch_without_consume(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
+
+    log = []
+    _patch_executorch_lowering(monkeypatch, {}, log=log, supports_consume=False)
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    with offload_engines_to_disk():
+        tc._save_as_executorch(ep, str(tmp_path / "model.pte"))
+
+    assert log == [("program", False), ("ptd", False)]
+    assert (tmp_path / "model.pte").read_bytes() == b"program"
+
+
+@pytest.mark.unit
+def test_save_in_the_offload_block_copies_when_writing_an_etrecord(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
+
+    log = []
+    _patch_executorch_lowering(monkeypatch, {}, log=log)
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    with offload_engines_to_disk():
+        tc._save_as_executorch(ep, str(tmp_path / "model.pte"), generate_etrecord=True)
+
+    # The ETRecord reads the engines after the program is written.
+    assert log == [("program", False), ("ptd", False), "etrecord"]
+
+
+@pytest.mark.unit
+def test_a_failed_move_deletes_the_data_files_it_cut_short(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        offload_engines_to_disk,
+    )
+
+    # Other data the save moves, such as CUDA weights: one cut short, one untouched.
+    cut, kept = tmp_path / "cut.data", tmp_path / "kept.data"
+    for path in (cut, kept):
+        path.write_bytes(b"w" * 64)
+
+    def stopped_partway(path):
+        os.truncate(cut, 16)
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    _patch_executorch_lowering(
+        monkeypatch, {}, sources=[cut, kept], move=stopped_partway
+    )
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    with offload_engines_to_disk():
+        with pytest.raises(OSError, match="No space left") as raised:
+            tc._save_as_executorch(ep, str(tmp_path / "model.pte"))
+
+    assert not cut.exists() and kept.exists()
+    assert any("Export again" in note for note in raised.value.__notes__)
 
 
 @pytest.mark.unit
