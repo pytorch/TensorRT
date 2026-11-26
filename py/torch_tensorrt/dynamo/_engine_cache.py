@@ -310,22 +310,13 @@ class DiskEngineCache(BaseEngineCache):
         engine_cache_dir: str,
         engine_cache_size: int,
     ) -> None:
-        def get_dir_size(path: str) -> int:
-            total = 0
-            with os.scandir(path) as it:
-                for entry in it:
-                    if entry.is_file():
-                        total += entry.stat().st_size
-                    elif entry.is_dir():
-                        total += get_dir_size(entry.path)
-            return total
-
         if not os.path.exists(engine_cache_dir):
             os.makedirs(engine_cache_dir, exist_ok=True)
         self.engine_cache_dir = engine_cache_dir
         self.total_engine_cache_size = engine_cache_size
-        self.available_engine_cache_size = engine_cache_size - get_dir_size(
-            engine_cache_dir
+        self.available_engine_cache_size = engine_cache_size - sum(
+            os.path.getsize(os.path.join(engine_cache_dir, entry, "blob.bin"))
+            for entry in self._entries()
         )
         if engine_cache_dir not in DiskEngineCache.dir2hash2size_map:
             DiskEngineCache.dir2hash2size_map[engine_cache_dir] = {}
@@ -333,6 +324,15 @@ class DiskEngineCache(BaseEngineCache):
         _LOGGER.info(
             f"Disk engine cache initialized (cache directory:{self.engine_cache_dir}, max size: {self.total_engine_cache_size})"
         )
+
+    def _entries(self) -> List[str]:
+        """The entries this cache wrote, each a folder holding a ``blob.bin``. Other files and folders
+        in the cache folder are not the cache's to count or delete."""
+        return [
+            entry
+            for entry in os.listdir(self.engine_cache_dir)
+            if os.path.isfile(os.path.join(self.engine_cache_dir, entry, "blob.bin"))
+        ]
 
     def has_available_cache_size(self, needed_size: int) -> bool:
         """Check if the cache has available space for saving object
@@ -355,7 +355,7 @@ class DiskEngineCache(BaseEngineCache):
         def LRU() -> None:
             """Clear the Least Recently Used engine in the cache"""
             # Get the list of engine directories
-            engines_hash_values = os.listdir(self.engine_cache_dir)
+            engines_hash_values = self._entries()
             # Sort the engine directories by modification time (oldest first)
             engines_hash_values.sort(
                 key=lambda x: os.path.getmtime(os.path.join(self.engine_cache_dir, x))

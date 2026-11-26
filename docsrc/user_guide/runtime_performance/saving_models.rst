@@ -277,6 +277,8 @@ warning and are ignored. With this format, an unknown keyword raises a ``TypeErr
   for an engine compiled with ``enable_weight_streaming=True``.
 * ``external_engine_data``: a file name, without ``.ptd``, to store the engines in instead of the
   ``.pte``.
+* ``engine_offload_dir``: a folder (Linux only) to write the engines to during the save, so they
+  are streamed into the program from files instead of all being copied in memory.
 * ``zero_copy_kv``: let an engine update its KV cache in place. See
   :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord``: also write an ETRecord, a debug record for the ExecuTorch Developer Tools
@@ -329,8 +331,8 @@ values of the options above:
     program.write_tensor_data_to_file(".")
 
 It takes the same options as ``save()``, except ``backend_config``, which goes to
-``to_executorch()``. ``partitioners``, ``compile_specs`` and ``transform_passes`` can also be a dict
-keyed by method name.
+``to_executorch()``, and ``engine_offload_dir``. ``partitioners``, ``compile_specs`` and
+``transform_passes`` can also be a dict keyed by method name.
 
 TensorRT needs every input and output on a 256-byte boundary, and ExecuTorch plans memory on
 16-byte boundaries by default. ``save()`` plans on 256 for you. Here, give ``backend_config`` a

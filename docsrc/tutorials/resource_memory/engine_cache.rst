@@ -103,8 +103,9 @@ LRU Eviction
 
 When a new engine would exceed the configured ``engine_cache_size``,
 ``DiskEngineCache`` evicts the least-recently-used entries (based on file modification
-time) until enough space is available. An engine larger than the total cache size is
-silently not cached (a warning is logged).
+time) until enough space is available. It counts and evicts only the entries it wrote (each a
+folder holding a ``blob.bin``), so other files and folders in the cache folder are left alone.
+An engine larger than the total cache size is silently not cached (a warning is logged).
 
 ----
 

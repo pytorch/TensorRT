@@ -16,6 +16,7 @@ from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._engine_cache import (
     BaseEngineCache,
+    DiskEngineCache,
     _canonicalize_setting_value,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -206,6 +207,28 @@ class TestHashFunction(TestCase):
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
         self.assertNotEqual(hash1, hash2)
+
+
+class TestDiskEngineCacheEviction(TestCase):
+    def test_the_cache_counts_and_evicts_only_the_entries_it_wrote(self):
+        with tempfile.TemporaryDirectory() as cache_dir:
+            other = os.path.join(cache_dir, "other")
+            os.makedirs(other)
+            with open(os.path.join(other, "notes.txt"), "w") as f:
+                f.write("notes")
+            # Older than every engine, so it would be evicted first.
+            os.utime(other, (1, 1))
+            cache = DiskEngineCache(cache_dir, 1000)
+            cache.save("old", b"o" * 600)
+            cache.save("new", b"n" * 600)
+
+            self.assertIsNone(cache.load("old"))
+            self.assertEqual(cache.load("new"), b"n" * 600)
+            with open(os.path.join(other, "notes.txt")) as f:
+                self.assertEqual(f.read(), "notes")
+            # What eviction cannot delete does not count against the size either.
+            reopened = DiskEngineCache(cache_dir, 1000)
+            self.assertEqual(reopened.available_engine_cache_size, 400)
 
 
 class TestEngineCache(TestCase):

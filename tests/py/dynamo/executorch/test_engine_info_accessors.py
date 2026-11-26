@@ -215,3 +215,26 @@ def test_rewrite_stages_the_engine_once_as_bytes():
     assert np.shares_memory(
         engine_buffer.numpy(), np.frombuffer(engine_bytes, dtype=np.uint8)
     ), "the registered buffer must view the bytes preprocess hands to named data"
+
+
+@pytest.mark.unit
+def test_rewrite_without_the_tensor_accessor_stages_the_engine_in_a_file(tmp_path):
+    """In a save given an engine_offload_dir, the fallback writes the engine to a file
+    too, so the save does not keep it in memory."""
+    from torch_tensorrt.dynamo.runtime._offloaded_engines import (
+        get_offloaded_engine_path,
+        offload_engines_for_save,
+    )
+
+    program, _ = _program_with_engine(RuntimeWithoutTensorAccessor())
+    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+    with offload_engines_for_save(tmp_path):
+        _export_utils.replace_execute_engine(program, {})
+        (no_op_node,) = [
+            n for n in program.graph_module.graph.nodes if n.target is no_op
+        ]
+        engine_buffer = getattr(
+            program.graph_module, no_op_node.args[1 + ENGINE_IDX].target
+        )
+        assert get_offloaded_engine_path(engine_buffer) is not None
+        assert engine_buffer.numpy().tobytes() == ENGINE_BYTES
