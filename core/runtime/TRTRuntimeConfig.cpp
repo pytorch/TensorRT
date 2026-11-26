@@ -28,7 +28,7 @@ bool TRTRuntimeConfig::settings(RuntimeSettings new_settings) {
 }
 
 void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine* cuda_engine) {
-#ifdef TRT_HAS_IRUNTIME_CONFIG
+#if TORCHTRT_HAS_IRUNTIME_CONFIG()
   if (!config) {
     TORCHTRT_CHECK(cuda_engine != nullptr, "Cannot initialize TRTRuntimeConfig without a live ICudaEngine");
     config = make_trt(cuda_engine->createRuntimeConfig());
@@ -74,11 +74,11 @@ void TRTRuntimeConfig::ensure_initialized(TORCHTRT_UNUSED nvinfer1::ICudaEngine*
     LOG_DEBUG("CUDA graph strategy set to " << settings_.cuda_graph_strategy.to_string());
   }
 #endif
-#endif // TRT_HAS_IRUNTIME_CONFIG
+#endif // TORCHTRT_HAS_IRUNTIME_CONFIG()
 }
 
 void TRTRuntimeConfig::reset() {
-#ifdef TRT_HAS_IRUNTIME_CONFIG
+#if TORCHTRT_HAS_IRUNTIME_CONFIG()
   config.reset();
 #endif
 }
@@ -87,7 +87,7 @@ std::shared_ptr<nvinfer1::IExecutionContext> TRTRuntimeConfig::create_execution_
     nvinfer1::ICudaEngine* cuda_engine,
     nvinfer1::ExecutionContextAllocationStrategy allocation_strategy) {
   ensure_initialized(cuda_engine);
-#ifdef TRT_HAS_IRUNTIME_CONFIG
+#if TORCHTRT_HAS_IRUNTIME_CONFIG()
   config->setExecutionContextAllocationStrategy(allocation_strategy);
   return make_trt(cuda_engine->createExecutionContext(config.get()));
 #else
@@ -129,7 +129,7 @@ bool TRTRuntimeConfig::is_monolithic_capturable(
 
 std::ostream& operator<<(std::ostream& os, const TRTRuntimeConfig& cfg) {
   os << "TRTRuntimeConfig{settings=" << cfg.settings().to_str();
-#ifdef TRT_HAS_IRUNTIME_CONFIG
+#if TORCHTRT_HAS_IRUNTIME_CONFIG()
   os << ", config=" << (cfg.config ? "live" : "null");
 #endif
   os << "}";
