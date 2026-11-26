@@ -291,6 +291,24 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        ``x``, as the model does. To keep an op in FP32, exclude the op, not the cast.
        ``x.to(y)`` is such a cast too, since export gives it the dtype of ``y``. A
        ``type_as`` is not: autocast chooses its precision as for other ops.
+   * - ``autocast_l2_norm_in_low_precision``
+     - ``False``
+     - When autocast runs a 2-norm (L2 norm) in float16 or bfloat16, whether to compute it
+       in that type instead of FP32. This covers ``torch.linalg.vector_norm``, which
+       ``F.normalize``, ``torch.norm`` and ``Tensor.norm`` use. The norm is written as
+       ``m * sqrt(sum((x / m) ** 2))``, where ``m`` is the largest magnitude of ``x``,
+       clamped to the finite positive range of the type. So a zero vector has a norm of 0,
+       and one that holds an inf has a norm of inf. Dividing by ``m`` keeps each square at
+       most 1, so the sum does not overflow, though a square much smaller than 1 can still
+       round to 0. By default PyTorch computes the norm in FP32, as eager does, which adds
+       casts around it. These norms stay as they are: other norms such as the 1-norm,
+       ``torch.linalg.norm``, which exports another op, a norm given a ``dtype``, a norm of
+       a 0-d tensor, and a norm of 0 values, of more values than the largest number of the
+       type (65504 in float16), or of a count not known when compiling. The sum still adds
+       its values in the low precision type, so check the accuracy. To keep a norm in FP32,
+       exclude it with ``autocast_excluded_node_names`` or the op
+       ``torch.ops.aten.linalg_vector_norm.default``. Excluding ``sum`` or ``div`` does not
+       keep this norm in FP32.
 
 ----
 
@@ -596,6 +614,7 @@ rebuilt from scratch:
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
 ``autocast_model_casts``,
+``autocast_l2_norm_in_low_precision``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,

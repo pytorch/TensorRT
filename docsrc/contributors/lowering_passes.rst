@@ -194,6 +194,11 @@ export checks that dtype.
 With ``autocast_model_casts="reclassify"``, a cast to FP32 that runs in the low
 precision type, between ops that run in it, keeps the ``dtype`` of its input. One that
 changed the dtype when traced still has ``copy=True``.
+With ``autocast_l2_norm_in_low_precision=True``, a 2-norm (``aten.linalg_vector_norm``)
+that runs in the low precision type becomes ``m * sqrt(sum((x / m) ** 2))``, where ``m``
+is the largest magnitude of ``x``, clamped to the finite positive range of the type.
+This needs a norm with no ``dtype`` argument, of a tensor with at least 1 dimension, over
+a count of values known when compiling, from 1 up to the largest number of that type.
 
 remove_sym_nodes
 ^^^^^^^^^^^^^^^^^
