@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
+    set_layer_name,
 )
 
 
@@ -153,3 +154,22 @@ def grouped_mm(
             ctx, out, out_dtype, f"{name}_out_dtype", target, source_ir
         )
     return out
+
+
+def grouped_mm_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    mat1: trt.ITensor,
+    mat2: trt.ITensor,
+    offs: Union[trt.ITensor, torch.Tensor],
+) -> trt.ITensor:
+    # Imported here because it needs Triton.
+    from torch_tensorrt.dynamo.conversion.impl import _grouped_mm_kernel
+
+    plugin = _grouped_mm_kernel.plugin()
+    offs = get_trt_tensor(ctx, offs, f"{name}_offs")
+    layer = ctx.net.add_plugin(plugin(mat1, mat2, offs), aot=True)
+    set_layer_name(layer, target, name, source_ir)
+    return layer.get_output(0)

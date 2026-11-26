@@ -41,6 +41,7 @@ from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .inline_autocast_regions import inline_autocast_regions, log_kept_regions
 from .lower_associative_scan import lower_associative_scan
+from .merge_parallel_linears import merge_parallel_linears
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
 from .preserve_attention_output_layout import preserve_attention_output_layout
@@ -84,6 +85,7 @@ post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     lower_associative_scan,
+    merge_parallel_linears,
     mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
