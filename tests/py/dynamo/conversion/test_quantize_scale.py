@@ -9,7 +9,8 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt import _enums
+from torch_tensorrt import ENABLED_FEATURES, _enums
+from torch_tensorrt.dynamo import _refit
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion import aten_ops_converters, impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -332,9 +333,19 @@ class TestQuantizeScale(TestCase):
             self.assertTrue(supported(-128, 127, block_size=(1, 256)))
 
     def _int4_matmul(
-        self, qdata, scale, x, dtype, runtime_scale=False, refittable=False
+        self,
+        qdata,
+        scale,
+        x,
+        dtype,
+        runtime_scale=False,
+        refittable=False,
+        refit_qdata=None,
     ):
-        """Build and run x @ dequantize_affine(qdata, scale).T, the scale optionally an input."""
+        """Build and run x @ dequantize_affine(qdata, scale).T, the scale optionally an input.
+
+        With refit_qdata, the engine is refit with those weights before it runs.
+        """
         skip_if_trt_rtx_turing(self, "INT4 dequantize into a matmul")
         builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
         network = builder.create_network(
@@ -371,6 +382,30 @@ class TestQuantizeScale(TestCase):
         plan = builder.build_serialized_network(network, config)
         self.assertIsNotNone(plan)
         engine = trt.Runtime(trt.Logger(trt.Logger.ERROR)).deserialize_cuda_engine(plan)
+        if refit_qdata is not None:
+            new_ctx = ConversionContext(
+                builder.create_network(
+                    1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+                ),
+                ctx.compilation_settings,
+            )
+            impl.quantize.dequantize_affine(
+                new_ctx,
+                torch.ops.aten.mul.Tensor,
+                None,
+                "dq",
+                refit_qdata,
+                [1, 128],
+                scale,
+                dtype,
+            )
+            with mock.patch.object(
+                _refit,
+                "construct_refit_mapping",
+                return_value=new_ctx.weight_refit_map,
+            ):
+                _refit._refit_single_trt_engine_with_gm(None, engine, [])
+            qdata = refit_qdata
         context = engine.create_execution_context()
         buffers = {"x": x.to("cuda", dtype), "scale": scale.cuda()}
         out = torch.empty(x.shape[0], qdata.shape[0], device="cuda", dtype=dtype)
@@ -408,6 +443,18 @@ class TestQuantizeScale(TestCase):
                         qdata, scale, x, dtype, runtime_scale, refittable=True
                     )
                     torch.testing.assert_close(out, expected, rtol=2e-2, atol=1.0)
+
+    @unittest.skipIf(not ENABLED_FEATURES.refit, "Refit is not available")
+    def test_int4_dequantize_refits_new_weights(self):
+        # Refit, which a cached engine also goes through, loads the INT4 weights.
+        qdata = torch.randint(-8, 8, (512, 1024), dtype=torch.int8)
+        new_qdata = torch.randint(-8, 8, (512, 1024), dtype=torch.int8)
+        scale = torch.rand(512, 8, dtype=torch.bfloat16) + 0.5
+        x = torch.randn(4, 1024)
+        out, expected = self._int4_matmul(
+            qdata, scale, x, torch.bfloat16, refittable=True, refit_qdata=new_qdata
+        )
+        torch.testing.assert_close(out, expected, rtol=2e-2, atol=1.0)
 
     def test_int4_dequantize_in_the_scale_dtype_adds_no_cast(self):
         # A cast between the DQ and its matmul stops TensorRT from fusing them.

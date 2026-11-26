@@ -72,9 +72,8 @@ processed_model = pre_process_model_for_export(model)
 # ^^^^^^^^^^^^^^^^^^
 # Wrap export in exclude_dq_from_constant_folding so inductor does not fold
 # dequantize_affine before Torch-TensorRT lowering. Use
-# immutable_weights=True: the converter re-packs int8 qdata into an INT4
-# constant at build time, and engine refit would push unpacked int8 at an INT4
-# prototype.
+# immutable_weights=True, so TensorRT can fuse the INT4 dequantize into the
+# matmul.
 
 with exclude_dq_from_constant_folding():
     exp_program = torch.export.export(processed_model, (example_input,), strict=True)

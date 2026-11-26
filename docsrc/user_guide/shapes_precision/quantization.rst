@@ -219,9 +219,10 @@ int8 qdata into ``trt.DataType.INT4``. With BF16 scales, as in the example,
 the weights are dequantized straight to BF16, so TensorRT can fuse the
 dequantize into the matmul.
 
-Compile with ``immutable_weights=True``. The converter packs INT4 at build
-time; engine refit would push the graph's int8 qdata at an INT4 prototype
-(``refit weights data type Int8 must equal to weights prototype Int4``).
+Compile with ``immutable_weights=True``. A refittable engine can be refit, but
+it dequantizes INT4 weights in FP32, and TensorRT does not fuse that into the
+matmul. So INT4 engines that refit or use the engine cache, which needs refittable
+engines, are slower: 2 to 3 times in a measured BF16 MLP.
 
 .. code-block:: python
 
@@ -490,7 +491,9 @@ Troubleshooting
     The graph must keep ``dequantize_affine`` (same preprocess / constant-fold
     exclusion as FP8 WOQ). Group-wise INT4 also requires the INT4 pack path in
     the converter; per-channel INT8-style DQ will not emit ``Datatype: Int4``.
-    Use symmetric quantization (zero zero-point) and ``immutable_weights=True``.
+    Use symmetric quantization (zero zero-point). ``immutable_weights=True`` is
+    not needed for INT4 constants, but it lets TensorRT fuse the INT4 dequantize
+    into the matmul.
 
 **"IDequantizeLayer rejects nonzero zero_point" / INT4 compile fails**
     TorchAO's default INT4 config is asymmetric. Use

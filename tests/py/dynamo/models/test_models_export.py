@@ -815,16 +815,21 @@ def test_int4_blockwise_weight_only(ir, dtype, in_features):
 def test_int4_blockwise_weight_only_refittable(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
+    from torch_tensorrt.dynamo import refit_module_weights
 
-    model = torch.nn.Linear(2048, 2048).eval().cuda().to(torch.bfloat16)
-    input_tensor = torch.randn(8, 2048, dtype=torch.bfloat16).cuda()
-    mtq.quantize(
-        model,
-        mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG,
-        forward_loop=lambda model: model(input_tensor),
-    )
+    input_tensor = torch.randn(4, 1024, dtype=torch.bfloat16).cuda()
+
+    def quantized_linear():
+        model = torch.nn.Linear(1024, 512).eval().cuda().to(torch.bfloat16)
+        mtq.quantize(
+            model,
+            mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG,
+            forward_loop=lambda model: model(input_tensor),
+        )
+        return model
+
+    model = quantized_linear()
     output_pyt = model(input_tensor)
-
     with torch.no_grad(), export_torch_mode():
         exp_program = torch.export.export(model, (input_tensor,), strict=False)
         trt_model = torchtrt.dynamo.compile(
@@ -837,6 +842,17 @@ def test_int4_blockwise_weight_only_refittable(ir):
         )
         outputs_trt = trt_model(input_tensor)
     assert torch.ops.tensorrt.quantize_op.default not in _pytorch_ops(trt_model)
+    assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=5e-2)
+
+    # Refit, which a cached engine also goes through, loads new INT4 weights.
+    model = quantized_linear()
+    output_pyt = model(input_tensor)
+    with torch.no_grad(), export_torch_mode():
+        exp_program = torch.export.export(model, (input_tensor,), strict=False)
+        trt_model = refit_module_weights(
+            trt_model, exp_program, arg_inputs=(input_tensor,)
+        )
+        outputs_trt = trt_model(input_tensor)
     assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=5e-2)
 
 

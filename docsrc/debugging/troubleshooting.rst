@@ -229,10 +229,12 @@ Accuracy / Performance Issues
     size is a multiple of the block size (128). ModelOpt pads other weights, and
     their engine dequantizes a full 16-bit copy of the weight into scratch memory.
 
-    Refit does not support INT4 weights yet, so keep the default
-    ``immutable_weights=True``. A refittable engine still builds, but TensorRT does
-    not fuse its INT4 dequantize into the matmul, and refitting it fails with an
-    error. Reusing a cached engine fails the same way, because it refits the engine.
+    Keep the default ``immutable_weights=True``. A refittable engine, which the
+    engine cache needs, builds and can be refit, but TensorRT does not fuse its INT4
+    dequantize into the matmul, so INT4 engines that refit or use the engine cache
+    are slower. They dequantize every weight into scratch memory on each run. For a
+    BF16 gated MLP (4096 to 14336 to 4096) on an A100, one token took 0.76 ms with a
+    refittable INT4 engine, 0.27 ms with an immutable one, and 0.24 ms in BF16.
 
     With TensorRT 11.4, some deeper networks with INT4 weights fail with an illegal
     memory access when the engine runs in the process that built it. The same engine
@@ -256,7 +258,8 @@ Accuracy / Performance Issues
     For **INT4 weight-only** quantization with TorchAO, see
     :ref:`quantize_linear_int4_woq`, :ref:`torch_export_flux_int4_woq`, and
     :ref:`torch_export_qwen3_int4_woq`. Use symmetric INT4 (zero zero-point)
-    and ``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+    and ``immutable_weights=True``, so TensorRT can fuse the INT4 dequantize into the
+    matmul.
 
     For **NVFP4 weight-only** quantization with TorchAO, see
     :ref:`quantize_linear_nvfp4_woq` and :ref:`torch_export_flux_nvfp4_woq`.
