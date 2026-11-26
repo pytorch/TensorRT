@@ -3,7 +3,7 @@
 
 import logging
 import math
-from typing import List, Tuple, cast
+from typing import List, Optional, Tuple, cast
 
 import tensorrt as trt
 import torch
@@ -27,36 +27,64 @@ Step = Tuple[List[int], List[int]]
 def collapse_high_rank_permutes(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
-    """Run a reshape, permute, reshape chain over more than 8 dims on at most 8.
+    """Run reshape, permute or unsqueeze, expand chains past 8 dims on at most 8.
 
     Window and patch layouts (neighborhood attention, the Qwen2-VL image patches)
     reshape a tensor to more than 8 dimensions, permute it, and reshape it back.
     TensorRT tensors have at most 8 dimensions, so each such chain ran in PyTorch and
-    split the graph. A chain with static shapes is rewritten as reshapes and permutes
-    of at most 8 dimensions that compute the same values (see ``_steps``). Chains that
-    ``torch_executed_ops`` or ``torch_executed_modules`` keep in PyTorch are left as
-    they are, since there the rewrite would only add work.
+    split the graph. With ``collapse_high_rank_permutes``, a chain with static shapes
+    is rewritten as reshapes and permutes of at most 8 dimensions that compute the
+    same values (see ``_steps``). With ``collapse_high_rank_expands``, an unsqueeze,
+    expand, reshape chain past 8 dims whose expand repeats only the new dimension, as
+    in newer Qwen2-VL image patches, is rewritten on 3 dims (see ``_rewrite_expand``).
+    All chains of one kind are left as they are when ``torch_executed_ops`` lists one
+    of their ops (the permute; the unsqueeze or the expand; a clone; a reshape). So is
+    a chain in a module that ``torch_executed_modules`` keeps in PyTorch.
     """
-    if not settings.collapse_high_rank_permutes:
-        return gm
+    expands = permutes = 0
+    if settings.collapse_high_rank_expands:
+        # The last one first: each rewrite can leave a reshape as the only reader of
+        # the expand or permute before it.
+        for node in reversed(
+            _chains(gm, settings, aten.unsqueeze.default, aten.expand.default)
+        ):
+            expands += _rewrite_expand(gm, node, settings)
+    if settings.collapse_high_rank_permutes:
+        for node in _chains(gm, settings, aten.permute.default):
+            permutes += _rewrite(gm, node)
+    if permutes or expands:
+        gm = clean_up_graph_after_modifications(gm)
+    if permutes:
+        logger.debug(f"Rewrote {permutes} permute(s) of more than 8 dims")
+    if expands:
+        logger.debug(f"Rewrote {expands} expand(s) of more than 8 dims")
+    return gm
+
+
+def _chains(
+    gm: torch.fx.GraphModule,
+    settings: CompilationSettings,
+    *ops: torch._ops.OpOverload,
+) -> List[torch.fx.Node]:
+    """The ``ops[0]`` nodes over 8 dims whose chains may run in TensorRT.
+
+    ``ops`` are the ops of the chain besides clones and reshapes. None may be in
+    ``torch_executed_ops``, even one the rewrite removes, since the partitioner could
+    then no longer keep it in PyTorch.
+    """
     excluded = settings.torch_executed_ops
     if any(
         op in excluded or ConverterRegistry.qualified_name_or_str(op) in excluded
-        for op in (aten.permute.default, aten.clone.default, *_RESHAPES)
+        for op in (*ops, aten.clone.default, *_RESHAPES)
     ):
-        return gm
-    count = 0
-    for node in list(gm.graph.nodes):
-        if (
-            node.target == aten.permute.default
-            and _rank(node) > trt.Dims.MAX_DIMS
-            and not node_in_torch_executed_module(node, settings.torch_executed_modules)
-        ):
-            count += _rewrite(gm, node)
-    if count:
-        gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Rewrote {count} permute(s) of more than 8 dims")
-    return gm
+        return []
+    return [
+        node
+        for node in gm.graph.nodes
+        if node.target == ops[0]
+        and _rank(node) > trt.Dims.MAX_DIMS
+        and not node_in_torch_executed_module(node, settings.torch_executed_modules)
+    ]
 
 
 def _rank(node: torch.fx.Node) -> int:
@@ -64,21 +92,45 @@ def _rank(node: torch.fx.Node) -> int:
     return val.ndim if isinstance(val, torch.Tensor) else 0
 
 
+def _static_sizes(node: torch.fx.Node) -> Optional[List[int]]:
+    val = node.meta.get("val")
+    if isinstance(val, torch.Tensor) and all(isinstance(s, int) for s in val.shape):
+        return list(val.shape)
+    return None
+
+
+def _reshaped_clones(node: torch.fx.Node) -> Optional[List[torch.fx.Node]]:
+    """The clones of ``node``.
+
+    None if anything besides these clones and reshapes reads ``node`` or a clone.
+    """
+    clones = [user for user in node.users if user.target == aten.clone.default]
+    for n in [node, *clones]:
+        if any(u not in clones and u.target not in _RESHAPES for u in n.users):
+            return None
+    return clones
+
+
+def _set_vals(nodes: List[torch.fx.Node], source: torch.Tensor) -> None:
+    """Recompute the values of ``nodes``.
+
+    The first is computed from ``source``, and each other one from its own input.
+    """
+    for i, node in enumerate(nodes):
+        op = cast(torch._ops.OpOverload, node.target)
+        value = source if i == 0 else node.all_input_nodes[0].meta["val"]
+        node.meta["val"] = op(value, *node.args[1:], **node.kwargs)
+        # "tensor_meta" would keep the old shapes.
+        node.meta.pop("tensor_meta", None)
+
+
 def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
     head = permute.all_input_nodes[0]
     if head.target not in _RESHAPES or len(head.users) != 1:
         return False
-    val = head.meta.get("val")
-    if not isinstance(val, torch.Tensor) or not all(
-        isinstance(size, int) for size in val.shape
-    ):
+    sizes, clones = _static_sizes(head), _reshaped_clones(permute)
+    if sizes is None or clones is None:
         return False
-    sizes = list(val.shape)
-    clones = [user for user in permute.users if user.target == aten.clone.default]
-    for node in [permute, *clones]:
-        if any(u not in clones and u.target not in _RESHAPES for u in node.users):
-            return False
-
     dims = [d % len(sizes) for d in cast(List[int], permute.args[1])]
     (shape, dims), *rest = _steps(sizes, dims)
     head.args = (head.args[0], shape)
@@ -100,12 +152,57 @@ def _rewrite(gm: torch.fx.GraphModule, permute: torch.fx.Node) -> bool:
             added[-1], delete_user_cb=lambda user: user is not added[1]
         )
     # The head's input may get its value only after all passes, so the head starts
-    # from its own old value. "tensor_meta" would keep the old shapes.
-    for node in [head, *added, *clones]:
-        op = cast(torch._ops.OpOverload, node.target)
-        source = val if node is head else node.all_input_nodes[0].meta["val"]
-        node.meta["val"] = op(source, *node.args[1:], **node.kwargs)
-        node.meta.pop("tensor_meta", None)
+    # from its own old value.
+    _set_vals([head, *added, *clones], head.meta["val"])
+    return True
+
+
+def _rewrite_expand(
+    gm: torch.fx.GraphModule,
+    unsqueeze: torch.fx.Node,
+    settings: CompilationSettings,
+) -> bool:
+    """Run ``unsqueeze(d)`` and an expand of dim d alone on 3 dims.
+
+    In row-major order the result repeats each block of the dims from d on, so
+    reshaping the input to (A, 1, B) and expanding that to (A, k, B) gives the same
+    values, where A is the size of the dims before d and B the size of the rest.
+    Each reshape that reads the result must come back to at most 8 dims, and
+    ``torch_executed_modules`` must not keep the expand, a clone or a reshape of the
+    result in PyTorch. Otherwise the graph stays split right there, and the expanded
+    tensor instead of the input would cross an engine boundary.
+    """
+    if len(unsqueeze.users) != 1:
+        return False
+    expand = next(iter(unsqueeze.users))
+    if expand.target != aten.expand.default:
+        return False
+    # The unsqueeze's own value, since its input may get one only after all passes.
+    shape, out = _static_sizes(unsqueeze), _static_sizes(expand)
+    clones = _reshaped_clones(expand)
+    if shape is None or out is None or clones is None:
+        return False
+    readers = [u for n in [expand, *clones] for u in n.users if u not in clones]
+    if any(_rank(r) > trt.Dims.MAX_DIMS for r in readers) or any(
+        node_in_torch_executed_module(n, settings.torch_executed_modules)
+        for n in [expand, *clones, *readers]
+    ):
+        return False
+    dim = cast(int, unsqueeze.args[1]) % len(shape)
+    sizes = shape[:dim] + shape[dim + 1 :]
+    if out[:dim] + out[dim + 1 :] != sizes:
+        return False
+
+    outer, inner = math.prod(sizes[:dim]), math.prod(sizes[dim:])
+    with gm.graph.inserting_before(expand):
+        reshape = gm.graph.call_function(
+            aten._reshape_copy.default, (unsqueeze.args[0], [outer, 1, inner])
+        )
+    reshape.meta.update(unsqueeze.meta)
+    expand.args = (reshape, [outer, out[dim], inner])
+    _set_vals([reshape, expand, *clones], unsqueeze.meta["val"])
+    # Erase it now, so an expand or permute before it sees only reshapes reading it.
+    gm.graph.erase_node(unsqueeze)
     return True
 
 

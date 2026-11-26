@@ -975,6 +975,14 @@ class TestCollapseHighRankPermutes(TestCase):
             p = x.view(2, 1, 2, 3, 2, 2, 2, 2, 2, 2)
             return p.permute(0, 1, 4, 7, 5, 8, 3, 2, 6, 9).reshape(2, 16, 24)
 
+    class ExpandedPatches(torch.nn.Module):
+        """Newer transformers' Qwen2-VL patches: 8-D, then repeated over 2 frames."""
+
+        def forward(self, x):
+            p = (x + 1).view(-1, 3, 2, 2, 2, 2, 2, 2).permute(0, 2, 5, 3, 6, 1, 4, 7)
+            p = p.unsqueeze(-3).expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+            return p.reshape(-1, 16, 24) * 2
+
     class WithPatches(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -985,7 +993,7 @@ class TestCollapseHighRankPermutes(TestCase):
 
     def _compile(self, mod, inputs, dynamic_shapes=None, collapse=True, **settings):
         if collapse:
-            settings["collapse_high_rank_permutes"] = True
+            settings.setdefault("collapse_high_rank_permutes", True)
         trt_mod = torch_tensorrt.dynamo.compile(
             torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes),
             list(inputs),
@@ -996,11 +1004,28 @@ class TestCollapseHighRankPermutes(TestCase):
         return {n: m for n, m in trt_mod.named_children() if "_run_on" in n}
 
     def test_off_by_default(self):
-        x = torch.randn(2, 2, 3, 8, 8, device="cuda")
-        self.assertEqual(
-            list(self._compile(self.WithPatches(), (x,), collapse=False)),
-            ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
-        )
+        for mod, x in (
+            (self.WithPatches(), (2, 2, 3, 8, 8)),
+            (self.ExpandedPatches(), (2, 3, 8, 8)),
+        ):
+            with self.subTest(mod=type(mod).__name__):
+                x = torch.randn(*x, device="cuda")
+                self.assertEqual(
+                    list(self._compile(mod, (x,), collapse=False)),
+                    ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+                )
+
+    def test_each_setting_runs_only_its_rewrite(self):
+        for mod, x, on in (
+            (self.ExpandedPatches(), (2, 3, 8, 8), "collapse_high_rank_permutes"),
+            (self.WithPatches(), (2, 2, 3, 8, 8), "collapse_high_rank_expands"),
+        ):
+            with self.subTest(on=on):
+                x = torch.randn(*x, device="cuda")
+                self.assertEqual(
+                    list(self._compile(mod, (x,), collapse=False, **{on: True})),
+                    ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+                )
 
     def test_steps(self):
         from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
@@ -1055,6 +1080,177 @@ class TestCollapseHighRankPermutes(TestCase):
             list(self._compile(self.WithPatches(), (x,))), ["_run_on_acc_0"]
         )
 
+    def test_expanded_patch_layout(self):
+        logger = "torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes"
+        x = torch.randn(2, 3, 8, 8, device="cuda")
+        with self.assertLogs(logger, level="DEBUG") as logs:
+            parts = self._compile(
+                self.ExpandedPatches(), (x,), collapse_high_rank_expands=True
+            )
+        self.assertEqual(list(parts), ["_run_on_acc_0"])
+        self.assertIn("Rewrote 1 expand(s)", "\n".join(logs.output))
+
+    def test_expanded_values_updated(self):
+        """Later passes in the same lowering read the values the rewrite leaves."""
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            collapse_high_rank_permutes,
+        )
+
+        class Cloned(torch.nn.Module):
+            def forward(self, x):
+                y = x.view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
+                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return y.clone().reshape(2, 768)
+
+        gm = torch.export.export(Cloned(), (torch.randn(2, 3, 8, 16),)).graph_module
+        gm = collapse_high_rank_permutes(
+            gm, CompilationSettings(collapse_high_rank_expands=True)
+        )
+        shapes = {
+            n.target: n.meta["val"].shape
+            for n in gm.graph.nodes
+            if n.op == "call_function"
+        }
+        # 2 * 3 * 2 * 2 * 2 * 2 dims before the new one, 2 * 4 after it.
+        self.assertEqual(shapes[torch.ops.aten._reshape_copy.default], (96, 1, 8))
+        self.assertEqual(shapes[torch.ops.aten.expand.default], (96, 2, 8))
+        self.assertEqual(shapes[torch.ops.aten.clone.default], (96, 2, 8))
+        # Engine layer names come from node names.
+        self.assertFalse(any("unsqueeze" in n.name for n in gm.graph.nodes))
+
+    def test_chains_within_8_dims_untouched(self):
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            collapse_high_rank_permutes,
+        )
+
+        class Small(torch.nn.Module):
+            def forward(self, x):
+                y = x.reshape(2, 3, 4, 2).permute(0, 2, 1, 3).reshape(2, 24)
+                return y, x.unsqueeze(1).expand(-1, 2, -1, -1).reshape(2, 48)
+
+        gm = torch.export.export(Small(), (torch.randn(2, 3, 8),)).graph_module
+        before = [(n.target, n.args) for n in gm.graph.nodes]
+        gm = collapse_high_rank_permutes(
+            gm,
+            CompilationSettings(
+                collapse_high_rank_permutes=True, collapse_high_rank_expands=True
+            ),
+        )
+        self.assertEqual([(n.target, n.args) for n in gm.graph.nodes], before)
+
+    def test_expanded_matches_eager(self):
+        """New dim first, inside and last, with k of 1 and 3 and explicit sizes."""
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            collapse_high_rank_permutes,
+        )
+
+        class Repeat(torch.nn.Module):
+            def __init__(self, dim, sizes):
+                super().__init__()
+                self.dim, self.sizes = dim, sizes
+
+            def forward(self, x):
+                return x.unsqueeze(self.dim).expand(self.sizes).reshape(-1)
+
+        x = torch.randn(2, 1, 3, 1, 2, 1, 1, 4)
+        for dim, k in ((0, 3), (4, 1), (-1, 3)):
+            with self.subTest(dim=dim, k=k):
+                sizes = list(x.unsqueeze(dim).shape)
+                sizes[dim] = k
+                mod = Repeat(dim, sizes)
+                gm = torch.export.export(mod, (x,)).graph_module
+                gm = collapse_high_rank_permutes(
+                    gm, CompilationSettings(collapse_high_rank_expands=True)
+                )
+                targets = [n.target for n in gm.graph.nodes]
+                self.assertNotIn(torch.ops.aten.unsqueeze.default, targets)
+                torch.testing.assert_close(gm(x)[0], mod(x))
+
+    def test_expanded_patch_layout_left_to_pytorch(self):
+        class WithExpandedPatches(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.patches = TestCollapseHighRankPermutes.ExpandedPatches()
+
+            def forward(self, x):
+                return self.patches(x + 1) * 2
+
+        x = torch.randn(2, 3, 8, 8, device="cuda")
+        patches = (
+            f"{self.ExpandedPatches.__module__}.{self.ExpandedPatches.__qualname__}"
+        )
+        for settings in (
+            {"torch_executed_modules": {patches}},
+            *(
+                {"torch_executed_ops": {f"torch.ops.aten.{op}.default"}}
+                for op in ("unsqueeze", "expand", "_reshape_copy", "clone")
+            ),
+        ):
+            with self.subTest(settings=settings):
+                parts = self._compile(
+                    WithExpandedPatches(),
+                    (x,),
+                    collapse_high_rank_expands=True,
+                    **settings,
+                )
+                # An excluded _reshape_copy also splits off the view before the permute.
+                unsqueezes = [
+                    n
+                    for name, part in parts.items()
+                    if "_run_on_gpu" in name
+                    for n in part.graph.nodes
+                    if n.target == torch.ops.aten.unsqueeze.default
+                ]
+                self.assertEqual(len(unsqueezes), 1)
+
+    def test_expanded_reader_left_to_pytorch(self):
+        """A kept module that holds any node of the chain keeps the repeat.
+
+        Otherwise the expanded tensor would cross an engine boundary.
+        """
+
+        class Repeat(torch.nn.Module):
+            def forward(self, x):
+                return (x + 1).view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
+
+        class Expand(torch.nn.Module):
+            def forward(self, y):
+                return y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+
+        class Contiguous(torch.nn.Module):
+            def forward(self, y):
+                return y.contiguous()
+
+        class Flatten(torch.nn.Module):
+            def forward(self, y):
+                return y.reshape(2, 768)
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.repeat, self.expand = Repeat(), Expand()
+                self.contiguous, self.flatten = Contiguous(), Flatten()
+
+            def forward(self, x):
+                y = self.expand(self.repeat(x))
+                return self.flatten(self.contiguous(y)) * 2
+
+        for kept in (Repeat, Expand, Contiguous, Flatten):
+            with self.subTest(kept=kept.__name__):
+                parts = self._compile(
+                    Model(),
+                    (torch.randn(2, 3, 8, 16, device="cuda"),),
+                    torch_executed_modules={f"{kept.__module__}.{kept.__qualname__}"},
+                    collapse_high_rank_expands=True,
+                )
+                targets = [
+                    n.target
+                    for name, part in parts.items()
+                    if "_run_on_gpu" in name
+                    for n in part.graph.nodes
+                ]
+                self.assertIn(torch.ops.aten.unsqueeze.default, targets)
+
     def test_patch_layout_left_to_pytorch(self):
         x = torch.randn(2, 2, 3, 8, 8, device="cuda")
         patches = f"{self.Patches.__module__}.{self.Patches.__qualname__}"
@@ -1078,26 +1274,45 @@ class TestCollapseHighRankPermutes(TestCase):
 
     def test_torch_compile_and_serialized_engine(self):
         logger = "torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes"
-        mod, x = self.WithPatches(), torch.randn(2, 2, 3, 8, 8, device="cuda")
-        torch._dynamo.reset()
-        compiled = torch.compile(
-            mod,
-            backend="torch_tensorrt",
-            options={"collapse_high_rank_permutes": True, "min_block_size": 1},
-        )
-        with self.assertLogs(logger, level="DEBUG") as logs, torch.no_grad():
-            torch.testing.assert_close(compiled(x), mod(x))
-        torch._dynamo.reset()
-        self.assertIn("Rewrote 1 permute(s)", "\n".join(logs.output))
-        # Without the rewrite this path fails to build the engine.
-        with self.assertLogs(logger, level="DEBUG") as logs:
-            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
-                torch.export.export(mod, (x,)),
-                [x],
-                min_block_size=1,
-                collapse_high_rank_permutes=True,
-            )
-        self.assertIn("Rewrote 1 permute(s)", "\n".join(logs.output))
+        for mod, x, setting, rewrote in (
+            (
+                self.WithPatches(),
+                torch.randn(2, 2, 3, 8, 8),
+                "collapse_high_rank_permutes",
+                "Rewrote 1 permute(s)",
+            ),
+            (
+                self.ExpandedPatches(),
+                torch.randn(2, 3, 8, 8),
+                "collapse_high_rank_expands",
+                "Rewrote 1 expand(s)",
+            ),
+        ):
+            with self.subTest(mod=type(mod).__name__):
+                x = x.cuda()
+                torch._dynamo.reset()
+                compiled = torch.compile(
+                    mod,
+                    backend="torch_tensorrt",
+                    options={
+                        setting: True,
+                        "min_block_size": 1,
+                        "pass_through_build_failures": True,
+                    },
+                )
+                with self.assertLogs(logger, level="DEBUG") as logs, torch.no_grad():
+                    torch.testing.assert_close(compiled(x), mod(x))
+                torch._dynamo.reset()
+                self.assertIn(rewrote, "\n".join(logs.output))
+                # Without the rewrite this path fails to build the engine.
+                with self.assertLogs(logger, level="DEBUG") as logs:
+                    torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                        torch.export.export(mod, (x,)),
+                        [x],
+                        min_block_size=1,
+                        **{setting: True},
+                    )
+                self.assertIn(rewrote, "\n".join(logs.output))
 
     def test_chains_left_alone(self):
         class ReadsReshape(torch.nn.Module):
@@ -1134,6 +1349,159 @@ class TestCollapseHighRankPermutes(TestCase):
         self.assertEqual(
             list(self._compile(self.Window(), (x,), dynamic_shapes=({0: batch},))),
             ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+        )
+
+    def test_expanded_chains_left_alone(self):
+        class ReadsUnsqueeze(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                z = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return z.reshape(2, 16, 24) * 2, (y * 3).sum(6)
+
+        class ReadsExpand(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                z = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return z.reshape(2, 16, 24) * 2, z.sum(6)
+
+        class ReadsClone(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                z = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1).contiguous()
+                return z.reshape(2, 16, 24) * 2, z.sum(6)
+
+        class ExpandsTwoDims(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(1, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                z = y.expand(2, -1, -1, -1, -1, -1, 2, -1, -1)
+                return z.reshape(2, 16, 24) * 2
+
+        class NotExpanded(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                return (y * 2).reshape(2, 16, 12)
+
+        for mod, x in (
+            (ReadsUnsqueeze(), torch.randn(2, 3, 8, 8, device="cuda")),
+            (ReadsExpand(), torch.randn(2, 3, 8, 8, device="cuda")),
+            (ReadsClone(), torch.randn(2, 3, 8, 8, device="cuda")),
+            (ExpandsTwoDims(), torch.randn(1, 3, 8, 8, device="cuda")),
+            (NotExpanded(), torch.randn(2, 3, 8, 8, device="cuda")),
+        ):
+            with self.subTest(mod=type(mod).__name__):
+                self._compile(mod, (x,), collapse_high_rank_expands=True)
+
+    def test_expanded_dynamic_shape(self):
+        x = torch.randn(2, 3, 8, 8, device="cuda")
+        batch = torch.export.Dim("batch", min=2, max=8)
+        self.assertEqual(
+            list(
+                self._compile(
+                    self.ExpandedPatches(),
+                    (x,),
+                    dynamic_shapes=({0: batch},),
+                    collapse_high_rank_expands=True,
+                )
+            ),
+            ["_run_on_acc_0", "_run_on_gpu_1", "_run_on_acc_2"],
+        )
+
+    def test_permute_into_expanded(self):
+        class PatchesRepeated(torch.nn.Module):
+            def forward(self, x):
+                p = (x + 1).view(2, 1, 2, 3, 2, 2, 2, 2, 2, 2)
+                p = p.permute(0, 1, 4, 7, 5, 8, 3, 2, 6, 9).unsqueeze(-3)
+                p = p.expand(-1, -1, -1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return p.reshape(2, 16, 48) * 2
+
+        x = torch.randn(2, 2, 3, 8, 8, device="cuda")
+        self.assertEqual(
+            list(
+                self._compile(PatchesRepeated(), (x,), collapse_high_rank_expands=True)
+            ),
+            ["_run_on_acc_0"],
+        )
+
+    def test_stacked_expanded(self):
+        class TwoRepeats(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1).unsqueeze(8)
+                y = y.expand(-1, -1, -1, -1, -1, -1, -1, -1, 2, -1)
+                return y.reshape(2, 16, 48) * 2
+
+        x = torch.randn(2, 3, 8, 8, device="cuda")
+        self.assertEqual(
+            list(self._compile(TwoRepeats(), (x,), collapse_high_rank_expands=True)),
+            ["_run_on_acc_0"],
+        )
+
+    def test_expanded_reader_over_8_dims(self):
+        """A reader over 8 dims stays in PyTorch, so the engine would return the
+        expanded tensor. Every reader is checked, not only the first."""
+        from torch_tensorrt.dynamo.lowering.passes.collapse_high_rank_permutes import (
+            collapse_high_rank_permutes,
+        )
+
+        class TwoReaders(torch.nn.Module):
+            def forward(self, x):
+                y = x.view(2, 3, 2, 2, 2, 2, 2, 4).unsqueeze(6)
+                y = y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return y.reshape(2, 768), y.reshape(3, 2, 2, 2, 2, 2, 2, 2, 4).sum(-1)
+
+        gm = torch.export.export(TwoReaders(), (torch.randn(2, 3, 8, 16),)).graph_module
+        before = [(n.target, n.args) for n in gm.graph.nodes]
+        gm = collapse_high_rank_permutes(
+            gm, CompilationSettings(collapse_high_rank_expands=True)
+        )
+        self.assertEqual([(n.target, n.args) for n in gm.graph.nodes], before)
+
+    def test_other_rewrite_ops_excluded(self):
+        class Repeat(torch.nn.Module):
+            def forward(self, x):
+                y = (x + 1).view(2, 3, 2, 2, 2, 2, 2, 2).unsqueeze(6)
+                return (
+                    y.expand(-1, -1, -1, -1, -1, -1, 2, -1, -1).reshape(2, 16, 24) * 2
+                )
+
+        for mod, x, op in (
+            (self.WithPatches(), torch.randn(2, 2, 3, 8, 8, device="cuda"), "expand"),
+            (Repeat(), torch.randn(2, 3, 8, 8, device="cuda"), "permute"),
+        ):
+            with self.subTest(mod=type(mod).__name__):
+                parts = self._compile(
+                    mod,
+                    (x,),
+                    torch_executed_ops={f"torch.ops.aten.{op}.default"},
+                    collapse_high_rank_expands=True,
+                )
+                self.assertEqual(list(parts), ["_run_on_acc_0"])
+
+    def test_expanded_input_added_by_lowering(self):
+        """The dynamic slice_scatter lowering adds nodes without values."""
+
+        class CacheRepeated(torch.nn.Module):
+            def forward(self, cache, new):
+                n = cache.shape[1]
+                out = cache.slice_scatter(new, dim=1, start=n - new.shape[1], end=n)
+                y = out.unsqueeze(-3).expand(-1, -1, -1, -1, -1, -1, 2, -1, -1)
+                return y.reshape(2, 6, 128) * 2
+
+        inputs = (
+            torch.randn(2, 6, 2, 2, 2, 2, 2, 2, device="cuda"),
+            torch.randn(2, 3, 2, 2, 2, 2, 2, 2, device="cuda"),
+        )
+        length = torch.export.Dim("length", min=2, max=5)
+        self.assertEqual(
+            list(
+                self._compile(
+                    CacheRepeated(),
+                    inputs,
+                    dynamic_shapes=({}, {1: length}),
+                    collapse_high_rank_expands=True,
+                )
+            ),
+            ["_run_on_acc_0"],
         )
 
     def test_reshape_of_a_node_added_by_lowering(self):
