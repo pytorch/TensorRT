@@ -41,6 +41,7 @@ from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .inline_autocast_regions import inline_autocast_regions, log_kept_regions
 from .lower_associative_scan import lower_associative_scan
+from .nodeclassifier import record_weight_magnitudes
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
 from .preserve_attention_output_layout import preserve_attention_output_layout
@@ -327,6 +328,12 @@ def pre_export_lowering(
         # Autocast inserts casts and changes the dtypes of nodes, so it works on a
         # copy, and the caller's program stays as it was.
         ep = _copy_program(ep)
+        # Refit reuses the precisions that the weights chose at compile time.
+        if (
+            settings.autocast_low_precision_type is not None
+            and settings._autocast_constant_range_nodes is None
+        ):
+            record_weight_magnitudes(ep)
         # Without a low precision type autocast changes nothing, so the regions keep
         # theirs. Inlining comes before calibration, so that it records the values of
         # the inlined ops. Like inlining, the message about kept regions reads the graph
