@@ -13,6 +13,11 @@ def _find_nccl_include(repository_ctx, torch_path):
         return candidate
     return None
 
+def _has_legacy_process_group_nccl(repository_ctx, torch_path):
+    """Check that the installed PyTorch exposes the legacy NCCL backend."""
+    header = torch_path + "/include/torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
+    return repository_ctx.execute(["test", "-f", header]).return_code == 0
+
 def _has_process_group_nccl2(repository_ctx, torch_path):
     """Check that the installed PyTorch exposes the NCCL2 backend."""
     header = torch_path + "/include/torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
@@ -24,6 +29,7 @@ def _torch_nccl_detect_impl(repository_ctx):
     # Skip detection on non-Linux (NCCL not available)
     os_name = repository_ctx.os.name.lower()
     nccl_include_dir = ""
+    has_legacy_process_group_nccl = False
     has_process_group_nccl2 = False
     if "linux" not in os_name:
         has_nccl = False
@@ -58,6 +64,7 @@ def _torch_nccl_detect_impl(repository_ctx):
                 found = _find_nccl_include(repository_ctx, torch_path)
                 if found:
                     nccl_include_dir = found
+                    has_legacy_process_group_nccl = _has_legacy_process_group_nccl(repository_ctx, torch_path)
                     has_process_group_nccl2 = _has_process_group_nccl2(repository_ctx, torch_path)
                 else:
                     # Cannot find nccl.h — disable to avoid build errors
@@ -100,6 +107,16 @@ config_setting(
 )
 
 bool_flag(
+    name = "use_legacy_process_group_nccl",
+    build_setting_default = {has_legacy_process_group_nccl},
+)
+
+config_setting(
+    name = "legacy_process_group_nccl_enabled",
+    flag_values = {{":use_legacy_process_group_nccl": "True"}},
+)
+
+bool_flag(
     name = "use_process_group_nccl2",
     build_setting_default = {has_process_group_nccl2},
 )
@@ -111,6 +128,7 @@ config_setting(
 {nccl_headers_target}
 """.format(
         has_nccl = has_nccl,
+        has_legacy_process_group_nccl = has_legacy_process_group_nccl,
         has_process_group_nccl2 = has_process_group_nccl2,
         nccl_headers_target = nccl_headers_target,
     ))
@@ -124,6 +142,13 @@ def if_torch_nccl(if_true, if_false = []):
     """Returns if_true if PyTorch has NCCL, else if_false."""
     return select({
         "@torch_nccl//:nccl_enabled": if_true,
+        "//conditions:default": if_false,
+    })
+
+def if_torch_legacy_nccl(if_true, if_false = []):
+    """Returns if_true if PyTorch exposes the legacy ProcessGroupNCCL."""
+    return select({
+        "@torch_nccl//:legacy_process_group_nccl_enabled": if_true,
         "//conditions:default": if_false,
     })
 
