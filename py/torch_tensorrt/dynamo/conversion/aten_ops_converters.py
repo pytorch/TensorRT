@@ -5,6 +5,7 @@
 
 import functools
 import logging
+import math
 import operator
 from typing import (
     Any,
@@ -44,6 +45,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     args_bounds_check,
     enforce_tensor_types,
+    extend_attr_to_tuple,
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
@@ -4395,16 +4397,74 @@ def aten_ops_cdist_forward(
     )
 
 
+_POOL_SPATIAL_RANK = {
+    torch.ops.aten.avg_pool1d.default: 1,
+    torch.ops.aten.avg_pool2d.default: 2,
+    torch.ops.aten.avg_pool3d.default: 3,
+    torch.ops.aten.max_pool1d.default: 1,
+    torch.ops.aten.max_pool2d.default: 2,
+    torch.ops.aten.max_pool3d.default: 3,
+}
+
+
+def _ceil_mode_pool_supported(
+    pool_node: Node, settings: Optional[CompilationSettings]
+) -> bool:
+    """ceil_mode pools ran in PyTorch before the converters supported them, so inputs the
+    converters cannot build stay there."""
+    import tensorrt as trt
+
+    meta = pool_node.args[0].meta if isinstance(pool_node.args[0], Node) else {}
+    val = meta.get("val", meta.get("tensor_meta"))
+    spatial_rank = _POOL_SPATIAL_RANK[pool_node.target]
+    if val is None:
+        _LOGGER.debug("ceil_mode pooling needs the input shape, which is unknown.")
+        return False
+    if spatial_rank == 1:
+        _LOGGER.debug("ceil_mode pooling in 1D converts only after lowering to 2D.")
+        return False
+    if pool_node.all_input_nodes != [pool_node.args[0]]:
+        _LOGGER.debug(
+            "ceil_mode pooling needs a kernel_size, stride and padding that are not graph values."
+        )
+        return False
+    kernel_size = extend_attr_to_tuple(pool_node.args[1], spatial_rank)
+    # TensorRT's limits on the pooling window volume.
+    max_window_volume = 100000 if spatial_rank == 2 else 31622776
+    if math.prod(kernel_size) >= max_window_volume:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a window of fewer than {max_window_volume} elements, got kernel_size={kernel_size}."
+        )
+        return False
+    if len(val.shape) != spatial_rank + 2:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a batched input, got shape={tuple(val.shape)}."
+        )
+        return False
+    if not val.dtype.is_floating_point:
+        _LOGGER.debug(
+            f"ceil_mode pooling needs a floating point input, got {val.dtype}."
+        )
+        return False
+    if val.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
+        _LOGGER.debug("ceil_mode pooling of float64 needs truncate_double=True.")
+        return False
+    # TensorRT 10.3, kept for JetPack, cannot build a strongly typed bfloat16 pool.
+    if val.dtype == torch.bfloat16 and trt.__version__.startswith("10.3."):
+        _LOGGER.debug("ceil_mode pooling of bfloat16 does not build on TensorRT 10.3.")
+        return False
+    return True
+
+
 def avg_pool_param_validator(
     pool_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
 
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
+    if ceil_mode and not _ceil_mode_pool_supported(pool_node, settings):
         return False
 
     if divisor_override is not None:
@@ -4445,7 +4505,7 @@ def aten_ops_avg_pool(
         source_ir=SourceIR.ATEN,
         name=name,
         input=args[0],
-        kernel_size=args[1],
+        kernel_size=extend_attr_to_tuple(args[1], _POOL_SPATIAL_RANK[target]),
         stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         ceil_mode=args_bounds_check(args, 4, replacement=False),
@@ -4503,13 +4563,31 @@ def aten_ops_adaptive_avg_poolNd(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input, output_size = args[0], args[1]
+    spatial_rank = len(output_size)
+    # The pooling windows need static spatial sizes. TensorRT can still see -1 for a size
+    # the graph knows, such as a crop with a dynamic start.
+    val = ctx.current_node.args[0].meta.get("val")
+    if (
+        any(size == -1 for size in input.shape[-spatial_rank:])
+        and val is not None
+        and all(isinstance(size, int) for size in val.shape[-spatial_rank:])
+    ):
+        input = impl.shuffle.reshape(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_static_spatial_size",
+            input,
+            [0] * (len(input.shape) - spatial_rank) + list(val.shape[-spatial_rank:]),
+        )
     return impl.pool.adaptive_avg_poolNd(
         ctx,
         target,
         source_ir=SourceIR.ATEN,
         name=name,
-        input=args[0],
-        output_size=args[1],
+        input=input,
+        output_size=output_size,
     )
 
 
@@ -4642,14 +4720,19 @@ def max_pool_param_validator(
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
 
+    # Passing ceil_mode makes export write out the default dilation as a list of ones.
+    if (
+        ceil_mode
+        and isinstance(dilation, (list, tuple))
+        and all(d == 1 for d in dilation)
+    ):
+        dilation = 1
+
     if dilation != 1:
         _LOGGER.debug(f"Currently we don't support dilation, got dilation={dilation}.")
         return False
 
-    if ceil_mode is not False:
-        _LOGGER.debug(
-            f"Currently we don't support specifying ceil_mode, got ceil_mode={ceil_mode}."
-        )
+    if ceil_mode and not _ceil_mode_pool_supported(pool_node, settings):
         return False
 
     return True
@@ -4684,7 +4767,7 @@ def aten_ops_max_pool(
         source_ir=SourceIR.ATEN,
         name=name,
         input=args[0],
-        kernel_size=args[1],
+        kernel_size=extend_attr_to_tuple(args[1], _POOL_SPATIAL_RANK[target]),
         stride=args_bounds_check(args, 2, replacement=[]),
         padding=args_bounds_check(args, 3, replacement=0),
         dilation=args_bounds_check(args, 4, replacement=1),
