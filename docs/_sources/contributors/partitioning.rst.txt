@@ -278,6 +278,71 @@ What it does not bound:
   engine of its own, larger than the size. Lowering the size below the largest layer
   doesn't make that layer's engine any smaller.
 
+Recomputing Input-Only Values
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Every split puts engine boundaries inside the model: the adjacency and global partitioners
+split around operators that run in PyTorch, and the resource partitioner splits by size. A
+model computes the values that depend only on its inputs, such as an attention mask or rotary
+``cos``/``sin``, before its first layer, so they land in the first engine. Instead of passing
+them to every later engine as inputs, each later TensorRT engine that reads one gets its own
+copy of the operations that compute it. All three partitioners do this with
+``recompute_input_only_nodes`` (``torch_tensorrt/dynamo/partitioning/common.py``).
+
+Why:
+
+* It removes engine inputs that can be large. A 4096-token float attention mask is 64 MiB, and
+  every layer reads it. On a stack of Gemma 2B-sized layers split one layer per engine (A40),
+  recomputing the mask ran 6% faster and used about 1 GiB less GPU memory than passing it.
+* TensorRT 11.0 to 11.4 can't build its fused attention on sm_110 (Jetson AGX Thor) for a layer
+  that receives both the mask and ``cos``/``sin`` as inputs: the kernel needs 0x39174 bytes of
+  shared memory, 0x38c00 at most.
+
+What is recomputed:
+
+* A chain starts at the nodes that read a graph input. Those cross engines as they are, so each
+  graph input keeps a single reader, as GPU-resident ExecuTorch programs require.
+* A chain never contains an operator that is impure (random, in place, an assert), a collective,
+  an operator that runs in PyTorch, or a weight.
+* A weight is identified by where it comes from, not by its size: an ``nn.Parameter``, or a
+  constant that constant folding built from one (``w.T``, ``w.to(dtype)``). Any other constant
+  is copied into each engine that recomputes from it, whatever its size: a buffer (rotary's
+  ``inv_freq``), a tensor constant, or a value constant folding built without reading a
+  parameter (the causal part of a mask, marked ``folded_without_parameters``).
+
+The design follows the rematerialization that AOTAutograd's min-cut partitioner does between the
+forward and backward graphs, recomputing values from a few saved ones instead of saving all of
+them (`Min-cut optimal(*) recomputation with AOTAutograd
+<https://dev-discuss.pytorch.org/t/min-cut-optimal-recomputation-i-e-activation-checkpointing-with-aotautograd/467>`_,
+`min_cut_rematerialization_partition
+<https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L4178>`_).
+It differs in two places:
+
+* **Where the cut is.** AOTAutograd chooses the cut that saves the fewest bytes (`solve_min_cut
+  <https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2491>`_).
+  Here the cut is fixed at the readers of the graph inputs, which the ExecuTorch constraint
+  requires anyway, and which hold the small data (padding views, position sums) that a mask or
+  ``cos``/``sin`` is expanded from.
+* **Which operators may be recomputed.** AOTAutograd bans recomputing random and
+  compute-intensive operators and, by default, any operator outside an allowlist
+  (`should_ban_recomputation
+  <https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2585>`_,
+  `get_default_op_list
+  <https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L3224>`_).
+  Those lists don't describe Torch-TensorRT's lowered graphs. Lowering keeps ``aten.matmul``,
+  which isn't among the compute-intensive operators (``mm``, ``bmm``, ...), and the allowlist
+  leaves out ``matmul`` and ``cat``, which Hugging Face rotary embeddings use to build
+  ``cos``/``sin``. Recomputing a weightless chain is taken to be cheap instead.
+
+What it costs:
+
+* Small values are recomputed too. With a 64-token prompt, recomputing a 16 KiB mask and 32 KiB
+  of ``cos``/``sin`` in each engine ran about 3% slower than passing them (A40).
+* A large constant that isn't a weight, such as an old GPT-2-style causal buffer of
+  ``max_positions²`` entries, is copied into every engine that reads it.
+* A value computed in PyTorch, or passed in as a graph input, still reaches the engines as an
+  input.
+
 Atomic Subgraphs and Fusion Preservation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

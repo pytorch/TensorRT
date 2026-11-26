@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -777,6 +777,65 @@ engine of its own, larger than the size. Lowering the size below the largest lay
 doesn’t make that layer’s engine any smaller.</p></li>
 </ul>
 </section>
+<section id="recomputing-input-only-values">
+<h3>Recomputing Input-Only Values<a class="headerlink" href="#recomputing-input-only-values" title="Link to this heading">#</a></h3>
+<p>Every split puts engine boundaries inside the model: the adjacency and global partitioners
+split around operators that run in PyTorch, and the resource partitioner splits by size. A
+model computes the values that depend only on its inputs, such as an attention mask or rotary
+<code class="docutils literal notranslate"><span class="pre">cos</span></code>/<code class="docutils literal notranslate"><span class="pre">sin</span></code>, before its first layer, so they land in the first engine. Instead of passing
+them to every later engine as inputs, each later TensorRT engine that reads one gets its own
+copy of the operations that compute it. All three partitioners do this with
+<code class="docutils literal notranslate"><span class="pre">recompute_input_only_nodes</span></code> (<code class="docutils literal notranslate"><span class="pre">torch_tensorrt/dynamo/partitioning/common.py</span></code>).</p>
+<p>Why:</p>
+<ul class="simple">
+<li><p>It removes engine inputs that can be large. A 4096-token float attention mask is 64 MiB, and
+every layer reads it. On a stack of Gemma 2B-sized layers split one layer per engine (A40),
+recomputing the mask ran 6% faster and used about 1 GiB less GPU memory than passing it.</p></li>
+<li><p>TensorRT 11.0 to 11.4 can’t build its fused attention on sm_110 (Jetson AGX Thor) for a layer
+that receives both the mask and <code class="docutils literal notranslate"><span class="pre">cos</span></code>/<code class="docutils literal notranslate"><span class="pre">sin</span></code> as inputs: the kernel needs 0x39174 bytes of
+shared memory, 0x38c00 at most.</p></li>
+</ul>
+<p>What is recomputed:</p>
+<ul class="simple">
+<li><p>A chain starts at the nodes that read a graph input. Those cross engines as they are, so each
+graph input keeps a single reader, as GPU-resident ExecuTorch programs require.</p></li>
+<li><p>A chain never contains an operator that is impure (random, in place, an assert), a collective,
+an operator that runs in PyTorch, or a weight.</p></li>
+<li><p>A weight is identified by where it comes from, not by its size: an <code class="docutils literal notranslate"><span class="pre">nn.Parameter</span></code>, or a
+constant that constant folding built from one (<code class="docutils literal notranslate"><span class="pre">w.T</span></code>, <code class="docutils literal notranslate"><span class="pre">w.to(dtype)</span></code>). Any other constant
+is copied into each engine that recomputes from it, whatever its size: a buffer (rotary’s
+<code class="docutils literal notranslate"><span class="pre">inv_freq</span></code>), a tensor constant, or a value constant folding built without reading a
+parameter (the causal part of a mask, marked <code class="docutils literal notranslate"><span class="pre">folded_without_parameters</span></code>).</p></li>
+</ul>
+<p>The design follows the rematerialization that AOTAutograd’s min-cut partitioner does between the
+forward and backward graphs, recomputing values from a few saved ones instead of saving all of
+them (<a class="reference external" href="https://dev-discuss.pytorch.org/t/min-cut-optimal-recomputation-i-e-activation-checkpointing-with-aotautograd/467">Min-cut optimal(*) recomputation with AOTAutograd</a>,
+<a class="reference external" href="https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L4178">min_cut_rematerialization_partition</a>).
+It differs in two places:</p>
+<ul class="simple">
+<li><p><strong>Where the cut is.</strong> AOTAutograd chooses the cut that saves the fewest bytes (<a class="reference external" href="https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2491">solve_min_cut</a>).
+Here the cut is fixed at the readers of the graph inputs, which the ExecuTorch constraint
+requires anyway, and which hold the small data (padding views, position sums) that a mask or
+<code class="docutils literal notranslate"><span class="pre">cos</span></code>/<code class="docutils literal notranslate"><span class="pre">sin</span></code> is expanded from.</p></li>
+<li><p><strong>Which operators may be recomputed.</strong> AOTAutograd bans recomputing random and
+compute-intensive operators and, by default, any operator outside an allowlist
+(<a class="reference external" href="https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L2585">should_ban_recomputation</a>,
+<a class="reference external" href="https://github.com/pytorch/pytorch/blob/45f9fe1c9c9997a94cd6e2afd5b93920427b566b/torch/_functorch/partitioners.py#L3224">get_default_op_list</a>).
+Those lists don’t describe Torch-TensorRT’s lowered graphs. Lowering keeps <code class="docutils literal notranslate"><span class="pre">aten.matmul</span></code>,
+which isn’t among the compute-intensive operators (<code class="docutils literal notranslate"><span class="pre">mm</span></code>, <code class="docutils literal notranslate"><span class="pre">bmm</span></code>, …), and the allowlist
+leaves out <code class="docutils literal notranslate"><span class="pre">matmul</span></code> and <code class="docutils literal notranslate"><span class="pre">cat</span></code>, which Hugging Face rotary embeddings use to build
+<code class="docutils literal notranslate"><span class="pre">cos</span></code>/<code class="docutils literal notranslate"><span class="pre">sin</span></code>. Recomputing a weightless chain is taken to be cheap instead.</p></li>
+</ul>
+<p>What it costs:</p>
+<ul class="simple">
+<li><p>Small values are recomputed too. With a 64-token prompt, recomputing a 16 KiB mask and 32 KiB
+of <code class="docutils literal notranslate"><span class="pre">cos</span></code>/<code class="docutils literal notranslate"><span class="pre">sin</span></code> in each engine ran about 3% slower than passing them (A40).</p></li>
+<li><p>A large constant that isn’t a weight, such as an old GPT-2-style causal buffer of
+<code class="docutils literal notranslate"><span class="pre">max_positions²</span></code> entries, is copied into every engine that reads it.</p></li>
+<li><p>A value computed in PyTorch, or passed in as a graph input, still reaches the engines as an
+input.</p></li>
+</ul>
+</section>
 <section id="atomic-subgraphs-and-fusion-preservation">
 <h3>Atomic Subgraphs and Fusion Preservation<a class="headerlink" href="#atomic-subgraphs-and-fusion-preservation" title="Link to this heading">#</a></h3>
 <p>Certain operator sequences are registered as <strong>atomic subgraphs</strong> — patterns that
@@ -949,6 +1008,7 @@ Segments marked <code class="docutils literal notranslate"><span class="pre">do_
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#partitioning-strategies">Partitioning Strategies</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#resource-partitioning">Resource Partitioning</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fixing-the-engine-size">Fixing the Engine Size</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#recomputing-input-only-values">Recomputing Input-Only Values</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#atomic-subgraphs-and-fusion-preservation">Atomic Subgraphs and Fusion Preservation</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#user-facing-controls">User-Facing Controls</a></li>
 </ul>
