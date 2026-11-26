@@ -44,6 +44,13 @@ class ConvModel(torch.nn.Module):
         return torch.relu(self.conv(x))
 
 
+class _MaterializedCache:
+    def serialize(self):
+        import numpy as np
+
+        return np.arange(8, dtype=np.uint8)
+
+
 def _fresh_conv_model_and_inputs(seed=0):
     torch.manual_seed(seed)
     return ConvModel().eval().cuda(), [torch.randn(2, 3, 16, 16).cuda()]
@@ -488,6 +495,181 @@ class TestRuntimeCacheAutosave(TestCase):
 
         # Must not raise even though ref() is dead.
         _autosave_at_exit(ref)
+
+    @parameterized.expand(["python_empty", "python_with_data", "cpp", "cpp_with_data"])
+    def test_gc_autosave_during_export_leaves_the_graph_unchanged(self, backing):
+        """The garbage collector can run ``__del__`` while another model is
+        being exported. The autosave must not add nodes to that model's graph
+        or change their "torch_fn" metadata, and a cache that holds data must
+        still be written. Only TensorRT-RTX builds can give the C++ handle data.
+        """
+        import weakref
+
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _RuntimeCacheHandle,
+        )
+
+        if backing.startswith("cpp") and not ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("C++ runtime is not available")
+        if backing == "cpp_with_data" and not ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest("C++ handle holds data only on TensorRT-RTX")
+
+        freed_while_traced = []
+        ref = None
+
+        class _CollectsWhileTraced(torch.nn.Module):
+            def forward(self, x):
+                was_alive = ref is not None and ref() is not None
+                gc.collect()
+                if was_alive:
+                    freed_while_traced.append(ref() is None)
+                # The empty Python handle's save also calls torch.empty, so a
+                # save that the tracer sees shifts this node's "torch_fn" label.
+                return x + torch.empty(2)
+
+        def _nodes(exported):
+            return [
+                (n.target, n.meta.get("torch_fn"))
+                for n in exported.graph.nodes
+                if n.op == "call_function"
+            ]
+
+        gc.collect()
+        expected = _nodes(
+            torch.export.export(_CollectsWhileTraced(), (torch.randn(2),))
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            if not backing.startswith("cpp"):
+                handle._handle = _RuntimeCacheHandle(path=path)
+            if backing == "python_with_data":
+                handle._handle._cache = _MaterializedCache()
+            if backing == "cpp_with_data":
+                handle._handle.deserialize(torch.arange(8, dtype=torch.uint8))
+            ref = weakref.ref(handle)
+            # Keep an automatic collection from freeing the handle before
+            # the one inside ``forward`` does.
+            gc_was_enabled = gc.isenabled()
+            gc.disable()
+            try:
+                # A reference cycle, so only the garbage collector can free it.
+                cycle = [handle, None]
+                cycle[1] = cycle
+                del handle, cycle
+                exported = torch.export.export(
+                    _CollectsWhileTraced(), (torch.randn(2),)
+                )
+            finally:
+                if gc_was_enabled:
+                    gc.enable()
+                # A handle that survived a failed run must not save later.
+                alive = ref()
+                if alive is not None:
+                    alive.autosave_on_del = False
+
+            self.assertEqual(freed_while_traced, [True])
+            self.assertEqual(_nodes(exported), expected)
+            if backing.endswith("with_data"):
+                with open(path, "rb") as f:
+                    self.assertEqual(f.read(), bytes(range(8)))
+
+    def test_autosave_inside_torch_func_writes_the_cache(self):
+        """A finalizer can also run inside a torch.func transform. A cache
+        that holds data must still be written there.
+        """
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _RuntimeCacheHandle,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            handle._handle = _RuntimeCacheHandle(path=path)
+            handle._handle._cache = _MaterializedCache()
+            holder = [handle]
+            del handle
+
+            def _frees_the_cache(x):
+                holder.clear()
+                return (x * x).sum()
+
+            torch.func.grad(_frees_the_cache)(torch.randn(2))
+
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), bytes(range(8)))
+
+    @unittest.skipIf(
+        not ENABLED_FEATURES.tensorrt_rtx
+        or not ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Needs TensorRT-RTX and the C++ runtime",
+    )
+    def test_autosave_during_functionalization_writes_the_cache(self):
+        """FunctionalTensorMode, for example in run_decompositions(), runs
+        operators with the Functionalize key included on the thread. A
+        finalizer that runs then must still write the C++ handle's data.
+        """
+        from torch_tensorrt.runtime._runtime_cache import RuntimeCache
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            handle._handle.deserialize(torch.arange(8, dtype=torch.uint8))
+            include = torch._C._dispatch_tls_local_include_set() | (
+                torch._C.DispatchKeySet(torch._C.DispatchKey.Functionalize)
+            )
+            with torch._C._ForceDispatchKeyGuard(
+                include, torch._C._dispatch_tls_local_exclude_set()
+            ):
+                del handle
+
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), bytes(range(8)))
+
+    def test_autosave_inside_a_python_dispatcher_lookup_leaves_it_working(self):
+        """The garbage collector can also run ``__del__`` while the Python
+        dispatcher is filling its cache for an operator, for example under
+        torch.compile. The save must not fill the same cache entry, or the
+        interrupted lookup fails.
+        """
+        from torch._dispatch.python import enable_python_dispatcher
+        from torch_tensorrt.runtime._runtime_cache import (
+            RuntimeCache,
+            _RuntimeCacheHandle,
+        )
+
+        op = torch.ops.aten.detach.default
+        key = torch._C.DispatchKey.AutogradMeta
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = RuntimeCache(path=path, autosave_on_del=True)
+            handle._handle = _RuntimeCacheHandle(path=path)
+            handle._handle._cache = _MaterializedCache()
+            holder = [handle]
+            del handle
+            get_dispatch = type(op)._get_dispatch
+
+            def _frees_the_cache_first(self, k):
+                if self is op and k == key:
+                    holder.clear()
+                return get_dispatch(self, k)
+
+            op._dispatch_cache.pop(key, None)
+            with (
+                patch.object(type(op), "_get_dispatch", _frees_the_cache_first),
+                enable_python_dispatcher(),
+                torch._C._PreserveDispatchKeyGuard(),
+            ):
+                # FakeTensorMode runs kernels with Meta included like this.
+                torch._C._set_meta_in_tls_dispatch_include(True)
+                op(torch.zeros(1))
+
+            self.assertEqual(holder, [])
+            with open(path, "rb") as f:
+                self.assertEqual(f.read(), bytes(range(8)))
 
     def test_atexit_token_unregistered_after_del(self):
         """``__del__`` removes the handle's atexit hook so the registry does
