@@ -670,9 +670,7 @@ class ConverterRegistry:
         return available_converters
 
 
-# Initialize dynamo converter registry with Dynamo aten converters only
-# FX converters are not loaded here - they are legacy and should only be used
-# in the FX frontend, not as fallbacks in the dynamo frontend
+# Initialize the Dynamo converter registry with Dynamo ATen converters.
 registries: List[
     Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
 ] = [

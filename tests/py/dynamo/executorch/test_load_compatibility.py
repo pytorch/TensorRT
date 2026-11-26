@@ -46,7 +46,6 @@ def compiler(monkeypatch):
         "torch_tensorrt._enums": {"dtype": object},
         "torch_tensorrt._features": {
             "ENABLED_FEATURES": types.SimpleNamespace(
-                fx_frontend=False,
                 dynamo_frontend=False,
                 torch_tensorrt_runtime=True,
             ),

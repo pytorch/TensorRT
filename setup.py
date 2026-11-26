@@ -120,10 +120,6 @@ if "--use-rtx" in sys.argv:
     USE_TRT_RTX = True
     sys.argv.remove("--use-rtx")
 
-if "--fx-only" in sys.argv:
-    PY_ONLY = True
-    sys.argv.remove("--fx-only")
-
 if "--py-only" in sys.argv:
     PY_ONLY = True
     sys.argv.remove("--py-only")
@@ -552,19 +548,6 @@ class CleanCommand(Command):
                 os.remove(path)
 
 
-_FX_FE_AVAIL = False if USE_TRT_RTX else True
-
-fx_packages = [
-    "torch_tensorrt.fx",
-    "torch_tensorrt.fx.converters",
-    "torch_tensorrt.fx.converters.impl",
-    "torch_tensorrt.fx.passes",
-    "torch_tensorrt.fx.tools",
-    "torch_tensorrt.fx.tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer",
-]
-
 dynamo_packages = [
     "torch_tensorrt",
     "torch_tensorrt.distributed",
@@ -595,18 +578,6 @@ dynamo_packages = [
     "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
 ]
-
-fx_package_dir = {
-    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
-    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
-    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
-    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
-    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
-    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
-}
-
 
 dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
@@ -655,17 +626,6 @@ exclude_package_data = {
         "*.cpp",
     ],
 }
-
-if _FX_FE_AVAIL:
-    package_dir = package_dir | fx_package_dir
-    packages = packages + fx_packages
-    exclude_package_data["torch_tensorrt.fx"] = ["test/*.py"]
-    exclude_package_data[""].extend(
-        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
-    )
-    exclude_package_data["torch_tensorrt"].extend(
-        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
-    )
 
 package_data = {}
 

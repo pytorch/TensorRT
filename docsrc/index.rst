@@ -58,9 +58,3 @@ Additional resources:
    :caption: Contributing
 
    contributing
-
-.. toctree::
-   :hidden:
-   :caption: Legacy
-
-   legacy

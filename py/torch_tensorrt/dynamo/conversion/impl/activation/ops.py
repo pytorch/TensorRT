@@ -364,7 +364,6 @@ def hardtanh(
     min_val: float = -1.0,
     max_val: float = 1.0,
 ) -> TRTTensor:
-    # Ported from fx/converters/impl/activation.py
     # dyn_range_fn removed as it's not used in dynamo's convert_activation base
     operation_type = trt.ActivationType.CLIP
     return convert_activation(
