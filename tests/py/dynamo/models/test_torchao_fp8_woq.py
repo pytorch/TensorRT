@@ -266,6 +266,68 @@ def test_dequantize_default_output_dtype(weight_dtype):
 
 @pytest.mark.unit
 @unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+def test_groupwise_int8_outside_int4_range_runs_in_pytorch():
+    # TensorRT dequantizes group-wise int8 weights as INT4, which cannot hold these.
+    from torch._inductor.constant_folding import (
+        _dont_constant_fold,
+        add_dont_constant_fold,
+    )
+
+    op = torch.ops.torchao.dequantize_affine.default
+
+    class DequantizedLinear(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer(
+                "weight", torch.randint(-128, 128, (128, 64), dtype=torch.int8)
+            )
+            self.register_buffer("scale", torch.rand(128, 2) / 100 + 0.001)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return x @ op(self.weight, [1, 32], self.scale, None, torch.int8).t()
+
+    model = DequantizedLinear().eval().cuda()
+    example_input = torch.randn(8, 64, device="cuda")
+
+    add_dont_constant_fold(op)
+    try:
+        exp_program = torch.export.export(model, (example_input,), strict=True)
+    finally:
+        if op in _dont_constant_fold:
+            _dont_constant_fold.remove(op)
+
+    trt_mod = torchtrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+    pytorch_ops = [
+        node.target
+        for name, submodule in trt_mod.named_children()
+        if name.startswith("_run_on_gpu")
+        for node in submodule.graph.nodes
+    ]
+    assertions.assertIn(op, pytorch_ops)
+
+    with torch.no_grad():
+        eager_out = model(example_input)
+        trt_out = trt_mod(example_input)
+    cos_sim = cosine_similarity(eager_out, trt_out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=(
+            "Group-wise int8 dequantize doesn't match eager. "
+            f"Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}"
+        ),
+    )
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
 @unittest.skipIf(
     importlib.util.find_spec("triton") is None,
     "TorchAO INT4 dependencies require Triton, which is unavailable",

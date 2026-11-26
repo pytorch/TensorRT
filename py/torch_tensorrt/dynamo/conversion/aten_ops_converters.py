@@ -1091,6 +1091,31 @@ def aten_ops_neg(
     )
 
 
+def _get_attr_value(arg: Argument) -> Argument:
+    if isinstance(arg, Node) and arg.op == "get_attr":
+        return operator.attrgetter(str(arg.target))(arg.graph.owning_module)
+    return arg
+
+
+def quantize_op_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if not (node.args[2] == 4 and node.args[3] == 0):
+        return True
+    # TensorRT-RTX cannot dequantize INT4 into a matmul on Turing (SM 7.5).
+    if trt_rtx_targets_turing(settings):
+        return False
+    weight = _get_attr_value(node.args[0])
+    amax = _get_attr_value(node.args[1])
+    unsigned = node.kwargs.get("unsigned", args_bounds_check(node.args, 4, False))
+    # TensorRT keeps INT4 only for a constant weight, and its INT4 is signed.
+    return (
+        isinstance(weight, torch.Tensor)
+        and not unsigned
+        and impl.quantize.int4_weight_shape(node, weight, amax) is not None
+    )
+
+
 try:
     import modelopt.torch.quantization as mtq  # noqa: F401
 
@@ -1102,7 +1127,9 @@ except Exception as e:
 else:
 
     @dynamo_tensorrt_converter(
-        torch.ops.tensorrt.quantize_op.default, supports_dynamic_shapes=True
+        torch.ops.tensorrt.quantize_op.default,
+        capability_validator=quantize_op_validator,
+        supports_dynamic_shapes=True,
     )
     def aten_ops_quantize_op(
         ctx: ConversionContext,
@@ -1120,6 +1147,7 @@ else:
             args[1],
             args[2],
             args[3],
+            narrow_range=kwargs.get("narrow_range", args_bounds_check(args, 5, True)),
         )
 
 
@@ -1160,6 +1188,19 @@ if is_tensorrt_version_supported("10.8.0"):
             )
 
 
+def torchao_dequantize_affine_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    qdata = _get_attr_value(node.args[0])
+    block_size = cast(Sequence[object], node.args[1])
+    # TensorRT-RTX cannot dequantize INT4 into a matmul on Turing (SM 7.5).
+    if trt_rtx_targets_turing(settings) and impl.quantize.is_groupwise_int4(
+        qdata, block_size
+    ):
+        return False
+    return not impl.quantize.is_wide_groupwise_int8(qdata, block_size)
+
+
 try:
     import torchao  # noqa: F401
 
@@ -1173,6 +1214,7 @@ else:
 
     @dynamo_tensorrt_converter(
         torch.ops.torchao.dequantize_affine.default,
+        capability_validator=torchao_dequantize_affine_validator,
         supports_dynamic_shapes=False,
     )
     def aten_ops_torchao_dequantize_affine(

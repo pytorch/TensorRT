@@ -109,9 +109,11 @@ def _refit_single_trt_engine_with_gm(
             # Use Tensor to create weights
             weight = mapping[layer_name]
             trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
-            trt_wt_tensor = trt.Weights(
-                trt_dtype, weight.data_ptr(), torch.numel(weight)
-            )
+            count = torch.numel(weight)
+            if refitter.get_weights_prototype(layer_name).dtype == trt.DataType.INT4:
+                # INT4 weights are recorded packed, two values per byte.
+                trt_dtype, count = trt.DataType.INT4, 2 * count
+            trt_wt_tensor = trt.Weights(trt_dtype, weight.data_ptr(), count)
             if not refitter.set_named_weights(
                 layer_name, trt_wt_tensor, trt_wt_location
             ):

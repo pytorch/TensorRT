@@ -16,8 +16,8 @@ unpacked int8 qdata into a trt.DataType.INT4 constant.
 
 You need access to FLUX.1-dev on Hugging Face. Quantization is done
 layer-by-layer on GPU so the rest of the pipeline can stay on CPU. Compile with
-immutable_weights=True (INT4 constants cannot be refit from int8 graph
-weights). On 32GB cards, park the text encoders during compile and generate
+immutable_weights=True, so TensorRT can fuse the INT4 dequantize into the
+matmul. On 32GB cards, park the text encoders during compile and generate
 from precomputed prompt embeddings so T5 and the TRT execution context are not
 resident together.
 
@@ -132,8 +132,8 @@ with exclude_dq_from_constant_folding():
 # ---------------------------
 # .. note::
 #    Compilation of the 12B transformer takes on the order of 20–30 minutes.
-#    immutable_weights=True is required: the converter packs int8 qdata into
-#    INT4 at build time, and refit would push Int8 weights at an Int4 prototype.
+#    immutable_weights=True lets TensorRT fuse the INT4 dequantize into the
+#    matmul. A refittable engine dequantizes in FP32 instead.
 
 trt_gm = torch_tensorrt.dynamo.compile(
     exp_program,

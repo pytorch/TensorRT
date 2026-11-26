@@ -192,32 +192,57 @@ Accuracy / Performance Issues
     * Use CUDAGraphs (``enable_cudagraphs=True``) for fixed-shape low-latency
       inference; see :ref:`cuda_graphs`.
 
-**"How do I do weight-only quantization (A16W8 / W8A16)?"**
+**"How do I do weight-only quantization?"**
 
-    Weight-only quantization compresses model weights to INT8 while keeping activations
-    in FP16/BF16. This is common for large language models where memory bandwidth is the
-    bottleneck. To do this with ModelOpt, create a custom quantization config that
-    enables ``weight_quantizer`` but disables ``input_quantizer``:
+    Weight-only quantization compresses model weights while keeping activations in
+    FP16/BF16. This is common for large language models where memory bandwidth is the
+    bottleneck. With ModelOpt, use INT4 block quantization of matmul weights, which
+    makes those weights about 4x smaller:
 
     .. code-block:: python
 
         import modelopt.torch.quantization as mtq
 
-        # Custom weight-only INT8 config
-        quant_cfg = {
-            "quant_cfg": {
-                "*weight_quantizer": {"num_bits": 8, "axis": 0},
-                "*input_quantizer": {"enable": False},  # activations stay FP16
-                "default": {"enable": False},
-            },
-            "algorithm": "max",
-        }
-
-        mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
+        mtq.quantize(model, mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG, forward_loop=calibration_loop)
 
         trt_model = torch_tensorrt.compile(
             model, ir="dynamo", arg_inputs=inputs,
         )
+
+    TensorRT has INT4 weight-only kernels for matmul weights only, so a convolution
+    weight in INT4 is quantized in PyTorch on every run, and TensorRT gets a 16-bit
+    weight. ``INT4_BLOCKWISE_WEIGHT_ONLY_CFG`` also quantizes convolutions, so leave
+    them out of the config. Add one entry for each convolution class the model uses.
+    This one is for ``nn.Conv2d``; add ``nn.Conv1d`` or ``nn.Conv3d`` the same way:
+
+    .. code-block:: python
+
+        import copy
+
+        quant_cfg = copy.deepcopy(mtq.INT4_BLOCKWISE_WEIGHT_ONLY_CFG)
+        quant_cfg["quant_cfg"].append(
+            {"quantizer_name": "*weight_quantizer", "parent_class": "nn.Conv2d", "enable": False}
+        )
+        mtq.quantize(model, quant_cfg, forward_loop=calibration_loop)
+
+    TensorRT fuses the INT4 dequantize into the matmul only when the layer's input
+    size is a multiple of the block size (128). ModelOpt pads other weights, and
+    their engine dequantizes a full 16-bit copy of the weight into scratch memory.
+
+    Keep the default ``immutable_weights=True``. A refittable engine, which the
+    engine cache needs, builds and can be refit, but TensorRT does not fuse its INT4
+    dequantize into the matmul, so INT4 engines that refit or use the engine cache
+    are slower. They dequantize every weight into scratch memory on each run. For a
+    BF16 gated MLP (4096 to 14336 to 4096) on an A100, one token took 0.76 ms with a
+    refittable INT4 engine, 0.27 ms with an immutable one, and 0.24 ms in BF16.
+
+    With TensorRT 11.4, some deeper networks with INT4 weights fail with an illegal
+    memory access when the engine runs in the process that built it. The same engine
+    runs correctly in a new process, and ``optimization_level=1`` avoids it.
+
+    INT8 weight-only quantization (``mtq.INT8_WEIGHT_ONLY_CFG``) compiles, but does not
+    make the engine smaller: TensorRT keeps INT8 weights only for a matmul whose
+    activations are INT8 too, and folds the others back into FP16/BF16 weights.
 
     See `NVIDIA ModelOpt documentation <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_
     for the full list of built-in quantization configs and customization options.
@@ -233,7 +258,8 @@ Accuracy / Performance Issues
     For **INT4 weight-only** quantization with TorchAO, see
     :ref:`quantize_linear_int4_woq`, :ref:`torch_export_flux_int4_woq`, and
     :ref:`torch_export_qwen3_int4_woq`. Use symmetric INT4 (zero zero-point)
-    and ``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+    and ``immutable_weights=True``, so TensorRT can fuse the INT4 dequantize into the
+    matmul.
 
     For **NVFP4 weight-only** quantization with TorchAO, see
     :ref:`quantize_linear_nvfp4_woq` and :ref:`torch_export_flux_nvfp4_woq`.

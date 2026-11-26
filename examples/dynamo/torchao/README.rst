@@ -15,7 +15,7 @@ so TensorRT can fuse Q/DQ into FP8 GEMMs.
 
 Weight-only INT4 is the same DQ pattern with packed 4-bit integer weights.
 Use **symmetric** group-wise INT4 (zero zero-point) and compile with
-``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+``immutable_weights=True`` so TensorRT can fuse the INT4 dequantize into the matmul.
 
 Weight-only NVFP4 stores packed FP4 E2M1 weights with FP8 block scales.
 Export emits ``dequantize_nvfp4``, which Torch-TensorRT maps to two-level
