@@ -36,6 +36,7 @@ if not _has_executorch_exir():
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "TensorRTRTXBackend",
         "export",
         "zero_copy_backend_config",
         "check_zero_copy_kv",
@@ -46,7 +47,7 @@ else:
         check_zero_copy_kv,
         zero_copy_backend_config,
     )
-    from torch_tensorrt.executorch.backend import TensorRTBackend
+    from torch_tensorrt.executorch.backend import TensorRTBackend, TensorRTRTXBackend
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
     def get_edge_compile_config() -> "EdgeCompileConfig":
@@ -59,6 +60,7 @@ else:
         "get_edge_compile_config",
         "TensorRTPartitioner",
         "TensorRTBackend",
+        "TensorRTRTXBackend",
         "export",
         "zero_copy_backend_config",
         "check_zero_copy_kv",

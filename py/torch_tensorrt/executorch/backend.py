@@ -595,8 +595,7 @@ def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     return str(value)
 
 
-@final
-class TensorRTBackend(BackendDetails):  # type: ignore[misc]
+class _TensorRTBackendImplementation:
     """Backend that serializes TensorRT engines for the native ExecuTorch runtime.
 
     The partition contains a single execute_engine node; we extract the engine
@@ -620,11 +619,19 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         }
         return copy.deepcopy(edge_program, tensor_memo)
 
-    @staticmethod
+    engine_family = "tensorrt"
+
+    @classmethod
     def preprocess(
+        cls,
         edge_program: ExportedProgram,
         compile_specs: List[CompileSpec],
     ) -> PreprocessResult:
+        active_family = getattr(tensorrt, "_package_name", "tensorrt")
+        if active_family != cls.engine_family:
+            raise ValueError(
+                f"{cls.__name__} requires {cls.engine_family}, but the active compiler uses {active_family}"
+            )
         engine_node = _get_single_engine_node(edge_program)
         engine_info = _get_engine_info_for_node(edge_program, engine_node)
         engine_info = list(engine_info)
@@ -713,6 +720,7 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
             tensorrt_version=tensorrt.__version__,
+            engine_family=cls.engine_family,
             # Content-keyed, so identical engines in different methods share one
             # entry and different engines can never collide on a key.
             engine_key="tensorrt_engine_" + engine_data_sha256.hex(),
@@ -731,3 +739,24 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             processed_bytes=serialize_engine(b"", metadata),
             data_store_output=named_data.get_named_data_store_output(),
         )
+
+
+@final
+class TensorRTBackend(_TensorRTBackendImplementation, BackendDetails):  # type: ignore[misc]
+    """Serialize standard TensorRT engines for the native TensorRT delegate."""
+
+
+@final
+class TensorRTRTXBackend(_TensorRTBackendImplementation, BackendDetails):  # type: ignore[misc]
+    """Serialize TensorRT-RTX engines for the distinct native RTX delegate."""
+
+    engine_family = "tensorrt_rtx"
+
+
+def get_backend_id() -> str:
+    """Select the delegate matching the TensorRT package used by the compiler."""
+    return (
+        "TensorRTRTXBackend"
+        if getattr(tensorrt, "_package_name", "tensorrt") == "tensorrt_rtx"
+        else "TensorRTBackend"
+    )

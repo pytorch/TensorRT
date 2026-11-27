@@ -212,3 +212,30 @@ def test_an_engine_is_inline_or_named_never_both_or_neither():
     inline_blob[:4] = TENSORRT_MAGIC_NAMED_ENGINE
     with pytest.raises(ValueError, match="engine_key"):
         deserialize_engine(bytes(inline_blob))
+
+
+@pytest.mark.parametrize("named", [False, True])
+@pytest.mark.parametrize("aliased", [False, True])
+def test_rtx_blob_roundtrip_and_family_mismatch(named, aliased):
+    metadata = TensorRTBlobMetadata(
+        engine_family="tensorrt_rtx",
+        io_bindings=[
+            TensorRTIOBinding(name="x"),
+            TensorRTIOBinding(name="y", is_input=False),
+        ],
+        engine_key="rtx_engine" if named else "",
+        aliased_io={"y": ("x", "user")} if aliased else {},
+    )
+    engine = b"" if named else b"rtx-engine"
+    blob = serialize_engine(engine, metadata)
+    assert blob[:2] == b"RX"
+    restored_engine, restored = deserialize_engine(blob)
+    assert restored_engine == engine
+    assert restored == metadata
+    with pytest.raises(ValueError, match="Engine family"):
+        deserialize_engine(b"TR" + blob[2:])
+
+
+def test_unknown_engine_family_is_rejected():
+    with pytest.raises(ValueError, match="Unknown engine family"):
+        serialize_engine(b"engine", TensorRTBlobMetadata(engine_family="other"))

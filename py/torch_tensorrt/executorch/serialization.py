@@ -28,10 +28,12 @@ from typing import Dict, List, Tuple, Union
 TENSORRT_MAGIC = b"TR01"
 TENSORRT_MAGIC_ALIASED_IO = b"TR02"
 TENSORRT_MAGIC_NAMED_ENGINE = b"TR03"
+TENSORRT_RTX_MAGICS = (b"RX01", b"RX02", b"RX03")
 SUPPORTED_MAGICS = (
     TENSORRT_MAGIC,
     TENSORRT_MAGIC_ALIASED_IO,
     TENSORRT_MAGIC_NAMED_ENGINE,
+    *TENSORRT_RTX_MAGICS,
 )
 HEADER_FORMAT = "<4sIIIQ8s"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
@@ -67,6 +69,7 @@ class TensorRTBlobMetadata:
     # TensorRT version that exported the engine, so a runtime whose TensorRT cannot
     # read the engine can name both versions. Empty when unknown.
     tensorrt_version: str = ""
+    engine_family: str = "tensorrt"
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -96,6 +99,7 @@ class TensorRTBlobMetadata:
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
             "tensorrt_version": self.tensorrt_version,
+            "engine_family": self.engine_family,
         }
         if self.engine_key:
             data["engine_key"] = self.engine_key
@@ -124,6 +128,7 @@ class TensorRTBlobMetadata:
             target_platform=parsed.get("target_platform", ""),
             engine_key=parsed.get("engine_key", ""),
             tensorrt_version=parsed.get("tensorrt_version", ""),
+            engine_family=parsed.get("engine_family", "tensorrt"),
         )
 
 
@@ -136,12 +141,16 @@ def serialize_engine(
             "A TensorRT blob carries its engine either inline or as named data "
             "(engine_key), never both or neither"
         )
+    if metadata.engine_family not in {"tensorrt", "tensorrt_rtx"}:
+        raise ValueError(f"Unknown engine family: {metadata.engine_family!r}")
     if metadata.engine_key:
         magic = TENSORRT_MAGIC_NAMED_ENGINE
     elif metadata.aliased_io:
         magic = TENSORRT_MAGIC_ALIASED_IO
     else:
         magic = TENSORRT_MAGIC
+    if metadata.engine_family == "tensorrt_rtx":
+        magic = b"RX" + magic[2:]
     metadata_json = metadata.to_json()
     metadata_offset = HEADER_SIZE
     engine_offset = _align_to_16(metadata_offset + len(metadata_json))
@@ -184,7 +193,10 @@ def deserialize_engine(blob: bytes) -> Tuple[bytes, TensorRTBlobMetadata]:
     metadata = TensorRTBlobMetadata.from_json(
         blob[metadata_offset : metadata_offset + metadata_size]
     )
-    if (magic == TENSORRT_MAGIC_NAMED_ENGINE) != bool(metadata.engine_key):
+    expected_family = "tensorrt_rtx" if magic in TENSORRT_RTX_MAGICS else "tensorrt"
+    if metadata.engine_family != expected_family:
+        raise ValueError("Engine family does not match the blob magic")
+    if (magic in (TENSORRT_MAGIC_NAMED_ENGINE, b"RX03")) != bool(metadata.engine_key):
         raise ValueError(
             f"Magic {magic!r} does not match the engine_key in the metadata"
         )

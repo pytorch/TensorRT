@@ -487,6 +487,15 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
       return false;
     }
   }
+  const std::size_t family_key = find_top_level_key(json, "\"engine_family\"");
+  std::string family = "tensorrt";
+  if (family_key != std::string::npos &&
+      parse_string(json, skip_ws(json, json.find(':', family_key) + 1), family) == std::string::npos) {
+    return false;
+  }
+  if (family != out.engine_family) {
+    return false;
+  }
   // Only an error message reads it, so a value that is not a string is ignored rather than refused.
   out.tensorrt_version.clear();
   const std::size_t version_key = find_top_level_key(json, "\"tensorrt_version\"");
@@ -512,10 +521,14 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   const auto* bytes = static_cast<const uint8_t*>(data);
-  const bool aliased_io_magic = std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) == 0;
+  const bool rtx = bytes[0] == 'R' && bytes[1] == 'X';
+  uint8_t normalized_magic[4] = {'T', 'R', bytes[2], bytes[3]};
+  const auto* magic = rtx ? normalized_magic : bytes;
+  out.engine_family = rtx ? "tensorrt_rtx" : "tensorrt";
+  const bool aliased_io_magic = std::memcmp(magic, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) == 0;
   const bool named_engine_magic =
-      std::memcmp(bytes, TENSORRT_MAGIC_NAMED_ENGINE, sizeof(TENSORRT_MAGIC_NAMED_ENGINE)) == 0;
-  if (!aliased_io_magic && !named_engine_magic && std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
+      std::memcmp(magic, TENSORRT_MAGIC_NAMED_ENGINE, sizeof(TENSORRT_MAGIC_NAMED_ENGINE)) == 0;
+  if (!aliased_io_magic && !named_engine_magic && std::memcmp(magic, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
     return false;
   }
 

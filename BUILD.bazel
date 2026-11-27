@@ -83,6 +83,7 @@ filegroup(
     name = "torchtrt_cmake_modules",
     srcs = [
         "cmake/Modules/FindTensorRT.cmake",
+        "cmake/Modules/FindTensorRTRTX.cmake",
     ],
     visibility = ["//visibility:public"],
 )
@@ -198,7 +199,10 @@ pkg_files(
 
 pkg_files(
     name = "executorch_backend_cmake_module_pkg_files",
-    srcs = ["cmake/Modules/FindTensorRT.cmake"],
+    srcs = [
+        "cmake/Modules/FindTensorRT.cmake",
+        "cmake/Modules/FindTensorRTRTX.cmake",
+    ],
     prefix = "src/torch_tensorrt/executorch/cmake/Modules/",
 )
 

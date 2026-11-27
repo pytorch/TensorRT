@@ -64,6 +64,22 @@ std::vector<uint8_t> make_blob(
   return blob;
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, RtxEngineFamilyMustMatchMagic) {
+  const std::string metadata =
+      R"({"io_bindings":[{"name":"x","is_input":true},{"name":"y","is_input":false}],"engine_family":"tensorrt_rtx"})";
+  const char rtx_magic[4] = {'R', 'X', '0', '1'};
+  auto blob = make_blob(metadata, 4, rtx_magic);
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_family, "tensorrt_rtx");
+  blob[0] = 'T';
+  blob[1] = 'R';
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  blob = make_blob(VALID_METADATA);
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_family, "tensorrt");
+}
+
 TEST(ExecuTorchTensorRTBlobHeader, ParsesValidHeaderAndMetadata) {
   const std::string metadata =
       R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],"hardware_compatible":true,"device_id":2})";

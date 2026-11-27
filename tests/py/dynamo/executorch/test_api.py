@@ -278,6 +278,7 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
 
 
 _PUBLIC_API_SYMBOLS = (
+    "TensorRTRTXBackend",
     "get_edge_compile_config",
     "TensorRTPartitioner",
     "TensorRTBackend",

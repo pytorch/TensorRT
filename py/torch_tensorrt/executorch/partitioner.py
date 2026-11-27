@@ -24,13 +24,13 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
     ZERO_COPY_KV_COMPILE_SPEC_KEY,
-    TensorRTBackend,
     _external_engine_tag,
     _get_engine_info_for_node,
     _get_engine_nodes_in,
     _get_str,
     _parse_device_id,
     _serialize_elided_output_names,
+    get_backend_id,
 )
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
 
@@ -255,7 +255,7 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         # export() checks this name too, but a caller can lower with this partitioner directly.
         _external_engine_tag(self.compile_specs)
         self.delegation_spec = DelegationSpec(
-            backend_id=TensorRTBackend.__name__,
+            backend_id=get_backend_id(),
             compile_specs=self.compile_specs,
         )
 
@@ -404,7 +404,7 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                         )
                     )
             partition_tags[tag] = DelegationSpec(
-                backend_id=TensorRTBackend.__name__,
+                backend_id=get_backend_id(),
                 compile_specs=specs,
             )
 

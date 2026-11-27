@@ -103,12 +103,20 @@ lean_build=no
 case ":${runpath}:" in
     *':$ORIGIN/../../tensorrt_lean_libs:'*) lean_build=yes ;;
 esac
+rtx_build=no
+case ":${runpath}:" in
+    *':$ORIGIN/../../tensorrt_rtx_libs:'*) rtx_build=yes ;;
+esac
 for entry in $(needed_entries "${dyn}"); do
     case "${entry}" in
         libexecutorch.so|libexecutorch_extension_cuda.so|libexecutorch_threadpool.so) ;;
+        libtensorrt_rtx.so.*)
+            [ "${rtx_build}" = yes ] || fail "${target} links RTX in a standard build" ;;
         libnvinfer.so.*|libnvinfer_plugin.so.*)
+            [ "${rtx_build}" = no ] || fail "${target} is an RTX build but links ${entry}"
             [ "${lean_build}" = no ] || fail "${target} is a lean build but links ${entry}" ;;
         libnvinfer_lean.so.*)
+            [ "${rtx_build}" = no ] || fail "${target} is an RTX build but links ${entry}"
             [ "${lean_build}" = yes ] || fail "${target} links ${entry}, which only a lean build may link" ;;
         libcudart.so.*) ;;
         libstdc++.so.*|libc.so.*|libm.so.*|libgcc_s.so.*|libdl.so.*|librt.so.*|libpthread.so.*) ;;

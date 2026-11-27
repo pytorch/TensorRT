@@ -995,3 +995,33 @@ def test_preprocess_rejects_a_malformed_external_engine_spec(specs, message):
         TensorRTBackend.preprocess(
             _simple_engine_program(_engine_tensor(b"engine-bytes")), specs
         )
+
+
+@pytest.mark.unit
+def test_rtx_preprocess_uses_distinct_backend_and_blob(monkeypatch):
+    from torch_tensorrt.executorch.backend import TensorRTRTXBackend, get_backend_id
+
+    monkeypatch.setattr(tensorrt, "_package_name", "tensorrt_rtx")
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"rtx-engine")
+    engine_info[DEVICE_IDX] = "0"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "input_0"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "output_0"
+    program = _build_edge_program(engine_info)
+    assert get_backend_id() == "TensorRTRTXBackend"
+    result = TensorRTRTXBackend.preprocess(program, [])
+    assert result.processed_bytes[:4] == b"RX03"
+    _, metadata = deserialize_engine(result.processed_bytes)
+    assert metadata.engine_family == "tensorrt_rtx"
+    assert _named_engine(result) == b"rtx-engine"
+    with pytest.raises(ValueError, match="requires tensorrt"):
+        TensorRTBackend.preprocess(program, [])
+
+
+@pytest.mark.unit
+def test_rtx_preprocess_rejects_standard_compiler(monkeypatch):
+    from torch_tensorrt.executorch.backend import TensorRTRTXBackend
+
+    monkeypatch.setattr(tensorrt, "_package_name", "tensorrt")
+    with pytest.raises(ValueError, match="requires tensorrt_rtx"):
+        TensorRTRTXBackend.preprocess(None, [])

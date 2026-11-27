@@ -662,3 +662,28 @@ constexpr int32_t kPrefillProfile = 1;
   wheel ships no header. On Linux, an application can compile against the header, which also needs
   the TensorRT headers, and link the wheel's delegate. On Windows, the wheel's library does not
   export the guard. Python cannot choose a profile.
+
+
+### TensorRT-RTX engines
+
+The same delegate sources can be built against TensorRT-RTX 1.7 or newer:
+
+```sh
+cmake -S cpp/src/torch_tensorrt/executorch -B build/et-rtx \
+  -DTORCH_TENSORRT_EXECUTORCH_USE_RTX=ON \
+  -DTensorRTRTX_ROOT=/path/to/TensorRT-RTX \
+  -DCMAKE_PREFIX_PATH=/path/to/executorch/share/cmake
+cmake --build build/et-rtx
+```
+
+An RTX build registers `TensorRTRTXBackend`; a standard build registers
+`TensorRTBackend`. Export automatically selects the backend matching the active
+Torch-TensorRT compiler. Engine blobs record the family and use distinct `RX01`,
+`RX02`, and `RX03` signatures. Engines cannot be exchanged between the two runtimes.
+
+RTX contexts use eager dynamic-shape specialization and disable RTX's internal
+CUDA graphs, so the delegate owns capture/replay. It waits until RTX reports the
+stream capturable before recording. Persistent RTX runtime-cache files are not
+exposed by this initial integration. TensorRT plugins and lean runtimes are not
+used by the RTX delegate. The existing output-allocator and refitting restrictions
+also apply to RTX exports.

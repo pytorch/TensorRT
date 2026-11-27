@@ -36,7 +36,7 @@
 #include <vector>
 
 #include <NvInfer.h>
-#ifndef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
+#if !defined(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME) && !defined(TRT_MAJOR_RTX)
 #include <NvInferPlugin.h>
 #endif
 #include <cuda_runtime.h>
@@ -353,7 +353,7 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
     }
     if (logger == nullptr) {
       logger = new TRTLogger();
-#ifndef TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME
+#if !defined(TORCH_TENSORRT_EXECUTORCH_LEAN_RUNTIME) && !defined(TRT_MAJOR_RTX)
       // Engines can use TensorRT's standard plugins, such as ScatterElements for an
       // accumulating index_put, and their creators are only registered on request.
       // The lean library has no plugins, so a lean build cannot load such an engine.
@@ -720,7 +720,20 @@ Error initialize_engine_io(EngineHandle& handle) {
   const auto strategy = handle.shared_scratch ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
                                               : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
   last_load_error = {};
+#ifdef TRT_MAJOR_RTX
+  // Own capture in the delegate. RTX specialization can change kernels after a
+  // warm-up, so ExecutionGraph also checks isStreamCapturable before recording.
+  handle.runtime_config.reset(handle.engine->createRuntimeConfig());
+  auto* config = handle.runtime_config.get();
+  if (!config || !config->setCudaGraphStrategy(nvinfer1::CudaGraphStrategy::kDISABLED)) {
+    return Error::InvalidState;
+  }
+  config->setDynamicShapesKernelSpecializationStrategy(nvinfer1::DynamicShapesKernelSpecializationStrategy::kEAGER);
+  config->setExecutionContextAllocationStrategy(strategy);
+  handle.exec_ctx.reset(handle.engine->createExecutionContext(config));
+#else
   handle.exec_ctx.reset(handle.engine->createExecutionContext(strategy));
+#endif
   if (handle.exec_ctx == nullptr) {
     return report_load_error("create TensorRT execution context");
   }
@@ -1701,6 +1714,20 @@ Result<DelegateHandle*> TensorRTBackend::init(
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(processed->data(), processed->size(), header)) {
     ET_LOG(Error, "TensorRTBackend::init: failed to parse TensorRT blob");
+    return Error::InvalidProgram;
+  }
+
+#ifdef TRT_MAJOR_RTX
+  constexpr const char* expected_family = "tensorrt_rtx";
+#else
+  constexpr const char* expected_family = "tensorrt";
+#endif
+  if (header.engine_family != expected_family) {
+    ET_LOG(
+        Error,
+        "TensorRT delegate: engine family '%s' requires its matching delegate (this is '%s')",
+        header.engine_family.c_str(),
+        expected_family);
     return Error::InvalidProgram;
   }
 
@@ -2961,7 +2988,11 @@ TensorRTBackend& get_backend() {
   return backend;
 }
 
+#ifdef TRT_MAJOR_RTX
+const ::executorch::runtime::Backend kBackendId{"TensorRTRTXBackend", &get_backend()};
+#else
 const ::executorch::runtime::Backend kBackendId{"TensorRTBackend", &get_backend()};
+#endif
 const Error kRegistrationResult = ::executorch::runtime::register_backend(kBackendId);
 
 } // namespace
