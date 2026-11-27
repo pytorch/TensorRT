@@ -58,7 +58,7 @@
       },
       "outputs": [],
       "source": [
-        "model = StreamingKV().cuda()\nx_k = torch.ones(1, 4, 1, 8, device=\"cuda\") * 3.0\nx_v = torch.ones(1, 4, 1, 8, device=\"cuda\") * 5.0\n\nep = export(model, (x_k.clone(), x_v.clone()))\n\n# Show how torch.export sees the model:\nprint(\"graph_signature.input_specs:\")\nfor s in ep.graph_signature.input_specs:\n    print(f\"  {s}\")\nprint(\"graph_signature.output_specs:\")\nfor s in ep.graph_signature.output_specs:\n    print(f\"  {s}\")\n\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[x_k.clone(), x_v.clone()],\n    enabled_precisions={torch.float32},\n    min_block_size=1,\n    use_python_runtime=False,\n)"
+        "model = StreamingKV().cuda()\nx_k = torch.ones(1, 4, 1, 8, device=\"cuda\") * 3.0\nx_v = torch.ones(1, 4, 1, 8, device=\"cuda\") * 5.0\n\nep = export(model, (x_k.clone(), x_v.clone()))\n\n# Show how torch.export sees the model:\nprint(\"graph_signature.input_specs:\")\nfor s in ep.graph_signature.input_specs:\n    print(f\"  {s}\")\nprint(\"graph_signature.output_specs:\")\nfor s in ep.graph_signature.output_specs:\n    print(f\"  {s}\")\n\ncompiled = torch_tensorrt.compile(\n    ep,\n    ir=\"dynamo\",\n    inputs=[x_k.clone(), x_v.clone()],\n    min_block_size=1,\n)"
       ]
     },
     {

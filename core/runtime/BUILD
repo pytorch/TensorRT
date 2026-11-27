@@ -4,7 +4,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
-load("//toolchains/torch_nccl:defs.bzl", "if_torch_nccl", "if_torch_nccl2")
+load("//toolchains/torch_nccl:defs.bzl", "if_torch_legacy_nccl", "if_torch_nccl", "if_torch_nccl2")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -149,7 +149,7 @@ cc_library(
         "TensorRTBindingNames.h",
         "runtime.h",
     ],
-    defines = if_torch_nccl(["USE_C10D_NCCL"]) + if_torch_nccl2(["TORCHTRT_HAS_PROCESS_GROUP_NCCL2"]) + select({
+    defines = if_torch_nccl(["USE_C10D_NCCL"]) + if_torch_legacy_nccl(["TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL"]) + if_torch_nccl2(["TORCHTRT_HAS_PROCESS_GROUP_NCCL2"]) + select({
         # nvinfer1::IRuntimeConfig (and the matching ICudaEngine::createRuntimeConfig
         # / createExecutionContext(IRuntimeConfig*) overloads) was introduced in
         # TensorRT 10.11. The TensorRT shipped with the Jetpack l4t-r36.4 toolchain

@@ -135,9 +135,10 @@ effect when the ``torch_tensorrt_rtx`` wheel is installed.
         model,
         ir="dynamo",
         inputs=inputs,
-        enabled_precisions={torch.float32},
-        use_python_runtime=True,
     )
+
+The model and input dtypes determine precision, and Torch-TensorRT selects the
+runtime automatically.
 
     # RTX-only: persist JIT-compiled kernels across runs, eagerly specialize
     # for the current input shape, and let TensorRT-RTX capture+replay the

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -624,25 +624,27 @@ effect when the <code class="docutils literal notranslate"><span class="pre">tor
     <span class="n">model</span><span class="p">,</span>
     <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
     <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">},</span>
-    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
-
-<span class="c1"># RTX-only: persist JIT-compiled kernels across runs, eagerly specialize</span>
-<span class="c1"># for the current input shape, and let TensorRT-RTX capture+replay the</span>
-<span class="c1"># engine internally as a CUDA graph. Apply before first execute so the</span>
-<span class="c1"># engine's IExecutionContext picks the settings up on its single, lazy</span>
-<span class="c1"># create.</span>
-<span class="n">compiled</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span>
-    <span class="n">runtime_cache</span><span class="o">=</span><span class="s2">"/tmp/my_rtx_cache.bin"</span><span class="p">,</span>
-    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="s2">"eager"</span><span class="p">,</span>
-    <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">,</span>
-<span class="p">)</span>
-
-<span class="n">out</span> <span class="o">=</span> <span class="n">compiled</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>The model and input dtypes determine precision, and Torch-TensorRT selects the
+runtime automatically.</p>
+<blockquote>
+<div><p># RTX-only: persist JIT-compiled kernels across runs, eagerly specialize
+# for the current input shape, and let TensorRT-RTX capture+replay the
+# engine internally as a CUDA graph. Apply before first execute so the
+# engine’s IExecutionContext picks the settings up on its single, lazy
+# create.
+compiled.runtime_settings = RuntimeSettings(</p>
+<blockquote>
+<div><p>runtime_cache=”/tmp/my_rtx_cache.bin”,
+dynamic_shapes_kernel_specialization_strategy=”eager”,
+cuda_graph_strategy=”whole_graph_capture”,</p>
+</div></blockquote>
+<p>)</p>
+<p>out = compiled(torch.randn(4, 3, 224, 224).cuda())
+print(out.shape)</p>
+</div></blockquote>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>To both flip <code class="docutils literal notranslate"><span class="pre">cuda_graph_strategy</span></code> <em>and</em> wrap the module for outer

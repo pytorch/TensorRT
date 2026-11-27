@@ -38,11 +38,13 @@ Custom Setting Usage
     import torch_tensorrt
     ...
     optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False,
-                                    options={"truncate_long_and_double": True,
-                                             "debug": True,
+                                    options={"truncate_double": True,
                                              "min_block_size": 2,
                                              "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
                                              "optimization_level": 4,})
+
+For verbose compilation logs, use the :class:`~torch_tensorrt.dynamo.Debugger`
+context manager around compilation and the first forward call.
 
 .. note:: Supported precisions include FP32, FP16, BF16, INT8, FP8, and FP4. INT8/FP8 quantization requires the `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library and a quantized model. FP4 requires TensorRT >= 10.8.0.
 
@@ -78,7 +80,7 @@ Compilation is also a useful tool in determining operator coverage for a particu
     import torch_tensorrt
     ...
     optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False,
-                                    options={"debug": True,
+                                    options={"dryrun": True,
                                              "min_block_size": float("inf"),})
 
 If key operators for your model are unsupported, see :ref:`dynamo_conversion` to contribute your own converters, or file an issue here: https://github.com/pytorch/TensorRT/issues.
@@ -94,7 +96,7 @@ Compilation can also be helpful in demonstrating graph breaks and the feasibilit
     ...
     explanation = torch._dynamo.explain(model)(*inputs)
     print(f"Graph breaks: {explanation.graph_break_count}")
-    optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False, options={"truncate_long_and_double": True})
+    optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False, options={"truncate_double": True})
 
 Dynamic Shape Support
 -----------------
