@@ -5,6 +5,7 @@
 
 import functools
 import logging
+import math
 import operator
 from typing import (
     Any,
@@ -5864,6 +5865,46 @@ def _shares_bf16_query_with_another_attention(node: Node) -> bool:
     )
 
 
+def _single_key_attention_fails(
+    node: Node,
+    settings: Optional[CompilationSettings],
+    dtype: Optional[torch.dtype] = None,
+) -> bool:
+    # With a single key, TensorRT 11.4's attention layer gives wrong values (or inf) for a head size of 2 to 15 in FP32
+    # and 2 to 8 in 16 bits, for any query length and head count, except a one-row query with a head size of 8 and 4
+    # or more heads in all (batch times heads). It cannot build an FP16 one-row query with a head size of 32 or 64 and
+    # fewer than 4 heads in all. Seen on an A100 and an H100, and declined on every version but TensorRT-RTX targeting
+    # Turing, which cannot run the FP32 decomposition. A declined attention is decomposed, or left to PyTorch where
+    # the decomposition cannot compute it.
+    if trt_rtx_targets_turing(settings):
+        return False
+    query, key = (
+        arg.meta.get("val") if isinstance(arg, Node) else None for arg in node.args[:2]
+    )
+    if query is None or key is None or not statically_known_true(key.size(-2) == 1):
+        return False
+    dtype = dtype or query.dtype
+    if dtype == torch.float64 and settings is not None and settings.truncate_double:
+        dtype = torch.float32
+    head_size = query.size(-1)
+    if not isinstance(head_size, int):
+        return False
+    one_row = statically_known_true(query.size(-2) == 1)
+    # A dynamic batch or head count counts as 1, since the engine's shape range can start there.
+    heads = math.prod(size if isinstance(size, int) else 1 for size in query.shape[:-2])
+    if one_row and head_size % 8 == 0 and heads >= 4:
+        return False
+    if (2 <= head_size < (16 if dtype == torch.float32 else 9)) or (
+        dtype == torch.float16 and head_size in (32, 64) and one_row
+    ):
+        _LOGGER.debug(
+            "Declining attention %s: TensorRT's attention layer fails for a single key of this shape.",
+            node.name,
+        )
+        return True
+    return False
+
+
 def _output_quantized_to_fp8(node: Node) -> bool:
     # Imported here: the lowering passes import this module.
     from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
@@ -5952,6 +5993,8 @@ def scaled_dot_product_attention_validator(
             "cannot build unless its inputs are FP8 too.",
             node.name,
         )
+        return False
+    if _single_key_attention_fails(node, settings):
         return False
 
     attn_mask = args_bounds_check(node.args, 3, None)
@@ -6059,6 +6102,9 @@ def scaled_dot_product_flash_attention_validator(
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
 
+    if _single_key_attention_fails(node, settings):
+        return False
+
     query_shape, key_shape, value_shape = None, None, None
     if "val" in node.args[0].meta:
         query_shape = node.args[0].meta["val"].size()
@@ -6154,6 +6200,9 @@ def scaled_dot_product_efficient_attention_validator(
 
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
+        return False
+
+    if _single_key_attention_fails(node, settings):
         return False
 
     query_shape, key_shape, value_shape = None, None, None

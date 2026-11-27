@@ -1,6 +1,7 @@
+import functools
 import logging
 import operator
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import tensorrt as trt
 import torch
@@ -12,6 +13,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistr
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     _PASS_THROUGH_OPS,
     _inputs_quantized_to_fp8,
+    _single_key_attention_fails,
     attention_capability_validator,
     scaled_dot_product_attention_validator,
     scaled_dot_product_cudnn_attention_validator,
@@ -20,6 +22,7 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
 from torch_tensorrt.dynamo.lowering._decompositions import (
     get_decompositions,
     scaled_dot_product_attention_decomposition,
+    scaled_dot_product_cudnn_attention_decomposition,
     scaled_dot_product_efficient_attention_decomposition,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -58,6 +61,31 @@ _VIEWS = _PASS_THROUGH_OPS - {
     torch.ops.aten.expand.default,
 }
 _HALF = (torch.float16, torch.bfloat16)
+
+
+_DECOMPOSITIONS = {
+    **_FP32_ATTENTION,
+    _CUDNN: scaled_dot_product_cudnn_attention_decomposition,
+}
+
+
+def _single_key_attention_decomposition(
+    decomposition: Callable[..., Any],
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    # In 16 bits, a score over the one key can overflow and the softmax of a hidden key is NaN, where PyTorch gives the
+    # value and zeros. In FP32 neither happens.
+    dtype = torch.promote_types(query.dtype, torch.float32)
+    output = decomposition(
+        query.to(dtype), key.to(dtype), value.to(dtype), *args, **kwargs
+    )
+    if isinstance(output, tuple):
+        return (output[0].to(query.dtype), *output[1:])
+    return output.to(query.dtype)
 
 
 def _dtype(arg: Any) -> Optional[torch.dtype]:
@@ -141,7 +169,7 @@ def _fp32_attention_layer_fails(node: torch.fx.Node) -> bool:
 
 
 def _decomposable(node: torch.fx.Node) -> bool:
-    if node.target == _EFFICIENT:
+    if node.target in _BIAS_ATTENTION:
         # The decomposition computes only the attention output, and it refuses a bias with is_causal.
         mask = node.args[3] if len(node.args) > 3 else None
         is_causal = len(node.args) > 6 and node.args[6]
@@ -386,9 +414,27 @@ def _inline_traced_decomp(
     example_args = tuple(_example_val(a) for a in node.args)
     example_kwargs = {k: _example_val(v) for k, v in node.kwargs.items()}
     example_kwargs["use_fp32_acc"] = settings.use_fp32_acc
+    val = node.meta["val"]
+    order, _ = compute_elementwise_output_logical_to_physical_perm(
+        val[0] if isinstance(val, tuple) else val
+    )
 
     def wrapped(*args: Any) -> Any:
-        return decomp_fn(*args, **example_kwargs)
+        output = decomp_fn(*args, **example_kwargs)
+        # Only the memory order is restored, not the row padding that CUDA gives a 16-bit head size that is not a
+        # multiple of 8.
+        if order == sorted(order):
+            return output
+        # PyTorch returns attention in a memory order, such as that of a transposed query, that a reader of its
+        # strides relies on. The decomposition returns a contiguous tensor, so it is copied to that order. The final
+        # clone stops the result from being a view, which detach_() refuses.
+        inverse = [order.index(i) for i in range(len(order))]
+        if isinstance(output, tuple):
+            return (
+                output[0].permute(order).contiguous().permute(inverse).clone(),
+                *output[1:],
+            )
+        return output.permute(order).contiguous().permute(inverse).clone()
 
     # Lowered with the same table as the rest of the graph: this pass runs after decomposition, and ops such
     # as aten.transpose.int have no converter of their own, so they would be left to PyTorch.
@@ -467,14 +513,15 @@ def decompose_unsupported_attention(
     that has a mask, for which the layer gives NaN where a query sees no key, is
     decomposed as well when the decomposition can compute it. A 16-bit attention whose
     mask TensorRT ignores, with a query length fixed at 1 and a long key, gets more
-    query rows instead.
+    query rows instead. An attention that TensorRT fails over a single key is decomposed,
+    in FP32 if it is 16-bit, when the decomposition can compute it.
     """
     if settings.decompose_attention:
         return gm
 
     # Decide for every node before changing the graph: whether a node is supported can depend on the other
     # attention nodes, such as two that read the same query.
-    declined = []
+    declined: List[Tuple[torch.fx.Node, Callable[..., Any]]] = []
     rewritten = []
     for node in gm.graph.nodes:
         if node.op != "call_function" or (
@@ -494,6 +541,20 @@ def decompose_unsupported_attention(
         if node_in_torch_executed_module(node, settings.torch_executed_modules):
             continue
 
+        if _single_key_attention_fails(node, settings):
+            # Not left to PyTorch, which would break require_full_compilation=True, and whose efficient attention
+            # rejects a bias with the unaligned strides an engine gives it.
+            if _decomposable(node):
+                declined.append(
+                    (
+                        node,
+                        functools.partial(
+                            _single_key_attention_decomposition,
+                            _DECOMPOSITIONS[node.target],
+                        ),
+                    )
+                )
+            continue
         if node.target in _ATTENTION_FALLBACKS:
             validator, decomp = _ATTENTION_FALLBACKS[node.target]
             if not validator(node, settings):
@@ -515,6 +576,12 @@ def decompose_unsupported_attention(
                 and _single_query_mask_ignored(
                     node, settings, _folded_half(node) or torch.float32
                 )
+            )
+            # TensorRT runs it as an FP16 layer, so it fails for the same single-key shapes.
+            or (
+                _decomposable(node)
+                and _folded_half(node) == torch.float16
+                and _single_key_attention_fails(node, settings, torch.float16)
             )
         ):
             declined.append((node, _FP32_ATTENTION[node.target]))

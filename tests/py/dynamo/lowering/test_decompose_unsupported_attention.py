@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo.lowering.passes.decompose_unsupported_attention impor
     decompose_unsupported_attention,
 )
 
+from ..conversion.harness import skip_if_trt_rtx_turing
 from ..testing_utilities import lower_graph_testing
 
 attention_pass = importlib.import_module(
@@ -421,6 +422,108 @@ class TestDecomposeUnsupportedAttention(TestCase):
                 mock.patch.object(trt, "__version__", version),
             ):
                 self.assertEqual(attention_pass._ignores_single_query_mask(), ignores)
+
+    def test_float64_attention_over_a_single_key_is_decomposed_in_float64(self):
+        skip_if_trt_rtx_turing(self, "FP32 decomposition of single-key attention")
+        # truncate_double makes TensorRT run it in FP32, which fails for this head size. Where PyTorch runs the
+        # decomposition, FP32 would turn this value into inf.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+
+        class Attention(nn.Module):
+            def forward(self, q, k, v):
+                return sdpa(q, k, v)
+
+        query = torch.zeros(1, 1, 1, 12, dtype=torch.float64)
+        inputs = (query, query, torch.full_like(query, 1e300))
+        gm = decompose_unsupported_attention(
+            torch.export.export(Attention(), inputs).module(),
+            CompilationSettings(decompose_attention=False, truncate_double=True),
+        )
+        self.assertNotIn(sdpa, [n.target for n in gm.graph.nodes])
+        torch.testing.assert_close(gm(*inputs), Attention()(*inputs))
+
+    @unittest.skipIf(not torch.cuda.is_available(), "Needs CUDA")
+    def test_decomposed_single_key_attention_keeps_its_memory_order(self):
+        skip_if_trt_rtx_turing(self, "FP32 decomposition of single-key attention")
+        # PyTorch returns attention on a transposed query in the query's memory order, and efficient attention in
+        # its own. A clone or an elementwise op keeps that order for as_strided to read.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        efficient = torch.ops.aten._scaled_dot_product_efficient_attention.default
+
+        class FlatReader(nn.Module):
+            def __init__(self, reader):
+                super().__init__()
+                self.reader = reader
+
+            def forward(self, q, k, v, bias):
+                if self.reader.startswith("efficient"):
+                    out = efficient(q, k, v, bias[..., :1], False)[0]
+                else:
+                    out = sdpa(q.transpose(1, 2), k, v)
+                if self.reader.endswith("output"):
+                    return out
+                if self.reader == "clone":
+                    out = out.clone()
+                elif self.reader == "mul":
+                    out = out * 2
+                return torch.as_strided(out, (out.numel(),), (1,))
+
+        inputs = (
+            torch.randn(2, 2, 2, 8, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, 1, 8, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, 1, 8, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, 2, 8, dtype=torch.float16, device="cuda"),
+        )
+        for reader in (
+            "output",
+            "direct",
+            "clone",
+            "mul",
+            "efficient",
+            "efficient_output",
+        ):
+            with self.subTest(reader=reader):
+                gm = decompose_unsupported_attention(
+                    torch.export.export(FlatReader(reader), inputs).module(),
+                    CompilationSettings(decompose_attention=False),
+                )
+                targets = [n.target for n in gm.graph.nodes]
+                self.assertNotIn(sdpa, targets)
+                self.assertNotIn(efficient, targets)
+                out, expected = gm(*inputs), FlatReader(reader)(*inputs)
+                torch.testing.assert_close(out, expected)
+                # detach_() refuses a view.
+                self.assertEqual(out._is_view(), expected._is_view())
+
+    def test_single_key_attention_the_decomposition_cannot_compute_is_kept(self):
+        # The decomposition refuses a bias with is_causal, and it computes only the attention output.
+        inputs = (
+            torch.randn(1, 1, 5, 8, dtype=torch.float16),
+            torch.randn(1, 1, 1, 8, dtype=torch.float16),
+            torch.randn(1, 1, 1, 8, dtype=torch.float16),
+            torch.randn(1, 1, 5, 1, dtype=torch.float16),
+        )
+        for attention in (
+            torch.ops.aten._scaled_dot_product_efficient_attention.default,
+            torch.ops.aten._scaled_dot_product_cudnn_attention.default,
+        ):
+
+            class Causal(nn.Module):
+                def forward(self, q, k, v, bias):
+                    return attention(q, k, v, bias, False, 0.0, True)[0]
+
+            class Outputs(nn.Module):
+                def forward(self, q, k, v, bias):
+                    out = attention(q, k, v, bias, False)
+                    return out[0], out[1]
+
+            for module in (Causal(), Outputs()):
+                with self.subTest(attention=attention, module=type(module).__name__):
+                    gm = decompose_unsupported_attention(
+                        torch.export.export(module, inputs).module(),
+                        CompilationSettings(decompose_attention=False),
+                    )
+                    self.assertIn(attention, [n.target for n in gm.graph.nodes])
 
     def test_attention_with_a_constant_key_is_left_for_pytorch(self):
         # TensorRT's attention layer gets a constant key wrong in FP16 and BF16. FP32 matches an
