@@ -9,6 +9,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -82,6 +83,58 @@ class TestBinaryOpConverters(DispatchTestCase):
             torch.randint(1, 3, (1, 1), dtype=torch.int),
         ]
         self.run_test(m, inputs)
+
+    @parameterized.expand(
+        [
+            ("empty_has_more_dims", lambda x, y: x[..., 4:] + y, (2, 3, 4), (3, 1)),
+            ("empty_has_more_dims_rhs", lambda x, y: y + x[..., 4:], (2, 3, 4), (3, 1)),
+            ("empty_has_fewer_dims", lambda x, y: y[..., 4:] + x, (2, 3, 1), (3, 4)),
+            (
+                "empty_has_fewer_dims_rhs",
+                lambda x, y: x + y[..., 4:],
+                (2, 3, 1),
+                (3, 4),
+            ),
+            ("two_empty_dims", lambda x, y: x[4:, 3:] + y, (4, 3, 3), (2, 1, 1, 3)),
+        ]
+    )
+    def test_add_broadcast_to_zero_size_dim(self, _, fn, x_shape, y_shape):
+        class TestModule(nn.Module):
+            def forward(self, x, y):
+                return fn(x, y)
+
+        inputs = [torch.rand(x_shape), torch.rand(y_shape)]
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
+
+    def test_add_broadcast_to_zero_size_dim_with_dynamic_shape(self):
+        class TestModule(nn.Module):
+            def forward(self, x, y):
+                return x[4:, 3:] + y
+
+        input_specs = [
+            Input(shape=(4, 3, 3), dtype=torch.float32),
+            Input(
+                min_shape=(1, 1, 1, 3),
+                opt_shape=(2, 1, 1, 3),
+                max_shape=(2, 1, 1, 3),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, use_dynamo_tracer=True
+        )
+
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+        "nonzero is not supported for tensorrt_rtx",
+    )
+    def test_add_broadcast_with_size_that_is_zero_at_run_time(self):
+        class TestModule(nn.Module):
+            def forward(self, x, y):
+                return torch.ops.aten.nonzero.default(x) + y
+
+        inputs = [torch.zeros(2, 3), torch.rand(3, 1, 2)]
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [

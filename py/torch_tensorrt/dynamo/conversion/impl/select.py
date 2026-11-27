@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import List, Optional, Sequence, Union
+import operator
+import sys
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
@@ -66,6 +68,24 @@ def select(
             indices_tensor = impl.shuffle.reshape(
                 ctx, target, source_ir, f"{name}_index_rank0", indices_tensor, ()
             )
+    elif _meets_its_data(ctx, ctx.current_node):
+        # TensorRT 10.15 to 11.4 and TensorRT-RTX 1.7 can return wrong values when a
+        # gather with a scalar index ends up in a concatenation that rebuilds the tensor
+        # it gathers from. So when the select's result goes back to its data, gather with
+        # a one element index and drop the dim afterwards. That gives the right values
+        # on TensorRT 11.2 to 11.4 and TensorRT-RTX 1.7, while older versions stay wrong
+        # in some cases. The version is not checked: no fixed version is known, and
+        # TensorRT 10.3 builds the same layers at the same speed with either index.
+        # Other selects keep the scalar index, as TensorRT 11.4 fails to build some
+        # engines with the one element form.
+        indices_tensor = get_trt_tensor(
+            ctx, np.array([index], dtype=np.int32), f"{name}_indices_tensor"
+        )
+        layer = ctx.net.add_gather(input, indices_tensor, dim)
+        set_layer_name(layer, target, f"{name}_gather", source_ir)
+        return impl.squeeze.squeeze(
+            ctx, target, source_ir, f"{name}_squeeze", layer.get_output(0), dim
+        )
     else:
         indices_tensor = get_trt_tensor(
             ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
@@ -74,6 +94,175 @@ def select(
     set_layer_name(layer, target, f"{name}_gather", source_ir)
 
     return layer.get_output(0)
+
+
+_SPLIT_OPS = {torch.ops.aten.split.Tensor, torch.ops.aten.split_with_sizes.default}
+
+
+def _is_full_slice(node: torch.fx.Node) -> bool:
+    """Whether node is an aten.slice that keeps all of its dim."""
+    if node.target != torch.ops.aten.slice.Tensor:
+        return False
+    defaults = [0, None, None, 1][len(node.args) - 1 :]
+    source, dim, start, end, step = list(node.args) + defaults
+    if step != 1 or not all(isinstance(b, (int, type(None))) for b in (start, end)):
+        return False
+    val = source.meta.get("val") if isinstance(source, torch.fx.Node) else None
+    shape = getattr(val, "shape", None)
+    size = None if shape is None else shape[dim]
+    # A negative start counts from the end, so it keeps the whole dim if it reaches
+    # back past the first element.
+    from_first = not start or (
+        size is not None and statically_known_true(start + size <= 0)
+    )
+    to_last = (
+        end is None
+        or end >= sys.maxsize
+        or (size is not None and statically_known_true(end >= size))
+    )
+    return from_first and to_last
+
+
+def _part_of(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The tensor that node is a slice, a select or a split piece of, or None."""
+    if node.target in (torch.ops.aten.slice.Tensor, torch.ops.aten.select.int):
+        whole = node.args[0]
+    elif (
+        node.target == operator.getitem
+        and getattr(node.args[0], "target", None) in _SPLIT_OPS
+    ):
+        whole = node.args[0].args[0]
+    else:
+        return None
+    return whole if isinstance(whole, torch.fx.Node) else None
+
+
+def _is_constant(arg: Any) -> bool:
+    """Whether arg holds no graph tensor, other than a graph constant of one element."""
+    if isinstance(arg, (list, tuple)):
+        return all(_is_constant(a) for a in arg)
+    if not isinstance(arg, torch.fx.Node):
+        return True
+    val = arg.meta.get("val")
+    if isinstance(val, (int, float, torch.SymInt, torch.SymFloat)):
+        return True
+    return arg.op == "get_attr" and isinstance(val, torch.Tensor) and val.numel() == 1
+
+
+def _data_source(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The one tensor input that node computes its result from, unless node takes a
+    part of it, or None."""
+    if node.target == torch.ops.aten.copy.default:
+        source = node.args[1]
+    elif _is_full_slice(node):
+        source = node.args[0]
+    elif not node.args or _part_of(node) is not None:
+        return None
+    else:
+        # The tensor may be any argument, as in self.one * x.
+        tensors = [arg for arg in node.args if not _is_constant(arg)]
+        if len(tensors) != 1:
+            return None
+        source = tensors[0]
+    return source if isinstance(source, torch.fx.Node) else None
+
+
+def _meets_its_data(ctx: ConversionContext, node: Optional[torch.fx.Node]) -> bool:
+    """Whether node is aten.select whose result, through any ops, goes into a
+    concatenation with a part of the same data, or into a slice_scatter into that data.
+
+    TensorRT simplifies the network before it builds it: it removes a multiply by one,
+    a where with equal branches, reshapes, casts and more. So the ops on the way to the
+    concatenation or scatter can vanish. A part of the data or the data is looked up
+    through any op with one tensor input besides constants, and through a cat. This
+    covers most ops TensorRT removes without listing them, but not a where on the side
+    of the part, which has more tensor inputs. It also looks through ops that TensorRT
+    keeps, such as a softmax or a sum, where the one element form gives the right
+    values too. Graphs without such a concatenation or scatter keep the scalar index.
+    """
+    if node is None or node.target != torch.ops.aten.select.int:
+        return False
+    found = ctx.selects_meeting_their_data
+    if node.graph not in found:
+        found[node.graph] = _selects_meeting_their_data(node.graph)
+    return node in found[node.graph]
+
+
+def _selects_meeting_their_data(graph: torch.fx.Graph) -> Set[torch.fx.Node]:
+    """The selects of graph that _meets_its_data matches.
+
+    Each pass visits every node once. One finds each concatenation operand or scatter
+    that holds a part of a select's data. Only if there is one, another finds which
+    selects the cat or scatter is computed from. Bit i of a mask stands for the i-th
+    select.
+    """
+    select_op = torch.ops.aten.select.int
+    selects = [node for node in graph.nodes if node.target == select_op]
+    if not selects:
+        return set()
+    # The tensor a node is computed from through ops with one tensor input.
+    roots: Dict[torch.fx.Node, torch.fx.Node] = {}
+
+    def root(node: torch.fx.Node) -> torch.fx.Node:
+        path: List[torch.fx.Node] = []
+        while node not in roots and (source := _data_source(node)) is not None:
+            path.append(node)
+            node = source
+        top = roots.setdefault(node, node)
+        for passed in path:
+            roots[passed] = top
+        return top
+
+    # The selects whose data, or a tensor their data is a part of, has the root.
+    data_of: Dict[torch.fx.Node, int] = {}
+    for i, select in enumerate(selects):
+        data = root(select.args[0])
+        data_of[data] = data_of.get(data, 0) | 1 << i
+    # A part comes after its whole, so going backwards passes each root's selects on
+    # to the root of its whole once, however deep the parts nest.
+    for node in reversed(graph.nodes):
+        if node in data_of and (whole := _part_of(node)) is not None:
+            whole = root(whole)
+            data_of[whole] = data_of.get(whole, 0) | data_of[node]
+
+    # For a part, the selects whose data has the root of the tensor it was cut from.
+    # For a cat, the same for its operands.
+    held: Dict[torch.fx.Node, int] = {}
+    # A cat or scatter, its operand that holds the data (None for a scatter), and the
+    # selects whose data it is.
+    checks: List[Tuple[torch.fx.Node, Optional[torch.fx.Node], int]] = []
+    # Looked up once, as every node is compared with them.
+    cat_op = torch.ops.aten.cat.default
+    scatter_op = torch.ops.aten.slice_scatter.default
+    part_ops = {torch.ops.aten.slice.Tensor, select_op, operator.getitem}
+    for node in graph.nodes:
+        if node.target == scatter_op:
+            if mask := data_of.get(root(node.args[0]), 0):
+                checks.append((node, None, mask))
+        elif node.target == cat_op:
+            held[node] = 0
+            for operand in node.args[0]:
+                if isinstance(operand, torch.fx.Node):
+                    if mask := held.get(root(operand), 0):
+                        checks.append((node, operand, mask))
+                    held[node] |= mask
+        elif node.target in part_ops and (whole := _part_of(node)) is not None:
+            held[node] = data_of.get(root(whole), 0)
+    if not checks:
+        return set()
+
+    bits = {select: 1 << i for i, select in enumerate(selects)}
+    # The selects that a node is or is computed from.
+    below: Dict[torch.fx.Node, int] = {}
+    for node in graph.nodes:
+        below[node] = bits.get(node, 0)
+        for arg in node.all_input_nodes:
+            below[node] |= below[arg]
+    meets = 0
+    for target, operand, mask in checks:
+        # A cat operand computed from the select is not a part of its data.
+        meets |= below[target] & ~below.get(operand, 0) & mask
+    return {select for select, bit in bits.items() if meets & bit}
 
 
 def is_boolean_tensor(

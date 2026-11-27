@@ -5,6 +5,7 @@ import unittest
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -39,6 +40,25 @@ class TestReshapeConverter(DispatchTestCase):
             Reshape(),
             inputs,
         )
+
+    def test_reshape_to_zero_size_dim(self):
+        class Reshape(torch.nn.Module):
+            def forward(self, x):
+                return x[..., 4:].reshape(1, 2, 2, 3, 0)
+
+        self.run_test(Reshape(), [torch.randn(1, 4, 3, 4)], use_dynamo_tracer=True)
+
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+        "nonzero is not supported for tensorrt_rtx",
+    )
+    def test_reshape_to_size_that_is_zero_at_run_time(self):
+        class Reshape(torch.nn.Module):
+            def forward(self, x):
+                indices = torch.ops.aten.nonzero.default(x)
+                return indices.reshape(2, indices.shape[0])
+
+        self.run_test(Reshape(), [torch.zeros(2, 3)], use_dynamo_tracer=True)
 
     @parameterized.expand(
         [

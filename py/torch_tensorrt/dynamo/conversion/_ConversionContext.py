@@ -77,6 +77,11 @@ class ConversionContext:
         default_factory=dict
     )
     current_node: Optional[torch.fx.Node] = field(default=None)
+    # The selects of each graph whose result goes back to their data, found once per
+    # graph (see impl.select._meets_its_data).
+    selects_meeting_their_data: dict[torch.fx.Graph, set[torch.fx.Node]] = field(
+        default_factory=dict
+    )
     # The values of the nodes converted so far (see the in-place plugin converter).
     node_values: dict[torch.fx.Node, Any] = field(default_factory=dict)
     # Outputs of nodes whose value is a Python float, such as a quotient of sizes or a
