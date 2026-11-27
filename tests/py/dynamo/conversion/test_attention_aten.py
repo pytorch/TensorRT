@@ -834,5 +834,110 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
         self.run_test(EfficientSDPA(), inputs, rtol=1e-2, atol=1e-2, enable_passes=True)
 
 
+class TestOddKeyLengthPadding(DispatchTestCase):
+    """A masked attention with an odd key length gets one blocked key (issue 5009)."""
+
+    @parameterized.expand(
+        [
+            (f"{op}_{mask}_{kv}", op, mask, kv)
+            for op in ("sdpa", "efficient", "efficient_causal")
+            for mask in ("bool", "float")
+            for kv in (37, 38)
+            if not (op != "sdpa" and mask == "bool")
+        ]
+    )
+    def test_matches_pytorch(self, _, op, mask_kind, kv_len):
+        # A multiple of 8, which PyTorch's memory-efficient kernel needs for the bias strides.
+        q_len = 8
+        is_causal = op == "efficient_causal"
+
+        class Attention(nn.Module):
+            def forward(self, query, key, value, mask):
+                if op == "sdpa":
+                    return torch.ops.aten.scaled_dot_product_attention.default(
+                        query, key, value, mask
+                    )
+                # PyTorch's kernel also needs bias rows that start at multiples of 8 elements.
+                aligned = nn.functional.pad(mask, (0, -kv_len % 8))[..., :kv_len]
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, key, value, aligned, False, 0.0, is_causal
+                )[0]
+
+        query = torch.randn(1, 4, q_len, 16, dtype=torch.float16)
+        key = torch.randn(1, 4, kv_len, 16, dtype=torch.float16)
+        value = torch.randn(1, 4, kv_len, 16, dtype=torch.float16)
+        keep = torch.rand(1, 1, q_len, kv_len) < 0.5
+        keep[..., 0] = True  # no query has every key blocked
+        if mask_kind == "bool":
+            mask = keep
+        else:
+            mask = torch.where(keep, 0.0, float("-inf")).to(torch.float16)
+            if op != "sdpa":
+                mask = mask.expand(1, 4, q_len, kv_len).contiguous()
+        self.run_test(
+            Attention(),
+            [query, key, value, mask],
+            rtol=1e-2,
+            atol=1e-2,
+            enable_passes=True,
+        )
+
+    @parameterized.expand(
+        [
+            ("odd", 6, 37, 37, 38),
+            ("odd_bf16", 6, 37, 37, 38, trt.bfloat16),
+            ("even", 6, 38, 38, None),
+            ("single_query", 1, 37, 37, None),
+            ("mask_broadcast_over_keys", 6, 37, 1, None),
+            ("dynamic_keys", 6, -1, -1, None),
+            ("no_mask", 6, 37, None, None),
+            ("float32", 6, 37, 37, None, trt.float32),
+        ]
+    )
+    def test_key_length_seen_by_attention(
+        self, _, q_len, kv_len, mask_len, padded_len, dtype=trt.float16
+    ):
+        for attention in (
+            impl.attention.scaled_dot_product_attention,
+            impl.attention.scaled_dot_product_efficient_attention,
+        ):
+            network = trt.Builder(trt.Logger(trt.Logger.ERROR)).create_network(
+                1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+            )
+            query = network.add_input("q", dtype, (1, 4, q_len, 16))
+            key = network.add_input("k", dtype, (1, 4, kv_len, 16))
+            value = network.add_input("v", dtype, (1, 4, kv_len, 16))
+            mask = (
+                None
+                if mask_len is None
+                else network.add_input("mask", trt.bool, (1, 1, q_len, mask_len))
+            )
+            attention(
+                ConversionContext(network),
+                torch.ops.aten.scaled_dot_product_attention.default,
+                SourceIR.ATEN,
+                "attention",
+                query,
+                key,
+                value,
+                mask,
+            )
+            # The attention's query, key, value and mask are the inputs of its input layer.
+            layer = next(
+                network.get_layer(i)
+                for i in range(network.num_layers)
+                if network.get_layer(i).type == trt.LayerType.ATTENTION_INPUT
+            )
+            expected = kv_len if padded_len is None else padded_len
+            with self.subTest(attention=attention.__name__):
+                self.assertEqual(layer.get_input(1).shape[-2], expected)
+                self.assertEqual(layer.get_input(2).shape[-2], expected)
+                if mask is not None:
+                    self.assertEqual(
+                        layer.get_input(3).shape[-1],
+                        mask_len if padded_len is None else expected,
+                    )
+
+
 if __name__ == "__main__":
     run_tests()
