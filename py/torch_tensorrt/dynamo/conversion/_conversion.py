@@ -240,13 +240,16 @@ def interpret_module_to_result(
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
-        module: FX GraphModule to interpret
+        module: FX GraphModule to interpret. With pointwise_in_float32 set, it is rewritten in place.
         inputs: It requires a sequence of FLATTENED Inputs representing inputs to the module. It should include both arg_inputs and kwarg_inputs, if applicable.
         settings: Compilation settings
         engine_cache: Engine cache instance
     Returns:
         SerializedInterpreterResult
     """
+    from torch_tensorrt.dynamo.lowering.passes.pointwise_in_float32 import (
+        pointwise_in_float32,
+    )
     from torch_tensorrt.dynamo.tuning import (
         gpt_settings_requested,
         require_global_perf_tuning,
@@ -254,6 +257,10 @@ def interpret_module_to_result(
         tune_subgraph,
         validate_tuning_options,
     )
+
+    # Here rather than in lowering, so that code left to PyTorch keeps its dtype and
+    # every cast the pass adds lands in an engine.
+    module = pointwise_in_float32(module, settings)
 
     if gpt_settings_requested(settings) or should_run_tuning(settings):
         require_global_perf_tuning("Requested Global Performance Tuning settings")
