@@ -624,7 +624,12 @@ def scaled_dot_product_attention_decomposition(
         # As PyTorch's _safe_softmax: zeros, not NaN, for a query that the mask hides all keys from. A 16-bit
         # softmax is left alone, as this would stop TensorRT's fused 16-bit attention, which gives zeros. A 16-bit
         # attention that is not fused, such as one with different key and value head sizes, still gives NaN.
-        hidden = attn_weight.amax(-1, keepdim=True) == float("-inf")
+        if isinstance(S, int):
+            hidden = attn_weight.amax(-1, keepdim=True) == float("-inf")
+        else:
+            # Export takes a dynamic key to be longer than 1, but where PyTorch runs this graph it can be empty,
+            # where amax fails and any gives False.
+            hidden = (attn_weight != float("-inf")).any(-1, keepdim=True).logical_not()
         attn_weight = torch.where(hidden, 0.0, torch.softmax(attn_weight, dim=-1))
     else:
         attn_weight = torch.softmax(attn_weight, dim=-1)

@@ -20,6 +20,14 @@ from torch_tensorrt.dynamo.lowering.passes.decompose_unsupported_attention impor
 
 from ..testing_utilities import lower_graph_testing
 
+attention_pass = importlib.import_module(
+    "torch_tensorrt.dynamo.lowering.passes.decompose_unsupported_attention"
+)
+# The rewrite of the graph does not need a TensorRT version that ignores the mask.
+_ignores_single_query_mask = mock.patch.object(
+    attention_pass, "_ignores_single_query_mask", return_value=True
+)
+
 
 class TestDecomposeUnsupportedAttention(TestCase):
     def test_turing_fp32_attention_left_intact_for_pytorch_fallback(self):
@@ -103,6 +111,303 @@ class TestDecomposeUnsupportedAttention(TestCase):
 
         targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
         self.assertIn(torch.ops.aten.scaled_dot_product_attention.default, targets)
+
+    @_ignores_single_query_mask
+    def test_masked_single_query_attention(self, _):
+        # TensorRT ignores the mask of a 16-bit attention layer whose query length is fixed at 1.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+
+        class SDPA(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(q, k, v, mask, enable_gqa=q.shape[1] != k.shape[1])
+
+        class Causal(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(
+                    q, k, v, None, 0.0, True, enable_gqa=q.shape[1] != k.shape[1]
+                )
+
+        def targets(
+            query_len,
+            kv_heads,
+            dynamic=False,
+            mask_shape=None,
+            key_len=1024,
+            dtype=torch.float16,
+            batch=1,
+            module=SDPA,
+            **settings,
+        ):
+            # With 8 query heads and 2 key heads, a swapped order of the grouped heads changes the result.
+            inputs = (
+                torch.randn(batch, 8, query_len, 8, dtype=dtype),
+                torch.randn(batch, kv_heads, key_len, 8, dtype=dtype),
+                torch.randn(batch, kv_heads, key_len, 8, dtype=dtype),
+                torch.rand(mask_shape or (batch, 8, query_len, key_len)) > 0.3,
+            )
+            length = torch.export.Dim("length", min=1, max=8)
+            dynamic_shapes = ({2: length}, None, None, {2: length}) if dynamic else None
+            if batch > 1:
+                size = torch.export.Dim("batch", min=1, max=8)
+                dynamic_shapes = ({0: size}, {0: size}, {0: size}, {0: size})
+            gm = torch.export.export(
+                module(), inputs, dynamic_shapes=dynamic_shapes
+            ).module()
+            gm = decompose_unsupported_attention(
+                gm, CompilationSettings(decompose_attention=False, **settings)
+            )
+            # The rewritten graph still computes the same attention, head by head, in a dense output.
+            out = gm(*inputs)
+            torch.testing.assert_close(out, module()(*inputs))
+            self.assertTrue(out.is_contiguous())
+            self.assertFalse(out._is_view())
+            return [n for n in gm.graph.nodes if n.target == sdpa]
+
+        # Grouped query heads become the query rows of one attention per key head.
+        (folded,) = targets(1, 2)
+        self.assertEqual(folded.args[0].meta["val"].shape, (1, 2, 4, 8))
+        self.assertFalse(folded.kwargs.get("enable_gqa", False))
+        # Without grouped heads the row is repeated.
+        (repeated,) = targets(1, 8)
+        self.assertEqual(repeated.args[0].meta["val"].shape, (1, 8, 2, 8))
+        # So is a causal query, whose rows see different keys, and a per-head mask with a dynamic batch.
+        for kv_heads in (2, 8):
+            (repeated,) = targets(1, kv_heads, module=Causal)
+            self.assertEqual(repeated.args[0].meta["val"].shape[-2], 2)
+        (repeated,) = targets(1, 2, batch=2)
+        self.assertEqual(repeated.args[0].meta["val"].shape[1:], (8, 2, 8))
+        # A mask with one entry per query head and no batch dimension is regrouped too.
+        (folded,) = targets(1, 2, mask_shape=(8, 1, 1024))
+        self.assertEqual(folded.args[3].meta["val"].shape, (2, 4, 1024))
+        # A mask without a head dimension broadcasts over the new rows as it is.
+        (folded,) = targets(1, 2, mask_shape=(1, 1024))
+        self.assertEqual(folded.args[0].meta["val"].shape, (1, 2, 4, 8))
+        self.assertEqual(folded.args[3].meta["val"].shape, (1, 1024))
+        # An op the rewrite adds that must run in PyTorch only splits the graph, so the rewrite stays.
+        (repeated,) = targets(1, 8, torch_executed_ops={torch.ops.aten.cat.default})
+        self.assertEqual(repeated.args[0].meta["val"].shape, (1, 8, 2, 8))
+        # The longest key TensorRT masks is 512 in FP16 and is taken as 32768 in BF16.
+        for dtype, key_len in ((torch.float16, 513), (torch.bfloat16, 32769)):
+            (repeated,) = targets(1, 8, key_len=key_len, dtype=dtype)
+            self.assertEqual(repeated.args[0].meta["val"].shape, (1, 8, 2, 8))
+        # A key short enough for TensorRT to mask is left alone.
+        for kept in (
+            targets(1, 8, key_len=512),
+            targets(1, 8, key_len=32768, dtype=torch.bfloat16),
+            # So are several query rows, or a query length that is not fixed. Export needs a length other than 1
+            # to keep it dynamic.
+            targets(2, 8),
+            targets(2, 8, dynamic=True),
+        ):
+            self.assertEqual(kept[0].args[0].op, "placeholder")
+
+        cast = torch.ops.aten._to_copy.default
+        settings = CompilationSettings(decompose_attention=False)
+
+        class Folded(nn.Module):
+            def forward(self, q, k, v, mask):
+                dtype = q.dtype
+                q, k, v = (cast(t, dtype=torch.float32) for t in (q, k, v))
+                return cast(sdpa(q, k, v, mask, scale=0.125), dtype=dtype)
+
+        # TensorRT runs this FP32 attention as a 16-bit layer, so it is decomposed in FP32 instead.
+        for dtype, key_len in ((torch.float16, 1024), (torch.bfloat16, 32769)):
+            inputs = (
+                torch.randn(1, 4, 1, 8, dtype=dtype),
+                torch.randn(1, 4, key_len, 8, dtype=dtype),
+                torch.randn(1, 4, key_len, 8, dtype=dtype),
+                torch.rand(1, 4, 1, key_len) > 0.3,
+            )
+            gm = decompose_unsupported_attention(
+                torch.export.export(Folded(), inputs).module(), settings
+            )
+            self.assertFalse([n for n in gm.graph.nodes if n.target == sdpa])
+            torch.testing.assert_close(gm(*inputs), Folded()(*inputs))
+        # An empty query is left alone: no mask can change it.
+        for batch, dim in ((1, 0), (0, 8)):
+            inputs = (
+                torch.randn(batch, 4, 1, dim, dtype=torch.float16),
+                torch.randn(batch, 2, 1024, dim, dtype=torch.float16),
+                torch.randn(batch, 2, 1024, dim, dtype=torch.float16),
+                torch.rand(batch, 4, 1, 1024) > 0.3,
+            )
+            gm = decompose_unsupported_attention(
+                torch.export.export(SDPA(), inputs).module(), settings
+            )
+            (kept,) = [n for n in gm.graph.nodes if n.target == sdpa]
+            self.assertEqual(kept.args[0].op, "placeholder")
+
+        class Unmasked(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(q, k, v)
+
+        class Masked(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(q, k, v, mask)
+
+        # So is an attention without a mask, and one whose query is not 4D.
+        for module, shape in ((Unmasked, (1, 4)), (Masked, (4,))):
+            inputs = (
+                torch.randn(*shape, 1, 8, dtype=torch.float16),
+                torch.randn(*shape, 1024, 8, dtype=torch.float16),
+                torch.randn(*shape, 1024, 8, dtype=torch.float16),
+                torch.rand(*shape, 1, 1024) > 0.3,
+            )
+            gm = decompose_unsupported_attention(
+                torch.export.export(module(), inputs).module(), settings
+            )
+            (kept,) = [n for n in gm.graph.nodes if n.target == sdpa]
+            self.assertEqual(kept.args[0].op, "placeholder")
+
+    @unittest.skipIf(not torch.cuda.is_available(), "Needs CUDA")
+    @_ignores_single_query_mask
+    def test_masked_single_query_attention_with_a_growing_cache(self, _):
+        # On CUDA, running attention on fake tensors needs a static key length.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+
+        class SDPA(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(q, k, v, mask, enable_gqa=True)
+
+        inputs = (
+            torch.randn(2, 8, 1, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, 64, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(2, 2, 64, 64, dtype=torch.float16, device="cuda"),
+            torch.rand(2, 8, 1, 64, device="cuda") > 0.5,
+        )
+        length = torch.export.Dim("length", min=2, max=4096)
+        gm = torch.export.export(
+            SDPA(),
+            inputs,
+            dynamic_shapes=(None, {2: length}, {2: length}, {3: length}),
+        ).module()
+        gm = decompose_unsupported_attention(
+            gm, CompilationSettings(decompose_attention=False)
+        )
+        (folded,) = [n for n in gm.graph.nodes if n.target == sdpa]
+        self.assertEqual(folded.args[0].meta["val"].shape, (2, 2, 4, 64))
+        torch.testing.assert_close(gm(*inputs), SDPA()(*inputs))
+
+    @unittest.skipIf(not torch.cuda.is_available(), "Needs CUDA")
+    @_ignores_single_query_mask
+    def test_single_query_efficient_attention_keeps_an_aligned_bias(self, _):
+        # PyTorch's kernel needs bias strides that are a multiple of 8, as a padded bias has.
+        efficient = torch.ops.aten._scaled_dot_product_efficient_attention.default
+
+        class Efficient(nn.Module):
+            def forward(self, q, k, v, bias):
+                return efficient(q, k, v, bias[..., : k.shape[2]], False)[0]
+
+        inputs = (
+            torch.randn(1, 4, 1, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(1, 4, 1025, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(1, 4, 1025, 64, dtype=torch.float16, device="cuda"),
+            torch.randn(1, 4, 1, 1032, dtype=torch.float16, device="cuda"),
+        )
+        gm = torch.export.export(Efficient(), inputs).module()
+        gm = decompose_unsupported_attention(
+            gm, CompilationSettings(decompose_attention=False)
+        )
+        (rewritten,) = [n for n in gm.graph.nodes if n.target == efficient]
+        self.assertEqual(rewritten.args[0].meta["val"].shape, (1, 4, 2, 64))
+        torch.testing.assert_close(gm(*inputs), Efficient()(*inputs))
+
+        class Seed(nn.Module):
+            def forward(self, q, k, v, bias):
+                out = efficient(q, k, v, bias[..., : k.shape[2]], False)
+                return out[0], out[2]
+
+        # The rewrite rebuilds only the attention output, so an attention whose other outputs are read is left alone.
+        gm = decompose_unsupported_attention(
+            torch.export.export(Seed(), inputs).module(),
+            CompilationSettings(decompose_attention=False),
+        )
+        (kept,) = [n for n in gm.graph.nodes if n.target == efficient]
+        self.assertEqual(kept.args[0].op, "placeholder")
+
+    @_ignores_single_query_mask
+    def test_single_query_attention_keeps_the_memory_order_of_its_output(self, _):
+        # PyTorch returns attention on a transposed query in the query's memory order, and as_strided reads it.
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+
+        class FlatReader(nn.Module):
+            def forward(self, q, k, v, mask):
+                out = sdpa(q.transpose(0, 1), k, v, mask, enable_gqa=True)
+                return torch.as_strided(out, (out.numel(),), (1,))
+
+        for kv_heads in (2, 8):
+            inputs = (
+                torch.randn(8, 2, 1, 8, dtype=torch.float16),
+                torch.randn(2, kv_heads, 1024, 8, dtype=torch.float16),
+                torch.randn(2, kv_heads, 1024, 8, dtype=torch.float16),
+                torch.rand(2, 8, 1, 1024) > 0.3,
+            )
+            gm = decompose_unsupported_attention(
+                torch.export.export(FlatReader(), inputs).module(),
+                CompilationSettings(decompose_attention=False),
+            )
+            (rewritten,) = [n for n in gm.graph.nodes if n.target == sdpa]
+            self.assertGreater(rewritten.args[0].meta["val"].size(-2), 1)
+            torch.testing.assert_close(gm(*inputs), FlatReader()(*inputs))
+
+    @_ignores_single_query_mask
+    def test_single_query_fp32_attention_with_an_empty_cache_gives_zeros(self, _):
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        cast = torch.ops.aten._to_copy.default
+
+        class Masked(nn.Module):
+            def forward(self, q, k, v, mask):
+                return sdpa(q, k, v, mask)
+
+        class Folded(nn.Module):
+            def forward(self, q, k, v, mask):
+                q, k, v = (cast(t, dtype=torch.float32) for t in (q, k, v))
+                return cast(sdpa(q, k, v, mask, scale=0.125), dtype=torch.float16)
+
+        def inputs(length, dtype):
+            return (
+                torch.randn(1, 4, 1, 8, dtype=dtype),
+                torch.randn(1, 4, length, 8, dtype=dtype),
+                torch.randn(1, 4, length, 8, dtype=dtype),
+                torch.rand(1, 4, 1, length) > 0.3,
+            )
+
+        length = torch.export.Dim("length", min=0, max=4096)
+        for module, dtype in ((Masked, torch.float32), (Folded, torch.float16)):
+            gm = decompose_unsupported_attention(
+                torch.export.export(
+                    module(),
+                    inputs(1024, dtype),
+                    dynamic_shapes=(None, {2: length}, {2: length}, {3: length}),
+                ).module(),
+                CompilationSettings(decompose_attention=False),
+            )
+            self.assertFalse([n for n in gm.graph.nodes if n.target == sdpa])
+            for key_len in (1024, 0):
+                with self.subTest(module=module.__name__, key_len=key_len):
+                    args = inputs(key_len, dtype)
+                    torch.testing.assert_close(gm(*args), module()(*args))
+
+    def test_single_query_rewrite_runs_only_with_the_tensorrt_versions_that_ignore_the_mask(
+        self,
+    ):
+        trt = attention_pass.trt
+        for package, version, ignores in (
+            ("tensorrt", "10.3.0", False),
+            ("tensorrt", "11.1.0", False),
+            ("tensorrt", "11.2.0", True),
+            ("tensorrt", "11.3.0", True),
+            ("tensorrt", "11.4.0.106", True),
+            # Not measured.
+            ("tensorrt", "11.5.0.63", False),
+            ("tensorrt_rtx", "1.7.1", False),
+        ):
+            with (
+                self.subTest(package=package, version=version),
+                mock.patch.object(trt, "_package_name", package),
+                mock.patch.object(trt, "__version__", version),
+            ):
+                self.assertEqual(attention_pass._ignores_single_query_mask(), ignores)
 
     def test_attention_with_a_constant_key_is_left_for_pytorch(self):
         # TensorRT's attention layer gets a constant key wrong in FP16 and BF16. FP32 matches an

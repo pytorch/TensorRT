@@ -1,7 +1,10 @@
 import logging
+import operator
 from typing import Any, Callable, Dict, Optional, Tuple
 
+import tensorrt as trt
 import torch
+from torch._prims_common import compute_elementwise_output_logical_to_physical_perm
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -11,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     _inputs_quantized_to_fp8,
     attention_capability_validator,
     scaled_dot_product_attention_validator,
+    scaled_dot_product_cudnn_attention_validator,
     scaled_dot_product_efficient_attention_validator,
 )
 from torch_tensorrt.dynamo.lowering._decompositions import (
@@ -40,6 +44,9 @@ _ATTENTION_FALLBACKS: Dict[
 }
 
 _EFFICIENT = torch.ops.aten._scaled_dot_product_efficient_attention.default
+_CUDNN = torch.ops.aten._scaled_dot_product_cudnn_attention.default
+# The attention ops that take a bias and is_causal at the same positions and return a tuple.
+_BIAS_ATTENTION = (_EFFICIENT, _CUDNN)
 # The attention ops that take FP32 inputs (flash and cuDNN do not), with their decomposition.
 _FP32_ATTENTION = {
     torch.ops.aten.scaled_dot_product_attention.default: scaled_dot_product_attention_decomposition,
@@ -85,6 +92,21 @@ def _cast_back_to(node: torch.fx.Node, dtype: torch.dtype) -> bool:
     return True
 
 
+def _folded_half(node: torch.fx.Node) -> Optional[torch.dtype]:
+    """The 16-bit type TensorRT runs this FP32 attention layer in, if it folds the casts of all its inputs."""
+    query, key, value = node.args[:3]
+    mask = node.args[3] if len(node.args) > 3 else None
+    half = _upcast_source(query) if node.kwargs.get("scale") is not None else None
+    if (
+        half is not None
+        and _upcast_source(key) == half == _upcast_source(value)
+        and _dtype(mask) in (None, torch.bool)
+        and _cast_back_to(node, half)
+    ):
+        return half
+    return None
+
+
 def _fp32_attention_layer_fails(node: torch.fx.Node) -> bool:
     # TensorRT 11.4 folds a cast from FP16 or BF16 to FP32 into its attention layer when the cast reaches the key
     # or value, or the query through a given scale (a scale computed from the query's shape stops it). It then
@@ -113,20 +135,211 @@ def _fp32_attention_layer_fails(node: torch.fx.Node) -> bool:
             )
         ):
             return False
-    elif (
-        folded[0] is not None
-        and folded.count(folded[0]) == 3
-        and _dtype(mask) in (None, torch.bool)
-        and _cast_back_to(node, folded[0])
-    ):
+    elif _folded_half(node) is not None:
         return False
+    return _decomposable(node)
+
+
+def _decomposable(node: torch.fx.Node) -> bool:
     if node.target == _EFFICIENT:
         # The decomposition computes only the attention output, and it refuses a bias with is_causal.
+        mask = node.args[3] if len(node.args) > 3 else None
         is_causal = len(node.args) > 6 and node.args[6]
         return not (is_causal and mask is not None) and all(
             item.args[1] == 0 for item in node.users if item.users
         )
     return True
+
+
+# The longest key a one-row query masks correctly, by query dtype. With TensorRT 11.4 the edges are the same on an A100
+# (108 SMs), a Jetson Thor (20) and a Jetson Orin (8): FP16 is right up to 512 keys and wrong from 513 for every head
+# size (32 to 256), head count and batch measured, and BF16 is right up to 55296 and wrong from 57344, so it keeps a
+# margin. On the A100, giving shorter keys more query rows too was up to 1.2x slower in FP16, and in BF16 up to 1.4x
+# slower at 4096 keys but faster from 16384.
+_SINGLE_QUERY_MASKED_KEYS = {torch.float16: 512, torch.bfloat16: 32768}
+
+
+def _ignores_single_query_mask() -> bool:
+    """Whether the installed TensorRT ignores the mask of a one-row query, as _single_query_mask_ignored describes.
+
+    TensorRT 11.2 to 11.4 do, and TensorRT-RTX 1.7 does not. Other versions were not tested; the engine tests in
+    test_attention_aten.py compare with PyTorch, so they fail on a version that has the bug but is not listed.
+    """
+    return bool(
+        trt._package_name != "tensorrt_rtx"
+        and trt.__version__.startswith(("11.2.", "11.3.", "11.4."))
+    )
+
+
+def _single_query_mask_ignored(
+    node: torch.fx.Node, dtype: Optional[torch.dtype] = None
+) -> bool:
+    """Whether TensorRT would ignore the mask, or the causal mask, of this attention.
+
+    Affected TensorRT versions do that for a 16-bit attention layer with a query length fixed at 1 and a long key; see
+    ``_SINGLE_QUERY_MASKED_KEYS``. Fused FP8 attention, which was not measured, is kept: it has to read its quantize
+    ops directly.
+    """
+    query, key = node.args[:2]
+    dtype = dtype or _dtype(query)
+    mask = node.args[3] if len(node.args) > 3 else None
+    causal = 6 if node.target in _BIAS_ATTENTION else 5
+    is_causal = len(node.args) > causal and node.args[causal]
+    query_val = query.meta.get("val") if isinstance(query, torch.fx.Node) else None
+    key_val = key.meta.get("val") if isinstance(key, torch.fx.Node) else None
+    if not (
+        (mask is not None or bool(is_causal))
+        and dtype in _SINGLE_QUERY_MASKED_KEYS
+        and not _inputs_quantized_to_fp8(node)
+        and query_val is not None
+        and key_val is not None
+        and query_val.dim() == 4
+        and statically_known_true(query_val.size(-2) == 1)
+        and not statically_known_true(
+            key_val.size(-2) <= _SINGLE_QUERY_MASKED_KEYS[dtype]
+        )
+        # An empty query has no element a mask could change.
+        and not statically_known_true(query_val.numel() == 0)
+        # The efficient and cuDNN attention ops are rewritten only when their output alone is read.
+        and (
+            node.target not in _BIAS_ATTENTION
+            or all(item.args[1] == 0 for item in node.users if item.users)
+        )
+    ):
+        return False
+    if _ignores_single_query_mask():
+        return True
+    logger.debug(
+        "Keeping attention %s as it is: %s %s is not known to ignore the mask of a one-row query",
+        node.name,
+        trt._package_name,
+        trt.__version__,
+    )
+    return False
+
+
+def _foldable_query_heads(node: torch.fx.Node) -> bool:
+    if (
+        node.target != torch.ops.aten.scaled_dot_product_attention.default
+        or not node.kwargs.get("enable_gqa", False)
+        or (len(node.args) > 5 and node.args[5])
+    ):
+        return False
+    query, key = (node.args[i].meta["val"] for i in (0, 1))
+    heads, kv_heads, dim = query.size(-3), key.size(-3), query.size(-1)
+    if not all(isinstance(size, int) for size in (heads, kv_heads, dim)):
+        return False
+    mask = node.args[3] if len(node.args) > 3 else None
+    mask_val = mask.meta.get("val") if isinstance(mask, torch.fx.Node) else None
+    # The heads of a mask with one entry per query head are regrouped, which needs its leading dimensions static.
+    return heads > kv_heads and (
+        mask_val is None
+        or mask_val.dim() < 3
+        or mask_val.size(-3) == 1
+        or all(isinstance(size, int) for size in mask_val.shape[:-3])
+    )
+
+
+def _give_query_rows(gm: torch.fx.GraphModule, node: torch.fx.Node) -> None:
+    """Gives a one-row attention more query rows, so TensorRT applies its mask.
+
+    With grouped-query attention, the query heads of each key head become its query rows, so each key and value
+    head is still read once. Otherwise the row is repeated and the first output row is kept.
+    """
+    query, key, value = node.args[:3]
+    mask = node.args[3] if len(node.args) > 3 else None
+    output_val = (
+        node.meta["val"][0] if node.target in _BIAS_ATTENTION else node.meta["val"]
+    )
+    fold = _foldable_query_heads(node)
+
+    def call(target: Any, *args: Any, val: Any = None, **kw: Any) -> torch.fx.Node:
+        new = gm.graph.call_function(target, args, kw)
+        new.meta["val"] = (
+            target(*torch.fx.node.map_arg(args, lambda n: n.meta["val"]), **kw)
+            if val is None
+            else val
+        )
+        for name in ("nn_module_stack", "stack_trace", "source_fn_stack"):
+            if name in node.meta:
+                new.meta[name] = node.meta[name]
+        return new
+
+    kwargs = {k: v for k, v in node.kwargs.items() if not (fold and k == "enable_gqa")}
+    with gm.graph.inserting_before(node):
+        if fold:
+            heads, dim = output_val.size(-3), output_val.size(-1)
+            kv_heads = key.meta["val"].size(-3)
+            rows = [-1, kv_heads, heads // kv_heads, query.meta["val"].size(-1)]
+            query = call(torch.ops.aten.reshape.default, query, rows)
+            mask_val = mask.meta["val"] if isinstance(mask, torch.fx.Node) else None
+            if mask_val is not None and mask_val.dim() >= 3 and mask_val.size(-3) > 1:
+                leading = list(mask_val.shape[:-3])
+                mask = call(
+                    torch.ops.aten.reshape.default,
+                    mask,
+                    [*leading, kv_heads, heads // kv_heads, -1],
+                )
+            rows_val = output_val.reshape(*query.meta["val"].shape[:-1], dim)
+        else:
+            query = call(torch.ops.aten.cat.default, [query, query], 2)
+            if (
+                node.target in _BIAS_ATTENTION
+                and isinstance(mask, torch.fx.Node)
+                and mask.meta["val"].dim() >= 2
+            ):
+                # Efficient attention needs a bias row for every query row. Expanding keeps the bias strides, which
+                # its PyTorch kernel requires to be aligned.
+                rank = mask.meta["val"].dim()
+                mask = call(
+                    torch.ops.aten.expand.default, mask, [-1] * (rank - 2) + [2, -1]
+                )
+            rows_val = torch.cat([output_val, output_val], 2)
+        # Running the attention on fake tensors can need a static key length, so its value is derived instead.
+        if node.target in _BIAS_ATTENTION:
+            rows_val = (rows_val, *node.meta["val"][1:])
+        attention = call(
+            node.target,
+            query,
+            key,
+            value,
+            mask,
+            *node.args[4:],
+            val=rows_val,
+            **kwargs,
+        )
+        output = attention
+        if node.target in _BIAS_ATTENTION:
+            output = call(operator.getitem, attention, 0, val=rows_val[0])
+        if fold:
+            output = call(torch.ops.aten.reshape.default, output, [-1, heads, 1, dim])
+        else:
+            output = call(torch.ops.aten.slice.Tensor, output, 2, 0, 1)
+        # Where PyTorch runs it, attention returns a dense tensor of its own, in a memory order that a reader of its
+        # strides relies on, such as the order of a transposed query. The result is a view, so it is copied to that
+        # order.
+        order, _ = compute_elementwise_output_logical_to_physical_perm(output_val)
+        if order != sorted(order):
+            output = call(torch.ops.aten.permute.default, output, order)
+            output = call(
+                torch.ops.aten.clone.default,
+                output,
+                memory_format=torch.contiguous_format,
+            )
+            output = call(
+                torch.ops.aten.permute.default,
+                output,
+                [order.index(i) for i in range(len(order))],
+            )
+        output = call(torch.ops.aten.clone.default, output)
+    if node.target in _BIAS_ATTENTION:
+        for item in list(node.users):
+            if item.users:
+                item.replace_all_uses_with(output)
+            gm.graph.erase_node(item)
+    else:
+        node.replace_all_uses_with(output)
+    gm.graph.erase_node(node)
 
 
 def _torch_executed(node: torch.fx.Node, settings: CompilationSettings) -> bool:
@@ -240,7 +453,9 @@ def decompose_unsupported_attention(
     rejections (TensorRT-RTX on Turing, a constant key) keep the fused op intact for
     PyTorch fallback. FP32 attention that TensorRT's attention layer fails to build, or
     that has a mask, for which the layer gives NaN where a query sees no key, is
-    decomposed as well when the decomposition can compute it.
+    decomposed as well when the decomposition can compute it. A 16-bit attention whose
+    mask TensorRT ignores, with a query length fixed at 1 and a long key, gets more
+    query rows instead.
     """
     if settings.decompose_attention:
         return gm
@@ -248,10 +463,11 @@ def decompose_unsupported_attention(
     # Decide for every node before changing the graph: whether a node is supported can depend on the other
     # attention nodes, such as two that read the same query.
     declined = []
+    rewritten = []
     for node in gm.graph.nodes:
         if node.op != "call_function" or (
             node.target not in _ATTENTION_FALLBACKS
-            and node.target not in _FP32_ATTENTION
+            and node.target not in _BIAS_ATTENTION
         ):
             continue
 
@@ -271,16 +487,36 @@ def decompose_unsupported_attention(
             if not validator(node, settings):
                 declined.append((node, decomp))
                 continue
-        # The converter leaves the efficient attention it declines to PyTorch.
-        elif not scaled_dot_product_efficient_attention_validator(node, settings):
+        # The converter leaves the efficient and cuDNN attention it declines to PyTorch.
+        elif not (
+            scaled_dot_product_cudnn_attention_validator
+            if node.target == _CUDNN
+            else scaled_dot_product_efficient_attention_validator
+        )(node, settings):
             continue
-        if node.target in _FP32_ATTENTION and _fp32_attention_layer_fails(node):
+        if node.target in _FP32_ATTENTION and (
+            _fp32_attention_layer_fails(node)
+            # TensorRT runs this FP32 attention as a 16-bit layer, so it ignores the mask the same way. More query
+            # rows would sit between the casts and the layer, so it is decomposed in FP32 instead.
+            or (
+                _decomposable(node)
+                and _single_query_mask_ignored(
+                    node, _folded_half(node) or torch.float32
+                )
+            )
+        ):
             declined.append((node, _FP32_ATTENTION[node.target]))
+        elif _single_query_mask_ignored(node):
+            rewritten.append(node)
+
+    for node in rewritten:
+        logger.info("Giving the one-row query of attention %s more rows", node.name)
+        _give_query_rows(gm, node)
 
     for node, decomp in declined:
         logger.info("Decomposing attention %s in place", node.name)
         _inline_traced_decomp(gm, node, decomp, settings)
-    changed = bool(declined)
+    changed = bool(declined or rewritten)
 
     if changed:
         gm = clean_up_graph_after_modifications(gm)
