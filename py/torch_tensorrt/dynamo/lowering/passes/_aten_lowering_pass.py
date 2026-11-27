@@ -10,6 +10,7 @@ import torch.utils._pytree as pytree
 from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._utils import is_tegra_platform
+from torch_tensorrt.dynamo._low_memory import stop_placing_parameters_on_meta
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
 from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import (
@@ -192,6 +193,7 @@ def post_lowering(
     gm: torch.fx.GraphModule, settings: CompilationSettings = CompilationSettings()
 ) -> torch.fx.GraphModule:
     """Applies the lowering passes to a graph module after torch.export/torch.compile and their decompositions, returns the modified GraphModule"""
+    stop_placing_parameters_on_meta()
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
@@ -314,6 +316,7 @@ def pre_export_lowering(
     settings: CompilationSettings = CompilationSettings(),
 ) -> torch.export.ExportedProgram:
     """Applies the lowering passes to an ExportedProgram after torch.export/torch.compile but before run_decompositions, returns the modified ExportedProgram."""
+    stop_placing_parameters_on_meta()
     weights = _get_weights_the_graph_reads(ep)
     if not settings.dryrun:  # a dry run builds no engine: shapes are enough
         _raise_if_weights_on_meta(weights)

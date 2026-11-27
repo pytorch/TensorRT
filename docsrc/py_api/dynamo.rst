@@ -36,7 +36,9 @@ Classes
 
 .. note::
 
-   ``low_memory`` is **experimental** in 2.15: its API will change in 2.16.
+   ``low_memory`` is **experimental**. In 2.16 it provides ``compile_settings`` and
+   ``low_mem.map_weights(model, checkpoint=...)`` (with ``model_weights_on_meta=True`` to construct parameters on
+   ``meta`` inside the block); in 2.15 it took a function that builds the model and a weights file.
 
 .. autoclass:: CompilationSettings
 

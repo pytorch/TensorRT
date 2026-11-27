@@ -196,8 +196,10 @@ Compiling from Memory-Mapped Weights
 
 .. note::
 
-   ``map_weights``, ``save_weights_for_mapping``, ``checkpoint_source`` and ``low_memory`` are
-   **experimental** in 2.15: their API will change in 2.16.
+   ``low_memory``, ``map_weights``, ``save_weights_for_mapping`` and ``checkpoint_source`` are
+   **experimental**. In 2.16, ``low_memory`` maps weights via ``low_mem.map_weights(model)`` (with
+   optional ``model_weights_on_meta=True`` to construct parameters on ``meta`` inside the block); in 2.15 it took
+   a function that builds the model and a weights file.
 
 To compile, a model's weights normally have to be loaded into host memory first, all of them, before
 the first engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's weights at
@@ -208,42 +210,82 @@ zero-copy views of a safetensors file:
 - The pages are dropped again once the last engine that reads the weight is built. A mapped weight stays
   valid; its pages are read back if it is used again.
 
-``torch_tensorrt.dynamo.low_memory`` does all of it in one block: it builds the model on ``meta``, so
-building it allocates no weights, maps them, and drops their pages when the block ends, unless
-``release_weights_after_build=False``. Its ``compile_settings`` turn the resource partitioner on, so the
-model is built as several engines, each small enough to build within ``cpu_memory_budget`` (or the
-available memory without one), so only about one engine's weights are resident at a time. They also give a
-part of the model that runs in PyTorch its weights on the GPU after compilation
-(``offload_module_to_cpu``). Pass them to ``compile``:
+``torch_tensorrt.dynamo.low_memory`` does all of it in one block. Pass ``model_weights_on_meta=True`` and
+**initialize the model from its config** (``AutoModelForCausalLM.from_config(config)`` or
+``MyModel(config)``): entering places newly created ``nn.Parameter`` tensors on ``meta`` while keeping
+buffers real, and ``low_mem.map_weights(model)`` turns ``meta`` creation off, streams the checkpoint in
+64 MiB chunks into a file in Torch-TensorRT's cache directory (casting each chunk to the model's dtype),
+and points the model's tensors at views of that file. For Hugging Face models built from
+``AutoConfig.from_pretrained(...)``, ``map_weights`` finds the checkpoint automatically from
+``model.config._name_or_path``; otherwise pass ``checkpoint`` (a safetensors file, sharded
+``model.safetensors.index.json``, local folder, or Hugging Face Hub repo id) and optional
+``checkpoint_key`` to ``low_mem.map_weights(...)``:
+
+.. warning::
+
+   Always construct the model from its **config** (``from_config(config)`` or ``MyModel(config)``) —
+   **do not** call ``from_pretrained(...)``. ``from_pretrained`` reads and materializes the full
+   checkpoint in memory even inside ``low_memory(model_weights_on_meta=True)``, making the feature ineffective
+   for avoiding initialization peak memory; ``low_memory`` detects ``from_pretrained`` and logs a warning.
 
 .. code-block:: python
 
     import torch
     import torch_tensorrt
+    from transformers import AutoConfig, AutoModelForCausalLM
 
-    # Map the checkpoint's weights, and build engines that fit an 8 GiB host memory budget.
+    config = AutoConfig.from_pretrained("meta-llama/Llama-3.2-1B")
     with torch_tensorrt.dynamo.low_memory(
-        lambda: MyModel().eval(), "model.safetensors", cpu_memory_budget=8 << 30
+        model_weights_on_meta=True, cpu_memory_budget=8 << 30
     ) as low_mem:
-        print(f"{low_mem.report.mapped_bytes / 2**30:.2f} GiB mapped")
-        example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
-        exported = torch.export.export(low_mem.model, (example,))
+        model = AutoModelForCausalLM.from_config(config, dtype=torch.bfloat16).eval()
+        low_mem.map_weights(model)
+        exported = torch.export.export(model, (example,))
         trt_model = torch_tensorrt.dynamo.compile(
             exported, inputs=[example.cuda()], **low_mem.compile_settings
         )
 
 ``cpu_memory_budget`` is the host memory the compiling process may use, counting what it already uses,
 and each engine gets up to a quarter of what's left. In :ref:`compile_from_mapped_weights`, a model with
-192 MiB of weights built this way as 7 engines had at most 32 MiB of its weights file resident while
-compiling, against all 192 MiB when built as one engine.
+192 MiB of weights built this way as 12 engines had at most 16 MiB of its weights file resident while
+compiling, against all 192 MiB when built as one engine. To split the same way on every run, set
+``max_partition_size``, the weight bytes per engine, instead of ``cpu_memory_budget``.
 
 ``low_memory`` takes the compile settings that lower memory during compilation:
-``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget`` and
-``release_weights_after_build``. ``compile_settings`` holds the ones given, with the first two on unless
-set. They apply only to the calls they're passed to: another model compiled inside the block keeps its own
-settings.
+``offload_module_to_cpu``, ``enable_resource_partitioning``, ``cpu_memory_budget``,
+``max_partition_size`` and ``release_weights_after_build``. ``compile_settings`` holds the ones given, with the first two on unless
+set. With ``model_weights_on_meta=True``, ``offload_module_to_cpu`` stays on even when set to ``False``, with a
+warning: the mapped weights are CPU tensors, and it is what moves the weights of the parts that run in PyTorch
+to the GPU. They apply only to the calls they're passed to: another model compiled inside the block keeps its
+own settings.
 
-``low_memory`` uses ``map_weights``, which also works alone on a model you build yourself.
+The checkpoint is read with plain reads, one chunk at a time, so none of it stays in the process's memory.
+Compiling then peaks while one engine builds, so the peak depends on the engine size, not on the model's.
+For a Llama-shaped model in bfloat16 saved with ``torch_tensorrt.compile_and_save`` as 0.5 GiB engines (A40,
+warm timing cache), the whole compilation, from starting Python to the saved program, peaked at 4.63, 4.64
+and 4.75 GiB of host and GPU memory with 2.00, 3.88 and 8.03 GiB of weights. Loaded normally with
+``from_pretrained`` and compiled with the same settings, the same models peaked at 5.72, 7.38 and
+11.79 GiB, since every weight TensorRT reads stays resident. Writing the file peaked at 1.20 to 1.26 GiB of
+host memory at each size. About 3.4 GiB of the peak doesn't depend on
+the model (the Python, PyTorch and TensorRT libraries, the CUDA context, and TensorRT's build memory), so a
+model with less than about 4.7 GiB of weights needs more memory than its weights to compile, and a larger
+one less. Smaller engines lower the peak: with 0.25 GiB engines, the 2.00 GiB model peaked at 4.11 GiB. For
+pi0.5, writing the file from its 14.5 GB float32 checkpoint peaked at 2.00 GiB of host and GPU memory, in
+22 s, and the whole warm-cache export peaked at 5.49 GiB.
+
+By default (``model_weights_on_meta=False``), entering ``low_memory`` leaves model construction untouched so
+``low_mem.compile_settings`` can be used on its own without ``map_weights``. Calling
+``low_mem.map_weights(model)`` on an already-allocated model also writes its tensors to the file and
+replaces them with views to free the loaded copy before compilation — though if that model was loaded
+from a checkpoint (such as ``from_pretrained``), initialization already paid full weight memory and
+``map_weights`` logs a warning recommending ``from_config`` with ``model_weights_on_meta=True``. Anything outside
+the model that still holds those tensors (an autograd graph, ``state_dict`` copy, or optimizer) keeps them
+in memory, and a warning says how much, from 1 MiB.
+
+The file goes to Torch-TensorRT's per-user cache directory, ``<TMPDIR>/torch_tensorrt_<user>/offloaded_weights``,
+which must be on a disk: on a RAM-backed tmpfs the file takes the memory this frees. It is deleted once the
+model no longer uses it, or when Python exits, and a file a killed process left behind is deleted the next
+time. ``low_mem.map_weights`` raises on Windows, which can't delete a memory-mapped file.
 
 **What to know:**
 
@@ -283,8 +325,8 @@ settings.
           model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
       )
 
-- **Missing names** raise for any name in the model's ``state_dict``, in ``map_weights`` and so in
-  ``low_memory``; non-persistent buffers, such as rotary frequencies, aren't required, so recompute those
+- **Missing names:** ``map_weights`` raises for any name in the model's ``state_dict`` that the file
+  doesn't store. Non-persistent buffers, such as rotary frequencies, aren't required, so recompute those
   or write them with ``save_weights_for_mapping``. With ``strict=False``, ``map_weights`` lists missing
   names in its result's ``missing`` and leaves them as they were. A missing tensor on ``meta`` stays
   there, with no values, and a warning names it: a model that reads it can't be exported or compiled,

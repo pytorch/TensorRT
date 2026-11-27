@@ -381,6 +381,33 @@ def test_real_tensors_the_checkpoint_stores_are_read_from_it(tmp_path, caplog):
     torch.testing.assert_close(mapped.scale, torch.full((4,), 2.0))
 
 
+@pytest.mark.skipif(
+    not os.path.exists("/proc/self/maps"), reason="needs /proc/self/maps"
+)
+def test_the_checkpoint_is_read_not_mapped(tmp_path):
+    safetensors_torch = pytest.importorskip("safetensors.torch")
+    torch.manual_seed(0)
+    weight = torch.randn(300, 8)
+    safetensors_torch.save_file(
+        {"weight": weight, "scalar": torch.tensor(3.0)},
+        str(tmp_path / "sd.safetensors"),
+    )
+    read = weight_mapping.checkpoint_source(
+        tmp_path / "sd.safetensors", chunk_bytes=1024
+    )
+    chunks = list(read("weight", torch.empty(300, 8, device="meta")))
+    # 1 KiB chunks of 32-byte rows, each in its own memory, and the file is never mapped.
+    assert [len(c) for c in chunks] == [32] * 9 + [12]
+    assert len({c.untyped_storage().data_ptr() for c in chunks}) == len(chunks)
+    assert (
+        os.path.realpath(tmp_path / "sd.safetensors")
+        not in open("/proc/self/maps").read()
+    )
+    torch.testing.assert_close(torch.cat(chunks), weight, rtol=0, atol=0)
+    (scalar,) = read("scalar", torch.empty((), device="meta"))
+    assert scalar.shape == () and scalar.item() == 3.0
+
+
 @pytest.mark.skipif(not hasattr(os, "symlink"), reason="needs symlinks")
 def test_saving_never_writes_through_a_link(tmp_path):
     victim = tmp_path / "victim.txt"
