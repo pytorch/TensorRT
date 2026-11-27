@@ -67,12 +67,12 @@ auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
                   auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
                   auto tensor_holder = TensorContainer();
                   tensor_holder.hold_tensor(slice_layer->getOutput(0));
-                  auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                  auto ival = c10::IValue(c10::make_intrusive<TensorContainer>(tensor_holder));
                   list.emplace_back(ival);
                   offset = offset + step;
                 }
               }
-              auto split_output_ivalue = std::move(torch::jit::IValue(list));
+              auto split_output_ivalue = torch::jit::IValue(list);
               ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
               return true;
             }});

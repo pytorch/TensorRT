@@ -133,8 +133,9 @@ cc_library(
         "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
-    include_prefix = "executorch",
-    strip_include_prefix = "executorch",
+    # The repository root, as a system include so that ExecuTorch's headers do
+    # not trip the warnings Torch-TensorRT's own sources are compiled with.
+    includes = ["."],
     deps = [
         ":extension_cuda_shared",
         # The device guard logs, so the shared object above leaves the runtime's
@@ -174,9 +175,10 @@ cc_library(
     defines = [
         "C10_USING_CUSTOM_GENERATED_MACROS",
     ],
-    include_prefix = "executorch",
-    strip_include_prefix = "executorch",
+    # The repository root, as a system include so that ExecuTorch's headers do
+    # not trip the warnings Torch-TensorRT's own sources are compiled with.
     includes = [
+        ".",
         "executorch/runtime/core/portable_type/c10",
     ],
 )

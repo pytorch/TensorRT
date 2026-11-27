@@ -61,9 +61,9 @@ int32_t ScatterAddPlugin::getNbOutputs() const noexcept {
 
 int32_t ScatterAddPlugin::getOutputDataTypes(
     nvinfer1::DataType* outputTypes,
-    int32_t nbOutputs,
+    int32_t /*nbOutputs*/,
     const nvinfer1::DataType* inputTypes,
-    int32_t nbInputs) const noexcept {
+    int32_t /*nbInputs*/) const noexcept {
   // Output has the same dtype as src (input 0).
   outputTypes[0] = inputTypes[0];
   return 0;
@@ -71,7 +71,7 @@ int32_t ScatterAddPlugin::getOutputDataTypes(
 
 int32_t ScatterAddPlugin::getOutputShapes(
     const nvinfer1::DimsExprs* inputs,
-    int32_t nbInputs,
+    int32_t /*nbInputs*/,
     const nvinfer1::DimsExprs* /*shapeInputs*/,
     int32_t /*nbShapeInputs*/,
     nvinfer1::DimsExprs* outputs,
@@ -86,7 +86,7 @@ bool ScatterAddPlugin::supportsFormatCombination(
     int32_t pos,
     const nvinfer1::DynamicPluginTensorDesc* inOut,
     int32_t nbInputs,
-    int32_t nbOutputs) noexcept {
+    int32_t /*nbOutputs*/) noexcept {
   const auto& desc = inOut[pos];
 
   // All tensors must be row-major (linear) layout.
@@ -159,8 +159,8 @@ int32_t ScatterAddPlugin::onShapeChange(
 }
 
 int32_t ScatterAddPlugin::enqueue(
-    const nvinfer1::PluginTensorDesc* inputDesc,
-    const nvinfer1::PluginTensorDesc* outputDesc,
+    const nvinfer1::PluginTensorDesc* /*inputDesc*/,
+    const nvinfer1::PluginTensorDesc* /*outputDesc*/,
     const void* const* inputs,
     void* const* outputs,
     void* /*workspace*/,

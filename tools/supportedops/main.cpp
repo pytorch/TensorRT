@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-int main(int argc, const char* argv[]) {
+int main(int /*argc*/, const char* argv[]) {
   std::vector<std::string> converters = torch_tensorrt::core::conversion::converters::get_converter_list();
   std::vector<std::string> evaluators = torch_tensorrt::core::conversion::evaluators::getEvaluatorList();
 

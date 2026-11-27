@@ -85,11 +85,11 @@ int32_t NormalizePlugin::getNbOutputs() const noexcept {
 
 int32_t NormalizePlugin::getOutputShapes(
     const nvinfer1::DimsExprs* inputs,
-    int32_t nbInputs,
-    const nvinfer1::DimsExprs* shapeInputs,
-    int32_t nbShapeInputs,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DimsExprs* /*shapeInputs*/,
+    int32_t /*nbShapeInputs*/,
     nvinfer1::DimsExprs* outputs,
-    int32_t nbOutputs,
+    int32_t /*nbOutputs*/,
     nvinfer1::IExprBuilder& exprBuilder) noexcept {
   outputs[0].nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - (int32_t)axes_.size();
 
@@ -122,9 +122,9 @@ int32_t NormalizePlugin::getOutputShapes(
 
 int32_t NormalizePlugin::getOutputDataTypes(
     nvinfer1::DataType* outputTypes,
-    int32_t nbOutputs,
-    const nvinfer1::DataType* inputTypes,
-    int32_t nbInputs) const noexcept {
+    int32_t /*nbOutputs*/,
+    const nvinfer1::DataType* /*inputTypes*/,
+    int32_t /*nbInputs*/) const noexcept {
   outputTypes[0] = nvinfer1::DataType::kFLOAT;
   return 0;
 }
@@ -156,19 +156,19 @@ bool NormalizePlugin::supportsFormatCombination(
 }
 
 int32_t NormalizePlugin::configurePlugin(
-    const nvinfer1::DynamicPluginTensorDesc* in,
-    int32_t nbInputs,
-    const nvinfer1::DynamicPluginTensorDesc* out,
-    int32_t nbOutputs) noexcept {
+    const nvinfer1::DynamicPluginTensorDesc* /*in*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DynamicPluginTensorDesc* /*out*/,
+    int32_t /*nbOutputs*/) noexcept {
   dtype_ = nvinfer1::DataType::kFLOAT;
   return 0;
 }
 
 size_t NormalizePlugin::getWorkspaceSize(
-    const nvinfer1::DynamicPluginTensorDesc* inputs,
-    int32_t nbInputs,
-    const nvinfer1::DynamicPluginTensorDesc* outputs,
-    int32_t nbOutputs) const noexcept {
+    const nvinfer1::DynamicPluginTensorDesc* /*inputs*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DynamicPluginTensorDesc* /*outputs*/,
+    int32_t /*nbOutputs*/) const noexcept {
   return 0;
 }
 
@@ -196,10 +196,10 @@ nvinfer1::PluginFieldCollection const* NormalizePlugin::getFieldsToSerialize() n
 // IPluginV3OneRuntime
 
 int32_t NormalizePlugin::onShapeChange(
-    const nvinfer1::PluginTensorDesc* in,
-    int32_t nbInputs,
-    const nvinfer1::PluginTensorDesc* out,
-    int32_t nbOutputs) noexcept {
+    const nvinfer1::PluginTensorDesc* /*in*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::PluginTensorDesc* /*out*/,
+    int32_t /*nbOutputs*/) noexcept {
   return 0;
 }
 
@@ -208,7 +208,7 @@ int32_t NormalizePlugin::enqueue(
     const nvinfer1::PluginTensorDesc* outputDesc,
     const void* const* inputs,
     void* const* outputs,
-    void* workspace,
+    void* /*workspace*/,
     cudaStream_t stream) noexcept {
   at::Tensor input =
       at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
@@ -239,7 +239,7 @@ int32_t NormalizePlugin::enqueue(
   return 0;
 }
 
-nvinfer1::IPluginV3* NormalizePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+nvinfer1::IPluginV3* NormalizePlugin::attachToContext(nvinfer1::IPluginResourceContext* /*context*/) noexcept {
   return new NormalizePlugin(order_, axes_, keep_dims_);
 }
 
@@ -268,7 +268,7 @@ const char* NormalizePluginCreator::getPluginVersion() const noexcept {
 }
 
 nvinfer1::IPluginV3* NormalizePluginCreator::createPlugin(
-    const char* name,
+    const char* /*name*/,
     const nvinfer1::PluginFieldCollection* fc,
     nvinfer1::TensorRTPhase phase) noexcept {
   if (phase == nvinfer1::TensorRTPhase::kBUILD) {

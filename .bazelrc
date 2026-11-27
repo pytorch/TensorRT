@@ -25,6 +25,17 @@ common --enable_platform_specific_config
 
 build:linux --cxxopt="-std=c++20"
 build:linux --cxxopt="-fdiagnostics-color=always"
+build:linux --config=warnings
+
+# Warnings for Torch-TensorRT's own C++ sources only. External repositories
+# compile from external/... and are not matched; their headers reach us through
+# `includes`, which Bazel passes as -isystem, so they do not warn either.
+# Deprecations stay warnings, not errors, so that a TensorRT or PyTorch release
+# deprecating an API does not break the build before the call sites can move.
+# Use --config=no_werror to keep the warnings but not fail the build on them
+# (e.g. with a newer compiler than CI uses).
+build:warnings --per_file_copt="^(core|cpp|py|tests|tools)/.*@-Wall,-Wextra,-Werror,-Wno-error=deprecated-declarations"
+build:no_werror --per_file_copt="^(core|cpp|py|tests|tools)/.*@-Wno-error"
 
 build:windows --cxxopt="/GS-" --cxxopt="/std:c++20" --cxxopt="/permissive-"
 build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819"

@@ -66,7 +66,7 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
     converted_ivalue = torch::jit::IValue(converted_elements);
   } else if (input_ivalue.isCustomClass()) {
     torchtrt::core::ir::Input cur_input = to_internal_input(*(input_ivalue.toCustomClass<torchtrt::Input>()));
-    converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input)));
+    converted_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input));
   }
 }
 

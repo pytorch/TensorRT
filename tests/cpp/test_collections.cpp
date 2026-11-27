@@ -119,7 +119,7 @@ TEST(CppAPITests, TestSpecifyDomainStandardTensorInput) {
   auto tensor_domain = std::vector<double>{35, 377};
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf, tensor_domain);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
@@ -162,7 +162,7 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
@@ -216,7 +216,7 @@ TEST(CppAPITests, TestCollectionListInput) {
   auto out = mod.forward(complex_inputs);
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   c10::TypePtr elementType = input_shape_ivalue.type();
   auto list = c10::impl::GenericList(elementType);
@@ -265,7 +265,7 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
@@ -323,7 +323,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   c10::TypePtr elementType = input_shape_ivalue.type();
   auto list = c10::impl::GenericList(elementType);
@@ -384,7 +384,7 @@ TEST(CppAPITests, TestCollectionComplexModel) {
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   c10::TypePtr elementType = input_shape_ivalue.type();
   auto list = c10::impl::GenericList(elementType);
@@ -445,7 +445,7 @@ TEST(CppAPITests, TestCollectionFullCompilationComplexModel) {
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
-  auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
+  auto input_shape_ivalue = torch::jit::IValue(c10::make_intrusive<torch_tensorrt::Input>(input_shape));
 
   c10::TypePtr elementType = input_shape_ivalue.type();
   auto list = c10::impl::GenericList(elementType);

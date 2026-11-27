@@ -81,7 +81,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto dim = args[1].unwrapToInt();
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> new_shape;
-               nvinfer1::ITensor* shape_tensor;
+               nvinfer1::ITensor* shape_tensor = nullptr;
                if (ctx->input_is_dynamic) {
                  /*
                   * In case the dim is negative
@@ -149,7 +149,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
 
                    shape_tensor = tensor_to_const(ctx, torch::tensor(new_shape).to(torch::kI32));
                  } else {
-                   LOG_ERROR(
+                   TORCHTRT_THROW_ERROR(
                        "Invalid IValue type of " << args[2].IValue()->type()
                                                  << " detected for shape tensor from node: " << *n);
                  }
@@ -178,7 +178,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto in = args[0].ITensorOrFreeze(ctx);
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> new_shape;
-               nvinfer1::ITensor* shape_tensor;
+               nvinfer1::ITensor* shape_tensor = nullptr;
                if (ctx->input_is_dynamic) {
                  LOG_DEBUG("Using dynamic version of reshape layer");
                  if (args[1].isITensorList()) {
@@ -193,7 +193,7 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                    auto shape_vec = args[1].unwrapToIntList().vec();
                    shape_tensor = tensor_to_const(ctx, torch::tensor(shape_vec).to(torch::kI32));
                  } else {
-                   LOG_ERROR(
+                   TORCHTRT_THROW_ERROR(
                        "Invalid IValue type of " << args[1].IValue()->type()
                                                  << " detected for shape tensor from node: " << *n);
                  }

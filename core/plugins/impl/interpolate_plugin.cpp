@@ -155,11 +155,11 @@ int32_t InterpolatePlugin::getNbOutputs() const noexcept {
 
 int32_t InterpolatePlugin::getOutputShapes(
     const nvinfer1::DimsExprs* inputs,
-    int32_t nbInputs,
-    const nvinfer1::DimsExprs* shapeInputs,
-    int32_t nbShapeInputs,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DimsExprs* /*shapeInputs*/,
+    int32_t /*nbShapeInputs*/,
     nvinfer1::DimsExprs* outputs,
-    int32_t nbOutputs,
+    int32_t /*nbOutputs*/,
     nvinfer1::IExprBuilder& exprBuilder) noexcept {
   outputs[0] = inputs[0];
 
@@ -180,8 +180,8 @@ int32_t InterpolatePlugin::getOutputShapes(
 int32_t InterpolatePlugin::getOutputDataTypes(
     nvinfer1::DataType* outputTypes,
     int32_t nbOutputs,
-    const nvinfer1::DataType* inputTypes,
-    int32_t nbInputs) const noexcept {
+    const nvinfer1::DataType* /*inputTypes*/,
+    int32_t /*nbInputs*/) const noexcept {
   for (int32_t i = 0; i < nbOutputs; i++) {
     outputTypes[i] = nvinfer1::DataType::kFLOAT;
   }
@@ -224,19 +224,19 @@ bool InterpolatePlugin::supportsFormatCombination(
 }
 
 int32_t InterpolatePlugin::configurePlugin(
-    const nvinfer1::DynamicPluginTensorDesc* in,
-    int32_t nbInputs,
-    const nvinfer1::DynamicPluginTensorDesc* out,
-    int32_t nbOutputs) noexcept {
+    const nvinfer1::DynamicPluginTensorDesc* /*in*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DynamicPluginTensorDesc* /*out*/,
+    int32_t /*nbOutputs*/) noexcept {
   dtype_ = nvinfer1::DataType::kFLOAT;
   return 0;
 }
 
 size_t InterpolatePlugin::getWorkspaceSize(
-    const nvinfer1::DynamicPluginTensorDesc* inputs,
-    int32_t nbInputs,
-    const nvinfer1::DynamicPluginTensorDesc* outputs,
-    int32_t nbOutputs) const noexcept {
+    const nvinfer1::DynamicPluginTensorDesc* /*inputs*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::DynamicPluginTensorDesc* /*outputs*/,
+    int32_t /*nbOutputs*/) const noexcept {
   return 0;
 }
 
@@ -269,10 +269,10 @@ nvinfer1::PluginFieldCollection const* InterpolatePlugin::getFieldsToSerialize()
 // IPluginV3OneRuntime
 
 int32_t InterpolatePlugin::onShapeChange(
-    const nvinfer1::PluginTensorDesc* in,
-    int32_t nbInputs,
-    const nvinfer1::PluginTensorDesc* out,
-    int32_t nbOutputs) noexcept {
+    const nvinfer1::PluginTensorDesc* /*in*/,
+    int32_t /*nbInputs*/,
+    const nvinfer1::PluginTensorDesc* /*out*/,
+    int32_t /*nbOutputs*/) noexcept {
   return 0;
 }
 
@@ -281,7 +281,7 @@ int32_t InterpolatePlugin::enqueue(
     const nvinfer1::PluginTensorDesc* outputDesc,
     const void* const* inputs,
     void* const* outputs,
-    void* workspace,
+    void* /*workspace*/,
     cudaStream_t stream) noexcept {
   at::Tensor input =
       at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
@@ -340,7 +340,7 @@ int32_t InterpolatePlugin::enqueue(
   return 0;
 }
 
-nvinfer1::IPluginV3* InterpolatePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+nvinfer1::IPluginV3* InterpolatePlugin::attachToContext(nvinfer1::IPluginResourceContext* /*context*/) noexcept {
   return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
 }
 
@@ -374,7 +374,7 @@ const char* InterpolatePluginCreator::getPluginVersion() const noexcept {
 }
 
 nvinfer1::IPluginV3* InterpolatePluginCreator::createPlugin(
-    const char* name,
+    const char* /*name*/,
     const nvinfer1::PluginFieldCollection* fc,
     nvinfer1::TensorRTPhase phase) noexcept {
   if (phase == nvinfer1::TensorRTPhase::kBUILD) {

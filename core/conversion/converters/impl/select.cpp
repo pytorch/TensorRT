@@ -81,13 +81,13 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
 
     auto tensor_holder = TensorContainer();
     tensor_holder.hold_tensor(gather_out);
-    auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+    auto ival = c10::IValue(c10::make_intrusive<TensorContainer>(tensor_holder));
     list.emplace_back(ival);
 
     start_idx = start_idx + sizes[i];
   }
 
-  auto split_output_ivalue = std::move(torch::jit::IValue(list));
+  auto split_output_ivalue = torch::jit::IValue(list);
   ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
 
   return true;

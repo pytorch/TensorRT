@@ -105,7 +105,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         // get_serialized_metadata() -- nothing executes or mutates it. Otherwise each
         // fakification serializes the whole engine through __obj_flatten__ and
         // deep-copies it through the pickle. The Python TRTEngine reports "real" too.
-        .def("tracing_mode", [](const c10::intrusive_ptr<TRTEngine>& self) -> std::string { return "real"; })
+        .def("tracing_mode", [](const c10::intrusive_ptr<TRTEngine>& /*self*/) -> std::string { return "real"; })
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("set_profile_format", &TRTEngine::set_profile_format)
         .def("disable_profiling", &TRTEngine::disable_profiling)
@@ -190,19 +190,19 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
 #else
         .def(
             "set_group_name",
-            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name) {
+            [](c10::intrusive_ptr<TRTEngine> /*self*/, std::string /*group_name*/) {
               LOG_ERROR(
                   "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); set_group_name is a no-op");
             })
         .def(
             "bind_nccl_comm",
-            [](c10::intrusive_ptr<TRTEngine> self) {
+            [](c10::intrusive_ptr<TRTEngine> /*self*/) {
               LOG_ERROR(
                   "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); bind_nccl_comm is a no-op");
             })
         .def(
             "release_nccl_comm",
-            [](c10::intrusive_ptr<TRTEngine> self) {
+            [](c10::intrusive_ptr<TRTEngine> /*self*/) {
               LOG_ERROR(
                   "This build does not support MultiDevice TensorRT (ENABLE_TRT_NCCL_COLLECTIVES is OFF); release_nccl_comm is a no-op");
             })
