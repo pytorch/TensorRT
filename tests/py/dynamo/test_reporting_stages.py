@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import inspect
 import random
 from types import SimpleNamespace
 from unittest import mock
@@ -8,7 +9,7 @@ from unittest import mock
 import numpy as np
 import pytest
 import torch
-from torch_tensorrt.dynamo import _compiler, _reporting
+from torch_tensorrt.dynamo import Debugger, _compiler, _reporting
 from torch_tensorrt.reporting import (
     AnalysisReport,
     CompilationFailed,
@@ -19,6 +20,22 @@ from torch_tensorrt.reporting import (
     Stage,
     event_context,
 )
+
+
+def test_debugger_configures_locked_compiler_and_resets_on_exit(tmp_path):
+    debugger = Debugger(log_level="error", logging_dir=str(tmp_path))
+
+    def debugger_default():
+        return (
+            inspect.signature(_compiler.compile_module)
+            .parameters["_debugger_config"]
+            .default
+        )
+
+    assert debugger_default() is None
+    with debugger:
+        assert debugger_default() is debugger.cfg
+    assert debugger_default() is None
 
 
 def test_engine_stage_events_report_stage_specific_elapsed_time():

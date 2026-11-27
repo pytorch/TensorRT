@@ -116,7 +116,7 @@ def validate_compiler_kwargs(kwargs: Dict[str, Any], api: Any) -> None:
     validate_compiler_options(kwargs, valid_options, api.__name__)
 
 
-@needs_cross_compile
+@needs_cross_compile  # type: ignore[misc]
 @with_compiler_lock  # type: ignore[misc]
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
@@ -1310,8 +1310,9 @@ def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
     return True
 
 
-@fn_supports_debugger  # type: ignore[misc]
 @with_compiler_lock  # type: ignore[misc]
+# Register the original function so Debugger can update its keyword defaults.
+@fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
@@ -2541,7 +2542,7 @@ def convert_exported_program_to_serialized_trt_engine(
     return serialized_engine
 
 
-@needs_cross_compile
+@needs_cross_compile  # type: ignore[misc]
 def save_cross_compiled_exported_program(
     gm: torch.fx.GraphModule,
     file_path: str,

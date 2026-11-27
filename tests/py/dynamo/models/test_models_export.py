@@ -13,6 +13,8 @@ import torch_tensorrt as torchtrt
 from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
+from ..quantization_utils import quantization_available
+
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
@@ -219,8 +221,8 @@ def test_resnet18_half(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -284,8 +286,8 @@ def test_base_fp4_dynamic_shapes(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -344,8 +346,8 @@ def test_base_fp4_static_shapes(ir):
     "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -414,8 +416,8 @@ def test_nvfp4_nd_input_quantizer(ir):
     "FP8 quantization requires compute capability 8.9 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -476,8 +478,8 @@ def test_fp8_and_input_quantizer(ir):
     "FP8 quantization requires compute capability 8.9 or later",
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -547,8 +549,8 @@ def test_base_fp8(ir):
     ],
 )
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -607,8 +609,8 @@ def test_zero_amax(ir, quant, dtype, calib_value, dynamic_amax, run_input):
 @pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -661,8 +663,8 @@ def test_base_int8(ir, dtype):
 @pytest.mark.unit
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @unittest.skipIf(
     platform.system() != "Linux",
@@ -723,8 +725,8 @@ def test_base_int8_dynamic_shape(ir, dtype):
 
 
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt"),
-    "ModelOpt is required to run this test",
+    not quantization_available("modelopt"),
+    "ModelOpt not installed or quantization tests disabled",
 )
 @pytest.mark.unit
 def test_fp8_mha_softmax_quantizer_annotation(ir):

@@ -77,7 +77,7 @@ jobs:
           # a different mode.
           # --all-extras so the optional dependencies are covered too. Dependency
           # groups are not covered: --all-groups on its own is rejected, because
-          # pyproject.toml declares test_ext and quantization as conflicting.
+          # pyproject.toml declares test-ext and modelopt_quantization as conflicting.
           # Built outside the checkout: the auto-commit step matches on uv.lock only,
           # but keeping the environment out of the tree avoids any chance of it being
           # swept into a commit, and keeps `git diff` about the lock alone. Falls back
