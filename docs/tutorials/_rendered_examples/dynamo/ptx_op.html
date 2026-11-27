@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -644,14 +644,13 @@ document.write(`
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import cuda.core  # noqa: F401
 import tensorrt.plugin as trtp
 import torch
+import torch_tensorrt
+import torch_tensorrt.kernels as ttk
 from cuda.core import Device as _Device
 from cuda.core import LaunchConfig as _LaunchConfig
 from cuda.core import Program as _Program
 from cuda.core import ProgramOptions as _ProgramOptions
 from cuda.core import launch as _cuda_launch
-
-import torch_tensorrt
-import torch_tensorrt.kernels as ttk
 
 # ---------------------------------------------------------------------------
 # Step 1: obtain PTX
@@ -780,7 +779,6 @@ if __name__ == "__main__":
     trt_model = torch_tensorrt.compile(
         model,
         inputs=[x],
-        enabled_precisions={torch.float32},
         min_block_size=1,
     )
     with torch.no_grad():

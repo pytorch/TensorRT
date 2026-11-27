@@ -238,23 +238,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_bert_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This is the PyTorch-canonical pattern for streaming inference: the cache lives inside the model...">
 
 .. only:: html
@@ -267,6 +250,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">In-place aliased I/O: module-owned buffers</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_bert_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
     </div>
 
 
@@ -459,23 +459,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_save_dynamic_shapes_both_methods_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_both_methods.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="A realistic single-layer transformer attention block with a static-shape KV cache held as modul...">
 
 .. only:: html
@@ -488,6 +471,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Streaming attention with a static KV cache</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates BOTH methods for saving Torch-TensorRT compiled models with dynamic i...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_save_dynamic_shapes_both_methods_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_save_dynamic_shapes_both_methods.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Saving Models with Dynamic Shapes - Both Methods</div>
     </div>
 
 
@@ -850,8 +850,8 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    /tutorials/_rendered_examples/dynamo/cutedsl_op
-   /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/aliased_io_buffers
+   /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/cutile_op
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
@@ -863,8 +863,8 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
    /tutorials/_rendered_examples/dynamo/compile_from_mapped_weights
-   /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
    /tutorials/_rendered_examples/dynamo/aliased_io_kv_attention
+   /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example

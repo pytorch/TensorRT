@@ -234,12 +234,40 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        This can be faster, for example when PyTorch autocast keeps a LayerNorm or a
        softmax in FP32, but it overrides a choice of the model author, so check the
        accuracy. Regions with ``enabled=False``, which a model uses to keep ops in FP32,
-       keep their autocast. So do regions whose values inlining would change, such as
-       one that writes into a buffer in place, and regions inside a ``torch.no_grad()``
-       block when the model is exported with grad mode on. Exported under
-       ``torch.no_grad()``, the block leaves nothing in the graph.
+       keep their autocast. ``"reclassify_all"`` removes theirs too, so that autocast can
+       also run those ops in low precision, and the exclusions and calibration above
+       choose which of them stay in FP32. ``"reclassify_all"`` does not tell apart a
+       region that keeps ops in FP32 for correctness, such as rotary embeddings, and
+       calibration may not catch one either, so add the path of the module that runs
+       such a region, as ``named_modules()`` gives it, to ``autocast_excluded_nodes``
+       as a full match, such as ``^rotary$``. That keeps the ops the module runs
+       directly in FP32, but not those of its submodules, so it works best when the
+       region is the whole ``forward`` of a module. Without the ``$``, the pattern
+       also matches its submodules and any other module whose path starts the same
+       way.
+       With ``"reclassify"`` or ``"reclassify_all"``, regions whose values inlining
+       would change, such as one that writes into a buffer in place, regions inside a
+       ``torch.no_grad()`` block when the model is exported with grad mode on, and
+       regions nested in a region that keeps its autocast, keep their autocast.
+       Exported under ``torch.no_grad()``, the block leaves nothing in the graph.
        ``autocast_excluded_node_names`` also matches the names that ops have in the
-       regions.
+       regions. A write into the output of a region, made after the region, can still
+       be lost when the rules give the op that writes, or a view it writes through, a
+       dtype other than the dtype of that output, as with ``bfloat16`` regions and
+       ``autocast_low_precision_type=torch.float16``. This also happens with
+       ``"keep"``. In a program loaded with ``torch.export.load``, the other two
+       values can also lose a write made in a region or after it, outside a
+       ``torch.no_grad()`` block, when it goes through an op that returns a view of
+       its input though its schema does not say so: ``unsafe_split``, or an eval
+       ``dropout``, ``type_as``, ``einsum``, ``broadcast_tensors`` or a similar op
+       of a tensor with a data-dependent size or of tensors in different floating
+       point dtypes.
+       Autocast logs, at INFO level, some of the regions that another value of
+       ``autocast_model_regions`` could let it choose in: under ``"keep"``, regions
+       with ``enabled=False`` or in a dtype other than ``autocast_low_precision_type``,
+       and under ``"reclassify"``, regions with ``enabled=False`` and those nested in
+       them, where one in another dtype logs as a warning. ``"reclassify_all"`` logs
+       nothing. Regions inside a ``torch.no_grad()`` block do not count.
 
 ----
 
@@ -305,11 +333,9 @@ Hardware Compatibility
      - ``STANDARD``
      - Restrict kernel selection to safe GPU kernels (``SAFETY``) or safe DLA kernels
        (``DLA_STANDALONE``). Use ``STANDARD`` for normal inference workloads.
-   * - ``enable_cross_compile_for_windows``
-     - ``False``
-     - Build engines on Linux that are deployable on Windows (x86-64). Disables Python
-       runtime, lazy engine init, and engine caching. See
-       :func:`torch_tensorrt.dynamo.cross_compile_for_windows`.
+
+To build Windows-deployable engines on Linux, use the dedicated
+:func:`torch_tensorrt.dynamo.cross_compile_for_windows` API.
 
 ----
 
@@ -467,9 +493,9 @@ Compilation Workflow
      - Defer TRT engine deserialization until all engines have been built.
        Works around resource contraints and builder overhad but engines
        may be less well tuned to their deployment resource availability
-   * - ``debug``
-     - ``False``
-     - Enable verbose TRT builder logs at ``DEBUG`` level.
+
+Use the :class:`~torch_tensorrt.dynamo.Debugger` context manager for verbose
+compilation logs and graph captures.
 
 ----
 
@@ -553,5 +579,5 @@ rebuilt from scratch:
 ``convert_antialiased_resize``, ``replace_interleave_stack_with_cat``.
 On TensorRT older than 10.14, ``strip_engine_weights`` also invalidates cached engines.
 
-Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
+Settings not in this list (e.g., ``dryrun`` and ``pass_through_build_failures``)
 can be changed without invalidating the cache.

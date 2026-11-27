@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -569,9 +569,7 @@ compiled = torch_tensorrt.compile(
     ep,
     ir="dynamo",
     inputs=[x_k.clone(), x_v.clone()],
-    enabled_precisions={torch.float32},
     min_block_size=1,
-    use_python_runtime=False,
 )
 </pre></div>
 </div>

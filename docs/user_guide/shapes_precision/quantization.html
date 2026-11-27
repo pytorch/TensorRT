@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -560,7 +560,8 @@ document.write(`
 weight-only</strong>, and <strong>MXFP4</strong> (<code class="docutils literal notranslate"><span class="pre">MXDynamicActivationMXWeightConfig</span></code>) via
 <a class="reference external" href="https://github.com/pytorch/ao">TorchAO</a>. Quantizers insert
 quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
-converts those nodes into TRT quantization layers and sets the appropriate builder flags.</p>
+converts those nodes into TRT quantization layers and sets the appropriate builder flags.
+PyTorch PT2E graphs work differently, see <a class="reference internal" href="#pt2e-qdq"><span class="std std-ref">PT2E graphs</span></a>.</p>
 <hr class="docutils" />
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
@@ -879,8 +880,20 @@ block size 32).</p>
 <p>For ModelOpt FP4, <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.dynamic_block_quantize_op.default</span></code> nodes
 are converted via the dynamic block quantize converter, which uses TRT’s
 <code class="docutils literal notranslate"><span class="pre">add_dynamic_quantize</span></code> API (TRT ≥ 10.8).</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">constant_folding</span></code> lowering pass explicitly marks quantization ops as <em>impure</em> to
-prevent their scales from being folded away before the TRT conversion step.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">constant_folding</span></code> lowering pass explicitly marks the ModelOpt and TorchAO
+quantization ops as <em>impure</em> to prevent their scales from being folded away before the
+TRT conversion step.</p>
+<p id="pt2e-qdq">For PyTorch PT2E graphs (<code class="docutils literal notranslate"><span class="pre">convert_pt2e</span></code>), the <code class="docutils literal notranslate"><span class="pre">quantized_decomposed</span></code> quantize and
+dequantize ops are not mapped to TRT quantization layers, because TRT’s quantize layer is
+symmetric and has no uint8 output. Each op is built from elementwise layers in float32,
+where every int8 and uint8 value is exact; only an int8 engine input is read through a
+dequantize layer with a scale of 1. These ops are left out of the impure set on purpose:
+the engine would compute a weight’s dequantize in floating point anyway, so constant
+folding turns each int8 weight into a floating-point constant of the dequantize’s output
+dtype. So the engine gets no INT8 speed or memory gain. Results match PyTorch, except that
+a value on a halfway point can move by one quantization step.
+Full conversion needs <code class="docutils literal notranslate"><span class="pre">torch.export</span></code>. Some cases stay in PyTorch, for example run-time
+scales, and on TensorRT-RTX an int8 dequantize whose quantize has other users.</p>
 </section>
 <hr class="docutils" />
 <section id="verifying-quantized-layers">

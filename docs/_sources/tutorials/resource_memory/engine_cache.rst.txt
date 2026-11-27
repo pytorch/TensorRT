@@ -63,7 +63,7 @@ components:
 2. **Input specs** — the ``min/opt/max`` shapes and dtypes of each input tensor.
 3. **Engine-invariant settings** — the subset of
    :class:`~torch_tensorrt.dynamo.CompilationSettings` that affect the compiled engine
-   (see :ref:`engine-invariant-settings`). Settings like ``debug`` or ``dryrun`` do not
+   (see :ref:`engine-invariant-settings`). Settings like ``dryrun`` do not
    affect the cache key.
 
 Each cache entry stores:
@@ -93,7 +93,7 @@ The following changes always require a cache miss (engine rebuild):
 * ``tiling_optimization_level`` / ``l2_limit_for_tiling``
 * All ``autocast_*`` settings except ``autocast_calibration_dataloader``
 
-Changes to ``min_block_size``, ``torch_executed_ops``, ``debug``, ``dryrun``,
+Changes to ``min_block_size``, ``torch_executed_ops``, ``dryrun``,
 ``pass_through_build_failures``, etc. do **not** invalidate cached engines.
 
 ----
@@ -150,7 +150,6 @@ persisted to disk via ``runtime_cache_path``:
         exported_program,
         arg_inputs=inputs,
         runtime_cache_path="/data/trt_cache/runtime_cache.bin",
-        use_python_runtime=True,
     )
 
 The default path is
