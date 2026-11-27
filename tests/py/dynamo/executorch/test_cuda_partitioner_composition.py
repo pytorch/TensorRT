@@ -11,6 +11,7 @@ import pytest
 executorch = pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
+from torch_tensorrt.executorch.backend import get_backend_id  # noqa: E402
 
 
 def _cuda_backend_available() -> bool:
@@ -142,7 +143,7 @@ def test_erfinv_routes_to_cuda_backend(tmp_path):
         "CudaBackend" in delegate_ids
     ), f"erfinv did not route to the CUDA backend; delegates={delegate_ids}"
     assert (
-        "TensorRTBackend" in delegate_ids
+        get_backend_id() in delegate_ids
     ), f"tanh/cos were not delegated to TensorRT; delegates={delegate_ids}"
 
 
@@ -194,7 +195,7 @@ def test_weighted_partition_persists_external_data(tmp_path):
     assert out.exists()
     delegate_ids = _delegate_ids(out)
     assert (
-        "TensorRTBackend" in delegate_ids
+        get_backend_id() in delegate_ids
     ), f"tanh/cos were not delegated to TensorRT; delegates={delegate_ids}"
     assert (
         "CudaBackend" in delegate_ids
@@ -310,7 +311,7 @@ def test_multimethod_trt_export_preserves_methods(tmp_path):
     execution_plans = serialized.execution_plan
     assert {plan.name for plan in execution_plans} == {"prefill", "decode"}
     assert all(
-        any(delegate.id == "TensorRTBackend" for delegate in plan.delegates)
+        any(delegate.id == get_backend_id() for delegate in plan.delegates)
         for plan in execution_plans
     )
     # deserialize_pte_binary inlines every delegate segment, so processed.index always
@@ -319,7 +320,7 @@ def test_multimethod_trt_export_preserves_methods(tmp_path):
         plan.name: serialized.backend_delegate_data[delegate.processed.index].data
         for plan in execution_plans
         for delegate in plan.delegates
-        if delegate.id == "TensorRTBackend"
+        if delegate.id == get_backend_id()
     }
     assert len(trt_payloads) == 2
     assert (
@@ -364,7 +365,7 @@ def test_graph_module_export_preserves_source(tmp_path):
     with out.open("wb") as output:
         edge.to_executorch().write_to_file(output)
 
-    assert "TensorRTBackend" in _delegate_ids(out)
+    assert get_backend_id() in _delegate_ids(out)
     assert trt_gm.code == source_code
     assert tuple(trt_gm.state_dict()) == source_state
     assert tuple(name for name, _ in trt_gm.named_modules()) == source_attrs
@@ -486,11 +487,13 @@ def test_the_caller_keeps_its_device_across_load_run_and_free(tmp_path):
         )
 
     delegate_ids = _delegate_ids(out)
-    assert (
-        "TensorRTBackend" in delegate_ids
-    ), f"nothing went to TensorRT; {delegate_ids}"
+    assert get_backend_id() in delegate_ids, f"nothing went to TensorRT; {delegate_ids}"
 
-    import torch_tensorrt_executorch_runtime  # noqa: F401
+    importlib.import_module(
+        "torch_tensorrt_executorch_rtx_runtime"
+        if get_backend_id() == "TensorRTRTXBackend"
+        else "torch_tensorrt_executorch_runtime"
+    )
     from executorch.runtime import Runtime
 
     torch.cuda.set_device(caller_device)

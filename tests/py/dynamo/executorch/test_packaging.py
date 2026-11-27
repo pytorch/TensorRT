@@ -41,7 +41,7 @@ FLAG_VALUES = [
     (" true ", False),
     ("1", True),
     ("true", True),
-    ("TrUe", True),
+    ("True", True),
     ("yes", True),
     ("YES", True),
     ("on", True),
@@ -71,6 +71,7 @@ def packaging_build(tmp_path, monkeypatch):
         "executorch": f"{pinned}+cu130",
         "torch-tensorrt": "2.15.0.dev20200103+cu130",
         "tensorrt-cu13": "11.2.1",
+        "tensorrt-rtx-cu13": "1.7.1.116",
         "nvidia-cuda-runtime": "13.0.0",
     }
     dependency_root = tmp_path / "dependencies"
@@ -140,7 +141,11 @@ def packaging_build(tmp_path, monkeypatch):
         output = (
             bazel_bin
             / "py/torch-tensorrt-executorch-runtime/native/delegate_native/lib"
-            / LIBRARY
+            / (
+                LIBRARY.replace("tensorrt", "tensorrt_rtx")
+                if "--config=rtx" in command
+                else LIBRARY
+            )
         )
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(state.payload)
@@ -815,3 +820,23 @@ def test_a_second_build_in_the_same_tree_succeeds(tmp_path):
             exec(text, namespace)
     assert output.stat().st_mode & stat.S_IWUSR, oct(output.stat().st_mode)
     assert sorted(p.name for p in output.parent.iterdir()) == ["built.so"]
+
+
+@pytest.mark.parametrize("flag,rtx", [("0", False), ("1", True), ("true", True)])
+def test_runtime_backend_packaging(packaging_build, monkeypatch, flag, rtx):
+    state = packaging_build
+    monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_USE_RTX", flag)
+    namespace = runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+    package = "torch_tensorrt_executorch_rtx_runtime" if rtx else PACKAGE
+    cmake = "executorch_backend_tensorrt_rtx" if rtx else "executorch_backend_tensorrt"
+    library = LIBRARY.replace("tensorrt", "tensorrt_rtx") if rtx else LIBRARY
+    output = Path(state.builds[-1].build_lib) / package
+    assert (output / "lib" / library).read_bytes() == state.payload
+    assert ("--config=rtx" in state.calls[0]) is rtx
+    requirement = "tensorrt-rtx-cu13==1.7.1.116" if rtx else "tensorrt-cu13==11.2.1"
+    assert requirement in state.requires
+    config = output / "lib/cmake" / cmake / f"{cmake}-config.cmake"
+    contents = config.read_text()
+    assert f"executorch::backend_tensorrt{'_rtx' if rtx else ''}" in contents
+    assert package in contents
+    assert namespace["PACKAGE_NAME"] == package

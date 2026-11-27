@@ -45,6 +45,10 @@ BACKEND_NAME = "TensorRTBackend"
 _DELEGATE_LIBRARY = "libexecutorch_backend_tensorrt.so"
 if sys.platform == "win32":
     _DELEGATE_LIBRARY = "executorch_backend_tensorrt.dll"
+if __name__ == "torch_tensorrt_executorch_rtx_runtime":
+    BACKEND_NAME = "TensorRTRTXBackend"
+    _DELEGATE_LIBRARY = _DELEGATE_LIBRARY.replace("tensorrt", "tensorrt_rtx")
+
 
 # Keep AddDllDirectory handles alive for subsequent CUDA model loads too.
 _dll_directories: list[Any] = []
@@ -75,6 +79,7 @@ def _configure_windows_dll_search() -> None:
         ("executorch", "executorch/lib"),
         ("executorch", "executorch/backends/cuda"),
         ("tensorrt-cu13-libs", "tensorrt_libs"),
+        ("tensorrt-rtx-cu13-libs", "tensorrt_rtx_libs"),
         ("torch", "torch/lib"),
     ):
         try:

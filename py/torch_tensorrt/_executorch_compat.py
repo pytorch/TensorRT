@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any, Collection, Sequence, Union, cast
 
@@ -46,17 +47,27 @@ def load(path: Union[str, Path]) -> Program:
     model_path = Path(path)
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
+    features = getattr(
+        sys.modules.get("torch_tensorrt._features"), "ENABLED_FEATURES", None
+    )
+    package = (
+        "torch_tensorrt_executorch_rtx_runtime"
+        if getattr(features, "tensorrt_rtx", False)
+        else "torch_tensorrt_executorch_runtime"
+    )
     try:
-        import torch_tensorrt_executorch_runtime as delegate
+        if package == "torch_tensorrt_executorch_rtx_runtime":
+            import torch_tensorrt_executorch_rtx_runtime as delegate
+        else:
+            import torch_tensorrt_executorch_runtime as delegate
     except ModuleNotFoundError as error:
-        if error.name != "torch_tensorrt_executorch_runtime":
+        if error.name != package:
             raise
         from torch_tensorrt._utils import executorch_runtime_install_command
 
         raise ImportError(
             "Loading an ExecuTorch program requires the Torch-TensorRT delegate "
-            "(torch_tensorrt_executorch_runtime). "
-            + executorch_runtime_install_command()
+            f"({package}). " + executorch_runtime_install_command()
         ) from error
     # A companion published before the delegate became a single registration call exposes
     # activate() instead. Accept it so upgrading this wheel alone keeps loading programs.

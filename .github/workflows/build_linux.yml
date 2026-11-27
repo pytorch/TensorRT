@@ -421,23 +421,30 @@ jobs:
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
         id: executorch-runtime
+        env:
+          TORCH_TENSORRT_EXECUTORCH_USE_RTX: ${{ inputs.use-rtx && '1' || '0' }}
+          MAIN_WHEEL_PACKAGE: ${{ inputs.use-rtx && 'torch_tensorrt_rtx' || 'torch_tensorrt' }}
         if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
+          export TORCH_TENSORRT_EXECUTORCH_USE_RTX="${TORCH_TENSORRT_EXECUTORCH_USE_RTX:-0}"
+          MAIN_WHEEL_PACKAGE="${MAIN_WHEEL_PACKAGE:-torch_tensorrt}"
           # Preserve the matrix's torch while installing the just-built main wheel.
-          ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt-*.whl
+          ${CONDA_RUN} python -m pip install --no-deps dist/${MAIN_WHEEL_PACKAGE}-*.whl
           ${CONDA_RUN} python - <<'PY'
           import importlib.metadata
+          import os
           import subprocess
           import sys
 
           from packaging.requirements import Requirement
           from packaging.utils import canonicalize_name
 
-          main = importlib.metadata.distribution("torch-tensorrt")
+          use_rtx = os.environ["TORCH_TENSORRT_EXECUTORCH_USE_RTX"] == "1"
+          main = importlib.metadata.distribution("torch-tensorrt-rtx" if use_rtx else "torch-tensorrt")
           library = main.locate_file("torch_tensorrt/lib/libtorchtrt.so")
           if not library.is_file():
               sys.exit("The main wheel has no libtorchtrt.so; the companion needs the full runtime build")
@@ -446,7 +453,8 @@ jobs:
           tensorrt = [
               str(requirement) for requirement in requirements
               if canonicalize_name(requirement.name) in {
-                  "tensorrt", "tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs"
+                  "tensorrt", "tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs",
+                  "tensorrt-rtx", "tensorrt-rtx-cu13", "tensorrt-rtx-cu13-bindings", "tensorrt-rtx-cu13-libs"
               }
               and (requirement.marker is None or requirement.marker.evaluate())
           ]
@@ -487,7 +495,7 @@ jobs:
                 continue
             fi
             abs_pkg=$(realpath $pkg)
-            if [[ "$(basename "${pkg}")" == torch_tensorrt_executorch_runtime-* ]]; then
+            if [[ "$(basename "${pkg}")" == torch_tensorrt_executorch*runtime-* ]]; then
               # The companion is retagged, not repaired, and that is deliberate rather than a gap. The
               # shared repair script handles CPython-tagged wheels only, and repairing would vendor the
               # libraries this wheel exists to stop shipping. Its one shared object already resolves
@@ -525,14 +533,18 @@ jobs:
           set -euo pipefail
           source "${BUILD_ENV_FILE}"
           shopt -s nullglob
-          wheels=(dist/torch_tensorrt_executorch_runtime-*.whl)
+          wheels=(dist/torch_tensorrt_executorch*runtime-*.whl)
+          module=torch_tensorrt_executorch_runtime
+          if [[ "${USE_TRT_RTX:-false}" == true || "${USE_TRT_RTX:-0}" == 1 ]]; then
+            module=torch_tensorrt_executorch_rtx_runtime
+          fi
           if [[ ${#wheels[@]} -ne 1 ]]; then
             echo "Expected one retagged ExecuTorch companion, found ${#wheels[@]}" >&2
             exit 1
           fi
           ${CONDA_RUN} python .github/scripts/check-executorch-runtime-wheel.py "${wheels[0]}" --architecture "${ARCH}"
           ${CONDA_RUN} python -m pip install --no-deps "${wheels[0]}"
-          delegate="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 ${CONDA_RUN} python -c 'import torch_tensorrt_executorch_runtime as m; print(m._delegate_path())')"
+          delegate="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 ${CONDA_RUN} python -c "import ${module} as m; print(m._delegate_path())")"
           # Build-machine library paths must not hide a broken installed RUNPATH.
           if ! resolution="$(env -u LD_LIBRARY_PATH ldd -r "${delegate}" 2>&1)"; then
             printf '%s\n' "${resolution}" >&2
@@ -543,7 +555,7 @@ jobs:
             echo "The installed delegate has unresolved dependencies" >&2
             exit 1
           fi
-          env -u LD_LIBRARY_PATH ${CONDA_RUN} python -c "import torch_tensorrt_executorch_runtime"
+          env -u LD_LIBRARY_PATH ${CONDA_RUN} python -c "import ${module}"
       - name: Inventory packaged wheels
         # Keep this immediately before the smoke test/upload boundary.  When a
         # matrix row fails downstream, its log shows exactly which repaired

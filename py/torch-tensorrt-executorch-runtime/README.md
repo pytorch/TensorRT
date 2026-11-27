@@ -309,3 +309,51 @@ whose directory is on the delegate's search path.
 - `TORCH_TENSORRT_EXECUTORCH_DEBUG`: build the delegate with debug information.
 
 Each accepts `1`, `true`, `yes` or `on`, in any case. Any other value, or no value, means off.
+
+
+## TensorRT-RTX variant
+
+Build an independent companion for a Torch-TensorRT-RTX compiler environment with
+CUDA 13 and the repository-pinned ExecuTorch CUDA wheel installed:
+
+```sh
+export CU_VERSION=cu134
+export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="0.3.0.dev0+${CU_VERSION}"
+TORCH_TENSORRT_EXECUTORCH_USE_RTX=1 python -m pip wheel \
+  --no-build-isolation --no-deps --wheel-dir dist \
+  ./py/torch-tensorrt-executorch-runtime
+python -m pip install dist/torch_tensorrt_executorch_rtx_runtime-*.whl
+```
+
+Run the wheel build in the same manylinux release environment as the standard
+companion. Its native dependency and symbol-version checks also apply to RTX;
+a newer host compiler cannot produce a correctly tagged release wheel by
+retagging its output. On Windows x86-64, set the same environment variable and
+`TensorRTRTX_ROOT` to the RTX C++ SDK before building from a developer shell.
+Windows ARM64 is not supported by the pinned ExecuTorch package.
+
+The resulting distribution is `torch-tensorrt-executorch-rtx-runtime`. It requires
+`tensorrt-rtx-cu13`, carries `libexecutorch_backend_tensorrt_rtx.so` (or the Windows
+DLL), and registers `TensorRTRTXBackend`:
+
+```python
+import torch_tensorrt_executorch_rtx_runtime  # registers the RTX delegate
+from executorch.runtime import Runtime
+
+program = Runtime.get().load_program("model.pte")
+method = program.load_method("forward")
+outputs = method.execute(inputs)
+```
+
+Compile and save the program using Torch-TensorRT-RTX and
+`torch_tensorrt.save(..., output_format="executorch")`. Backend selection is
+automatic. RTX and standard TensorRT engines are different artifacts and cannot
+be exchanged. Additional partitioners, including ExecuTorch's CUDA partitioner,
+can handle operators outside the RTX partitions.
+
+For C++ consumers, find `executorch_backend_tensorrt_rtx` and link
+`executorch::backend_tensorrt_rtx`. Its CMake prefix is the RTX companion's package
+directory, found with registration disabled just as in the standard recipe.
+Persistent RTX runtime-cache files are not exposed yet. Static and dynamic-shape
+execution and delegate CUDA graphs are covered by
+`tests/py/dynamo/executorch/test_rtx_runtime.py`.

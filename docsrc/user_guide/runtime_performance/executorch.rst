@@ -862,3 +862,23 @@ In ``examples/torchtrt_executorch_example/``:
 
 ``examples/executorch_reference_runner/`` loads and runs a ``.pte`` from Python and from C++,
 including optimization profiles and the green context option.
+
+
+TensorRT-RTX
+------------
+
+The ExecuTorch export path also supports Torch-TensorRT-RTX. Compile the model
+with the RTX compiler and save it with ``output_format="executorch"`` as above;
+the partitioner emits ``TensorRTRTXBackend`` delegates automatically.
+
+Install the separately built ``torch-tensorrt-executorch-rtx-runtime`` companion
+and import ``torch_tensorrt_executorch_rtx_runtime`` before loading the program
+with ExecuTorch's ``Runtime``. This companion links TensorRT-RTX rather than
+standard TensorRT. Native source builds select it with
+``TORCH_TENSORRT_EXECUTORCH_USE_RTX=1``; see
+``py/torch-tensorrt-executorch-runtime/README.md`` for the build commands.
+
+RTX programs carry a different engine-family signature and require the RTX
+delegate. Existing TensorRT engines must be rebuilt using RTX. CUDA fallback
+partitioners remain available for operators outside the RTX partitions.
+Persistent RTX runtime-cache files are not exposed by this integration yet.

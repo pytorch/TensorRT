@@ -236,7 +236,7 @@ if EXECUTORCH_RUNTIME_CHANNEL == EXECUTORCH_CHANNEL or (
 ):
     for _extra in ("executorch", "all"):
         EXTRAS_REQUIRE[_extra].append(
-            f"torch-tensorrt-executorch-runtime=={EXECUTORCH_RUNTIME_VERSION}; "
+            f"torch-tensorrt-executorch{'-rtx' if USE_TRT_RTX else ''}-runtime=={EXECUTORCH_RUNTIME_VERSION}; "
             + EXECUTORCH_REQUIREMENT.partition(";")[2].strip()
         )
 

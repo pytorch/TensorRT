@@ -32,18 +32,40 @@ filegroup(
 cmake(
     name = "delegate_native",
     build_args = ["--verbose"],
-    cache_entries = {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_PREFIX_PATH": "$${EXECUTORCH_CMAKE_PREFIX_PATH:-}",
-        "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
-        "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
-    },
+    cache_entries = select({
+        "//:rtx_sbsa": {
+            "CMAKE_BUILD_TYPE": "Release",
+            "CMAKE_PREFIX_PATH": "$${EXECUTORCH_CMAKE_PREFIX_PATH:-}",
+            "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
+            "TORCH_TENSORRT_EXECUTORCH_USE_RTX": "ON",
+            "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
+        },
+        "//:rtx_x86_64": {
+            "CMAKE_BUILD_TYPE": "Release",
+            "CMAKE_PREFIX_PATH": "$${EXECUTORCH_CMAKE_PREFIX_PATH:-}",
+            "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
+            "TORCH_TENSORRT_EXECUTORCH_USE_RTX": "ON",
+            "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
+        },
+        "//conditions:default": {
+            "CMAKE_BUILD_TYPE": "Release",
+            "CMAKE_PREFIX_PATH": "$${EXECUTORCH_CMAKE_PREFIX_PATH:-}",
+            "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
+            "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
+        },
+    }),
     lib_source = ":delegate_sources",
     out_include_dir = "",
-    out_shared_libs = ["libexecutorch_backend_tensorrt.so"],
+    out_shared_libs = select({
+        "//:rtx_sbsa": ["libexecutorch_backend_tensorrt_rtx.so"],
+        "//:rtx_x86_64": ["libexecutorch_backend_tensorrt_rtx.so"],
+        "//conditions:default": ["libexecutorch_backend_tensorrt.so"],
+    }),
     deps = [
         "@cuda//:cudart",
     ] + select({
+        "//:rtx_sbsa": ["@tensorrt_rtx_sbsa//:nvinfer"],
+        "//:rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":aarch64_linux": [
             "@tensorrt_sbsa//:nvinfer",
             "@tensorrt_sbsa//:nvinferplugin",
