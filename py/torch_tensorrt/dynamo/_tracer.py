@@ -103,6 +103,13 @@ def trace(
 
         export_context = export_torch_mode()
 
+    if kwargs.get("regions"):
+        raise ValueError(
+            "regions= selects modules when a model is compiled: pass it to "
+            "torch_tensorrt.compile or torch_tensorrt.dynamo.compile, not to "
+            "torch_tensorrt.dynamo.trace"
+        )
+
     with export_context:
         exp_program = export(
             mod,
@@ -110,6 +117,9 @@ def trace(
             kwargs=torch_kwarg_inputs,
             dynamic_shapes=dynamic_shapes,
             strict=kwargs.get("strict", False),
+            preserve_module_call_signature=tuple(
+                kwargs.get("preserve_module_call_signature", ())
+            ),
         )
 
     return exp_program

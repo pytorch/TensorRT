@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 # attention, leaving fp32 softmax feeding a bf16 matmul and triggering a
 # ``Float vs BFloat16`` mismatch at AOT meta-bmm dispatch.
 _IDENTITY_METHODS = frozenset({"clone", "contiguous", "detach"})
+# Marks the copies region capture makes of inputs that share storage.
+_REGION_COPY_KEY = "torch_tensorrt_region_alias_copy"
 _IDENTITY_FUNCTIONS = frozenset(
     {
         torch.ops.aten.clone.default,
@@ -40,6 +42,10 @@ def _remove_identity_ops(gm: torch.fx.GraphModule) -> bool:
         if not is_identity:
             continue
         if len(node.args) < 1 or not isinstance(node.args[0], torch.fx.Node):
+            continue
+        if node.meta.get("custom", {}).get(_REGION_COPY_KEY):
+            # A region may not read two tensors that share storage: keep the
+            # copy that capture made for it.
             continue
         node.replace_all_uses_with(node.args[0])
         gm.graph.erase_node(node)

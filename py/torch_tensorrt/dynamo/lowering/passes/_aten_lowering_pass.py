@@ -195,6 +195,12 @@ def post_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
+    from torch_tensorrt.dynamo.region_compilation import (
+        attach_region_records,
+        get_region_records,
+    )
+
+    region_records = get_region_records(gm)
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
     # Batch DCE/lint/recompile across passes: each pass may still call
@@ -205,6 +211,8 @@ def post_lowering(
         gm = flush_deferred_graph_cleanup(gm)
     finally:
         set_defer_graph_cleanup(False)
+    # A pass may return a new module; compilation audits the regions it holds.
+    attach_region_records(gm, region_records)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
 
@@ -322,6 +330,17 @@ def pre_export_lowering(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
 
+    from torch_tensorrt.dynamo.region_compilation import (
+        is_region_hop,
+        normalize_region_scopes,
+        region_hop_records,
+        validate_region_settings,
+    )
+
+    # Extract regions before other passes can move or erase their operations.
+    ep = normalize_region_scopes(ep)
+    validate_region_settings(settings, region_hop_records(ep.graph_module))
+
     # Only for rule-based autocast to collect the intermediate node outputs
     if settings.enable_autocast:
         # Autocast inserts casts and changes the dtypes of nodes, so it works on a
@@ -359,6 +378,12 @@ def pre_export_lowering(
         # stays as it was.
         ep = _copy_program(ep)
     gm = ep.graph_module
+    # Pre-export passes may enter region bodies; post-lowering treats them as leaves.
+    for node in gm.graph.nodes:
+        if is_region_hop(node):
+            body_target = str(node.args[0].target)
+            child = gm.get_submodule(body_target)
+            gm.set_submodule(body_target, ATEN_PRE_LOWERING_PASSES(child, settings))
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     for sub in iter_cond_subgraphs(gm):
         ATEN_PRE_LOWERING_PASSES(sub, settings)

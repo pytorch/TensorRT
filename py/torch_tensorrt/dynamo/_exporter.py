@@ -107,6 +107,10 @@ def export(
             a write into the program's tensors, or a backend that frees them after lowering, changes ``gm``
             too, and an in-place refit of ``gm`` changes the program's PyTorch weights but not its engines.
     """
+    if gm.meta.get("torch_tensorrt_regions"):
+        from torch_tensorrt.region import RegionError
+
+        raise RegionError("Saving a model compiled with regions is not supported yet")
     patched_module = transform(
         gm,
         cross_compile_module,

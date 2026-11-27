@@ -147,7 +147,9 @@ jobs:
       matrix: ${{ fromJson(needs.suite-matrix.outputs.matrix) }}
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: ${{ matrix.suite }}-${{ matrix.variant }}
+      # A suite can run against both wheel flavors in the same workflow run.
+      # job-name also scopes concurrency and JUnit artifact names downstream.
+      job-name: ${{ matrix.suite }}-${{ matrix.variant }}${{ inputs.python-only && '-python-only' || '' }}
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra

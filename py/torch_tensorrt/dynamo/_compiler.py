@@ -408,6 +408,9 @@ def cross_compile_for_windows(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    from torch_tensorrt.dynamo.region_compilation._capture import reject_region_capture
+
+    reject_region_capture(exported_program, "cross-compilation")
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
@@ -556,6 +559,7 @@ def compile(
     accuracy_algorithm: str = _defaults.ACCURACY_ALGORITHM,
     accuracy_atol: float = _defaults.ACCURACY_ATOL,
     accuracy_rtol: float = _defaults.ACCURACY_RTOL,
+    regions: Optional[collections.abc.Mapping[Any, Any]] = None,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -686,6 +690,7 @@ def compile(
         accuracy_algorithm (str): Loss metric: "l0", "l1", "l2", "lInf", or "cos" (lower is better).
         accuracy_atol (float): Absolute tolerance for "accuracy_algorithm="l0"".
         accuracy_rtol (float): Relative tolerance for "accuracy_algorithm="l0"".
+        regions (Optional[Mapping]): Rules that place whole submodules in regions without editing their source, keyed by module path (``"encoder.layers.*.mlp"``; ``*`` matches one name and ``**`` any number) or by module class. Each value is a ``torch_tensorrt.region.ExecuteInTorch``, ``FusedOp`` or ``FusedKernel`` rule. The program's own ``torch_tensorrt.region`` scopes are honored with or without rules. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -844,8 +849,30 @@ def compile(
     settings = CompilationSettings(**compilation_options)
 
     logger.info("Compilation Settings: %s\n", settings)
+    from torch_tensorrt.dynamo.region_compilation import (
+        check_decomposed_regions,
+        configure_region_backends,
+        has_region_markers,
+        materialize_regions,
+        select_exported_regions,
+        validate_eval_mode,
+    )
+
+    if regions or has_region_markers(exported_program.graph_module):
+        # Capture rewrites the graph: keep the caller's program as it was traced,
+        # so that it can be saved or compiled again, with other rules.
+        exported_program = _copy_program_graph(exported_program)
+        if regions:
+            select_exported_regions(exported_program, regions)
+        # Capture renames the values that recorded submodule calls refer to.
+        for entry in exported_program.module_call_graph:
+            if entry.fqn:
+                entry.signature = None
     stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
+    validate_eval_mode(exported_program.graph_module)
+
+    captured = exported_program.graph_module
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
             get_decompositions(
@@ -859,7 +886,13 @@ def compile(
     )
     exported_program = remove_alias_from_exported_program(exported_program)
 
-    gm = exported_program.module()
+    check_decomposed_regions(captured, exported_program.graph_module)
+    from torch_tensorrt.dynamo.region_compilation._validation import (
+        validate_region_mutations,
+    )
+
+    validate_region_mutations(exported_program)
+    gm = materialize_regions(exported_program.module(), captured)
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
@@ -955,6 +988,8 @@ def compile(
     # mutation the caller cannot act on, so the compiled module keeps the arity of
     # the model it was compiled from.
     hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
+    if not settings.dryrun:
+        configure_region_backends(trt_gm)
     return trt_gm
 
 
@@ -1310,6 +1345,25 @@ def _placeholders_are_engine_bindings(gm: torch.fx.GraphModule) -> bool:
     return True
 
 
+def _copy_program_graph(exported_program: ExportedProgram) -> ExportedProgram:
+    """Copy a program's graph and signature; the copy shares the weights."""
+    graph_module = copy.deepcopy(exported_program.graph_module)
+    # Copying renames a node called like a builtin, such as the ``input`` of
+    # nn.Sequential, and the signature refers to nodes by name.
+    renamed = False
+    for original, copied in zip(exported_program.graph.nodes, graph_module.graph.nodes):
+        if copied.name != original.name:
+            copied.name = original.name
+            if copied.op == "placeholder":
+                copied.target = original.target
+            renamed = True
+    if renamed:
+        graph_module.recompile()
+    return exported_program._update(
+        graph_module, copy.deepcopy(exported_program.graph_signature)
+    )
+
+
 @fn_supports_debugger  # type: ignore[misc]
 @with_compiler_lock  # type: ignore[misc]
 def compile_module(
@@ -1335,6 +1389,20 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+    from torch_tensorrt.dynamo.region_compilation import (
+        assert_no_unresolved_regions,
+        attach_region_records,
+        audit_region_placement,
+        get_region_records,
+        is_torch_region_node,
+    )
+    from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+
+    assert_no_unresolved_regions(gm)
+    region_records = get_region_records(gm)
+    # Audit before early returns or shortcuts can bypass partitioning.
+    audit_region_placement(gm, region_records)
+
     if any(v.requires_grad for v in gm.state_dict().values()):
         logger.warning(
             "The model may be in training mode, which may affect the performance of the compiled model!"
@@ -1432,6 +1500,9 @@ def compile_module(
         if settings.offload_module_to_cpu:
             pin_torch_executed_state(gm, to_torch_device(settings.device))
         restore_reshape(gm)
+        audit_region_placement(
+            gm, region_records, require_plugins_in_trt=not settings.dryrun
+        )
         return gm
     else:
         logger.debug(
@@ -1484,6 +1555,7 @@ def compile_module(
         and not settings.enable_resource_partitioning
         and not defer_engine_setup_to_load()
         and _placeholders_are_engine_bindings(gm)
+        and not region_records
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1626,6 +1698,10 @@ def compile_module(
             analysis_source, partitioned_module, op_support, settings
         )
     del analysis_source
+    attach_region_records(partitioned_module, region_records)
+    audit_region_placement(
+        partitioned_module, region_records, require_plugins_in_trt=not settings.dryrun
+    )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
 
@@ -1701,14 +1777,23 @@ def compile_module(
             if attr.startswith("_frozen_param") and attr not in still_read:
                 delattr(gm, attr)
 
+    torch_region_children = {
+        str(node.target)
+        for node in partitioned_module.graph.nodes
+        if is_torch_region_node(partitioned_module, node)
+    }
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
         if not isinstance(submodule, torch.fx.graph_module.GraphModule):
             continue
         # Criteria for a module to be convertible to TRT
-        if settings.use_fast_partitioner and "_run_on_acc" not in name:
-            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
+        if (
+            settings.use_fast_partitioner and "_run_on_acc" not in name
+        ) or name in torch_region_children:
+            # The global partitioner's parent already reports its region calls.
+            if name not in torch_region_children:
+                dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
             logger.debug(
                 "Submodule in PyTorch: %s\n %s",
                 str(name),
@@ -1828,6 +1913,14 @@ def compile_module(
                 and weight_releaser.release_storages_after_build(read, name)
             ):
                 release_host_and_device_memory()
+            plugin_ids = tuple(
+                node.meta[REGION_META_KEY]["id"]
+                for node in submodule.graph.nodes
+                if node.op == "call_function"
+                and node.meta.get(REGION_META_KEY, {}).get("route") == "plugin"
+            )
+            if plugin_ids:
+                trt_module._torch_tensorrt_plugin_regions = plugin_ids
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
@@ -2387,6 +2480,9 @@ def convert_exported_program_to_serialized_trt_engine(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    from torch_tensorrt.dynamo.region_compilation._capture import reject_region_capture
+
+    reject_region_capture(exported_program, "serialized-engine-only output")
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
