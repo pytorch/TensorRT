@@ -251,7 +251,7 @@ def make_dtype_capability_validator(
     *,
     artifact: Optional[CompiledTritonArtifact] = None,
 ) -> Callable[..., bool]:
-    """Check tensor dtypes before enforcing Triton's compiled device target."""
+    """Check tensor dtypes and shared memory before Triton's compiled device target."""
     return _common.make_dtype_capability_validator(
         op_name,
         "Triton",
@@ -263,6 +263,7 @@ def make_dtype_capability_validator(
             if artifact is None
             else lambda device: validate_target(artifact, device)
         ),
+        shared_mem=0 if artifact is None else artifact.shared_mem,
     )
 
 
@@ -374,6 +375,23 @@ def _triton_import() -> Any:
     return triton
 
 
+def _pointer_divisibility_attrs(
+    kernel: Any, pointer_alignment: Mapping[str, int]
+) -> Dict[Tuple[int], Any]:
+    """Give Triton a divisibility hint for each pointer declared aligned.
+
+    A normal Triton launch adds a 16-byte hint for each aligned pointer it is
+    given. An ahead-of-time compile sees no pointers, so without the hint it
+    emits only scalar memory accesses. Keys index the full kernel declaration,
+    constexprs included.
+    """
+    return {
+        (kernel.arg_names.index(name),): [["tt.divisibility", min(alignment, 16)]]
+        for name, alignment in pointer_alignment.items()
+        if alignment > 1
+    }
+
+
 def _compile_within_driver_isa(
     triton: Any,
     kernel: Any,
@@ -381,6 +399,7 @@ def _compile_within_driver_isa(
     constexprs: Dict[str, Any],
     options: Dict[str, Any],
     target: Any,
+    pointer_alignment: Mapping[str, int],
 ) -> Any:
     """Compile ``kernel``, holding the PTX ISA to what the driver can load.
 
@@ -394,11 +413,14 @@ def _compile_within_driver_isa(
     ``ptxas`` can assemble fails the compile outright.
     """
 
+    attrs = _pointer_divisibility_attrs(kernel, pointer_alignment)
+
     def _compile(ptx_version: Optional[int] = None) -> Any:
         src = triton.compiler.ASTSource(
             fn=kernel,
             signature=dict(signature),
             constexprs=dict(constexprs),
+            attrs=attrs,
         )
         opts = dict(options)
         if ptx_version is not None:
@@ -481,7 +503,7 @@ def _launch_metadata_bool(metadata: Any, field: str, kernel_name: str) -> bool:
     return value
 
 
-def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
+def _validate_launch_metadata(compiled: Any, arch: int) -> Tuple[str, int, int]:
     """Refuse Triton launch features the QDP AOT path cannot reproduce.
 
     Triton appends ``global_scratch`` / ``profile_scratch`` pointer params to
@@ -554,6 +576,17 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
             "to avoid Triton scratch buffers to use triton_op."
         )
 
+    # A tcgen05 kernel allocates its tensor memory itself (tcgen05.alloc), so an
+    # ordinary launch serves it up to the columns an SM has, which Triton's own
+    # loader gives as 576 on sm_107 and 512 elsewhere (triton/compiler/compiler.py
+    # in Triton 3.9).
+    tmem_columns = 576 if arch == 107 else 512
+    if numeric["tmem_size"] > tmem_columns:
+        raise RuntimeError(
+            f"Triton kernel '{kernel_name}' needs {numeric['tmem_size']} tensor "
+            f"memory columns, but an SM on sm_{arch} has {tmem_columns}."
+        )
+
     unsupported = []
     if numeric["num_ctas"] != 1:
         unsupported.append(f"num_ctas={metadata.num_ctas}")
@@ -563,8 +596,6 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
         unsupported.append("launch_cooperative_grid=True")
     if pdl:
         unsupported.append("launch_pdl=True")
-    if numeric["tmem_size"]:
-        unsupported.append(f"tmem_size={metadata.tmem_size}")
     if tensordesc_meta:
         unsupported.append("tensordesc_meta is non-empty")
     if unsupported:
@@ -596,6 +627,8 @@ def compile_triton_to_ptx(
     constexprs: Dict[str, Any],
     num_warps: Optional[int] = None,
     num_stages: Optional[int] = None,
+    pointer_alignment: Optional[Mapping[str, int]] = None,
+    arch: Optional[int] = None,
 ) -> CompiledTritonArtifact:
     """Compile a ``@triton.jit`` kernel to PTX ahead of time.
 
@@ -614,6 +647,13 @@ def compile_triton_to_ptx(
             Triton's own choice. Also sets the launch's threads-per-block.
         num_stages: software pipelining depth, forwarded to ``triton.compile``.
             Defaults to Triton's own choice.
+        pointer_alignment: byte alignment the kernel may assume for each named
+            pointer, as resolved by :func:`triton_op`. Each alignment above 1
+            becomes Triton's divisibility hint, capped at 16 like Triton's own
+            launcher.
+        arch: the compute capability whose instructions Triton uses, for
+            example 80 for ``mma.sync``. Defaults to the device's. The PTX still
+            targets the device.
 
     Returns:
         An immutable artifact containing unmodified PTX, the entry symbol,
@@ -627,20 +667,28 @@ def compile_triton_to_ptx(
             "triton_op requires an NVIDIA CUDA target with 32-thread warps."
         )
 
-    # Bind compilation to the recorded device, including when an environment
-    # override would otherwise select a different architecture.
-    options: Dict[str, Any] = {"arch": f"sm{target.arch}"}
+    # arch picks the instructions; without it compilation is bound to the recorded
+    # device, including when an environment override would select another one.
+    options: Dict[str, Any] = {"arch": f"sm{arch or target.arch}"}
     if num_warps is not None:
         options["num_warps"] = num_warps
     if num_stages is not None:
         options["num_stages"] = num_stages
 
     compiled = _compile_within_driver_isa(
-        triton, kernel, signature, constexprs, options, target
+        triton,
+        kernel,
+        signature,
+        constexprs,
+        options,
+        target,
+        pointer_alignment or {},
     )
     # Read back from metadata rather than trusting the request: Triton clamps
     # num_warps to what the kernel can actually use.
-    kernel_name, compiled_warps, shared_mem = _validate_launch_metadata(compiled)
+    kernel_name, compiled_warps, shared_mem = _validate_launch_metadata(
+        compiled, target.arch
+    )
 
     # Embedded exactly as Triton emitted it. TensorRT sizes the kernel argument
     # buffer from the kernel's own declared ABI and pads the slots it wasn't

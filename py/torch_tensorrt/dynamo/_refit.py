@@ -303,14 +303,21 @@ def refit_module_weights(
         new_gm, settings.torch_executed_ops, settings.torch_executed_modules
     )
 
+    # Matches compile, which builds an engine for a fully supported graph however
+    # small it is under require_full_compilation.
     if num_supported_ops == 0 or (
-        num_supported_ops < settings.min_block_size and not settings.dryrun
+        num_supported_ops < settings.min_block_size
+        and not settings.dryrun
+        and not (settings.require_full_compilation and num_supported_ops == total_ops)
     ):
-        logger.warning(
-            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
-            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
+        # The compiled module has engines (its settings came from one), and returning
+        # the graph here would leave them with their old weights.
+        raise AssertionError(
+            "New weights module is not compatible with previously compiled "
+            f"Torch-TensorRT module: only {num_supported_ops} of its {total_ops} "
+            "operations can run in TensorRT now, so its engines cannot be "
+            "refitted. Compile it again."
         )
-        return new_gm
     else:
         logger.debug(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."

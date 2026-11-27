@@ -4,8 +4,10 @@
 # mypy: disallow-untyped-decorators=False
 
 import functools
+import importlib.util
 import logging
 import operator
+import weakref
 from typing import (
     Any,
     Callable,
@@ -14,6 +16,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Union,
     cast,
@@ -21,6 +24,7 @@ from typing import (
 
 import numpy as np
 import torch
+from packaging.version import Version
 from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.node import Argument, Node, Target
@@ -30,6 +34,7 @@ from torch_tensorrt._utils import (
     is_tensorrt_version_supported,
     trt_rtx_targets_turing,
 )
+from torch_tensorrt.dynamo._defaults import GROUPED_MM_DENSE_MAX_MACS
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -5279,6 +5284,211 @@ def aten_ops_histc(
     )
 
 
+def grouped_mm_kernel_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    if settings is None or not settings.grouped_mm_kernel:
+        return False
+    if not _grouped_mm_kernel_takes(node):
+        _LOGGER.debug(
+            "%s: the grouped GEMM kernel does not take this aten._grouped_mm; its "
+            "conditions are in the grouped_mm_kernel setting's docs",
+            node.name,
+        )
+        return False
+    reason = (
+        _grouped_mm_kernel_blocked(settings)
+        or _grouped_mm_kernel_unavailable()
+        or _grouped_mm_kernel_build_failure(node, settings)
+    )
+    if reason is None:
+        return True
+    _warn_grouped_mm_kernel_unused(settings, reason)
+    return False
+
+
+def _grouped_mm_kernel_takes(node: Node) -> bool:
+    """The (rows, K) x (groups, K, N) form in bfloat16 or float16 with int32 offsets.
+
+    Only the number of rows may be dynamic: K, N and the number of groups are compiled
+    into the kernel.
+    """
+    if _arg_or_kwarg(node.args, node.kwargs, 3, "bias") is not None:
+        return False
+    offs = _arg_or_kwarg(node.args, node.kwargs, 2, "offs")
+    if not isinstance(offs, Node):
+        return False
+    mat1, mat2, offs = (arg.meta.get("val") for arg in (*node.args[:2], offs))
+    if not all(isinstance(val, torch.Tensor) for val in (mat1, mat2, offs)):
+        return False
+    if (
+        mat1.dtype not in (torch.bfloat16, torch.float16)
+        or mat2.dtype != mat1.dtype
+        or offs.dtype != torch.int32
+        or _arg_or_kwarg(node.args, node.kwargs, 4, "out_dtype")
+        not in (None, mat1.dtype)
+    ):
+        return False
+    if mat1.dim() != 2 or mat2.dim() != 3:
+        return False
+    if not all(isinstance(dim, int) for dim in (mat1.shape[1], *mat2.shape)):
+        return False
+    # Rows that start 16-byte aligned let every load be 16 bytes wide. PyTorch's
+    # aten._grouped_mm requires the same of its matrices' strides.
+    if mat2.shape[1] % 8 or mat2.shape[2] % 8:
+        return False
+    # The launch grid would be empty.
+    if mat2.shape[2] == 0:
+        return False
+    # With one group the dense lowering does no extra work, so leave the op to it,
+    # unless the row count is dynamic, which the dense lowering does not handle.
+    return bool(mat2.shape[0] != 1 or not isinstance(mat1.shape[0], int))
+
+
+def _grouped_mm_kernel_blocked(
+    settings: Optional[CompilationSettings],
+) -> Optional[str]:
+    """Why these settings rule the kernel out, or None.
+
+    Its PTX targets the GPU and the CUDA driver of the machine that builds the engine.
+    """
+    if settings is None:
+        return None
+    if settings.hardware_compatible:
+        return "hardware_compatible is set, and the kernel runs only on the GPU it is built for"
+    if settings.enable_cross_compile_for_windows:
+        return "the engine is cross-compiled for Windows"
+    return None
+
+
+def _grouped_mm_kernel_unsupported() -> Optional[str]:
+    """Why this machine rules the kernel out, or None.
+
+    Starts neither Triton's driver nor a kernel compile, so the dense converter's
+    warning can use it too.
+    """
+    if not ENABLED_FEATURES.qdp_plugin:
+        return "TensorRT plugins (tensorrt.plugin) are not available"
+    if not torch.cuda.is_available():
+        return "it needs a CUDA GPU"
+    # Triton compiles for the current GPU, which is also the one TensorRT builds on.
+    capability = torch.cuda.get_device_capability()
+    if capability < (8, 0):
+        return "it needs a GPU with compute capability 8.0 or newer"
+    from torch_tensorrt.kernels import _triton
+
+    try:
+        triton = _triton._triton_import()
+    except ImportError as exc:
+        return f"Triton cannot build it ({exc})"
+    # The ptxas that Triton 3.5 and 3.6 ship cannot build code for sm_110.
+    if capability == (11, 0) and Version(triton.__version__) < Version("3.7"):
+        return f"on sm_110 it needs Triton 3.7 or newer; found {triton.__version__}"
+    if importlib.util.find_spec("cuda") is None:
+        return "it needs cuda-python, to read the highest PTX version the CUDA driver loads"
+    return None
+
+
+def _grouped_mm_kernel_unavailable() -> Optional[str]:
+    """Why the kernel cannot be built here, or None."""
+    reason = _grouped_mm_kernel_unsupported()
+    if reason is not None:
+        return reason
+    from torch_tensorrt.kernels import _triton
+
+    try:
+        _triton._triton_import().runtime.driver.active.get_current_target()
+    except Exception as exc:
+        return f"Triton cannot build it ({exc})"
+    if _triton._driver_max_ptx_version() is None:
+        return (
+            "the highest PTX version the CUDA driver loads could not be read, so "
+            "the engine might not load. Reading it needs cuda-python; the debug log "
+            "has the error"
+        )
+    return None
+
+
+def _grouped_mm_kernel_build_failure(
+    node: Node, settings: CompilationSettings
+) -> Optional[str]:
+    """Why the kernel does not build for this op, or None.
+
+    Compiles it now, while the op can still fall back, rather than during the build.
+    """
+    from torch_tensorrt.dynamo.conversion.impl import _grouped_mm_kernel
+
+    mat1, mat2 = (arg.meta["val"] for arg in node.args[:2])
+    pointer = "*bf16" if mat1.dtype == torch.bfloat16 else "*fp16"
+    kernel = (pointer, *mat2.shape)
+    failed: Dict[Tuple[Any, ...], str] = _per_compile(
+        _grouped_mm_kernel_failed, settings, dict
+    )
+    if kernel not in failed:
+        try:
+            _grouped_mm_kernel._compile(*kernel)
+        except Exception as exc:
+            failed[kernel] = str(exc)
+    return failed.get(kernel)
+
+
+def _per_compile(
+    store: Dict[int, Any], settings: CompilationSettings, empty: Callable[[], Any]
+) -> Any:
+    """The entry for this compile in store, created by empty.
+
+    A compile keeps one settings object, which is not hashable.
+    """
+    if id(settings) not in store:
+        store[id(settings)] = empty()
+        weakref.finalize(settings, store.pop, id(settings), None)
+    return store[id(settings)]
+
+
+# The registry runs validators on every lookup, so each compile tries a kernel that
+# does not build once and warns once per reason. The next compile tries again, in
+# case the failure was temporary, such as a full disk.
+_grouped_mm_kernel_failed: Dict[int, Dict[Tuple[Any, ...], str]] = {}
+_grouped_mm_kernel_warned: Dict[int, Set[str]] = {}
+
+
+def _warn_grouped_mm_kernel_unused(settings: CompilationSettings, reason: str) -> None:
+    warned = _per_compile(_grouped_mm_kernel_warned, settings, set)
+    if reason in warned:
+        return
+    warned.add(reason)
+    _LOGGER.warning(
+        "grouped_mm_kernel is set, but the grouped GEMM kernel is not used because %s. "
+        "aten._grouped_mm follows the dense lowering's rules instead.",
+        reason,
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._grouped_mm.default,
+    capability_validator=grouped_mm_kernel_validator,
+    priority=ConverterPriority.HIGH,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,)})
+def aten_ops_grouped_mm_kernel(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.moe.grouped_mm_kernel(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        _arg_or_kwarg(args, kwargs, 2, "offs"),
+    )
+
+
 def grouped_mm_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -5293,12 +5503,84 @@ def grouped_mm_validator(
         val = arg.meta.get("val")
         if val is None:
             return False
-        try:
-            shapes.append(tuple(int(d) for d in val.shape))
-        except (TypeError, ValueError):  # SymInt
+        # int() of a SymInt would pin it to the example size for the whole graph.
+        if any(isinstance(d, torch.SymInt) for d in val.shape):
+            _warn_grouped_mm_left_to_pytorch(
+                node,
+                "the dense lowering needs static shapes",
+                "",
+                _grouped_mm_kernel_hint(node, settings),
+            )
             return False
+        shapes.append(tuple(int(d) for d in val.shape))
     # Only the (rows, K) x (experts, K, N) form.
-    return len(shapes[0]) == 2 and len(shapes[1]) == 3
+    if len(shapes[0]) != 2 or len(shapes[1]) != 3:
+        return False
+    (rows, k), (experts, _, n) = shapes
+    # impl.moe.grouped_mm multiplies every row by every group's weight, so one group wastes nothing.
+    if experts == 1:
+        return True
+    # A slow engine still beats failing a compile that must run fully in TensorRT.
+    if settings is not None and settings.require_full_compilation:
+        return True
+    max_macs = (
+        settings.grouped_mm_dense_max_macs
+        if settings is not None
+        else GROUPED_MM_DENSE_MAX_MACS
+    )
+    if max_macs is not None and experts * rows * k * n > max_macs:
+        _warn_grouped_mm_left_to_pytorch(
+            node,
+            f"the dense lowering would multiply all {rows} rows (K={k}, N={n}) by all "
+            f"{experts} groups, {experts * rows * k * n} multiply-adds, above "
+            f"grouped_mm_dense_max_macs={max_macs}",
+            " Set grouped_mm_dense_max_macs=None to keep it in TensorRT.",
+            _grouped_mm_kernel_hint(node, settings),
+        )
+        return False
+    return True
+
+
+def _grouped_mm_kernel_hint(
+    node: Node, settings: Optional[CompilationSettings]
+) -> bool:
+    """Whether grouped_mm_kernel is unset and would likely take this op.
+
+    Skips the checks that start Triton's driver or compile the kernel, so a compile
+    without the kernel never pays for them.
+    """
+    return (
+        (settings is None or not settings.grouped_mm_kernel)
+        and _grouped_mm_kernel_takes(node)
+        and _grouped_mm_kernel_blocked(settings) is None
+        and _grouped_mm_kernel_unsupported() is None
+    )
+
+
+# The registry runs a validator more than once per node, so warn once per node. Each
+# compile has its own graph, so each compile warns again.
+_grouped_mm_left_to_pytorch_warned: "weakref.WeakSet[Node]" = weakref.WeakSet()
+
+
+def _warn_grouped_mm_left_to_pytorch(
+    node: Node, reason: str, advice: str, kernel_hint: bool
+) -> None:
+    if node in _grouped_mm_left_to_pytorch_warned:
+        return
+    _grouped_mm_left_to_pytorch_warned.add(node)
+    _LOGGER.warning(
+        "%s: not converting aten._grouped_mm: %s.%s%s",
+        node.name,
+        reason,
+        advice,
+        (
+            " grouped_mm_kernel=True would likely run it in TensorRT with the grouped "
+            "GEMM kernel, which computes only each row's own group and takes a dynamic "
+            "row count."
+            if kernel_hint
+            else ""
+        ),
+    )
 
 
 @dynamo_tensorrt_converter(

@@ -202,6 +202,19 @@ there, where PyTorch raises.
         fallback_pytorch_plugin_ops=True,
     )
 
+Mixture-of-experts layers
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+With ``grouped_mm_dense_max_macs`` set, large mixture-of-experts layers that the grouped GEMM
+kernel does not take (see ``grouped_mm_kernel``) leave ``aten._grouped_mm`` to PyTorch when its
+TensorRT lowering would do more than that many multiply-adds (see the compilation settings). In a
+``.pte`` the op then needs a partitioner that takes it, such as ExecuTorch's CUDA partitioner
+(which cannot lower it on sm_80 GPUs such as A100 yet, see pytorch/executorch#24902).
+Without one, saving stops with ``Missing out variants: {'aten::_grouped_mm'}``. Leave
+``grouped_mm_dense_max_macs`` at ``None`` to keep it in the TensorRT engine instead, or, for bfloat16
+and float16, set ``grouped_mm_kernel=True``, whose engine needs a CUDA driver at least as new as
+the build machine's. An op with a dynamic row count stays out of the engine unless the kernel takes it.
+
 Keep inputs and outputs on the GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

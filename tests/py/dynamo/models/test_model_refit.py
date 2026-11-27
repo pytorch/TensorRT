@@ -277,6 +277,31 @@ def test_batch_norm_refit_one_engine_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
+def test_refit_full_compilation_below_min_block_size():
+    # require_full_compilation builds this one-op graph into an engine although
+    # min_block_size is larger, so refit has to update that engine. Resource
+    # partitioning keeps the engine in a submodule, which in-place refit needs.
+    model = nn.Linear(8, 8).eval().to("cuda")
+    model2 = nn.Linear(8, 8).eval().to("cuda")
+    inputs = [torch.randn((2, 8)).to("cuda")]
+    trt_gm = torchtrt.dynamo.compile(
+        torch.export.export(model, tuple(inputs)),
+        tuple(inputs),
+        require_full_compilation=True,
+        enable_resource_partitioning=True,
+        immutable_weights=False,
+    )
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+    refit_module_weights(trt_gm, exp_program2, in_place=True)
+    torch.testing.assert_close(trt_gm(*inputs), model2(*inputs), rtol=1e-2, atol=1e-2)
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
 def test_batch_norm_refit_fp16_input_fp32_weights():
     # The new weights fold to a scale above the float16 range, unlike the weights
     # the engine was built with.
