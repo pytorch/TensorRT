@@ -5,7 +5,7 @@ import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt
-from parameterized import parameterized
+from parameterized import param, parameterized
 from torch.testing._internal.common_cuda import PLATFORM_SUPPORTS_CUDNN_ATTENTION
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -570,12 +570,30 @@ class TestScaledDotProductAttention(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("bfloat16", torch.bfloat16, 60000, False, False),
-            ("float32_cast_from_float16", torch.float16, 1024, True, False),
-            ("dynamic_key", torch.float16, 2048, False, True),
+            param("bfloat16", dtype=torch.bfloat16, key_len=60000),
+            param(
+                "bfloat16_hardware_compatible",
+                dtype=torch.bfloat16,
+                key_len=8192,
+                hardware_compatible=True,
+            ),
+            param("float16_hardware_compatible", hardware_compatible=True),
+            param("head_size_not_a_multiple_of_8", head_size=100),
+            param("float32_cast_from_float16", cast="sdpa"),
+            param("float32_efficient_cast_from_float16", cast="efficient"),
+            param("dynamic_key", key_len=2048, dynamic=True),
         ]
     )
-    def test_single_query_mask_compiled(self, _, dtype, key_len, cast, dynamic):
+    def test_single_query_mask_compiled(
+        self,
+        _,
+        dtype=torch.float16,
+        key_len=1024,
+        head_size=64,
+        cast=None,
+        dynamic=False,
+        hardware_compatible=False,
+    ):
         if dtype == torch.bfloat16:
             skip_if_trt_rtx_turing(self, "bfloat16")
 
@@ -583,19 +601,29 @@ class TestScaledDotProductAttention(DispatchTestCase):
         class Attention(nn.Module):
             def forward(self, query, key, value, mask):
                 if cast:
-                    # TensorRT folds these casts and runs the attention layer in FP16.
+                    # TensorRT would fold these casts and run the attention layer in FP16, so the pass decomposes
+                    # it in FP32.
                     query, key, value = (t.float() for t in (query, key, value))
-                    return torch.ops.aten.scaled_dot_product_attention.default(
-                        query, key, value, mask, scale=0.125
-                    ).half()
+                    if cast == "efficient":
+                        efficient = (
+                            torch.ops.aten._scaled_dot_product_efficient_attention
+                        )
+                        attention = efficient.default(
+                            query, key, value, None, False, 0.0, True, scale=0.125
+                        )[0]
+                    else:
+                        attention = torch.ops.aten.scaled_dot_product_attention.default(
+                            query, key, value, mask, scale=0.125
+                        )
+                    return attention.half()
                 return torch.ops.aten.scaled_dot_product_attention.default(
-                    query, key, value, mask, enable_gqa=True
+                    query, key, value, mask, scale=0.3, enable_gqa=True
                 )
 
         kv_heads = 8 if cast else 2
-        query = torch.randn(1, 8, 1, 64, dtype=dtype, device="cuda")
+        query = torch.randn(1, 8, 1, head_size, dtype=dtype, device="cuda")
         key, value = (
-            torch.randn(1, kv_heads, key_len, 64, dtype=dtype, device="cuda")
+            torch.randn(1, kv_heads, key_len, head_size, dtype=dtype, device="cuda")
             for _ in range(2)
         )
         value[:, :, 100:] = 4
@@ -609,6 +637,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             torch.export.export(Attention(), inputs, dynamic_shapes=dynamic_shapes),
             arg_inputs=inputs,
             min_block_size=1,
+            hardware_compatible=hardware_compatible,
         )
         torch.testing.assert_close(
             compiled(*inputs), Attention()(*inputs), rtol=1e-2, atol=1e-2

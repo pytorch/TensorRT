@@ -156,7 +156,6 @@ class TestDecomposeUnsupportedAttention(TestCase):
             gm = decompose_unsupported_attention(
                 gm, CompilationSettings(decompose_attention=False, **settings)
             )
-            # The rewritten graph still computes the same attention, head by head, in a dense output.
             out = gm(*inputs)
             torch.testing.assert_close(out, module()(*inputs))
             self.assertTrue(out.is_contiguous())
@@ -186,14 +185,28 @@ class TestDecomposeUnsupportedAttention(TestCase):
         # An op the rewrite adds that must run in PyTorch only splits the graph, so the rewrite stays.
         (repeated,) = targets(1, 8, torch_executed_ops={torch.ops.aten.cat.default})
         self.assertEqual(repeated.args[0].meta["val"].shape, (1, 8, 2, 8))
-        # The longest key TensorRT masks is 512 in FP16 and is taken as 32768 in BF16.
-        for dtype, key_len in ((torch.float16, 513), (torch.bfloat16, 32769)):
-            (repeated,) = targets(1, 8, key_len=key_len, dtype=dtype)
+        # The longest key TensorRT masks is 512 in FP16 and is taken as 32768 in BF16, or 4096 with
+        # hardware_compatible.
+        for dtype, key_len, hardware_compatible in (
+            (torch.float16, 513, False),
+            (torch.float16, 513, True),
+            (torch.bfloat16, 32769, False),
+            (torch.bfloat16, 4097, True),
+        ):
+            (repeated,) = targets(
+                1,
+                8,
+                key_len=key_len,
+                dtype=dtype,
+                hardware_compatible=hardware_compatible,
+            )
             self.assertEqual(repeated.args[0].meta["val"].shape, (1, 8, 2, 8))
         # A key short enough for TensorRT to mask is left alone.
         for kept in (
             targets(1, 8, key_len=512),
+            targets(1, 8, key_len=512, hardware_compatible=True),
             targets(1, 8, key_len=32768, dtype=torch.bfloat16),
+            targets(1, 8, key_len=4096, dtype=torch.bfloat16, hardware_compatible=True),
             # So are several query rows, or a query length that is not fixed. Export needs a length other than 1
             # to keep it dynamic.
             targets(2, 8),
