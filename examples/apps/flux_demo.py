@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 
 import gradio as gr
 import torch
@@ -148,7 +149,10 @@ def compile_model(
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("/tmp/forest.png")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image[0].save(output)
+    print(f"Saved image to {output.resolve()}")
 
     torch.cuda.empty_cache()
 
@@ -264,6 +268,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
     )
+    parser.add_argument("--output", type=Path, default=Path("forest.png"))
     parser.add_argument(
         "--model",
         default="black-forest-labs/FLUX.1-dev",
