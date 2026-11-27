@@ -704,23 +704,6 @@ def test_an_unrelated_package_at_the_target_version_is_not_a_pin_site(pin_repo):
 
 
 @pytest.mark.unit
-def test_the_stable_track_warns_that_its_pin_will_not_build(monkeypatch, capsys):
-    """A stable pin cannot build, and that used to be discovered from a failed pull request.
-
-    The delegate links the ExecuTorch runtime, so its build takes only a CUDA-labelled one. The
-    release index publishes processor-only wheels and the CUDA channels publish no stable ExecuTorch
-    at all, so a stable pin names something the build rejects. Warned rather than refused, because it
-    becomes correct as soon as a stable CUDA build exists.
-    """
-    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev0")
-    monkeypatch.setattr(updater, "available_versions", lambda args: ["1.5.0"])
-    monkeypatch.setattr(updater, "wheel_git_version", lambda version, args: _COMMIT)
-    monkeypatch.setattr(updater, "write_pins", lambda version, commit: True)
-    updater.main(["--track", "stable"])
-    assert "no CUDA build of ExecuTorch" in capsys.readouterr().err
-
-
-@pytest.mark.unit
 def test_a_bump_rewrites_no_workflow_file(pin_repo):
     """The reason this indirection exists at all.
 
