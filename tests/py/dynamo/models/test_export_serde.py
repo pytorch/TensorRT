@@ -636,6 +636,10 @@ def test_arange_export(ir, tmpdir):
 
 
 @pytest.mark.unit
+@pytest.mark.skipif(
+    not hasattr(torch.jit, "trace"),
+    reason="needs a PyTorch build with TorchScript (torch.jit.trace)",
+)
 def test_save_load_ts(ir, tmp_path):
     """
     This tests save/load API on Torchscript format (model still compiled using dynamo workflow)

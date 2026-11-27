@@ -787,8 +787,10 @@ class TestDecomposeUnsupportedAttention(TestCase):
         self.assertEqual(sum(n.target == sdpa for n in gm.graph.nodes), 2)
 
     @unittest.skipIf(
-        importlib.util.find_spec("modelopt") is None or platform.system() != "Linux",
-        "needs NVIDIA Model Optimizer's quantize op, which is only supported on Linux",
+        importlib.util.find_spec("modelopt") is None
+        or not hasattr(torch.jit, "script")
+        or platform.system() != "Linux",
+        "needs NVIDIA Model Optimizer's quantize op (Linux only, needs torch.jit.script)",
     )
     def test_attention_whose_output_is_quantized_to_fp8_is_decomposed(self):
         import modelopt.torch.quantization  # noqa: F401  # registers tensorrt.quantize_op
@@ -864,8 +866,9 @@ class TestDecomposeUnsupportedAttention(TestCase):
         not torch.cuda.is_available()
         or torch.cuda.get_device_capability() < (8, 9)
         or importlib.util.find_spec("modelopt") is None
+        or not hasattr(torch.jit, "script")
         or platform.system() != "Linux",
-        "needs an FP8 GPU and NVIDIA Model Optimizer's quantize op (Linux only)",
+        "needs an FP8 GPU and NVIDIA Model Optimizer's quantize op (Linux only, needs torch.jit.script)",
     )
     def test_attention_whose_output_is_quantized_to_fp8_builds(self):
         # TensorRT 11.4 failed to build this before the attention was decomposed.

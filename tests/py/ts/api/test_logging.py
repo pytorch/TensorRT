@@ -3,6 +3,7 @@
 
 import unittest
 
+import pytest
 import torch_tensorrt as torchtrt
 
 
@@ -10,6 +11,7 @@ import torch_tensorrt as torchtrt
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
 )
+@pytest.mark.runs_without_torchscript
 class TestLoggingAPIs(unittest.TestCase):
     def test_logging_prefix(self):
         new_prefix = "Python API Test: "
