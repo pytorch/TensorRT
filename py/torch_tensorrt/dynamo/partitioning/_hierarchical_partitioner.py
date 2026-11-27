@@ -32,6 +32,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import makes_uint8_tensor
+from torch_tensorrt.dynamo.partitioning.common import refuse_sorts_split_from_keys
 
 logger = logging.getLogger(__name__)
 
@@ -273,10 +274,10 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
                         result.append(subgraph)
         return result
 
-    def partition_graph(self) -> torch.fx.GraphModule:
-        """Partitions the GraphModule into subgraphs based on backend priority
+    def propose_subgraphs(self) -> List[Subgraph]:
+        """Groups the nodes of the GraphModule into subgraphs based on backend priority
 
-        Returns a GraphModule with submodules for each segment
+        Returns the subgraphs, in order, each with its backend
         """
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
@@ -311,10 +312,7 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
 
         # Set the number of accelerated subgraphs to be generated
         self.num_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
-
-        # Tag the accelerated nodes and split the graph accordingly
-        self.tag(subgraphs)
-        return self.split()
+        return subgraphs
 
     def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
         """Generates starter nodes for partitioning + segmentation"""
@@ -618,23 +616,32 @@ def hierarchical_adjacency_partition(
     if backend_priority is None:
         backend_priority = [TRT_BACKEND_NAME, "inductor"]
 
-    # Construct BackendOpSupportTester
-    supported_ops = BackendOpSupportTester(
-        backend_support_map=backend_support_map,
-        backend_priority=backend_priority,
-        torch_executed_ops=torch_executed_ops,
-    )
-    partitioner = HierarchicalAdjacencyPartitioner(
-        gm,
-        supported_ops,
-        backend_support_map=backend_support_map,
-        backend_priority=backend_priority,
-        min_block_size=min_block_size,
-        require_full_compilation=require_full_compilation,
-        skip_fusion=skip_fusion,
-    )
+    while True:
+        supported_ops = BackendOpSupportTester(
+            backend_support_map=backend_support_map,
+            backend_priority=backend_priority,
+            torch_executed_ops=torch_executed_ops,
+        )
+        partitioner = HierarchicalAdjacencyPartitioner(
+            gm,
+            supported_ops,
+            backend_support_map=backend_support_map,
+            backend_priority=backend_priority,
+            min_block_size=min_block_size,
+            require_full_compilation=require_full_compilation,
+            skip_fusion=skip_fusion,
+        )
+        subgraphs = partitioner.propose_subgraphs()
+        if not refuse_sorts_split_from_keys(
+            set(s.nodes)
+            for s in subgraphs
+            if s.is_acc and s.backend == TRT_BACKEND_NAME
+        ):
+            break
 
-    partitioned_graph = partitioner.partition_graph()
+    # Tag the accelerated nodes and split the graph accordingly
+    partitioner.tag(subgraphs)
+    partitioned_graph = partitioner.split()
 
     supported_ops.print_support_overview(partitioner.num_accelerated_subgraphs)
 

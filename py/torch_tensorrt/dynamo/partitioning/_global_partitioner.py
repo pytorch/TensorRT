@@ -29,6 +29,7 @@ from torch_tensorrt.dynamo.partitioning.common import (
     get_node_module_types,
     node_in_torch_executed_module,
     recompute_input_only_nodes,
+    refuse_sorts_split_from_keys,
 )
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
@@ -521,20 +522,24 @@ def partition(
                 f"{unmatched}. Ensure the module names are fully-qualified class names."
             )
 
-    supported_ops = TorchTensorRTOperatorSupport(
-        torch_executed_ops=torch_executed_ops,
-        torch_executed_modules=torch_executed_modules,
-    )
-    partitioner = TRTPartitioner(
-        gm,
-        supported_ops,
-        min_block_size=min_block_size,
-        require_full_compilation=require_full_compilation,
-    )
-
     # Determine partitions based on user specifications and operator support
     # Then, fuse partitions and display overview of supported/unsupported operators
-    partitions = partitioner.propose_partitions()
+    while True:
+        supported_ops = TorchTensorRTOperatorSupport(
+            torch_executed_ops=torch_executed_ops,
+            torch_executed_modules=torch_executed_modules,
+        )
+        partitioner = TRTPartitioner(
+            gm,
+            supported_ops,
+            min_block_size=min_block_size,
+            require_full_compilation=require_full_compilation,
+        )
+        partitions = partitioner.propose_partitions()
+        if not refuse_sorts_split_from_keys(p.nodes for p in partitions):
+            break
+        # It holds the dependents of every node, so free it before building the next one.
+        del partitioner
     fused_graph = partitioner.fuse_partitions(partitions, prefix="_run_on_acc_")
     supported_ops.print_support_overview(len(partitions))
 

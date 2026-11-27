@@ -30,6 +30,7 @@ from torch_tensorrt._utils import (
     is_tensorrt_version_supported,
     trt_rtx_targets_turing,
 )
+from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -5228,6 +5229,176 @@ def aten_ops_sort(
         args[0],
         dim=args_bounds_check(args, 1, -1),
         descending=args_bounds_check(args, 2, False),
+    )
+
+
+# Each count holds about 5.5 bytes of device memory for the life of the engine, on top of its
+# other activations, and a dynamic length counts at its upper bound. This cap keeps the sort's
+# own tensors under about 6 MiB, which a small device can afford in every mixture-of-experts
+# layer. With a dynamic length, the engine that takes in the sort can also plan more memory for
+# the ops around it, which grows with the length and their sizes, not with the counts. The cap
+# also allows at most 2**13 key values (one tile), well below the 2**15 where the cumulative
+# sums over them make even one tile as slow as a sort in PyTorch.
+_MAX_SORT_COUNTS = 2**20
+# Measured on A100 in a routing layer, a converted sort of up to this many elements saves 0.16
+# to 0.5 ms per layer. From 2**15 elements it can be slower than a sort in PyTorch with the
+# engine split, because TensorRT then fuses the gathers that read the order less well.
+_MAX_SORT_LENGTH = 2**14
+
+
+def _key_chain_converts(node: Node) -> bool:
+    """Whether every op from the keys of ``node`` back to the topk, argmax or argmin that makes
+    them has a converter, asked of the converter registry, which holds the settings of the
+    current compile. Whether partitioning puts them in the engine of the sort is checked later,
+    by refuse_sorts_split_from_keys.
+    """
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
+    from torch_tensorrt.dynamo.lowering.passes.annotate_sort_num_keys import key_chain
+
+    chain = key_chain(node.args[0])
+    return chain is not None and all(n in DYNAMO_CONVERTERS for n in chain)
+
+
+def sort_stable_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """A stable sort of integer positions in one row, such as expert ids in mixture-of-experts routing.
+
+    The converter counts keys, so it needs the number of key values, which the
+    annotate_sort_num_keys lowering pass records when it can prove it. It holds one count per
+    key value for every element of the sorted dim, padded to whole tiles. A dynamic length needs
+    an upper bound: for an nn.Module the max_shape of its Input gives one, and an
+    ExportedProgram needs a bounded dim such as torch.export.Dim(max=...).
+    """
+    # The converter has not been tested on TensorRT-RTX.
+    if ENABLED_FEATURES.tensorrt_rtx:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} is not converted on TensorRT-RTX; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    # Before 10.8 each cumulative sum in the converter is a loop over the summed dim.
+    if not is_tensorrt_version_supported("10.8.0"):
+        _LOGGER.debug(
+            f"[sort.stable validator] Converting {node.name} needs TensorRT 10.8 or newer; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    data = node.args[0].meta.get("val")
+    if (
+        not isinstance(data, torch.Tensor)
+        or data.dim() == 0
+        or data.dtype not in (torch.int32, torch.int64)
+    ):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} does not sort int32 or int64 keys of rank 1 "
+            "or more; aten.sort.stable will run in PyTorch."
+        )
+        return False
+    dim = get_positive_dim(node.kwargs.get("dim", -1), data.dim())
+    # The converter flattens its input into one row, so it cannot sort more than one.
+    if not all(
+        statically_known_true(size == 1)
+        for d, size in enumerate(data.shape)
+        if d != dim
+    ):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort more than one row, and the "
+            "converter sorts a single row; aten.sort.stable will run in PyTorch."
+        )
+        return False
+    num_keys = node.meta.get(NUM_SORT_KEYS)
+    if num_keys is None:
+        _LOGGER.debug(
+            f"[sort.stable validator] Cannot tell the range of the keys of {node.name}: "
+            "annotate_sort_num_keys recorded none (see its debug log). Only positions along a "
+            "dim of known size, such as topk indices, are supported; aten.sort.stable will run "
+            "in PyTorch."
+        )
+        return False
+    # The range holds for the shapes the keys were made from at compile time. Keys made in
+    # PyTorch come from whatever the caller passes, so a wider input would give keys past the
+    # range. The partitioners send a sort to PyTorch when they do not put it in the engine that
+    # makes its keys.
+    if not _key_chain_converts(node):
+        _LOGGER.debug(
+            f"[sort.stable validator] Some op that makes the keys of {node.name} has no "
+            "converter, so their range is not known when it runs; aten.sort.stable will run "
+            "in PyTorch."
+        )
+        return False
+    # The resource partitioner splits engines after this check, and it can put the producer of
+    # the keys in another engine than the sort.
+    if settings is not None and settings.enable_resource_partitioning:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} is not converted with resource "
+            "partitioning, which can split it from its keys; aten.sort.stable will run in "
+            "PyTorch."
+        )
+        return False
+    # An empty row gives the converter zero-size tiles, which fail the engine build. A plain
+    # comparison raises when the length depends on the data; this never guards.
+    length = data.shape[dim]
+    if not statically_known_true(length > 0):
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort an empty row; "
+            "aten.sort.stable will run in PyTorch."
+        )
+        return False
+    # A dynamic length is judged at its upper bound, where the cost matters.
+    if not isinstance(length, int):
+        length = extract_var_range_info(length)["max"]
+        if length is None:
+            _LOGGER.debug(
+                f"[sort.stable validator] The length of {node.name} has no upper bound; "
+                "aten.sort.stable will run in PyTorch."
+            )
+            return False
+    tile = impl.topk._COUNTING_SORT_TILE
+    counts = -(-length // tile) * tile * num_keys
+    if counts > _MAX_SORT_COUNTS:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} needs more than {_MAX_SORT_COUNTS} counts, "
+            "where the sort would hold too much device memory; aten.sort.stable will run in "
+            "PyTorch."
+        )
+        return False
+    if length > _MAX_SORT_LENGTH:
+        _LOGGER.debug(
+            f"[sort.stable validator] {node.name} may sort more than {_MAX_SORT_LENGTH} "
+            "elements, where the sort can run slower than in PyTorch; aten.sort.stable will "
+            "run in PyTorch."
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sort.stable,
+    capability_validator=sort_stable_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_sort_stable(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.topk.counting_sort(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        dim=kwargs.get("dim", -1),
+        descending=kwargs.get("descending", False),
+        num_keys=ctx.current_node.meta[NUM_SORT_KEYS],
     )
 
 

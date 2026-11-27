@@ -8,6 +8,7 @@ from typing import (
     Any,
     Collection,
     Dict,
+    Iterable,
     List,
     Optional,
     Sequence,
@@ -21,6 +22,7 @@ from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.passes.splitter_base import Subgraph
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._meta_keys import NUM_SORT_KEYS
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
     contains_sym_int,
@@ -146,6 +148,36 @@ def node_in_torch_executed_module(
             )
             return True
     return False
+
+
+def refuse_sorts_split_from_keys(groups: Iterable[Collection[torch.fx.Node]]) -> bool:
+    """Make the validator refuse each stable sort that partitioning split from its keys.
+
+    ``groups`` are the nodes of each proposed TensorRT engine. The sort converter trusts the
+    range of the keys only when the op that makes them runs in the same engine (see
+    sort_stable_validator). Without the range the validator refuses the sort, so the caller
+    partitions again when this returns True.
+    """
+    # Imported here: the lowering passes import the converter registry, which imports this module.
+    from torch_tensorrt.dynamo.lowering.passes.annotate_sort_num_keys import key_chain
+
+    split = False
+    for group in groups:
+        for node in group:
+            if (
+                node.target != torch.ops.aten.sort.stable
+                or NUM_SORT_KEYS not in node.meta
+            ):
+                continue
+            chain = key_chain(node.args[0])
+            if chain is None or not all(n in group for n in chain):
+                del node.meta[NUM_SORT_KEYS]
+                logger.debug(
+                    f"Partitioning did not put {node.name} in the TensorRT engine that makes "
+                    "its keys, so aten.sort.stable will not be converted."
+                )
+                split = True
+    return split
 
 
 def _example_kwargs(example_tensors: bool, is_shape_tensor: bool) -> Dict[str, Any]:
@@ -667,6 +699,8 @@ def recompute_input_only_nodes(
                 and node.op == "call_function"
                 and not node.is_impure()  # random, in place, or an assert
                 and not str(node.target).startswith(COLLECTIVE_OP_PREFIXES)
+                # A copy of a converted sort could be cut off from the op that makes its keys.
+                and NUM_SORT_KEYS not in node.meta
                 and all(input_only[i] for i in node._input_nodes)
             )
 
