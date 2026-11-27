@@ -74,7 +74,7 @@ cc_library(
         ],
         allow_empty = True,
     ),
-    strip_include_prefix = "include",
+    includes = ["include"],
     deps = [
         ":c10",
     ],
@@ -92,7 +92,7 @@ cc_library(
         ],
         allow_empty = True,
     ),
-    strip_include_prefix = "include",
+    includes = ["include"],
 )
 
 cc_library(
@@ -103,7 +103,7 @@ cc_library(
         ],
         allow_empty = True,
     ),
-    strip_include_prefix = "include",
+    includes = ["include"],
 )
 
 cc_library(
@@ -125,5 +125,5 @@ cc_library(
         ],
         allow_empty = True,
     ),
-    strip_include_prefix = "include",
+    includes = ["include"],
 )

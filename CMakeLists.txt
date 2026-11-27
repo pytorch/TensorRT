@@ -24,6 +24,18 @@ if(MSVC)
   string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
   string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
+
+# Warnings for Torch-TensorRT's own sources, matching the Bazel build (see .bazelrc).
+# These are directory-scoped compile options, so they are not exported to consumers.
+# Torch, TensorRT and CUDA come in as imported targets, whose headers are system includes.
+option(TORCHTRT_WARNINGS_AS_ERRORS "Treat compiler warnings in Torch-TensorRT sources as errors" ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  # Deprecations stay warnings so a TensorRT or PyTorch release does not break the build.
+  add_compile_options(-Wall -Wextra -Wno-error=deprecated-declarations)
+  if(TORCHTRT_WARNINGS_AS_ERRORS)
+    add_compile_options(-Werror)
+  endif()
+endif()
 # -----------------------------------------
 #  compilation
 # -----------------------------------------
