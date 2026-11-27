@@ -71,11 +71,6 @@ class ConversionContext:
     constant_cache: dict[Hashable, tuple[weakref.ref[Any], TRTTensor]] = field(
         default_factory=dict
     )
-    # One transposed view per constant and rank (see
-    # converter_utils.get_transposed_trt_tensor).
-    transposed_constants: dict[tuple[TRTTensor, int], TRTTensor] = field(
-        default_factory=dict
-    )
     current_node: Optional[torch.fx.Node] = field(default=None)
     # The values of the nodes converted so far (see the in-place plugin converter).
     node_values: dict[torch.fx.Node, Any] = field(default_factory=dict)

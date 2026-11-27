@@ -378,13 +378,14 @@ Memory and Resource Management
    * - ``deduplicate_weights``
      - ``False``
      - Add a weight that several layers read to the TRT network once instead of once
-       per layer, and give the linear layers that share a weight one transposed copy
-       of it. This cuts engine-build host memory for models that reuse weights, such
-       as a denoising loop unrolled into one graph, most of all in FP32 builds with
-       ``disable_tf32=True`` and in refittable engines. TRT may pick other kernels, so
-       results can round differently, and some models need more memory instead, so
-       measure it. Under ``torch.compile`` the weights are engine inputs, not
-       constants, so they are not shared.
+       per layer. This can cut engine-build host memory for models that reuse weights.
+       For linear layers, TRT may still keep a copy of a weight for each layer that
+       reads it, so the build memory saving for linear weights can be lost, for example
+       in FP32 builds, in refittable engines, and with large weights. A refittable
+       engine file can still be much smaller than with the setting off. Some models
+       need more memory instead, so measure it. TRT may pick other kernels, so results
+       can round differently. Under ``torch.compile`` the weights are engine inputs,
+       not constants, so they are not shared.
 
 ----
 
