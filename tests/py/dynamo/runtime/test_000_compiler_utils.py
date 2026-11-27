@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import inspect
+import tempfile
 import unittest
 from unittest import mock
 
@@ -274,6 +276,21 @@ class TestDeallocateModule(unittest.TestCase):
         with mock.patch("torch.cuda.empty_cache") as empty_cache:
             deallocate_module(gm)
         empty_cache.assert_not_called()
+
+
+class TestDebuggerConfig(unittest.TestCase):
+    def test_compile_module_defaults_to_the_active_debugger_config(self):
+        def default():
+            signature = inspect.signature(
+                torch_tensorrt.dynamo._compiler.compile_module
+            )
+            return signature.parameters["_debugger_config"].default
+
+        with tempfile.TemporaryDirectory() as logging_dir:
+            debugger = torch_tensorrt.dynamo.Debugger(logging_dir=logging_dir)
+            with debugger:
+                self.assertIs(default(), debugger.cfg)
+            self.assertIsNone(default())
 
 
 if __name__ == "__main__":
