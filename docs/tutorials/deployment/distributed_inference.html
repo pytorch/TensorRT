@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -798,9 +798,7 @@ row-parallel layers.</p>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">ep</span><span class="p">,</span>
     <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">input_ids</span><span class="p">],</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">use_distributed_mode_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
@@ -1144,7 +1142,8 @@ plain attributes on an <code class="docutils literal notranslate"><span class="p
 <li><p><strong>torch.compile engines</strong> — engines inside dynamo’s code cache, tracked via
 a thread-local registry populated at engine creation time.</p></li>
 </ul>
-<p>For <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code> (<code class="docutils literal notranslate"><span class="pre">use_python_runtime=True</span></code>), the group is
+<p>When the automatically selected runtime produces a <code class="docutils literal notranslate"><span class="pre">PythonTorchTensorRTModule</span></code>,
+the group is
 read lazily from the active context on the first forward call, so
 <code class="docutils literal notranslate"><span class="pre">distributed_context</span></code> (without the <em>module</em> argument) is sufficient — keep the
 context manager active for the duration of inference.</p>
@@ -1169,6 +1168,41 @@ this point.</p>
 <hr class="docutils" />
 <section id="compilation-settings-for-distributed-workloads">
 <h2>Compilation Settings for Distributed Workloads<a class="headerlink" href="#compilation-settings-for-distributed-workloads" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 15.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Use <code class="docutils literal notranslate"><span class="pre">aot_autograd</span></code> for tracing instead of the default <code class="docutils literal notranslate"><span class="pre">torch._dynamo</span></code> path.
+<strong>Auto-enabled</strong> for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> when <code class="docutils literal notranslate"><span class="pre">dist.is_initialized()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">world_size</span> <span class="pre">&gt;</span> <span class="pre">1</span></code> — no explicit flag needed. Must be set manually when using
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code> directly (e.g. AOT export workflows).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">assume_dynamic_shape_support</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Set to <code class="docutils literal notranslate"><span class="pre">True</span></code> for dynamic sequence lengths in LLM generation loops.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">use_fp32_acc</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Use FP32 accumulation for FP16 matmul layers. With
+<code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>, keep the complete decomposed FP16 attention
+calculation in FP32 and cast only its final output back to FP16.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The Dynamo path is always strongly typed: set precision through model/input dtypes
+(for example, <code class="docutils literal notranslate"><span class="pre">model.half()</span></code>) or autocast. Runtime selection is automatic.</p>
 </section>
 <hr class="docutils" />
 <section id="launching-distributed-scripts">

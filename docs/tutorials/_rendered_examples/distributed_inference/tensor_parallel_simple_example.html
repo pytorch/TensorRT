@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -621,11 +621,8 @@ document.write(`
 <p>This example demonstrates: - Setting up distributed environment for tensor parallelism - Model sharding across multiple GPUs - Compilation with Torch-TensorRT - Distributed inference execution</p>
 <section id="Usage">
 <h2>Usage<a class="headerlink" href="#Usage" title="Link to this heading">#</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># JIT mode python runtime</span>
-mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>jit_cpp
-
-<span class="c1"># JIT mode cpp runtime</span>
-mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>jit_python
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># JIT mode</span>
+mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span>jit
 
 WIP:<span class="w"> </span>Export<span class="w"> </span>and<span class="w"> </span>load<span class="w"> </span>mode
 <span class="w"> </span>mpirun<span class="w"> </span>-n<span class="w"> </span><span class="m">2</span><span class="w"> </span>python<span class="w"> </span>tensor_parallel_simple_example.py<span class="w"> </span>--mode<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--save-path<span class="w"> </span>/tmp/tp_model.ep
@@ -656,8 +653,8 @@ parser = argparse.ArgumentParser(description="Tensor Parallel Simple Example")
 parser.add_argument(
     "--mode",
     type=str,
-    choices=["jit_python", "jit_cpp", "export", "load"],
-    default="jit_python",
+    choices=["jit", "export", "load"],
+    default="jit",
 )
 parser.add_argument("--save-path", type=str, default="/tmp/tp_model.ep")
 args = parser.parse_args()
@@ -733,29 +730,12 @@ if args.mode == "load":
     assert (python_result - output).std() &lt; 0.01, "Result mismatch"
     logger.info("Load successful!")
 
-elif args.mode == "jit_python":
+elif args.mode == "jit":
     trt_model = torch.compile(
         tp_model,
         backend="torch_tensorrt",
         options={
-            "truncate_long_and_double": True,
-            "use_python_runtime": True,
-            "min_block_size": 1,
-        },
-    )
-    output = trt_model(inp)
-    dist.barrier()
-
-    assert (python_result - output).std() &lt; 0.01, "Result mismatch"
-    logger.info("JIT compile successful!")
-
-elif args.mode == "jit_cpp":
-    trt_model = torch.compile(
-        tp_model,
-        backend="torch_tensorrt",
-        options={
-            "truncate_long_and_double": True,
-            "use_python_runtime": False,
+            "truncate_double": True,
             "min_block_size": 1,
         },
     )
@@ -771,7 +751,6 @@ elif args.mode == "export":
         exported_program,
         inputs=[inp],
         truncate_double=True,
-        use_python_runtime=False,
         min_block_size=1,
         use_distributed_mode_trace=True,
     )

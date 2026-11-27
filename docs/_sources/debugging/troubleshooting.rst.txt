@@ -54,7 +54,8 @@ Compilation Errors
 
       .. code-block:: python
 
-          torch_tensorrt.compile(model, ..., debug=True)
+          with torch_tensorrt.dynamo.Debugger(log_level="debug"):
+              trt_model = torch_tensorrt.compile(model, ...)
 
       You should see per-layer TRT build messages. If the last message is stuck at the
       same layer for more than 10 minutes, compilation may be hung.

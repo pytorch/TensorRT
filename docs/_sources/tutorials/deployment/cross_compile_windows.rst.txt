@@ -20,8 +20,8 @@ Requirements
 * **Build machine**: Linux x86-64 with CUDA and TensorRT installed.
 * **Target machine**: Windows x86-64 with a compatible NVIDIA GPU (same or newer
   CUDA compute capability).
-* ``enable_cross_compile_for_windows=True`` is automatically set by this API;
-  do not set it manually on ``compile()``.
+* The former ``enable_cross_compile_for_windows`` compilation kwarg has been
+  removed. Call ``cross_compile_for_windows()`` directly.
 
 The following features are **disabled** during cross-compilation (they are not
 available in the Windows TRT runtime or require OS-specific binaries):
@@ -130,20 +130,6 @@ Save and load via the standard Torch-TensorRT save/load API:
     # Load (Windows)
     trt_gm = torch_tensorrt.load("model_windows.ep").module()
     trt_gm(*inputs)
-
-Alternatively, save as a raw ``.engine`` file for direct TRT deployment:
-
-.. code-block:: python
-
-    engine_bytes = torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
-        exp_program,
-        arg_inputs=inputs,
-        enable_cross_compile_for_windows=False,  # use cross_compile_for_windows() instead
-    )
-    # Note: use cross_compile_for_windows() for the full workflow;
-    # convert_exported_program_to_serialized_trt_engine() does not support cross-compilation.
-
-----
 
 Troubleshooting
 ---------------

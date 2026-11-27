@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=bb69758e"></script>
+    <script src="../../_static/documentation_options.js?v=e6dfebbe"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -575,14 +575,13 @@ stays identical:</p>
 <span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
 
 <span class="c1"># The only extra line you need</span>
-<span class="n">pipe</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
-    <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="p">,</span>
-    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># pipeline already loaded in float16 via torch_dtype</span>
-<span class="p">)</span>
+<span class="n">pipe</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The pipeline’s <code class="docutils literal notranslate"><span class="pre">unet</span></code> is now backed by a TRT engine. The first call to <code class="docutils literal notranslate"><span class="pre">pipe(...)</span></code>
-triggers compilation; subsequent calls run the cached engine.</p>
+triggers compilation; subsequent calls run the cached engine. Dynamo compilation is
+always strongly typed, so it preserves the <code class="docutils literal notranslate"><span class="pre">float16</span></code> dtype selected by
+<code class="docutils literal notranslate"><span class="pre">torch_dtype</span></code> above.</p>
 <p><strong>Dynamic shapes</strong> are required for diffusion pipelines because batch size and image
 dimensions vary. Set the ranges before the first call:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">BATCH</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">"BATCH"</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
