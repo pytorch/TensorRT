@@ -288,7 +288,12 @@ def is_platform_supported_for_trtllm() -> bool:
 
 
 def _cache_root() -> Path:
-    username = getpass.getuser()
+    try:
+        username = getpass.getuser()
+    except (KeyError, OSError):
+        # A container can run under a uid that has no passwd entry. Python
+        # 3.13 and newer raise OSError here instead of KeyError.
+        username = str(os.getuid())
     return Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
 
 

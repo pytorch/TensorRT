@@ -111,7 +111,11 @@ ACCURACY_RTOL = 1e-5
 if platform.system() == "Linux":
     import pwd
 
-    current_user = pwd.getpwuid(os.getuid())[0]
+    try:
+        current_user = pwd.getpwuid(os.getuid())[0]
+    except KeyError:
+        # A container can run under a uid that has no passwd entry.
+        current_user = str(os.getuid())
 else:
     import getpass
 
