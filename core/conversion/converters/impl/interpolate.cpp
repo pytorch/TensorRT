@@ -16,65 +16,6 @@ namespace converters {
 namespace impl {
 namespace {
 
-/*
- * Helper functions
- */
-#ifndef TRT_MAJOR_RTX
-void create_plugin(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    nvinfer1::ITensor* in,
-    const char* name,
-    std::vector<int64_t> in_shape,
-    std::vector<int64_t> out_shape,
-    std::vector<int64_t> out_size,
-    std::vector<double> scales,
-    std::string mode,
-    bool align_corners,
-    bool use_scales = false) {
-  LOG_WARNING("Interpolation layer will be run through ATen, not TensorRT. Performance may be lower than expected");
-  nvinfer1::PluginFieldCollection fc;
-  std::vector<nvinfer1::PluginField> f;
-
-  std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
-  f.emplace_back(
-      nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
-
-  std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
-  f.emplace_back(
-      nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
-
-  std::vector<int32_t> out_size_casted(out_size.begin(), out_size.end());
-  f.emplace_back(
-      nvinfer1::PluginField("out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size.size()));
-
-  f.emplace_back(nvinfer1::PluginField("scales", scales.data(), nvinfer1::PluginFieldType::kFLOAT64, scales.size()));
-  f.emplace_back(nvinfer1::PluginField("mode", &mode, nvinfer1::PluginFieldType::kCHAR, 1));
-
-  int32_t align_corners_casted = static_cast<int32_t>(align_corners);
-  f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners_casted, nvinfer1::PluginFieldType::kINT32, 1));
-
-  int32_t use_scales_casted = static_cast<int32_t>(use_scales);
-  f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales_casted, nvinfer1::PluginFieldType::kINT32, 1));
-
-  fc.nbFields = f.size();
-  fc.fields = f.data();
-  auto creator = static_cast<nvinfer1::IPluginCreatorV3One*>(
-      getPluginRegistry()->getCreator("Interpolate", "1", "torch_tensorrt"));
-  auto interpolate_plugin = creator->createPlugin(name, &fc, nvinfer1::TensorRTPhase::kBUILD);
-
-  auto resize_layer =
-      ctx->net->addPluginV3(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, nullptr, 0, *interpolate_plugin);
-  TORCHTRT_CHECK(resize_layer, "Unable to create interpolation plugin from node" << *n);
-
-  resize_layer->setName(util::node_info(n).c_str());
-
-  auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
-
-  LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
-}
-#endif
-
 void resize_layer_size(
     ConversionCtx* ctx,
     const torch::jit::Node* n,

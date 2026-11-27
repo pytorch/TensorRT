@@ -18,7 +18,7 @@ RegisterOperators trt_placeholder_ops_reg({
     /// to a TRT constant Tensor
     Operator(
         "trt::const(Tensor val) -> Tensor",
-        [](Stack& stack) { /*noop*/ },
+        [](Stack& /*stack*/) { /*noop*/ },
         aliasAnalysisFromSchema()),
     Operator(
         "trt::attn_bias_from_attn_mask(Tensor attn_mask) -> Tensor",

@@ -11,6 +11,7 @@
   auto name##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                             \
       {c10::Symbol::fromQualString(node_kind),                                                                \
        [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> { \
+         (void)ctx;                                                                                           \
          if (args.at(n->input(0)).IValue()->isInt()) {                                                        \
            auto a = args.at(n->input(0)).unwrapToInt();                                                       \
            if (args.at(n->input(1)).IValue()->isInt()) {                                                      \
@@ -86,6 +87,7 @@
   auto name##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                             \
       {c10::Symbol::fromQualString(node_kind),                                                                \
        [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> { \
+         (void)ctx;                                                                                           \
          if (args.at(n->input(0)).IValue()->isInt()) {                                                        \
            auto a = args.at(n->input(0)).unwrapToInt();                                                       \
            if (args.at(n->input(1)).IValue()->isInt()) {                                                      \
@@ -133,6 +135,7 @@
   auto node_kind##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                        \
       {c10::Symbol::fromQualString(node_name),                                                                \
        [](ConversionCtx* ctx, const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> { \
+         (void)ctx;                                                                                           \
          auto a = args.at(n->input(0)).unwrapTo<type>();                                                      \
          auto b = args.at(n->input(1)).unwrapTo<type>();                                                      \
          return operation;                                                                                    \

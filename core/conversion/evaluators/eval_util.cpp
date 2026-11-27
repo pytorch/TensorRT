@@ -52,7 +52,7 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
 
     auto tensor_holder = TensorContainer();
     tensor_holder.hold_tensor(shape_1d_tensor);
-    auto shape_1d_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+    auto shape_1d_ivalue = c10::IValue(c10::make_intrusive<TensorContainer>(tensor_holder));
 
     return shape_1d_ivalue;
 
@@ -65,7 +65,7 @@ c10::IValue dynamic_size_layer(ConversionCtx* ctx, const torch::jit::Node* n, kw
         auto dynamic_dim_tensor = index_layer(ctx, n, shape_1d_tensor, i);
         auto dynamic_dim_holder = TensorContainer();
         dynamic_dim_holder.hold_tensor(dynamic_dim_tensor);
-        auto dynamic_dim_ivalue = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(dynamic_dim_holder)));
+        auto dynamic_dim_ivalue = c10::IValue(c10::make_intrusive<TensorContainer>(dynamic_dim_holder));
         input_size.emplace_back(std::move(dynamic_dim_ivalue));
       } else {
         input_size.emplace_back(input_dims.d[i]);

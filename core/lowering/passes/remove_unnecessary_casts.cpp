@@ -122,7 +122,9 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
 
                           // Change intermediate op output type
                           LOG_GRAPH(user->schema());
-                          torch::jit::Node* new_node;
+                          // Stays null when an aten::div is left as is (its inputs or rounding mode do not
+                          // match a rewrite below).
+                          torch::jit::Node* new_node = nullptr;
                           // Use this to handle special cases where the scalar version of the intermediate operator
                           // has a different schema than the original
                           if (user->kind() == c10::Symbol::fromQualString("aten::add")) {
@@ -186,8 +188,10 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
                             user->destroy();
                           }
 
-                          LOG_GRAPH("New intermediate operation: " << *new_node);
-                          LOG_GRAPH(new_node->schema());
+                          if (new_node) {
+                            LOG_GRAPH("New intermediate operation: " << *new_node);
+                            LOG_GRAPH(new_node->schema());
+                          }
 
                           // Delete aten::Int
                           LOG_GRAPH("Deleting aten::[Int/Float]: " << *potential_cast);

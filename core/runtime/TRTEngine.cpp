@@ -57,7 +57,8 @@ constexpr int32_t kDynamicDim = -1;
 // PyTorch may expose the legacy ProcessGroupNCCL, nccl2, or both under the
 // built-in "nccl" backend. Both implementations provide the raw
 // ncclComm_t that TensorRT's setCommunicator() expects.
-std::optional<int64_t> get_nccl_comm_ptr(c10d::Backend* backend) {
+// `backend` goes unused in a build that defines neither macro below.
+std::optional<int64_t> get_nccl_comm_ptr([[maybe_unused]] c10d::Backend* backend) {
 #ifdef TORCHTRT_HAS_LEGACY_PROCESS_GROUP_NCCL
   if (auto* legacy_nccl = dynamic_cast<c10d::ProcessGroupNCCL*>(backend)) {
     return legacy_nccl->getCommPtr();
@@ -83,10 +84,10 @@ DynamicOutputAllocator::DynamicOutputAllocator(const std::unordered_map<std::str
 
 void* DynamicOutputAllocator::reallocateOutputAsync(
     char const* tensorName,
-    void* currentMemory,
+    void* /*currentMemory*/,
     uint64_t size,
-    uint64_t alignment,
-    cudaStream_t stream) {
+    uint64_t /*alignment*/,
+    cudaStream_t /*stream*/) {
   std::vector<int64_t> shape = {static_cast<int64_t>(size)};
   auto it = buffers.find(tensorName);
   if (it == buffers.end() || it->second.sizes() != shape) {

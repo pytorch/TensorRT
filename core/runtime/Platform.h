@@ -25,6 +25,7 @@ struct Platform {
   Platform();
   Platform(PlatformEnum val);
   Platform(const std::string& platform_str);
+  Platform(const Platform& other) = default;
   std::string serialize() const;
   Platform& operator=(const Platform& other);
 

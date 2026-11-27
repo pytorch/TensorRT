@@ -2219,8 +2219,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
-  bool input_staged_from_host = false;
-
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
     engine->cached_input_sizes.resize(num_inputs, 0);

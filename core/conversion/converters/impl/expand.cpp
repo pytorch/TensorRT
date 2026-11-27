@@ -410,11 +410,11 @@ auto expand_registrations TORCHTRT_UNUSED =
                for (auto t : out_tensors) {
                  auto tensor_holder = TensorContainer();
                  tensor_holder.hold_tensor(t);
-                 auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                 auto ival = c10::IValue(c10::make_intrusive<TensorContainer>(tensor_holder));
                  list.emplace_back(ival);
                }
 
-               auto output_list = std::move(torch::jit::IValue(list));
+               auto output_list = torch::jit::IValue(list);
                ctx->AssociateValueAndIValue(n->outputs()[0], output_list);
                return true;
              }});
