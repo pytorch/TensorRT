@@ -420,7 +420,6 @@ exclude = [
     "node_modules",
     "venv",
     "env",
-    "py/torch_tensorrt/fx",
     ".github",
     "examples",
     "tests",
@@ -440,7 +439,6 @@ max-complexity = 10
 [tool.isort]
 profile = "black"
 py_version = 311
-skip = ["py/torch_tensorrt/fx"]
 
 [tool.black]
 #line-length = 120
@@ -448,8 +446,6 @@ target-version = ["py311", "py312"]
 force-exclude = """
 elu_converter/setup.py
 | docs/
-| examples/fx/
-| py/torch_tensorrt/fx
 """
 
 [tool.mypy]
@@ -459,9 +455,6 @@ show_error_codes = true
 disable_error_code = "attr-defined"
 no_implicit_optional = true
 exclude = [
-    "^py/torch_tensorrt/fx",
-    "py/torch_tensorrt/fx",
-    "torch_tensorrt/fx",
     "py/torch_tensorrt/_C.so",
     "examples",
     "docs",
@@ -482,15 +475,9 @@ disable_error_code = "arg-type"
 module = "torch_tensorrt.dynamo.lowering._decompositions"
 disallow_untyped_calls = false
 
-[[tool.mypy.overrides]]
-module = "torch_tensorrt.fx.*"
-ignore_errors = true
-follow_imports = "skip"
-
 [tool.typos]
 files.extend-exclude = [
     "docs/**/*",
-    "*/fx/*",
     "docsrc/_rendered_examples/",
     "core/*",
     "!core/runtime/",
@@ -498,7 +485,6 @@ files.extend-exclude = [
     "CHANGELOG.md",
     "*.ipynb",
     "cpp/",
-    "py/torch_tensorrt/fx/",
     "tools/ci-dashboard/static/htmx.min.js",
 ]
 

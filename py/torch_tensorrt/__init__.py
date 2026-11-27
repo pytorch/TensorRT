@@ -91,9 +91,6 @@ from torch_tensorrt._enums import (  # noqa: F401
 from torch_tensorrt._Input import Input  # noqa: F401
 from torch_tensorrt.runtime import *  # noqa: F403
 
-if ENABLED_FEATURES.fx_frontend:
-    from torch_tensorrt import fx
-
 if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt import dynamo  # noqa: F401
     from torch_tensorrt.dynamo import backend  # noqa: F401

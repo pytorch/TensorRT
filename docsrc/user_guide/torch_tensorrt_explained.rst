@@ -55,29 +55,9 @@ Returns
 Legacy Frontends
 ------------------
 
-As there has been a number of compiler technologies in the PyTorch ecosystem over the years
-Torch-TensorRT has some legacy features targeting them.
-
-
-TorchScript compilation and serialization have been removed. Use the Dynamo frontend
-and export with ``torch.export``, AOTInductor, or ExecuTorch.
-
-
-FX Graph Modules (`torch_tensorrt.fx.compile`)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This frontend has almost entirely been replaced by the Dynamo frontend which is a superset of the
-features available though the FX frontend. The original FX frontend remains in the codebase for
-backwards compatibility reasons.
-
-Accepted Formats
-...................
-- torch.fx GraphModule (``torch.fx.GraphModule``)
-- PyTorch Module (``torch.nn.Module``) (via ``torch.fx.trace``)
-
-Returns
-...................
-- torch.fx GraphModule (``torch.fx.GraphModule``)
+TorchScript and the legacy FX frontend have been removed. Use the Dynamo frontend
+with ``torch.compile`` or ``torch.export``, and export with AOTInductor or ExecuTorch.
+Dynamo continues to accept and return ``torch.fx.GraphModule`` objects.
 
 ``torch_tensorrt.compile``
 ----------------------------------
@@ -90,4 +70,3 @@ Torch-TensorRT to try to lower the provided model through a specific intermediat
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 - ``torch_compile``: Use the ``torch.compile`` system. Immediately returns a boxed-function that will compile on first call
 - ``dynamo``: Run the graph through the ``torch.export``/ torchdynamo stack. If the input module is a ``torch.nn.Module``, it must be "export-traceable" as the module will be traced with ``torch.export.export``. Returns a ``torch.fx.GraphModule`` which can be run immediately or saved via ``torch.export.export`` or ``torch_tensorrt.save``
-- ``fx``: Run graph through the ``torch.fx`` stack. If the input module is a ``torch.nn.Module``, it will be traced with ``torch.fx.trace`` and subject to its limitations.

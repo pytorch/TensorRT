@@ -92,24 +92,6 @@ In this example, we are going to use a simple ResNet model to demonstrate the us
 
 * `Torch-TensorRT - Using Dynamic Shapes <https://github.com/pytorch/TensorRT/blob/master/notebooks/dynamic-shapes.ipynb>`_
 
-Using the FX Frontend with Torch-TensorRT
-********************************************
-
-The purpose of this example is to demonstrate the overall flow of lowering a PyTorch model to TensorRT
-conveniently using FX.
-
-* `Using the FX Frontend with Torch-TensorRT <https://github.com/pytorch/TensorRT/blob/master/notebooks/getting_started_with_fx_path_lower_to_trt.ipynb>`_
-
-
-Compiling a PyTorch model using FX Frontend with Torch-TensorRT
-*******************************************************************
-
-The purpose of this example is to demonstrate the overall flow of lowering a PyTorch
-model to TensorRT via FX with existing FX based tooling
-
-* `Compiling a PyTorch model using FX Frontend with Torch-TensorRT  <https://github.com/pytorch/TensorRT/blob/master/notebooks/getting_started_with_fx_path_module.ipynb>`_
-
-
 Compiling LeNet with Torch-TensorRT
 *******************************************************************
 

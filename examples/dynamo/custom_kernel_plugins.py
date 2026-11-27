@@ -513,8 +513,10 @@ from torch_tensorrt.dynamo.conversion import (
     ConversionContext,
     dynamo_tensorrt_converter,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_trt_tensor,
+    set_layer_name,
+)
 
 
 # The plugin's enqueue runs PyTorch, so ExecuTorch export must refuse its engine.

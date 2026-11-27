@@ -96,7 +96,7 @@ html_css_files = [
 
 # sphinx-gallery configuration
 # Explicitly list which example subdirectories to render so we don't accidentally
-# pick up legacy FX, raw triton client scripts, or training-only utilities.
+# pick up raw triton client scripts or training-only utilities.
 sphinx_gallery_conf = {
     "examples_dirs": [
         "../examples/dynamo",

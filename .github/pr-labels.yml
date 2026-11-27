@@ -36,11 +36,6 @@
       - any-glob-to-any-file:
           - core/conversion/evaluators/**/*
 
-"component: fx":
-  - changed-files:
-      - any-glob-to-any-file:
-          - py/torch_tensorrt/fx/**/*
-
 "component: dynamo":
   - changed-files:
       - any-glob-to-any-file:

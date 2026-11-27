@@ -63,5 +63,4 @@ Submodules
 
 :doc:`torch_tensorrt.logging <logging>` |
 :doc:`torch_tensorrt.dynamo <dynamo>` |
-:doc:`torch_tensorrt.runtime <runtime>` |
-:doc:`torch_tensorrt.fx <fx>`
+:doc:`torch_tensorrt.runtime <runtime>`

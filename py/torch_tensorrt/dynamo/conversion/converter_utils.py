@@ -368,13 +368,8 @@ def broadcast_to_same_shape(
     """Broadcast ITensors `lhs_val` and `rhs_val` to the same shape. If the shapes are already the same, return the
     original tensors. If the shapes are different, broadcast the tensors to the same shape.
 
-    This helper function is different from fx/converter_utils.broadcast.
-    fx/converter_utils.broadcast only broadcasts two ITensors to the same number of dimensions (ranks)
-    by prepending 1s, while this function broadcasts two ITensors to the same shape.
-
-    For example, we have original ITensors: lhs_val.shape: (2, 3) rhs_val.shape: (2, 2, 1, 3)
-    If calling fx/converter_utils.broadcast, lhs_val.shape: (1, 1, 2, 3) lhs_val.shape: (2, 2, 1, 3).
-    If calling this function broadcast_to_same_shape, lhs_val.shape: (2, 2, 2, 3) lhs_val.shape: (2, 2, 2, 3).
+    Unlike rank-only broadcasting, this expands both tensors to their common shape.
+    For example, shapes (2, 3) and (2, 2, 1, 3) both become (2, 2, 2, 3).
 
     Args:
         lhs_val (TRTTensor): A TensorRT ITensor.

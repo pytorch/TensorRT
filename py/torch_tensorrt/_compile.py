@@ -16,7 +16,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    List,
     Literal,
     Optional,
     Sequence,
@@ -35,17 +34,6 @@ from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
-from typing_extensions import TypeGuard
-
-if ENABLED_FEATURES.fx_frontend:
-    import torch.fx
-    from torch_tensorrt.fx import InputTensorSpec
-    from torch_tensorrt.fx.lower import compile as fx_compile
-    from torch_tensorrt.fx.utils import LowerPrecision
-
-    InputType = Union[Input, torch.Tensor]
-else:
-    InputType = Union[Input, torch.Tensor]  # type: ignore
 
 if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
@@ -122,16 +110,9 @@ def _has_executorch_exir() -> bool:
         return False
 
 
-def _non_fx_input_interface(
-    inputs: Sequence[Input | torch.Tensor],
-) -> TypeGuard[List[Input | torch.Tensor]]:
-    return all(isinstance(i, (torch.Tensor, Input)) for i in inputs)
-
-
 class _IRType(Enum):
     """Enum to determine the type of IR selected for model compilation"""
 
-    fx = 1
     dynamo = 2
     torch_compile = 3
     exported_program = 4
@@ -157,10 +138,11 @@ def _parse_module_type(module: Any) -> _ModuleType:
 
 
 def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
-    module_is_fxable = any(module_type == t for t in [_ModuleType.nn, _ModuleType.fx])
+    module_is_traceable = any(
+        module_type == t for t in [_ModuleType.nn, _ModuleType.fx]
+    )
     module_is_exportable = module_type == _ModuleType.ep
 
-    ir_targets_fx = ir == "fx"
     ir_targets_dynamo = ir == "dynamo"
     ir_targets_torch_compile = ir == "torch_compile"
 
@@ -168,26 +150,18 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
         raise ValueError(
             "TorchScript support has been removed. Use ir='dynamo' instead."
         )
-    if module_is_fxable and ir_targets_fx:
-        warnings.warn(
-            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
-            DeprecationWarning,
-            stacklevel=2,
+    if ir == "fx":
+        raise ValueError(
+            "FX frontend support has been removed. Use ir='dynamo' instead."
         )
-        if ENABLED_FEATURES.fx_frontend:
-            return _IRType.fx
-        else:
-            raise ValueError(
-                "Requested using the FX frontend but the FX frontend is not available in this build of Torch-TensorRT"
-            )
-    elif (module_is_fxable or module_is_exportable) and ir_targets_dynamo:
+    if (module_is_traceable or module_is_exportable) and ir_targets_dynamo:
         if ENABLED_FEATURES.dynamo_frontend:
             return _IRType.dynamo
         else:
             raise ValueError(
                 "Requested using the Dynamo frontend but the Dynamo frontend is not available in this build of Torch-TensorRT"
             )
-    elif module_is_fxable and ir_targets_torch_compile:
+    elif module_is_traceable and ir_targets_torch_compile:
         if ENABLED_FEATURES.dynamo_frontend:
             return _IRType.torch_compile
         else:
@@ -197,7 +171,7 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
     else:
         if ir == "default":
             # Options are listed in order of preference
-            if ENABLED_FEATURES.dynamo_frontend and module_is_fxable:
+            if ENABLED_FEATURES.dynamo_frontend and module_is_traceable:
                 logger.info("ir was set to default, using dynamo frontend")
                 return _IRType.dynamo
             elif ENABLED_FEATURES.dynamo_frontend and module_is_exportable:
@@ -205,7 +179,7 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
                 return _IRType.dynamo
             else:
                 raise ValueError(
-                    f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}\n\tFX - {ENABLED_FEATURES.fx_frontend})"
+                    f"Module was provided in an unsupported format\nInstalled frontends:\n\tDynamo - {ENABLED_FEATURES.dynamo_frontend}"
                 )
         else:
             raise ValueError("Unknown ir was requested")
@@ -214,7 +188,7 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
 def compile(
     module: Any,
     ir: str = "default",
-    inputs: Optional[Sequence[InputType]] = None,
+    inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
@@ -249,62 +223,17 @@ def compile(
                 ]
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
-        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Legacy FX-only option specifying the datatypes TensorRT may use when selecting kernels. Dynamo and ``torch_compile`` reject this option; express precision in the model or use the Dynamo autocast options instead.
-        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
+        enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Removed option. Dynamo and ``torch_compile`` reject this option; express precision in the model or use the Dynamo autocast options instead.
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
 
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
 
-    input_list = inputs if inputs is not None else []
-    # Default for the legacy FX frontend; not used for the Dynamo path
-    enabled_precisions_set: Set[Union[torch.dtype, dtype]] = (
-        enabled_precisions if enabled_precisions is not None else {torch.float32}
-    )
-
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
-    if target_ir == _IRType.fx:
-        warnings.warn(
-            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if not ENABLED_FEATURES.fx_frontend:
-            raise RuntimeError(
-                "FX frontend is not enabled, cannot compile with target_ir=fx"
-            )
-
-        if (
-            torch.float16 in enabled_precisions_set
-            or dtype.half in enabled_precisions_set
-        ):
-            lower_precision = LowerPrecision.FP16
-        elif (
-            torch.float32 in enabled_precisions_set
-            or dtype.float in enabled_precisions_set
-        ):
-            lower_precision = LowerPrecision.FP32
-        else:
-            raise ValueError(f"Precision {enabled_precisions_set} not supported on FX")
-
-        def _fx_input_interface(
-            inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
-        ) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
-            return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
-
-        assert _fx_input_interface(input_list)
-        compiled_fx_module: torch.nn.Module = fx_compile(
-            module,
-            input_list,
-            lower_precision=lower_precision,
-            explicit_batch_dimension=True,
-            dynamic_batch=False,
-            **kwargs,
-        )
-        return compiled_fx_module
-    elif target_ir == _IRType.dynamo:
+    if target_ir == _IRType.dynamo:
         _reject_enabled_precisions_for_dynamo(enabled_precisions)
         compiler_kwargs = _prepare_dynamo_compiler_kwargs(
             kwargs,
@@ -517,7 +446,7 @@ def convert_method_to_trt_engine(
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
         enabled_precisions (Optional[Set[Union[torch.dtype, torch_tensorrt.dtype]]]): Removed option. The Dynamo path rejects this option; express precision in the model or use the Dynamo autocast options instead.
-        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, fx - legacy FX, torch_compile - torch.compile)
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, dynamo - torch.export, torch_compile - torch.compile)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -537,11 +466,7 @@ def convert_method_to_trt_engine(
         raise ValueError(
             "Only method_name='forward' is supported by the Dynamo frontend."
         )
-    if target_ir == _IRType.fx:
-        raise RuntimeError(
-            "convert_method_to_trt_engine call is not supported for ir=fx"
-        )
-    elif target_ir == _IRType.dynamo:
+    if target_ir == _IRType.dynamo:
         _reject_enabled_precisions_for_dynamo(enabled_precisions)
         compiler_kwargs = _prepare_dynamo_compiler_kwargs(
             kwargs,
