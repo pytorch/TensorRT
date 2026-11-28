@@ -1163,7 +1163,7 @@ class TestLowering(TestCase):
             "torch_compile",
             inputs,
             min_block_size=1,
-            truncate_and_double=True,
+            truncate_double=True,
             pass_through_build_failures=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()

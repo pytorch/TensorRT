@@ -183,7 +183,6 @@ def test_sdpa_dynamic_shape(is_causal, scale):
 
     compile_spec = {
         "inputs": inputs,
-        "ir": "dynamo",
         "min_block_size": 1,
     }
     trt_model = torchtrt.dynamo.compile(exp_program, **compile_spec)

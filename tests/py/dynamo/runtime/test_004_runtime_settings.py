@@ -475,6 +475,12 @@ def _traced_linear():
     return torch.jit.trace(torch.nn.Linear(3, 3).cuda(), torch.randn(1, 3).cuda())
 
 
+_needs_torchscript = unittest.skipIf(
+    not hasattr(torch.jit, "trace"),
+    "needs a PyTorch build with TorchScript (torch.jit.trace)",
+)
+
+
 class TestApplyRuntimeSettingsTypeErrors(TestCase):
     """Rejection of bad arguments; no engine compile required."""
 
@@ -496,6 +502,7 @@ class TestApplyRuntimeSettingsTypeErrors(TestCase):
 
     # The FX walk used to iterate a TorchScript graph and crash with an
     # unrelated TypeError, so each check below also asserts on the message.
+    @_needs_torchscript
     def test_torchscript_target_raises(self):
         with self.assertRaises(TypeError) as cm:
             apply_runtime_settings(
@@ -503,18 +510,21 @@ class TestApplyRuntimeSettingsTypeErrors(TestCase):
             )
         self.assertIn("TorchScript", str(cm.exception))
 
+    @_needs_torchscript
     def test_runtime_config_rejects_torchscript_target(self):
         with self.assertRaises(TypeError) as cm:
             with runtime_config(_traced_linear(), runtime_cache=None):
                 pass
         self.assertIn("TorchScript", str(cm.exception))
 
+    @_needs_torchscript
     def test_runtime_cache_rejects_torchscript_target(self):
         with self.assertRaises(TypeError) as cm:
             with runtime_cache(_traced_linear(), io.BytesIO()):
                 pass
         self.assertIn("TorchScript", str(cm.exception))
 
+    @_needs_torchscript
     def test_nested_torchscript_module_is_skipped(self):
         model = torch.nn.Sequential(_traced_linear())
         with self.assertRaises(RuntimeError) as cm:
