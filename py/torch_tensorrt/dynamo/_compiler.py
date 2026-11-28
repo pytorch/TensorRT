@@ -435,7 +435,7 @@ def cross_compile_for_windows(
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     # Move the weights in the state_dict to CPU
-    if offload_module_to_cpu:
+    if settings.offload_module_to_cpu:
         # Complex lowering can return a new module without the weights that only
         # constant folding read, so offload the module lowering started from too.
         deallocate_module(unlowered_gm)
@@ -444,7 +444,7 @@ def cross_compile_for_windows(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
         logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
-    elif not is_analyzing():
+    elif not is_analyzing() and not settings.dryrun:
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
             logger.warning(
@@ -901,7 +901,7 @@ def compile(
     assert_no_kv_alias_markers_survived(gm, _no_kv_alias_writes)
 
     # Move the weights in the state_dict to CPU
-    if offload_module_to_cpu:
+    if settings.offload_module_to_cpu:
         # Complex lowering can return a new module without the weights that only
         # constant folding read, so offload the module lowering started from too.
         deallocate_module(unlowered_gm)
@@ -910,7 +910,7 @@ def compile(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
         logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
-    elif not is_analyzing():
+    elif not is_analyzing() and not settings.dryrun:
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
             logger.warning(
