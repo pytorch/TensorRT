@@ -183,6 +183,10 @@ def test_linear_fp8_static():
 
 @pytest.mark.unit
 @unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(
+    importlib.util.find_spec("triton") is None,
+    "TorchAO INT4 dependencies require Triton, which is unavailable",
+)
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 @pytest.mark.parametrize(
     "weight_dtype", [torch.int8, torch.float8_e4m3fn], ids=["int8", "float8"]
