@@ -10,6 +10,9 @@ import torch
 import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    needs_undecomposed_graph,
+)
 
 from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
@@ -148,6 +151,9 @@ def _keep_tiny_constants_nonzero(
     node.kwargs = {k: keep(v) if k in names else v for k, v in node.kwargs.items()}
 
 
+# Autocast inserts casts, which decompose, anywhere in the graph, and
+# pre_export_lowering calibrates it on the graph as exported.
+@needs_undecomposed_graph(when=lambda settings: settings.enable_autocast)
 def rule_based_autocast(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
@@ -242,7 +248,7 @@ def rule_based_autocast(
                     # copy the meta of the original tensor to the casted tensor
                     cast.meta.update(arg.meta)
                     # update the dtype of the casted tensor
-                    cast.meta["val"] = cast.meta["val"].to(dtype)
+                    cast.meta["val"] = _retype_tensors(cast.meta["val"], dtype)
                     return cast
         elif isinstance(arg, (tuple, list)):
             return type(arg)(

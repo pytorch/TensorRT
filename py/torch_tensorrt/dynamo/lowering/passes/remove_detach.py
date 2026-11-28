@@ -5,10 +5,15 @@ import logging
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    runs_on_decomposed_graph,
+)
 
 logger = logging.getLogger(__name__)
 
 
+# Decomposition removes detach too, so the pass has nothing left to do there.
+@runs_on_decomposed_graph
 def remove_detach(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:

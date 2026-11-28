@@ -12,6 +12,9 @@ from torch._functorch.predispatch import (
 from torch._prims_common import is_contiguous_or_false
 from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._undecomposed_graph import (
+    needs_undecomposed_graph,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,9 @@ def _rewrite(module: torch.fx.GraphModule, in_vmap: bool = False) -> int:
     return count + subgraph_count
 
 
+@needs_undecomposed_graph(
+    when=lambda settings: settings.replace_interleave_stack_with_cat
+)
 def replace_interleave_stack_with_cat(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:

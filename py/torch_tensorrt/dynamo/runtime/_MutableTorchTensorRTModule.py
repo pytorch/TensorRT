@@ -15,11 +15,14 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
 import torch
 import torch_tensorrt
-from torch.export._trace import _export
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
+from torch_tensorrt.dynamo.lowering._export_with_decomps import (
+    export_with_tensorrt_decomps,
+    settings_from_kwargs,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     pin_torch_executed_state,
@@ -421,25 +424,16 @@ class MutableTorchTensorRTModule(object):
             _offload_original_model(self)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
-
         def export_fn() -> torch.export.ExportedProgram:
-            if self.prefer_deferred_runtime_asserts_over_guards:
-                return _export(
-                    self.original_model,
-                    self.arg_inputs,
-                    kwargs=self.kwarg_inputs,
-                    dynamic_shapes=self._get_total_dynamic_shapes(),
-                    strict=self.strict,
-                    prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
-                )
-            else:
-                return torch.export.export(
-                    self.original_model,
-                    self.arg_inputs,
-                    kwargs=self.kwarg_inputs,
-                    dynamic_shapes=self._get_total_dynamic_shapes(),
-                    strict=self.strict,
-                )
+            return export_with_tensorrt_decomps(
+                self.original_model,
+                args=tuple(self.arg_inputs),
+                kwargs=self.kwarg_inputs,
+                dynamic_shapes=self._get_total_dynamic_shapes(),
+                strict=self.strict,
+                prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
+                settings=settings_from_kwargs(self.additional_settings),
+            )
 
         # Check if the model has been quantized with modelopt
         if _is_modelopt_quantized(self.original_model):
