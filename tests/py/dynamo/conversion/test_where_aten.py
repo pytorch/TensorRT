@@ -184,7 +184,8 @@ class TestWhereConverter(DispatchTestCase):
         y = torch.tensor([1, -7, 3], dtype=y_dtype)
         self.run_test(Where(), (condition, x, y), rtol=0, atol=0)
 
-    def test_0d_int64_does_not_widen_int32(self):
+    @parameterized.expand([("0d_second", False), ("0d_first", True)])
+    def test_0d_int64_does_not_widen_int32(self, _, swap):
         # The result is int32, so 2**32 + 1 becomes 1 before the division.
         class Where(nn.Module):
             def forward(self, condition, x, y):
@@ -193,6 +194,8 @@ class TestWhereConverter(DispatchTestCase):
         condition = torch.tensor([True, False])
         x = torch.tensor([3, 7], dtype=torch.int32)
         y = torch.tensor(2**32 + 1)
+        if swap:
+            x, y = y, x
         self.run_test(Where(), (condition, x, y), rtol=0, atol=0)
 
 

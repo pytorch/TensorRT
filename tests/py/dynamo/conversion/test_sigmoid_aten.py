@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
@@ -59,12 +60,16 @@ class TestSigmoidConverter(DispatchTestCase):
             check_dtype=False,
         )
 
-    def test_sigmoid_int64(self):
+    @parameterized.expand([(torch.int8,), (torch.int32,), (torch.int64,)])
+    def test_sigmoid_int(self, dtype):
+        # The integer value is made inside the engine: TensorRT treats an int8 engine
+        # input as quantized.
         class TestModule(nn.Module):
             def forward(self, x):
+                x = torch.ops.aten._to_copy.default(x, dtype=dtype)
                 return torch.ops.aten.sigmoid.default(x)
 
-        inputs = [torch.randint(-5, 5, (2, 3), dtype=torch.int64)]
+        inputs = [torch.randint(-5, 5, (2, 3)).float()]
         self.run_test(TestModule(), inputs)
 
 

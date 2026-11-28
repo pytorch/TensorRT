@@ -80,14 +80,36 @@ class TestProdConverter(DispatchTestCase):
         ]
     )
     def test_prod_int32_accumulates_in_int64(self, _, dim, keep_dims):
-        # PyTorch multiplies integers in int64: 250**4 is past 2**31.
+        # PyTorch multiplies integers in int64: 50001**2 is past 2**31, and 50001**4
+        # still fits in int64.
         class Prod(nn.Module):
             def forward(self, x):
                 if dim is None:
                     return torch.prod(x)
                 return torch.prod(x, dim, keep_dims)
 
-        inputs = [torch.full((2, 4), 250, dtype=torch.int32)]
+        inputs = [torch.full((2, 2), 50001, dtype=torch.int32)]
+        self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
+
+    def test_prod_dim_int_dtype(self):
+        # 300 * 300 overflows float16 but not the requested float32.
+        class Prod(nn.Module):
+            def forward(self, x):
+                return torch.prod(x, 1, dtype=torch.float32)
+
+        inputs = [torch.tensor([[300, 300], [3, 5]], dtype=torch.float16)]
+        self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
+
+    @parameterized.expand([("input", False), ("slice", True)])
+    def test_prod_uint8_accumulates_in_int64(self, _, sliced):
+        # 250**4 is past 2**31. After a slice the engine holds uint8 values as int32.
+        class Prod(nn.Module):
+            def forward(self, x):
+                return torch.prod(x[:, 1:] if sliced else x, 1)
+
+        inputs = [
+            torch.tensor([[1, 250, 250, 250, 250], [1, 3, 5, 7, 1]], dtype=torch.uint8)
+        ]
         self.run_test(Prod(), inputs, rtol=0, atol=0, use_dynamo_tracer=True)
 
     def test_prod_bool(self):
