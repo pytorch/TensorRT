@@ -6,12 +6,13 @@ from typing import Any, Callable
 
 import torch
 import torch.nn.functional as F
-from torch_tensorrt.hf.exporters.models.common.patches import causal_lm_plugin_forward
-from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+
+from ...plugin.attn_patches import (
     _patch_language_attention,
     _patch_vision_attention,
     register_patch,
 )
+from ..common.patches import causal_lm_plugin_forward
 
 PI05 = "pi05"
 
@@ -97,7 +98,8 @@ def _patch_pi05_action_step_forward(original: Callable) -> Callable:
                 **kwargs,
             )
         from lerobot.policies.pi05.modeling_pi05 import create_sinusoidal_pos_embedding
-        from torch_tensorrt.hf.exporters.prefix_cache import PrefixKVCache
+
+        from ...prefix_cache import PrefixKVCache
 
         suffix_embs = self.action_in_proj(x_t)
         time_emb = create_sinusoidal_pos_embedding(

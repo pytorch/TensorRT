@@ -8,25 +8,19 @@ needs GrootEagleEncodeStep / embodiment_id from the policy wrapper.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
-_TRT_PY = _REPO_ROOT / "py"
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
-
-_src_pkg = str(_TRT_PY / "torch_tensorrt")
-if _src_pkg not in list(torch_tensorrt.__path__):
-    torch_tensorrt.__path__.append(_src_pkg)
-
+from exporters import EdgeConfig, EdgeExporter
+from exporters.measure import print_bench
+from exporters.plugin.plugin_utils import load_plugins_for_trt
+from exporters.utils import force_hf_attention
 from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.policies.groot import GrootPolicy
 from lerobot.policies.groot.configuration_groot import GrootConfig
 from lerobot.utils.constants import ACTION, OBS_STATE
-from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
-from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch, force_hf_attention
 
 
 def load_groot(device: torch.device) -> GrootPolicy:
@@ -62,7 +56,6 @@ def main() -> None:
     parser.add_argument("--engine-dir", default="/tmp/groot_edge_exporter")
     args = parser.parse_args()
 
-    configure_thor_pytorch()
     load_plugins_for_trt()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,13 +68,7 @@ def main() -> None:
     force_hf_attention(eagle.language_model, "eager")
 
     exporter = EdgeExporter()
-    config = EdgeConfig(
-        model_type="groot",
-        engine_dir=args.engine_dir,
-        max_seq_len=968,
-        dryrun=not args.compile,
-        skip_runtime_export=False,
-    )
+    config = EdgeConfig(model_type="groot", engine_dir=args.engine_dir, max_seq_len=968)
 
     # Spec tokenizes libero via Eagle chat template because we pass the policy.
     sample_inputs = {"device": device, "dtype": dtype}
@@ -98,6 +85,7 @@ def main() -> None:
 
     out = velocity[0] if isinstance(velocity, (tuple, list)) else velocity
     print("velocity", tuple(out.shape), "mean", float(out.float().mean()))
+    print_bench(exporter.bench)
 
 
 if __name__ == "__main__":
