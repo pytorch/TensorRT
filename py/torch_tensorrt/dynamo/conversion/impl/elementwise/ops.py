@@ -80,23 +80,14 @@ def trunc_div(
         A TensorRT tensor represent the result of trunc divide.
     """
     input, other = python_ints_as_0d(ctx, target, source_ir, name, input, other)
-    prod_output = convert_binary_elementwise(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_prod",
-        trt.ElementWiseOperation.PROD,
-        input,
-        other,
-    )
-
-    sign_output = sign(
-        ctx,
-        target,
-        source_ir,
-        name,
-        prod_output,
-    )
+    # PyTorch divides an integer tensor by a float in float32, so the float must not
+    # become an integer constant below.
+    if (
+        isinstance(other, float)
+        and isinstance(input, TRTTensor)
+        and not _enums.dtype._from(input.dtype).to(torch.dtype).is_floating_point
+    ):
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_input_float")
 
     # Convert constant input into ITensor for UnaryOperation. A scalar stays 0-d, so a 0-d
     # tensor does not gain a dim.
@@ -111,42 +102,51 @@ def trunc_div(
             min_rank=0,
         )
 
-    abs_input_output = convert_unary(
+    if not any(
+        _enums.dtype._from(value.dtype).to(torch.dtype).is_floating_point
+        for value in (input, other)
+    ):
+        # TensorRT's DIV truncates integers toward zero, with no ABS to overflow at the
+        # integer minimum.
+        return convert_binary_elementwise(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_output",
+            trt.ElementWiseOperation.DIV,
+            input,
+            other,
+        )
+
+    # Rounding the quotient itself toward zero keeps its sign, also for a quotient that
+    # rounds to -0.0 and for the infinity a 0 divisor gives.
+    quotient = convert_binary_elementwise(
         ctx,
         target,
         source_ir,
-        f"{name}_abs_input",
-        trt.UnaryOperation.ABS,
+        f"{name}_quotient",
+        trt.ElementWiseOperation.DIV,
         input,
-    )
-    abs_other_output = convert_unary(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_abs_other",
-        trt.UnaryOperation.ABS,
         other,
     )
-    abs_floor_output = convert_binary_elementwise(
+    floor = convert_unary(
+        ctx, target, source_ir, f"{name}_floor", trt.UnaryOperation.FLOOR, quotient
+    )
+    ceil = convert_unary(
+        ctx, target, source_ir, f"{name}_ceil", trt.UnaryOperation.CEIL, quotient
+    )
+    negative = convert_binary_elementwise(
         ctx,
         target,
         source_ir,
-        f"{name}_floor_div",
-        trt.ElementWiseOperation.FLOOR_DIV,
-        abs_input_output,
-        abs_other_output,
+        f"{name}_negative",
+        trt.ElementWiseOperation.LESS,
+        quotient,
+        0,
     )
-    output = convert_binary_elementwise(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_output",
-        trt.ElementWiseOperation.PROD,
-        abs_floor_output,
-        sign_output,
-    )
-
-    return output
+    layer = ctx.net.add_select(negative, ceil, floor)
+    set_layer_name(layer, target, f"{name}_output", source_ir)
+    return layer.get_output(0)
 
 
 def rsqrt(

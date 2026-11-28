@@ -311,8 +311,6 @@ def wrap_to_uint8(
 ) -> Any:
     """Return an integer value modulo 256, which is how PyTorch converts it to uint8."""
     if isinstance(value, TRTTensor):
-        # remainder() goes through trunc_div, which multiplies by the divisor and overflows
-        # near the integer limits. value - floor(value / 256) * 256 stays in range.
         quotient = impl.elementwise.floor_divide(
             ctx, target, SourceIR.ATEN, f"{name}_floor_div", value, 256
         )
