@@ -68,6 +68,14 @@ def where(
     if diff > 0:
         other = prepend_ones(ctx, other, f"{name}_other_broadcast", diff)
 
+    # In PyTorch a 0-dim int64 value does not widen a tensor with dims. An int8 tensor
+    # still becomes int32 below, where PyTorch keeps int8.
+    narrow = (trt.int8, trt.int32)
+    if not x_shape and y_shape and input.dtype == trt.int64 and other.dtype in narrow:
+        input = cast_trt_tensor(ctx, input, trt.int32, f"{name}_x_0d_int32")
+    if not y_shape and x_shape and other.dtype == trt.int64 and input.dtype in narrow:
+        other = cast_trt_tensor(ctx, other, trt.int32, f"{name}_y_0d_int32")
+
     # Ensure that input and other have the same TRT dtype
     input, other = promote_trt_tensors_to_same_dtype(ctx, input, other, name)
 
@@ -151,6 +159,12 @@ def cond(
 
     outputs: list[TRTTensor] = []
     for i, (t_out, f_out) in enumerate(zip(true_outs, false_outs)):
+        # The branches can hold one PyTorch dtype in two TensorRT dtypes, such as an int64
+        # sum and an int32 argmax, and the conditional output needs one.
+        if t_out.dtype != f_out.dtype:
+            t_out, f_out = promote_trt_tensors_to_same_dtype(
+                ctx, t_out, f_out, f"{name}_out_{i}_"
+            )
         layer = conditional.add_output(t_out, f_out)
         set_layer_name(layer, target, f"{name}_out_{i}", source_ir)
         outputs.append(layer.get_output(0))

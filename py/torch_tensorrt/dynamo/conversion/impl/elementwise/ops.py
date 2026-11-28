@@ -157,7 +157,7 @@ def rsqrt(
     input: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input, TRTTensor)) and (
-        input.dtype == trt.int8 or input.dtype == trt.int32
+        input.dtype in (trt.int8, trt.int32, trt.int64)
     ):
         input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_cast")
     sqrt_trt_output = convert_unary(

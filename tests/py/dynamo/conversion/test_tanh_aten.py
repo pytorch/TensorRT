@@ -47,6 +47,14 @@ class TestTanhConverter(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
+    def test_tanh_int64(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.tanh.default(x)
+
+        inputs = [torch.randint(-5, 5, (2, 3), dtype=torch.int64)]
+        self.run_test(TestModule(), inputs)
+
 
 if __name__ == "__main__":
     run_tests()

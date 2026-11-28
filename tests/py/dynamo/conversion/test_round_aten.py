@@ -74,6 +74,23 @@ class TestRoundConverter(DispatchTestCase):
             check_dtype=False,
         )
 
+    @parameterized.expand(
+        [
+            (torch.int8, [-56, 100]),
+            (torch.int32, [2**25 + 1, -(2**25) - 3]),
+            (torch.int64, [2**25 + 1, -(2**25) - 3]),
+        ]
+    )
+    def test_round_int_is_exact(self, dtype, values):
+        class round(nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.round.default(input)
+
+        # float32 would round the int32 and int64 values, and TensorRT treats an int8
+        # engine input as quantized, so a rounding layer after a cast fails the build.
+        inputs = [torch.tensor(values, dtype=dtype)]
+        self.run_test(round(), inputs, rtol=0, atol=0)
+
 
 if __name__ == "__main__":
     run_tests()

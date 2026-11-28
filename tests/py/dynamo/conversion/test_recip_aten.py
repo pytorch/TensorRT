@@ -60,6 +60,7 @@ class TestRecipConverter(DispatchTestCase):
         [
             ((10,), torch.int, 0, 5),
             ((1, 20), torch.int32, -10, 10),
+            ((1, 20), torch.int64, -10, 10),
             ((2, 3, 4), torch.int, -5, 5),
         ]
     )

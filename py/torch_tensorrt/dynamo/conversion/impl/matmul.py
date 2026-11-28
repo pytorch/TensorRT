@@ -51,6 +51,14 @@ def matrix_multiply(
     input, other = broadcast(
         ctx, input, other, f"{name}_input", f"{name}_other", preset_diff
     )
+    # TensorRT matrix multiply takes no int32 or int64, so it runs in float32 as for a
+    # float32 input, TF32 included. Values and sums past 2**24, or values past 2**11
+    # with TF32, are not exact.
+    integer_dtype = input.dtype if input.dtype in (trt.int32, trt.int64) else None
+    if integer_dtype is not None:
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_input_float")
+        other = cast_trt_tensor(ctx, other, trt.float32, f"{name}_other_float")
+
     # Get the original input dtype
     input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
 
@@ -77,4 +85,6 @@ def matrix_multiply(
         )
 
     set_layer_name(matmul_layer, target, name, source_ir)
+    if integer_dtype is not None:
+        return cast_trt_tensor(ctx, matmul_output, integer_dtype, f"{name}_integer")
     return matmul_output

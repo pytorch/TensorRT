@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import torch
+import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -351,6 +352,41 @@ class TestPoolConverter(DispatchTestCase):
             use_dynamo_tracer=True,
             enable_passes=True,
         )
+
+    @parameterized.expand(
+        [
+            ("max_int32", torch.ops.aten.max_pool2d.default, lambda x: x[..., 0]),
+            (
+                "max_int32_round",
+                torch.ops.aten.max_pool2d.default,
+                lambda x: torch.round(x[..., 0]),
+            ),
+            ("max_int64_prod", torch.ops.aten.max_pool2d.default, lambda x: x.prod(-1)),
+            ("avg_int64_prod", torch.ops.aten.avg_pool2d.default, lambda x: x.prod(-1)),
+            # An average of -15.25 truncates to -15, as in PyTorch.
+            (
+                "avg_int64_negative",
+                torch.ops.aten.avg_pool2d.default,
+                lambda x: x.sum(-1) // 3,
+            ),
+        ]
+    )
+    def test_pool2d_integer(self, _, pool, make):
+        # CUDA has no integer pooling, so the graph is exported and checked on the CPU.
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return pool(make(x), [2, 2])
+
+        model = TestModule().eval()
+        x = torch.arange(-40, 40, 5, dtype=torch.int32).reshape(1, 1, 4, 2, 2)
+        x = torch.cat([x, x.flip(-1)], -2)
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x.cuda()],
+            min_block_size=1,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(compiled(x.cuda()).cpu(), model(x), rtol=0, atol=0)
 
 
 if __name__ == "__main__":

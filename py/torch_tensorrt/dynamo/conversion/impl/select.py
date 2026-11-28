@@ -1216,7 +1216,6 @@ def index_put_converter(
         fill_value = cast_trt_tensor(
             ctx, fill_value, input_tensor.dtype, f"{name}_fill_value_cast"
         )
-        # A select keeps the input dtype, where impl.condition.where makes int64 int32.
         mask = get_trt_tensor(ctx, lone_index, f"{name}_mask", min_rank=0)
         rank = len(input_tensor.shape)
         if rank:
