@@ -18,7 +18,7 @@ from lerobot.policies.pi05 import PI05Policy
 from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE
 
 
-def load_pi05(device: torch.device) -> PI05Policy:
+def load_policy(device: torch.device) -> PI05Policy:
     policy = PI05Policy.from_pretrained("lerobot/pi05_libero_base").eval()
     cfg = policy.config
     cfg.device = str(device)
@@ -53,7 +53,7 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dtype = torch.float16
 
-    policy = load_pi05(device)
+    policy = load_policy(device)
 
     policy.model.to(device=device, dtype=dtype).eval()
     paligemma = policy.model.paligemma_with_expert.paligemma.model
