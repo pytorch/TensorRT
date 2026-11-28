@@ -36,6 +36,53 @@ class TestCondConverter(DispatchTestCase):
             ("pred_false", False),
         ]
     )
+    def test_cond_branches_with_different_integer_dtypes(self, _, pred):
+        # Both results are int64 in PyTorch. TensorRT holds the sum in int64 and the
+        # argmax in int32.
+        class CondSumArgmax(nn.Module):
+            def forward(self, x, predicate):
+                return torch.cond(
+                    predicate,
+                    lambda value: value.sum(1),
+                    lambda value: value.argmax(1),
+                    (x,),
+                )
+
+        self.run_test(
+            CondSumArgmax(),
+            [
+                torch.tensor([[1, 2, 3], [6, 5, 4]], dtype=torch.int32),
+                torch.tensor(pred),
+            ],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_cond_over_an_int8_value_made_in_the_engine(self):
+        # The int8 operand comes from a cast inside the engine, not from an engine input.
+        class CondInt8(nn.Module):
+            def forward(self, x):
+                return torch.cond(
+                    x.sum() > 0,
+                    lambda value: value.float().sum(),
+                    lambda value: value.float().sum() * 2,
+                    (x.to(torch.int8),),
+                )
+
+        self.run_test(
+            CondInt8(),
+            [torch.tensor([1.0, 2.0, 3.0])],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+            require_full_compilation=True,
+        )
+
+    @parameterized.expand(
+        [
+            ("pred_true", True),
+            ("pred_false", False),
+        ]
+    )
     def test_cond_one_element_pred(self, _, pred):
         class CondAddSub(nn.Module):
             def forward(self, x, predicate):

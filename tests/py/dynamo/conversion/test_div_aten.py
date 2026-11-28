@@ -156,6 +156,41 @@ class TestDivConverter(DispatchTestCase):
         ]
         self.run_test(div(), inputs)
 
+    @parameterized.expand(
+        [
+            ("int32", torch.tensor([2**20, -(2**20), 7, -7], dtype=torch.int32), 2048),
+            (
+                "int32_minimum",
+                torch.tensor([-(2**31), 2**31 - 1, -7], dtype=torch.int32),
+                -3,
+            ),
+            ("float", torch.tensor([3.5e-30, -3.5e-30, 7.0, -7.0]), 1e-30),
+            ("float_zero_divisor", torch.tensor([1.0, -1.0]), 0.0),
+            ("int32_float_divisor", torch.tensor([7, -7, 5], dtype=torch.int32), 2.5),
+        ]
+    )
+    def test_trunc_div_keeps_sign(self, _, x, divisor):
+        # The product of each value and the divisor overflows int32, or rounds to 0 in
+        # float32, and the absolute value of the int32 minimum overflows. A zero divisor
+        # gives an infinity with the sign of the value. A float divisor of an int32
+        # tensor gives a float32 quotient, so 2.5 does not become 2.
+        class div(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.div.Tensor_mode(x, divisor, rounding_mode="trunc")
+
+        self.run_test(div(), [x], rtol=0, atol=0)
+
+    def test_trunc_div_keeps_sign_of_zero(self):
+        # -1e-30 / 1e30 rounds to -0.0, and the reciprocal shows the sign of the zero.
+        class div(nn.Module):
+            def forward(self, x):
+                quotient = torch.ops.aten.div.Tensor_mode(
+                    x, 1e30, rounding_mode="trunc"
+                )
+                return torch.ops.aten.reciprocal.default(quotient)
+
+        self.run_test(div(), [torch.tensor([-1e-30, 1e-30, -0.5])], rtol=0, atol=0)
+
     def test_div_odd_dynamic_size_gives_float(self):
         class div(nn.Module):
             def forward(self, x):

@@ -12,6 +12,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     extend_attr_to_tuple,
     get_positive_dim,
     get_trt_tensor,
@@ -50,6 +51,12 @@ def avg_poolNd(
 
     padding = extend_attr_to_tuple(padding, dim)
 
+    # TensorRT pooling takes no int32 or int64. The cast back truncates toward zero, like
+    # the integer division of PyTorch's integer average.
+    integer_dtype = input.dtype if input.dtype in (trt.int32, trt.int64) else None
+    if integer_dtype is not None:
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_float")
+
     # add average pooling layer
     pool_layer = ctx.net.add_pooling_nd(
         input=input,
@@ -62,6 +69,10 @@ def avg_poolNd(
     pool_layer.average_count_excludes_padding = not count_include_pad
 
     set_layer_name(pool_layer, target, name, source_ir)
+    if integer_dtype is not None:
+        return cast_trt_tensor(
+            ctx, pool_layer.get_output(0), integer_dtype, f"{name}_integer"
+        )
     return pool_layer.get_output(0)
 
 
@@ -97,6 +108,12 @@ def max_poolNd(
 
     padding = extend_attr_to_tuple(padding, dim)
 
+    # TensorRT pooling takes no int32 or int64. float32 holds an integer exactly up to
+    # 2**24.
+    integer_dtype = input.dtype if input.dtype in (trt.int32, trt.int64) else None
+    if integer_dtype is not None:
+        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_float")
+
     # add max pooling layer
     pool_layer = ctx.net.add_pooling_nd(
         input=input,
@@ -108,6 +125,10 @@ def max_poolNd(
     pool_layer.padding_nd = padding
 
     set_layer_name(pool_layer, target, name, source_ir)
+    if integer_dtype is not None:
+        return cast_trt_tensor(
+            ctx, pool_layer.get_output(0), integer_dtype, f"{name}_integer"
+        )
     return pool_layer.get_output(0)
 
 

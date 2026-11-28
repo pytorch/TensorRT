@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -214,6 +215,23 @@ class TestMatMulConverter(DispatchTestCase):
             MatMul(),
             input_specs,
         )
+
+    def test_matmul_of_int32_prod(self):
+        # CUDA has no integer matmul, so the graph is exported and checked on the CPU.
+        class MatMul(nn.Module):
+            def forward(self, x):
+                y = x.prod(-1)
+                return y @ y.T
+
+        model = MatMul().eval()
+        x = torch.tensor([[[1, 2], [3, 4]], [[5, 1], [2, 3]]], dtype=torch.int32)
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x.cuda()],
+            min_block_size=1,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(compiled(x.cuda()).cpu(), model(x), rtol=0, atol=0)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     node_has_dynamic_shapes,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_DATA_MOVEMENT_OPS,
     args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
@@ -1991,25 +1992,8 @@ def aten_ops_scatter(
     )
 
 
-def select_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    """Keep a select of a uint8 tensor on the PyTorch path.
-
-    TensorRT allows uint8 only at engine inputs and at outputs made by a cast or
-    identity layer, so the gather's uint8 result fails the engine build, as it does
-    for aten.gather.
-    """
-    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
-    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
-        _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
-        return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.select.int,
-    capability_validator=select_validator,
     supports_dynamic_shapes=True,
 )
 def aten_ops_select(
@@ -2537,6 +2521,58 @@ def _truncatable_float64_copy(node: Node, source: Argument) -> bool:
         return False
 
 
+def _float64_copy_dtype(ctx: ConversionContext, dtype: Any) -> Any:
+    """Return float32 for a float64 copy with truncate_double.
+
+    The _to_copy and aten.copy validators accept such a copy only after
+    _truncatable_float64_copy checked the graph's source dtype. impl.cast.to_copy
+    cannot decide it here: an op inside the engine that moves uint8 data makes an int32
+    value, which it would not truncate. The placeholder converter keeps the rule in
+    impl.cast.to_copy, since a uint8 engine input stays uint8.
+    """
+    if dtype is torch.float64 and ctx.compilation_settings.truncate_double:
+        return torch.float32
+    return dtype
+
+
+_INT8_PASS_THROUGH_OPS = UINT8_DATA_MOVEMENT_OPS | {
+    torch.ops.aten._to_copy.default,
+    torch.ops.aten.clone.default,
+    torch.ops.aten.gather.default,
+    torch.ops.aten.index.Tensor,
+    operator.getitem,
+}
+
+
+def _cast_or_moved_from_int8(value: Argument, inputs_only: bool) -> bool:
+    """Whether value is int8, or made from an int8 value only by casts and data moves.
+
+    TensorRT treats an int8 engine input as quantized, so math on such a value fails
+    the build. Partitioning can make any int8 value an engine input, for example when
+    the op that makes it runs in PyTorch. With inputs_only, only an int8 graph input or
+    one made by an op TensorRT does not convert counts.
+    """
+    stack, seen = [value], set()
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, Node) or node in seen:
+            continue
+        seen.add(node)
+        if getattr(node.meta.get("val"), "dtype", None) == torch.int8 and (
+            not inputs_only
+            or node.op == "placeholder"
+            or (node.op == "call_function" and node not in DYNAMO_CONVERTERS)
+        ):
+            return True
+        # Follow only the operand whose values end up in the result.
+        if node.target is torch.ops.aten.copy.default:
+            stack.append(node.args[1])
+        elif node.target in _INT8_PASS_THROUGH_OPS:
+            data = node.args[0]
+            stack.extend(data if isinstance(data, (list, tuple)) else [data])
+    return False
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
@@ -2576,9 +2612,34 @@ def to_copy_dtype_validator(
             torch.int64,
             torch.bool,
             torch.int8,
+            torch.uint8,
             torch.float16,
             torch.bfloat16,
         }
+
+        source_dtype = getattr(
+            getattr(to_copy_node.args[0], "meta", {}).get("val"), "dtype", None
+        )
+        # The wrap in impl.cast.to_uint8 needs an exact int64 floor division, which
+        # TensorRT before 10.14 does not compute exactly for large values. A bool needs
+        # no wrap.
+        if to_copy_node.kwargs.get("dtype") == torch.uint8 and (
+            source_dtype not in impl.cast.UINT8_CAST_SOURCES
+            or _cast_or_moved_from_int8(
+                to_copy_node.args[0],
+                inputs_only=settings is not None and settings.require_full_compilation,
+            )
+            or (
+                source_dtype is not torch.bool
+                and not is_tensorrt_version_supported("10.14")
+            )
+        ):
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node}: no cast to uint8 "
+                f"from {source_dtype}, from an int8 value, or "
+                "before TensorRT 10.14"
+            )
+            return False
 
         # Validate input node has convertible kwargs
         if "dtype" in to_copy_node.kwargs:
@@ -2638,13 +2699,16 @@ def aten_ops_clone_copy_dtype(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # The validator lets a cast to uint8 through only from impl.cast.UINT8_CAST_SOURCES.
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     return impl.cast.to_copy(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         args[0],
-        kwargs.get("dtype", args[0].dtype),
+        _float64_copy_dtype(ctx, kwargs.get("dtype", args[0].dtype)),
         force_layer=False,  # force_layer=False results in better performance
     )
 
@@ -2748,6 +2812,8 @@ def aten_ops_clone_copy_placeholder(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     # For clone or copy nodes where the input is also the output,
     # we need to force cast to ensure a layer is added to the TRT engine
     # since TRT engine inputs cannot also be TRT engine outputs
@@ -2833,9 +2899,109 @@ def aten_ops_amin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.sum.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.sum.dim_IntList, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.prims.sum.default, supports_dynamic_shapes=True)
+def sum_prod_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep a sum or product with a result in uint8 or bool on the PyTorch path.
+
+    The next engine can take such a result as an input. An int8, int16 or float64
+    result could not feed another engine, so _sum_prod computes it in a dtype the
+    engine holds instead.
+    """
+    if node.target is torch.ops.prims.sum.default:
+        # PyTorch cannot run prims.sum with an output_dtype, and the converter casts
+        # to it.
+        return True
+    output_dtype = getattr(node.meta.get("val"), "dtype", None)
+    if output_dtype in (
+        None,
+        torch.float64,
+        torch.float32,
+        torch.float16,
+        torch.bfloat16,
+        torch.int32,
+        torch.int64,
+        torch.int16,
+        torch.int8,
+    ):
+        return True
+    _LOGGER.debug(f"{node.target} to {output_dtype} is not supported, falling back")
+    return False
+
+
+def _sum_prod(
+    ctx: ConversionContext,
+    target: Target,
+    name: str,
+    reduce: Callable[..., TRTTensor],
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+) -> TRTTensor:
+    """Reduce like PyTorch: a float result in its own dtype, an integer one in int64.
+
+    The result dtype is the requested dtype, else int64 for a bool or integer input.
+    The engine cannot hold a requested int8, int16 or float64, see sum_prod_validator.
+    int8 and int16 give int64 of the input cast to int64, which truncates a float like
+    PyTorch's cast to the dtype. The total is not wrapped into the range of the dtype,
+    since math in that dtype does not wrap in the engine either.
+    float64 gives float32, and an integer sum to float64 is reduced exactly in int64
+    first. prims.sum gives its output_dtype, else the input dtype. TensorRT may round
+    an int32 reduction through float32 or wrap it, so an integer result is reduced in
+    int64 and then cast, which wraps an int32 result like PyTorch.
+    """
+    input_val = args[0]
+    result_dtype = kwargs.get("dtype")
+    integer_sum_to_float64 = (
+        result_dtype == torch.float64
+        and reduce is impl.reduce.sum
+        and not _enums.dtype._from(input_val.dtype).to(torch.dtype).is_floating_point
+    )
+    if result_dtype in (torch.int8, torch.int16):
+        result_dtype = torch.int64
+    if kwargs.get("output_dtype") is not None:
+        result_dtype = kwargs["output_dtype"]
+    if result_dtype is None:
+        result_dtype = _enums.dtype._from(input_val.dtype).to(torch.dtype)
+        if not result_dtype.is_floating_point and target != torch.ops.prims.sum.default:
+            result_dtype = torch.int64
+    elif result_dtype == torch.float64:
+        result_dtype = torch.float32
+    accumulate = (
+        result_dtype
+        if result_dtype.is_floating_point and not integer_sum_to_float64
+        else torch.int64
+    )
+    result = reduce(
+        ctx,
+        target,
+        get_ir(target),
+        name,
+        impl.cast.to_copy(
+            ctx, target, SourceIR.ATEN, f"{name}_input", input_val, accumulate
+        ),
+        args_bounds_check(args, 1, replacement=None),
+        args_bounds_check(args, 2, replacement=False),
+    )
+    return impl.cast.to_copy(
+        ctx, target, SourceIR.ATEN, f"{name}_output", result, result_dtype
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sum.dim_IntList,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.prims.sum.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_sum(
     ctx: ConversionContext,
     target: Target,
@@ -2843,32 +3009,19 @@ def aten_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    sum_ = impl.reduce.sum(
-        ctx,
-        target,
-        get_ir(target),
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
-
-    if kwargs.get("output_dtype", None) is not None:
-        return impl.cast.to_copy(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name,
-            sum_,
-            kwargs["output_dtype"],
-            force_layer=False,  # force_layer=False results in better performance
-        )
-    else:
-        return sum_
+    return _sum_prod(ctx, target, name, impl.reduce.sum, args, kwargs)
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.prod.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.prod.dim_int, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.default,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.prod.dim_int,
+    capability_validator=sum_prod_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_prod(
     ctx: ConversionContext,
     target: Target,
@@ -2876,15 +3029,7 @@ def aten_ops_prod(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.reduce.prod(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args_bounds_check(args, 1, replacement=None),
-        args_bounds_check(args, 2, replacement=False),
-    )
+    return _sum_prod(ctx, target, name, impl.reduce.prod, args, kwargs)
 
 
 @dynamo_tensorrt_converter(
@@ -5400,7 +5545,7 @@ def aten_ops_copy(
         SourceIR.ATEN,
         name,
         src,
-        dest.dtype,
+        _float64_copy_dtype(ctx, dest.dtype),
         force_layer=True,
     )
 

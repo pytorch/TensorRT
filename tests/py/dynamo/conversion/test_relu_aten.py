@@ -18,6 +18,15 @@ class TestReLUConverter(DispatchTestCase):
         inputs = [torch.randn(1, 10)]
         self.run_test(TestModule(), inputs)
 
+    def test_relu_int32(self):
+        # Through float32, 2**25 + 1 would round.
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.relu.default(x)
+
+        inputs = [torch.tensor([-5, 0, 7, 2**25 + 1], dtype=torch.int32)]
+        self.run_test(TestModule(), inputs, rtol=0, atol=0)
+
     def test_relu_with_dynamic_shape(self):
         class TestModule(nn.Module):
             def forward(self, x):

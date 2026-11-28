@@ -6,10 +6,12 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import cast_trt_tensor
 from torch_tensorrt.dynamo.conversion.impl.activation.base import convert_activation
 
 
@@ -20,6 +22,9 @@ def relu(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (trt.int32, trt.int64):
+        # TensorRT RELU rejects int32 on some versions, and max with 0 is exact.
+        return impl.elementwise.max(ctx, target, source_ir, name, input_val, 0)
     operation_type = trt.ActivationType.RELU
 
     def relu_dyn_range_fn(dyn_range: Tuple[float, float]) -> Tuple[float, float]:
@@ -43,6 +48,12 @@ def sigmoid(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (
+        trt.int8,
+        trt.int32,
+        trt.int64,
+    ):
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, f"{name}_cast")
     operation_type = trt.ActivationType.SIGMOID
 
     def sigmoid_dyn_range_fn(dyn_range: Tuple[float, float]) -> Tuple[float, float]:
@@ -69,6 +80,12 @@ def tanh(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
+    if isinstance(input_val, TRTTensor) and input_val.dtype in (
+        trt.int8,
+        trt.int32,
+        trt.int64,
+    ):
+        input_val = cast_trt_tensor(ctx, input_val, trt.float32, f"{name}_cast")
     operation_type = trt.ActivationType.TANH
 
     def tanh_dyn_range_fn(dyn_range: Tuple[float, float]) -> Tuple[float, float]:

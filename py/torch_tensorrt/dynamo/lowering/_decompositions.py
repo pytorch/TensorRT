@@ -384,7 +384,6 @@ def _scatter_add_integer_decomposition(
     positions = torch.arange(input_tensor.shape[dim], device=index.device)
     exclude_scatter_add_positions_from_constant_fold(positions)
     hits = index == positions.view(-1, 1)
-    # The where converter narrows int64 to int32, multiplying keeps the dtype.
     added = (hits.to(src_tensor.dtype) * src_tensor).sum(-1, dtype=src_tensor.dtype)
     added = added.movedim(-1, dim)
     pad = []

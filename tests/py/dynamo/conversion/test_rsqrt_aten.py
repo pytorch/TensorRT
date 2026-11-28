@@ -16,6 +16,7 @@ class TestRSqrtConverter(DispatchTestCase):
             ("2d_dim_float", (2, 1), torch.float),
             ("3d_dim_float", (2, 1, 2), torch.float),
             ("3d_dim_int32", (2, 1, 2), torch.int32),
+            ("3d_dim_int64", (2, 1, 2), torch.int64),
         ]
     )
     def test_rsqrt(self, _, x, type):
@@ -23,8 +24,8 @@ class TestRSqrtConverter(DispatchTestCase):
             def forward(self, input):
                 return torch.ops.aten.rsqrt.default(input)
 
-        if type == torch.int32:
-            inputs = [torch.randint(255, x, dtype=torch.int32)]
+        if type in (torch.int32, torch.int64):
+            inputs = [torch.randint(255, x, dtype=type)]
         else:
             inputs = [torch.randn(x) + 1]
 
