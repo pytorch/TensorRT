@@ -11,7 +11,7 @@ one ``torch.export`` graph that calls those engines.
     from hf.exporters import EdgeExporter, EdgeConfig
 
     exporter = EdgeExporter()
-    config = EdgeConfig(dryrun=True, engine_dir="/tmp/pi05_edge")
+    config = EdgeConfig(engine_dir="/tmp/pi05_edge")
     exported = exporter.export(policy, {"device": device, "dtype": torch.float16}, config)
 
 ``EdgeExporter`` is a HuggingFace ``DynamoExporter``. The public call is the same
@@ -95,7 +95,6 @@ plus sample inputs, and call ``export()``.
         model_type="pi05",          # optional when the spec can infer it
         engine_dir="/tmp/pi05_edge",
         max_seq_len=968,
-        dryrun=True,                # skip TensorRT; still writes config.json + the outer graph
     )
     exported = exporter.export(policy, {"device": device, "dtype": torch.float16}, config)
 
@@ -108,13 +107,9 @@ plus sample inputs, and call ``export()``.
 Pass the **policy** for PI05 and GR00T (the spec needs the preprocessor), not an
 inner submodule. Pass the HuggingFace causal LM for Nemotron.
 
-``dryrun=True`` walks the same export path without building TensorRT engines. Each
-component directory still gets a ``config.json``. Use that to debug packing and
-patches, then set ``dryrun=False`` (or pass ``--compile`` on the example scripts)
-to emit ``.engine`` files.
-
-On a real compile, ``engine_dir/<component>/`` contains ``config.json`` and the
-serialized engine (for example ``visual.engine``, ``language.engine``).
+``engine_dir/<component>/`` contains ``config.json`` and the serialized engine
+(for example ``visual.engine``, ``language.engine``). The smoke scripts always
+compile.
 
 Export Program
 --------------
@@ -128,7 +123,7 @@ text embeddings. ``print(program.graph)`` prints that FX graph: each
 ``execute_engine`` node is one component, and the path in its args is the
 engine directory.
 
-Here is a GR00T dryrun (``vision`` → ``scatter_image_tokens`` →
+Here is a GR00T outer graph (``vision`` → ``scatter_image_tokens`` →
 ``language`` → ``context_projection`` → ``action``):
 
 .. code-block:: text
@@ -182,14 +177,15 @@ Patches
 -------
 
 Edge does not wrap the policy in a new module. It temporarily replaces
-``Class.forward`` on the original HuggingFace / LeRobot class, compiles that
-submodule, then restores the method (dryrun leaves the replacement in place).
+``Class.forward`` on the original HuggingFace / LeRobot class so
+``torch.export`` / TensorRT see plugin I/O, then restores the method.
+Eager inference is the unpatched model.
 
 ``@register_patch`` does not install anything. It records a factory and a dotted
 class path on a backend (``"pi05"``, ``"groot"``, ``"nemotron"``).
 ``apply_patches(backend)`` imports that class and does
-``setattr(Cls, "forward", factory(original))`` for the duration of
-``export()``.
+``setattr(Cls, "forward", factory(original))`` while each component is
+traced and compiled.
 
 HuggingFace ``DynamoExporter`` uses the same two steps. The purpose is
 different. HF patches make the original modeling ``forward`` traceable. Edge
@@ -288,15 +284,15 @@ Add a new model
 ---------------
 
 ``EdgeExporter.export`` never branches on PI05 vs GR00T. It loads an ``EdgeSpec``
-and loops ``spec.components``. A new architecture is a new spec plus a patch
-backend.
+and compiles whatever ``prepare`` returns. A new architecture is a new spec
+plus a patch backend.
 
 Create ``tools/hf/exporters/models/<family>/``:
 
 .. code-block:: text
 
     <family>/
-        spec.py       # EdgeSpec: components, sample inputs, prepare, run
+        spec.py       # EdgeSpec: sample inputs, prepare, run
         patches.py    # @register_patch factories on this family's backend
         helpers.py    # optional packing / submodule lookup
 
@@ -316,8 +312,6 @@ exporter package loads:
 
     @register_edge_spec("my_vla")
     class MyVlaSpec(EdgeSpec):
-        components = ("vision", "language", "action")
-
         def apply_patches(self, model=None):
             from hf.exporters.plugin.attn_patches import apply_patches
             from .patches import MY_VLA
@@ -340,17 +334,43 @@ Reuse the shared plugin attention factories when the layout matches
 3. Select submodules and flatten I/O
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``prepare(name, model, sample, upstream, config)`` returns a ``ComponentBundle``:
+``prepare(model, sample, config)`` returns a dict of ``ComponentBundle`` values
+(one per engine). The exporter compiles that dict; it does not branch on
+component names.
 
 * ``module`` — the original submodule to compile (vision tower, decoder, action head)
 * ``trace_args`` / ``save_args`` — positional tensors for ``torch.export`` / the engine
 * ``input_names`` / ``output_names`` — written into ``config.json``
 * ``context_attention_mask_type`` — padding vs causal for the language plugin
 
-``capture_upstream`` maps this engine's outputs into keys the next ``prepare``
-needs (image tokens, prefix KV, context embeddings).
+Pack later-stage example tensors inside ``prepare`` (unpatched eager, or zeros
+of the trace shape). ``run()`` still chains **engine** outputs at runtime.
 
-4. Call engines in ``run()``
+4. Capture unpatched eager
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``capture_eager_outputs(model, sample, config)`` runs the original HuggingFace /
+LeRobot forwards **before** ``apply_patches``. Return one tensor per component
+(the value e2e passes to ``parity``). The exporter compares that to TensorRT.
+
+.. code-block:: python
+
+    def capture_eager_outputs(self, model, sample, config, bench=None):
+        paligemma = ...
+        language = paligemma.language_model
+        with torch.no_grad():
+            visual_embeds = paligemma.multi_modal_projector(
+                paligemma.vision_tower(sample["pixel_values"]).last_hidden_state
+            )
+            lm = language(
+                inputs_embeds=sample["prefix_embs"],
+                attention_mask=sample["prefix_attention_mask"],
+                position_ids=sample["prefix_position_ids"],
+                return_dict=True,
+            )
+        return {"vision": visual_embeds, "language": lm.last_hidden_state, ...}
+
+5. Call engines in ``run()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``run(engines, sample)`` is the outer graph. Call ``call_engine`` for each
@@ -367,7 +387,7 @@ or your own custom op).
             engines["action"], "action", sample["step_actions"], ..., lm[2], lm[3]
         )
 
-5. Collate sample inputs
+6. Collate sample inputs
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``prepare_sample_inputs`` turns the caller payload into the stem dict ``prepare``
@@ -378,21 +398,16 @@ so the example scripts can pass only ``device`` and ``dtype``.
 Example scripts
 ---------------
 
-The smoke scripts live next to the other Dynamo examples. Default is **dryrun**
-(no TensorRT). Pass ``--compile`` to build engines.
+The smoke scripts live in ``tools/hf``. They always build TensorRT engines.
 
 .. code-block:: bash
 
-    cd TensorRT/examples/dynamo
+    cd TensorRT/tools/hf
 
     python run_pi05_export.py
-    python run_pi05_export.py --compile --engine-dir /tmp/pi05_edge
-
     python run_groot_export.py
-    python run_groot_export.py --compile --engine-dir /tmp/groot_edge
-
     python run_nemotron_export.py --prompt "Hello."
-    python run_nemotron_export.py --compile --checkpoint nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16
+    python run_nemotron_export.py --checkpoint nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16
 
 .. list-table::
    :header-rows: 1
@@ -414,9 +429,6 @@ The smoke scripts live next to the other Dynamo examples. Default is **dryrun**
 Each script loads plugins, forces ``eager`` attention, calls ``EdgeExporter.export``,
 prints ``exporter.engines``, and runs the returned program once.
 
-To export only one component while you debug a family, set
-``EdgeConfig(components=("vision",))`` (or pass a subset of ``spec.components``).
-
 Configuration
 -------------
 
@@ -432,18 +444,9 @@ Configuration
    * - ``engine_dir``
      - ``"edge_engines"``
      - Output directory; one subdirectory per component
-   * - ``dryrun``
-     - ``False``
-     - Skip TensorRT; keep patched Python modules for ``execute_engine``
-   * - ``skip_runtime_export``
-     - ``False``
-     - Return the runtime module without ``torch.export`` of the outer graph
    * - ``model_type``
      - inferred
      - ``"pi05"``, ``"groot"``, ``"nemotron_h"``
-   * - ``components``
-     - spec default
-     - Subset of engines to compile
    * - ``max_seq_len``
      - ``968``
      - KV / RoPE capacity for language
