@@ -25,4 +25,5 @@ responsibility.
    :maxdepth: 2
 
    direct_api
+   mcp_adapter
    contracts_testing

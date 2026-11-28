@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch-tensorrt-mcp"
+version = "0.1.0"
+description = "Local, policy-controlled Torch-TensorRT tools over stdio MCP"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = ["mcp>=2,<3", "packaging>=23", "pydantic>=2,<3"]
+license = "BSD-3-Clause"
+classifiers = ["Operating System :: POSIX :: Linux", "Programming Language :: Python :: 3"]
+
+[project.optional-dependencies]
+# Opt-in provisioning only. The normal install deliberately leaves an existing
+# GPU software environment alone and verifies its compatibility at execution.
+core = ["torch-tensorrt>=2.16.0.dev0"]
+test = ["pytest>=8", "anyio>=4"]
+
+[project.scripts]
+torch-tensorrt-mcp = "torch_tensorrt_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
