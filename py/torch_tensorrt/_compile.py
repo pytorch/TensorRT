@@ -1753,6 +1753,7 @@ def _lower_and_write_executorch(
         export,
         zero_copy_backend_config,
     )
+    from torch_tensorrt.executorch._export_utils import operators_without_kernels
 
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
@@ -1810,6 +1811,17 @@ def _lower_and_write_executorch(
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
     _write_external_tensor_data(executorch_program, file_path)
+    missing_kernels = operators_without_kernels(executorch_program)
+    if missing_kernels:
+        logger.warning(
+            "%s calls operators outside its TensorRT delegates that the ExecuTorch "
+            "runtime installed here has no kernel for: %s. Loading the program fails "
+            "with OperatorMissing unless the runtime it is deployed with registers "
+            "them. These are operators Torch-TensorRT left to PyTorch, usually for "
+            "lack of a converter.",
+            file_path,
+            ", ".join(missing_kernels),
+        )
     if generate_etrecord:
         # Follows ExecuTorch's example convention (e.g. examples/cuda/scripts/export.py):
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
