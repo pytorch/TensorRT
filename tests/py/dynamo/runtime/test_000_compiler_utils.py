@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import dataclasses
 import unittest
 from unittest import mock
 
@@ -150,6 +151,35 @@ class TestPrepareInputs(unittest.TestCase):
             prepare_inputs([x])
         prepared = prepare_inputs([x], disable_memory_format_check=True)
         self.assertEqual(tuple(prepared[0].shape), tuple(x.shape))
+
+
+@dataclasses.dataclass
+class _KVPair:
+    keys: torch.Tensor
+    values: torch.Tensor
+
+
+torch.utils._pytree.register_dataclass(_KVPair)
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is not available")
+class TestPytreeContainerInputs(unittest.TestCase):
+    def test_dynamo_compile_accepts_registered_pytree_input(self):
+        # e.g. Hugging Face's StaticCache, passed as a kwarg
+        class M(torch.nn.Module):
+            def forward(self, x, kv):
+                return x @ kv.keys.T + kv.values
+
+        x = torch.randn(2, 8, device="cuda")
+        kv = _KVPair(torch.randn(3, 8, device="cuda"), torch.randn(2, 3, device="cuda"))
+        ep = torch.export.export(M(), (x,), {"kv": kv})
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep, arg_inputs=(x,), kwarg_inputs={"kv": kv}, min_block_size=1
+        )
+        with torch.no_grad():
+            torch.testing.assert_close(
+                trt_mod(x, kv=kv), M()(x, kv=kv), rtol=1e-2, atol=1e-2
+            )
 
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is not available")
