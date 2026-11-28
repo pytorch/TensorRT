@@ -5,7 +5,7 @@ import base64
 import copy
 import logging
 import operator
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 import torch.utils._pytree as pytree
@@ -25,6 +25,7 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
+from torch.export.graph_signature import ConstantArgument
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._offloaded_engines import get_offloaded_engine_path
@@ -204,9 +205,15 @@ def lift(
         output_names[output_spec.arg.name] = output_spec.arg.name
 
     # Locate the user input to insert new placeholders before them
+    # Not graph_signature.user_inputs: it lists a ConstantArgument by value, not name.
+    user_input_names = {
+        spec.arg.name
+        for spec in graph_signature.input_specs
+        if spec.kind == InputKind.USER_INPUT
+    }
     first_user_input = None
     for node in gm.graph.nodes:
-        if node.op == "placeholder" and node.name in graph_signature.user_inputs:
+        if node.op == "placeholder" and node.name in user_input_names:
             first_user_input = node
             break
 
@@ -534,7 +541,7 @@ def create_trt_exp_program(
     ]
 
     input_specs = [
-        InputSpec(InputKind.USER_INPUT, TensorArgument(name=node.name), node.target)
+        InputSpec(InputKind.USER_INPUT, _user_input_arg(node), node.target)
         for node in input_nodes
     ]
     output_specs = [
@@ -687,6 +694,17 @@ def create_trt_exp_program(
     )
 
     return trt_exp_program
+
+
+def _user_input_arg(node: torch.fx.Node) -> Union[TensorArgument, ConstantArgument]:
+    """User inputs that torch.export folded to Python values (e.g. a ``float``
+    scale or ``mask=None``) are ConstantArgument, matching torch.export.
+    Declaring them as TensorArgument makes torch.export.save raise KeyError."""
+    if "val" in node.meta:
+        val = node.meta["val"]
+        if val is None or isinstance(val, (int, float, bool, str)):
+            return ConstantArgument(name=node.name, value=val)
+    return TensorArgument(name=node.name)
 
 
 def _declare_aliased_kv_mutations_on_ep(
