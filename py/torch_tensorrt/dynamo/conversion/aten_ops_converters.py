@@ -2537,6 +2537,20 @@ def _truncatable_float64_copy(node: Node, source: Argument) -> bool:
         return False
 
 
+def _float64_copy_dtype(ctx: ConversionContext, dtype: Any) -> Any:
+    """Return float32 for a float64 copy with truncate_double.
+
+    The _to_copy and aten.copy validators accept such a copy only after
+    _truncatable_float64_copy checked the graph's source dtype. impl.cast.to_copy
+    cannot decide it here: an op inside the engine that moves uint8 data makes an int32
+    value, which it would not truncate. The placeholder converter keeps the rule in
+    impl.cast.to_copy, since a uint8 engine input stays uint8.
+    """
+    if dtype is torch.float64 and ctx.compilation_settings.truncate_double:
+        return torch.float32
+    return dtype
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
@@ -2644,7 +2658,7 @@ def aten_ops_clone_copy_dtype(
         SourceIR.ATEN,
         name,
         args[0],
-        kwargs.get("dtype", args[0].dtype),
+        _float64_copy_dtype(ctx, kwargs.get("dtype", args[0].dtype)),
         force_layer=False,  # force_layer=False results in better performance
     )
 
@@ -5479,7 +5493,7 @@ def aten_ops_copy(
         SourceIR.ATEN,
         name,
         src,
-        dest.dtype,
+        _float64_copy_dtype(ctx, dest.dtype),
         force_layer=True,
     )
 
