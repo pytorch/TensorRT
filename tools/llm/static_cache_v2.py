@@ -2,11 +2,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 import torch.utils._pytree as pytree
-from cache_utils import _add_graph_input, create_random_output_tensors, get_kv_nodes
+from cache_utils import (
+    SDPA_OPS,
+    add_graph_input,
+    create_random_output_tensors,
+    get_kv_nodes,
+    set_output_spec,
+)
 from torch.fx import Node
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
@@ -19,7 +25,9 @@ from torch_tensorrt.dynamo.utils import extract_var_range_info
 
 logger = logging.getLogger(__name__)
 
-SDPA_OP = torch._C._nn.scaled_dot_product_attention
+# Length of the static KV cache; None ties it to the largest per-call sequence length. Set before
+# compiling (the lowering pass has no way to receive arguments).
+KV_CACHE_LEN: Optional[int] = None
 
 
 def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Tensor]]):
@@ -55,13 +63,15 @@ def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Ten
     return new_outputs
 
 
-def add_kv_cache_inputs(gm, fixed_kv: bool = True):
+def add_kv_cache_inputs(gm, fixed_kv: bool = True, kv_cache_len: Optional[int] = None):
     """
     Add key-value tensors, index parameters as inputs to the graph.
 
     Args:
         gm: The GraphModule to modify
         fixed_kv: Boolean indicating whether to use static tensors for KV cache. Default is True.
+        kv_cache_len: Length of the static KV cache. Default (None): the maximum of the dynamic
+            sequence-length range, which ties the cache to the largest single call.
 
     Returns:
         A tuple containing:
@@ -82,26 +92,41 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
         static_tensor = torch.randn(key_shape, dtype=tensor.dtype, device=tensor.device)
         return static_tensor
 
-    keys_values = get_kv_nodes(gm)
+    def get_cache_tensor(tensor: torch.Tensor):
+        """Cache for ``tensor`` ([B, H, L, D]): its length is ``kv_cache_len`` (decoupled from the
+        per-call ``L`` range) and a dynamic batch stays dynamic (same symbol as the new keys).
+        """
+        if kv_cache_len is None and not isinstance(tensor.shape[0], torch.SymInt):
+            return get_static_tensor(tensor)
+        seq = kv_cache_len
+        if seq is None:
+            seq = extract_var_range_info(tensor.shape[2])["max"]
+            assert (
+                seq is not None
+            ), "unable to extract sequence length from kv cache tensor"
+        return tensor.new_empty(
+            (tensor.shape[0], tensor.shape[1], seq, tensor.shape[3])
+        )
 
     kv_inputs = []
-    for idx, key_value in enumerate(keys_values):
+    for key_value in get_kv_nodes(gm):
         k_val = key_value[0].meta["val"]
         v_val = key_value[1].meta["val"]
         if fixed_kv:
-            k_val = get_static_tensor(k_val)
-            v_val = get_static_tensor(v_val)
+            k_val = get_cache_tensor(k_val)
+            v_val = get_cache_tensor(v_val)
 
         # Add new inputs using _add_graph_input
-        k_input = _add_graph_input(gm, key_value[0].name + "_k_input", k_val)
-        v_input = _add_graph_input(gm, key_value[1].name + "_v_input", v_val)
+        k_input = add_graph_input(gm, key_value[0].name + "_k_input", k_val)
+        v_input = add_graph_input(gm, key_value[1].name + "_v_input", v_val)
         kv_inputs.append((k_input, v_input))
 
     # Add start_idx and end_idx as inputs
-    start_idx_input = _add_graph_input(gm, "start_idx", torch.tensor(0))
-    end_idx_input = _add_graph_input(gm, "end_idx", torch.tensor(1))
+    start_idx_input = add_graph_input(gm, "start_idx", torch.tensor(0))
+    end_idx_input = add_graph_input(gm, "end_idx", torch.tensor(1))
 
-    # Get the max sequence length from the first key_cache node. The order of input nodes is: input_ids, key_cache1, value_cache1, key_cache2, value_cache2, start_idx, end_idx
+    # Get the max sequence length from the first key_cache node. The order of input nodes
+    # is: input_ids, key_cache1, value_cache1, key_cache2, value_cache2, start_idx, end_idx
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     # Get the third last input which should be the last value cache node and store the max_seq_len
     input_ids_meta = input_nodes[-3].meta["val"]
@@ -224,6 +249,25 @@ def create_kv_cache_update_nodes(
     return concat_keys_or_values, new_incoming_keys_or_values
 
 
+def build_cache_causal_mask(gm, sdpa_node, q_node, k_node, start_idx_input) -> Node:
+    """Boolean mask [q_len, k_len]: query row ``i`` (the ``i``-th of the *last* ``q_len`` positions)
+    attends key ``j`` iff ``j <= start_idx + i`` (``start_idx`` = ``k_len - q_len``, the cached prefix)."""
+    g = gm.graph
+    device = q_node.meta["val"].device
+    with g.inserting_before(sdpa_node):
+        q_len = g.call_function(torch.ops.aten.sym_size.int, (q_node, 2))
+        k_len = g.call_function(torch.ops.aten.sym_size.int, (k_node, 2))
+        rows = g.call_function(
+            torch.ops.aten.arange.start_step, (0, q_len, 1), {"dtype": torch.int32, "device": device}
+        )
+        rows = g.call_function(torch.ops.aten.add.Tensor, (rows, start_idx_input))
+        cols = g.call_function(
+            torch.ops.aten.arange.start_step, (0, k_len, 1), {"dtype": torch.int32, "device": device}
+        )
+        rows = g.call_function(torch.ops.aten.unsqueeze.default, (rows, 1))
+        return g.call_function(torch.ops.aten.le.Tensor, (cols, rows))
+
+
 def insert_kv_slicing_before_sdpa(
     gm,
     incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]],
@@ -241,14 +285,16 @@ def insert_kv_slicing_before_sdpa(
     # Find all nodes with scaled_dot_product_attention
     sdpa_nodes = []
     for node in gm.graph.nodes:
-        if node.op == "call_function" and node.target == SDPA_OP:
+        if node.op == "call_function" and node.target in SDPA_OPS:
             sdpa_nodes.append(node)
     kv_cache_for_graph = []
+    causal_mask = None  # identical for every layer: built once, before the first SDPA
     for idx, sdpa_node in enumerate(sdpa_nodes):
-        assert (
-            len(sdpa_node.args) == 6
-        ), f"SDPA node should have 6 arguments but got {len(sdpa_node.args)} arguments"
-        q_node, k_node, v_node, attn_mask, dropout_p, is_causal = sdpa_node.args
+        q_node, k_node, v_node = sdpa_node.args[:3]
+        # (attn_mask, dropout_p, is_causal) are positional or keyword depending on the op form
+        attn_mask, dropout_p, _ = (
+            list(sdpa_node.args[3:6]) + [None, 0.0, False][len(sdpa_node.args[3:6]) :]
+        )
         incoming_key, incoming_value = incoming_keys_values[idx]
         # For keys
         new_current_key_node, new_incoming_key_cache_node = (
@@ -268,11 +314,24 @@ def insert_kv_slicing_before_sdpa(
             [new_incoming_key_cache_node, new_incoming_value_cache_node]
         )
 
+        # K/V now come from the cache (a slice + cat), which TensorRT's fused FP8 attention kernel
+        # cannot take: drop the FP8 softmax annotation (``annotate_fp8_sdpa``, set while K/V were
+        # still the quantizers' outputs) so the attention stays decomposable.
+        sdpa_node.meta.pop("_fp8_softmax_scale", None)
+
         # Update the SDPA node arguments with current key and value nodes
+        # The keys are the cache's prefix plus the new ones, so the query rows are the *last* rows of
+        # the causal mask. ``is_causal=True`` would align it to the top-left for a shorter query, so
+        # the mask is explicit.
+        if causal_mask is None:
+            causal_mask = build_cache_causal_mask(
+                gm, sdpa_node, q_node, new_current_key_node, start_idx_input
+            )
+        attn_mask = causal_mask
         sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + (
             attn_mask,
             dropout_p,
-            True,
+            False,
         )
 
     # kv_cache_for_graph.extend([k_node, v_node])
@@ -286,7 +345,9 @@ def insert_static_cache_v2(
     """Insert KV cache ops in the graph"""
     """Perform insertion of kv-caches and attention kernel."""
     # Add static key and value as inputs to the graph
-    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(gm, fixed_kv=True)
+    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(
+        gm, fixed_kv=True, kv_cache_len=KV_CACHE_LEN
+    )
 
     # Build and update the KV cache using computed KV inputs for current token and
     # incoming keys and values from previous tokens (which were added as inputs)
@@ -302,7 +363,7 @@ def insert_static_cache_v2(
     new_output_tensors = create_random_output_tensors(logits_keys_values)
 
     new_out_spec = pytree.tree_flatten(new_output_tensors)[1]
-    gm._out_spec = new_out_spec
+    set_output_spec(gm, new_out_spec)
 
     logger.debug("After inserting KV cache into the graph: " + str(gm.graph))
     return gm
