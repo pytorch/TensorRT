@@ -41,6 +41,7 @@ from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .inline_autocast_regions import inline_autocast_regions, log_kept_regions
 from .lower_associative_scan import lower_associative_scan
+from .nodeclassifier import record_weight_magnitudes
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
 from .preserve_attention_output_layout import preserve_attention_output_layout
@@ -328,9 +329,9 @@ def pre_export_lowering(
         # copy, and the caller's program stays as it was.
         ep = _copy_program(ep)
         # Without a low precision type autocast changes nothing, so the regions keep
-        # theirs. Inlining comes before calibration, so that it records the values of
-        # the inlined ops. Like inlining, the message about kept regions reads the graph
-        # before the later passes change it.
+        # theirs. Inlining comes before calibration and the weight magnitudes, so that
+        # they cover the inlined ops. Like inlining, the message about kept regions
+        # reads the graph before the later passes change it.
         low_precision_type = settings.autocast_low_precision_type
         if isinstance(low_precision_type, dtype):
             low_precision_type = low_precision_type.to(torch.dtype)
@@ -343,6 +344,8 @@ def pre_export_lowering(
                 include_disabled=mode == "reclassify_all",
                 low_precision_type=low_precision_type,
             )
+        if settings.autocast_low_precision_type is not None:
+            record_weight_magnitudes(ep)
         if iter_cond_subgraphs(ep.graph_module):
             raise RuntimeError(
                 "Autocast does not support models with torch.cond yet: it would cast every "

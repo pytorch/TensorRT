@@ -11,12 +11,17 @@ import torch.utils._pytree as pytree
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-from .nodeclassifier import NodeClassifier, NodeNameSetRule
+from .inline_autocast_regions import _RAN_AGAIN
+from .nodeclassifier import ConstantRangeRule, NodeClassifier, NodeNameSetRule
 from .pass_utils import (
+    _has_no_floating_point_tensors,
+    _has_only_integer_outputs,
+    _is_given_a_dtype,
     _wait_tensor_op,
     clean_up_graph_after_modifications,
     tensors_maybe_written_by,
     tensors_written_by,
+    writes_a_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,35 +52,6 @@ def is_tensor_node(n: torch.fx.Node) -> bool:
     if hasattr(val, "dtype"):
         return True
     return False
-
-
-def _is_given_a_dtype(n: torch.fx.Node) -> bool:
-    if not isinstance(n.target, torch._ops.OpOverload):
-        return False
-    for i, a in enumerate(n.target._schema.arguments):
-        if a.name == "dtype":
-            given = n.args[i] if i < len(n.args) else n.kwargs.get("dtype")
-            return given is not None
-    return False
-
-
-def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
-    tensors = [
-        v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
-    ]
-    return bool(tensors) and not any(
-        t.dtype.is_floating_point or t.dtype == torch.bool for t in tensors
-    )
-
-
-def _has_no_floating_point_tensors(n: torch.fx.Node) -> bool:
-    tensors = [
-        v
-        for m in (n, *n.all_input_nodes)
-        for v in pytree.tree_leaves(m.meta.get("val"))
-        if isinstance(v, torch.Tensor)
-    ]
-    return bool(tensors) and not any(t.dtype.is_floating_point for t in tensors)
 
 
 def _returns_its_input(n: torch.fx.Node) -> bool:
@@ -197,6 +173,23 @@ def rule_based_autocast(
             f"values may then run in {autocast_low_precision_type}."
         )
 
+    # Refit cannot change the engine's precisions, so it reuses the nodes that the
+    # weights of the compiled program kept in high precision. An engine saved by an
+    # earlier version that recorded such nodes needs them too, so it gets this check.
+    constant_nodes = settings._autocast_constant_range_nodes
+    if constant_nodes is not None:
+        missing = constant_nodes - {n.name for n in gm.graph.nodes}
+        if missing:
+            raise RuntimeError(
+                "Autocast cannot reuse the precisions that the constants chose, because "
+                f"these nodes are not in the graph: {sorted(missing)}. Compile the model "
+                "again."
+            )
+    constant_rule = (
+        ConstantRangeRule(autocast_low_precision_type)
+        if constant_nodes is None
+        else NodeNameSetRule(constant_nodes)
+    )
     node_classifier = NodeClassifier(
         gm.graph.nodes,
         excluded_nodes=autocast_excluded_nodes,
@@ -205,10 +198,13 @@ def rule_based_autocast(
         max_output_threshold=autocast_max_output_threshold,
         max_depth_of_reduction=autocast_max_depth_of_reduction,
         custom_rule=replay_rule,
+        constant_rule=constant_rule,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(
         reference_data, reference_shapes
     )
+    if isinstance(constant_rule, ConstantRangeRule):
+        settings._autocast_constant_range_nodes = frozenset(constant_rule.kept)
     if reference_data:
         # A saved program drops the calibration data, so refit reuses this.
         settings._autocast_calibrated_high_precision_nodes = frozenset(
@@ -256,7 +252,9 @@ def rule_based_autocast(
         else:
             return arg
 
-    def _cast_tensor_args_to_dtype(node: torch.fx.Node, dtype: torch.dtype) -> None:
+    def _cast_tensor_args_to_dtype(
+        node: torch.fx.Node, dtype: torch.dtype, keep_first: bool = False
+    ) -> None:
         names = (
             [a.name for a in node.target._schema.arguments]
             if isinstance(node.target, torch._ops.OpOverload)
@@ -265,7 +263,8 @@ def rule_based_autocast(
         node.args = tuple(
             (
                 arg
-                if i < len(names) and names[i] in _INDEX_ARGUMENTS
+                if (keep_first and i == 0)
+                or (i < len(names) and names[i] in _INDEX_ARGUMENTS)
                 else _cast_all_tensor_args_to_dtype(node, arg, dtype)
             )
             for i, arg in enumerate(node.args)
@@ -310,34 +309,63 @@ def rule_based_autocast(
             ):
                 kept.update(nodes)
     owners = {n for n in kept if not _returns_its_input(n) and n in traced_dtypes}
+    if (
+        not isinstance(constant_rule, ConstantRangeRule)
+        and not settings._autocast_checks_constant_range
+    ):
+        logger.warning(
+            "This engine was built by an earlier version of Torch-TensorRT, so refit "
+            "does not check whether the new weights hold values that become inf in "
+            f"{autocast_low_precision_type}, and the results can differ from a new "
+            "compile. Compile the model again to check them."
+        )
+    elif not isinstance(constant_rule, ConstantRangeRule):
+        check = ConstantRangeRule(autocast_low_precision_type)
+        # An owner of memory that a view(dtype) writes into runs in its traced dtype.
+        low = set(low_precision_nodes) - {
+            n.name for n in owners if traced_dtypes[n] != autocast_low_precision_type
+        }
+        overflowing = [
+            n.name for n in gm.graph.nodes if n.name in low and check._check_inner(n)
+        ]
+        if overflowing:
+            raise RuntimeError(
+                "Refit cannot change the precisions of the engine, and these nodes run "
+                f"in {autocast_low_precision_type} but read constants with values "
+                "that become inf in it, or share memory with nodes that do: "
+                f"{overflowing}. Compile the model again to keep them in "
+                f"{autocast_high_precision_type}."
+            )
     wait_tensor = _wait_tensor_op()
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
+            if writes_a_list(node):
+                # A list writer, such as _foreach_lerp_, writes each tensor in its own
+                # dtype, as eager does, so it gets each source in that dtype.
+                dtypes = [
+                    getattr(t.meta.get("val"), "dtype", None) for t in node.args[0]
+                ]
+                node.args = node.args[:1] + tuple(
+                    (
+                        type(arg)(
+                            (
+                                a
+                                if d is None
+                                else _cast_all_tensor_args_to_dtype(node, a, d)
+                            )
+                            for a, d in zip(arg, dtypes)
+                        )
+                        if isinstance(arg, (list, tuple)) and len(arg) == len(dtypes)
+                        else arg
+                    )
+                    for arg in node.args[1:]
+                )
+                continue
             if node in kept and node not in owners:
                 if isinstance(node.target, torch._ops.HigherOrderOperator):
                     _cast_args_to_traced_dtypes(node)
                 elif node.args[0] in tensors_written_by(node):
                     _cast_tensor_args_to_dtype(node, traced_dtypes[node])
-                elif isinstance(node.args[0], (list, tuple)):
-                    # A list writer, such as _foreach_lerp_, gets each source in the
-                    # dtype of the tensor it updates.
-                    dtypes = [traced_dtypes.get(t) for t in node.args[0]]
-                    node.args = node.args[:1] + tuple(
-                        (
-                            type(arg)(
-                                (
-                                    a
-                                    if d is None
-                                    else _cast_all_tensor_args_to_dtype(node, a, d)
-                                )
-                                for a, d in zip(arg, dtypes)
-                            )
-                            if isinstance(arg, (list, tuple))
-                            and len(arg) == len(dtypes)
-                            else arg
-                        )
-                        for arg in node.args[1:]
-                    )
                 continue
             if node.target in (
                 torch.ops.higher_order.wrap_with_autocast,
@@ -368,6 +396,19 @@ def rule_based_autocast(
             if _is_given_a_dtype(node):
                 # An op such as x.float() or cumsum(dtype=torch.float32) makes the
                 # dtype it is given, whatever its inputs are.
+                if (
+                    node.target.overloadpacket is torch.ops.aten.to
+                    and traced_dtypes.get(node.args[0]) != traced_dtypes[node]
+                    and node.args[0].meta["val"].dtype == traced_dtypes[node]
+                ):
+                    # to() returns its input when that already has the dtype, as
+                    # h.float() does when autocast now runs the op that made h in
+                    # FP32. Keep the copy it made, which a write into it needs.
+                    names = [a.name for a in node.target._schema.arguments]
+                    if names.index("copy") < len(node.args):
+                        node.update_arg(names.index("copy"), True)
+                    else:
+                        node.update_kwarg("copy", True)
                 continue
             if _has_only_integer_outputs(node):
                 # An integer op such as ids % k must still make integers, for
@@ -386,16 +427,80 @@ def rule_based_autocast(
                 target_dtype = autocast_high_precision_type
             else:
                 continue
-            _cast_tensor_args_to_dtype(node, target_dtype)
+            # A view of, or an in-place op on, a tensor whose type is not float32 and
+            # that autocast does not change, such as a float16 buffer, must not use a
+            # cast copy of it in FP32, or the reads after a write would miss it. A view,
+            # or an in-place op that only changes the shape such as unsqueeze_, keeps
+            # the tensor. Another in-place op computes on a float32 copy, as an op such
+            # as lerp_ needs one type, and its result is rounded to the type of the
+            # tensor, as eager does, and written back for the ops after it to read.
+            keeps_its_type = (
+                target_dtype == autocast_high_precision_type
+                and _returns_its_input(node)
+                and traced_dtypes.get(node.args[0]) not in (None, target_dtype)
+                and node.args[0].meta["val"].dtype == traced_dtypes[node.args[0]]
+            )
+            written = (
+                node.args[0]
+                if keeps_its_type
+                and node.args[0] in tensors_written_by(node)
+                and torch.Tag.inplace_view not in node.target.tags
+                else None
+            )
+            viewed = keeps_its_type and written is None
+            outs = [t for t in tensors_written_by(node) if t is not node.args[0]]
+            _cast_tensor_args_to_dtype(node, target_dtype, keep_first=viewed)
             if target_dtype == autocast_low_precision_type:
                 _keep_tiny_constants_nonzero(node, target_dtype)
-            if any(
+            if not viewed and any(
                 getattr(n.meta.get("val"), "dtype", None) == target_dtype
                 for n in node.all_input_nodes
             ):
                 # With only bool inputs, mask * 0.5 still makes float32.
                 node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
+            # An op that writes another tensor it takes, such as the out of torch.add,
+            # writes into the cast copy of it, so that copy is written back too. An
+            # op that returns it, as add.out does, returns the tensor written back.
+            backs = [(written, node)] if written is not None else []
+            copies = {
+                n.args[0]: n
+                for n in node.all_input_nodes
+                if n.target == torch.ops.aten.to.dtype and n.args[0] in outs
+            }
+            returns_it = (
+                len(outs) == 1
+                and isinstance(node.meta.get("val"), torch.Tensor)
+                and node.target._schema.returns[0].alias_info is not None
+            )
+            backs += [(t, node if returns_it else copies[t]) for t in copies]
+            at = node
+            for tensor, value in backs:
+                # copy_ casts too, but a functional program reads its source instead.
+                with gm.graph.inserting_after(at):
+                    rounded = gm.graph.call_function(
+                        torch.ops.aten.to.dtype,
+                        args=(value, tensor.meta["val"].dtype),
+                    )
+                with gm.graph.inserting_after(rounded):
+                    back = gm.graph.call_function(
+                        torch.ops.aten.copy_.default, args=(tensor, rounded)
+                    )
+                for added in (rounded, back):
+                    added.meta.update(node.meta)
+                    added.meta["val"] = tensor.meta["val"]
+                traced_dtypes[back] = traced_dtypes[tensor]
+                if value is node:
+                    node.replace_all_uses_with(
+                        back, delete_user_cb=lambda user, r=rounded: user is not r
+                    )
+                at = back
 
+    # The results of the ops that ran again belong to this run, see
+    # inline_autocast_regions.
+    for module in gm.modules():
+        if isinstance(module, torch.fx.GraphModule):
+            for node in module.graph.nodes:
+                node.meta.pop(_RAN_AGAIN, None)
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)
 

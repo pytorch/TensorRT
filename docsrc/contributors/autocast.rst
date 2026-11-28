@@ -75,6 +75,75 @@ following rules fire:
 * It performs a reduction over a large domain (``max_depth_of_reduction`` heuristic).
 * The maximum data value flowing through it exceeds ``data_max`` (guards against
   overflow in fp16).
+* It reads a floating point weight or a number such as the ``1e6`` of ``x / 1e6``,
+  with a finite value that becomes ``inf`` in the low precision type, such as a
+  BatchNorm running variance of ``1e6`` in fp16. ``NaN`` and ``inf`` constants
+  stay as they are, so they do not count. A value that the graph computes from
+  constants alone, with an input or a number above the float16 range, is a
+  constant too, such as the ``(running_var + eps).rsqrt()`` of a frozen
+  BatchNorm, and so is ``torch.full_like(x, 1e6)``, which reads only the shape
+  of ``x``. A mask tensor whose largest finite magnitude is the limit of its
+  type, such as ``torch.finfo(torch.float32).min``, does not count when an op
+  only places it in its output, as ``torch.where``, ``masked_fill``,
+  ``index_put`` without ``accumulate=True``, ``fill_`` and ``copy_`` do, or
+  when ``scaled_dot_product_attention`` adds it to its scores as
+  ``attn_mask``: such a value stands for infinity and becomes ``-inf``, as it
+  does without this rule. So a row where every value is masked holds only
+  ``-inf``, also as without this rule. For a row of only ``-inf``, eager
+  ``scaled_dot_product_attention`` gives 0 on CPU and CUDA, and a softmax
+  gives ``NaN``. For a row of only ``torch.finfo(torch.float32).min``, as in
+  the fp32 model, it averages the values of all keys on CPU and gives 0 on
+  CUDA by default, and a softmax gives a uniform row. The other finite values
+  of that tensor still count, so a buffer that holds both the mask value and
+  ``1e6`` keeps the op in fp32. A placed tensor with a smaller largest
+  magnitude, such as a weight of ``1e6``, still counts. A value at the limit
+  always stands for infinity, so a placed weight that holds
+  ``torch.finfo(torch.float32).max`` as a real value becomes ``inf``. A number
+  given to ``masked_fill`` still counts: in fp16, ``masked_fill(mask, -1e9)``
+  does not compile otherwise. An additive mask, as in ``scores + mask``, also
+  counts, so the add runs in fp32 and the scores are cast twice; pass the mask
+  as ``attn_mask`` to avoid that. A view or an in-place op on a tensor that
+  this rule keeps runs in fp32 with it, since a cast would make an in-place op
+  write into a copy. So a constant that an in-place op reads, such as the
+  ``1e6`` of ``h.add_(1e6)``, keeps the op that made ``h`` in fp32 when
+  another op also reads ``h``, such as a view of it taken before. When the
+  only readers of ``h`` are in-place ops on it, as for
+  ``scores.masked_fill_(mask, -1e9)`` after
+  ``scores = q @ k.transpose(-2, -1)``, the matmul stays in fp16, and
+  ``masked_fill_`` runs in fp32 on a copy that the ops after it read. A
+  weight, buffer or graph input is not an op, so the in-place ops on it run in
+  fp32 when one of them reads such a constant, as ``buffer.add_(w)`` does for
+  a weight ``w`` of ``1e6``. So do the in-place ops on another tensor that
+  this rule cannot keep, such as the output of ``torch.full``, of an op given
+  a dtype such as ``x.float()``, or of an op that another rule keeps in fp32.
+  On one of another floating type, they compute in fp32 and write the result
+  in that type, rounded as in eager for float16 and bfloat16, and its views
+  see the write. A float64 buffer written this way needs
+  ``truncate_double=True``, as without autocast. An op that writes another
+  tensor it takes, such as the ``out=`` of ``torch.add``, writes into a cast
+  copy of it, which is rounded and written back, as in eager. A list writer
+  such as ``_foreach_add_`` writes each tensor in its own type, as in eager,
+  so the constants it reads count for each tensor it writes, and it gets each
+  source in the type of its tensor. A ``torch.no_grad()`` block runs in one
+  type for all the tensors it takes, so this rule does not keep an op that
+  such a block may write into while it also takes other tensors.
+  Not covered yet: an integer weight, such as an int64 buffer of ``100000``; a
+  value computed from constants that all fit, such as ``x / w.sum()`` with 1000
+  weights of ``100``; a value computed from a chunk of a constant, such as
+  ``(var + eps).rsqrt()`` after ``mean, var = stats.unbind(0)``, or from a fill
+  that reads a tensor or a dynamic size, such as ``torch.full_like(x, 1e6) + 1``;
+  a number or a computed value used inside a ``torch.no_grad()`` block, which
+  export keeps as one node; a view of an op that another rule keeps in fp32; a
+  list writer such as ``_foreach_mul_`` that writes into a float16 tensor and
+  reads such a constant, which it gets in float16; a list of numbers, such as
+  the ``[1e6, 1.0]`` of ``_foreach_add_(tensors, [1e6, 1.0])``, or a number
+  the graph reads with ``item()``; an ``out=`` tensor of a type other than
+  float32 that is also an input of the op, as in ``torch.add(b, 1e6, out=b)``
+  for a bfloat16 ``b``, whose result is not rounded and which a view taken
+  before does not see; and the users of an op kept for a constant that it only
+  places or gathers, such as ``torch.where(c, x, w)``,
+  ``torch.cat([x, w])``, ``index_select``, ``gather`` or ``embedding`` with a
+  weight ``w`` of ``1e6``: they read its large values in the low precision type.
 * It is an ``operator.getitem`` node (output unpacking).
 
 All other nodes are assigned the ``low_precision_type``.
