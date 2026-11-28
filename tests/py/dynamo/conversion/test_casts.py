@@ -3,11 +3,18 @@
 
 # type: ignore
 
+import unittest
+from unittest.mock import patch
+
 import torch
 import torch.nn as nn
 import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    UnsupportedOperatorException,
+)
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     to_copy_dtype_validator,
 )
@@ -223,6 +230,146 @@ class TestToCopyConverter(DispatchTestCase):
                 torch.testing.assert_close(out, expected)
                 self.assertEqual(out.stride(), expected.stride())
 
+    @unittest.skipIf(
+        not is_tensorrt_version_supported("10.14"),
+        "A cast to uint8 runs in PyTorch before TensorRT 10.14",
+    )
+    def test_to_copy_uint8_stays_in_one_engine(self):
+        # PyTorch truncates toward zero, then wraps modulo 256. Values outside the int64
+        # range, infinity and NaN are unspecified: PyTorch differs on CPU and CUDA.
+        class ToUint8(nn.Module):
+            def forward(self, x):
+                return x.to(torch.uint8), x.to(torch.uint8).float() * 2
+
+        # The engine holds True + True as 2, where PyTorch keeps a bool.
+        class BoolAddToUint8(nn.Module):
+            def forward(self, x):
+                return (x + x).to(torch.uint8)
+
+        # A cond branch that casts to uint8 can stay in the engine too.
+        class CondCast(nn.Module):
+            def forward(self, pred, x):
+                return torch.cond(
+                    pred, lambda v: v.to(torch.uint8).float(), lambda v: v * 2, (x,)
+                )
+
+        # NHWC frames, so the uint8 value is not contiguous until the slice is copied.
+        class Tiles(nn.Module):
+            def forward(self, frames, other):
+                tiles = frames.permute(0, 3, 1, 2).round().clamp(0, 255)
+                tiles = tiles.to(torch.uint8)[..., 1:3, :].contiguous()
+                return torch.cat([tiles, other], dim=-1).float()
+
+        # 3e9 is past the int32 range, where a cast through int32 would saturate.
+        cases = (
+            (ToUint8(), (torch.tensor([256.7, -1.5, 3e9]),)),
+            (ToUint8(), (torch.tensor([300, -1, -257, 2**40 + 300]),)),
+            (ToUint8(), (torch.tensor([300, -1, -257]).int(),)),
+            (ToUint8(), (torch.tensor([256.7, -1.5, 300.0]).half(),)),
+            (ToUint8(), (torch.tensor([256.7, -1.5, 3e9]).bfloat16(),)),
+            (ToUint8(), (torch.tensor([True, False]),)),
+            (BoolAddToUint8(), (torch.tensor([True, False]),)),
+            (CondCast(), (torch.tensor(True), torch.tensor([1.5, 2.0]))),
+            (
+                Tiles(),
+                (
+                    torch.linspace(-20, 300, 2 * 4 * 5 * 3).reshape(2, 4, 5, 3),
+                    torch.arange(2 * 3 * 2 * 4, dtype=torch.uint8).reshape(2, 3, 2, 4),
+                ),
+            ),
+        )
+        for model, inputs in cases:
+            with self.subTest(type(model).__name__, dtype=inputs[-1].dtype):
+                if inputs[-1].dtype == torch.bfloat16:
+                    skip_if_trt_rtx_turing(self, "bfloat16")
+                inputs = [x.cuda() for x in inputs]
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, tuple(inputs)),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                )
+                names = [name for name, _ in compiled.named_children()]
+                self.assertEqual(names, ["_run_on_acc_0"])
+                torch.testing.assert_close(
+                    compiled(*inputs), model(*inputs), rtol=0, atol=0
+                )
+
+    def test_to_copy_uint8_of_int8_input_runs_in_pytorch(self):
+        # The int8 engine input is only cast or moved before the cast to uint8, but the
+        # wrap is math, which TensorRT cannot do on an int8 engine input.
+        cases = (
+            lambda x: x.to(torch.int32).to(torch.uint8),
+            lambda x: x.reshape(2, 2).float().to(torch.uint8),
+            lambda x: torch.zeros(4, device=x.device).copy_(x).to(torch.uint8),
+        )
+        x = torch.tensor([-56, 100, 44, -1], dtype=torch.int8, device="cuda")
+        for index, cast in enumerate(cases):
+            with self.subTest(index):
+
+                class Cast(nn.Module):
+                    def forward(self, x):
+                        return cast(x)
+
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(Cast(), (x,)), arg_inputs=[x], min_block_size=1
+                )
+                names = [name for name, _ in compiled.named_children()]
+                self.assertTrue(any("_run_on_gpu" in name for name in names))
+                torch.testing.assert_close(compiled(x), cast(x), rtol=0, atol=0)
+
+    def test_to_copy_uint8_of_int8_made_in_pytorch_runs_in_pytorch(self):
+        # The int8 value comes from an op that runs in PyTorch, so it reaches the engine
+        # of the casts as an int8 input.
+        class Cast(nn.Module):
+            def forward(self, x):
+                return (x.to(torch.int8) * 1).to(torch.int32).to(torch.uint8)
+
+        x = torch.tensor([-56.0, 100.0, 3.0], device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(Cast(), (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        torch.testing.assert_close(compiled(x), Cast()(x), rtol=0, atol=0)
+
+    @unittest.skipIf(
+        not is_tensorrt_version_supported("10.14"),
+        "A cast to uint8 runs in PyTorch before TensorRT 10.14",
+    )
+    def test_to_copy_uint8_of_int8_made_in_engine_stays_in_one_engine(self):
+        # The int8 value made in the engine is not an engine input. The compile fails if
+        # any op is left to PyTorch.
+        class Cast(nn.Module):
+            def forward(self, x):
+                return x.to(torch.int8).to(torch.int32).to(torch.uint8)
+
+        x = torch.tensor([-56.0, 100.0, 3.0, -1.0], device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(Cast(), (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            require_full_compilation=True,
+        )
+        torch.testing.assert_close(compiled(x), Cast()(x), rtol=0, atol=0)
+
+    @unittest.skipIf(
+        not is_tensorrt_version_supported("10.14"),
+        "A cast to uint8 runs in PyTorch before TensorRT 10.14",
+    )
+    def test_to_copy_uint8_math_is_refused_without_fallback(self):
+        # The int32 values standing for uint8 would not wrap: 100 + 200 would give 300.
+        class AddToUint8(nn.Module):
+            def forward(self, x):
+                return (x.to(torch.uint8) + 200).float()
+
+        x = torch.tensor([100.0], device="cuda")
+        with self.assertRaises(UnsupportedOperatorException) as raised:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                torch.export.export(AddToUint8(), (x,)), inputs=[x], min_block_size=1
+            )
+        self.assertIn("computes a uint8 result", str(raised.exception.__cause__))
+
     def test_to_copy_multiple_returns(self):
         class ToCopyReturns(nn.Module):
             def forward(self, x):
@@ -236,6 +383,60 @@ class TestToCopyConverter(DispatchTestCase):
             ToCopyReturns(),
             inputs,
         )
+
+    def test_to_copy_validator_rejects_int8_and_float64_to_uint8(self):
+        class AddThenToUint8(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._to_copy.default(x + 1, dtype=torch.uint8)
+
+        validator = to_copy_dtype_validator(placeholder_only=False)
+        for dtype in (torch.int8, torch.float64):
+            with self.subTest(dtype=dtype):
+                x = torch.zeros(4, dtype=dtype)
+                exported = torch.export.export(AddThenToUint8(), (x,))
+                node = next(
+                    node
+                    for node in exported.graph.nodes
+                    if node.target is torch.ops.aten._to_copy.default
+                )
+                self.assertFalse(
+                    validator(node, CompilationSettings(truncate_double=True))
+                )
+
+    def test_to_copy_validator_needs_tensorrt_10_14_for_uint8(self):
+        # Older TensorRT gives a wrong int64 floor division for large values, which the
+        # wrap to uint8 uses. A bool needs no wrap.
+        class ToUint8(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._to_copy.default(x + 1, dtype=torch.uint8)
+
+        class BoolToUint8(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._to_copy.default(x > 0, dtype=torch.uint8)
+
+        validator = to_copy_dtype_validator(placeholder_only=False)
+        for model, needs_10_14 in ((ToUint8(), True), (BoolToUint8(), False)):
+            exported = torch.export.export(model, (torch.zeros(4),))
+            node = next(
+                node
+                for node in exported.graph.nodes
+                if node.target is torch.ops.aten._to_copy.default
+            )
+            for supported in (True, False):
+                with (
+                    self.subTest(type(model).__name__, supported=supported),
+                    patch(
+                        "torch_tensorrt.dynamo.conversion.aten_ops_converters."
+                        "is_tensorrt_version_supported",
+                        return_value=supported,
+                    ) as version_check,
+                ):
+                    self.assertEqual(
+                        validator(node, CompilationSettings()),
+                        supported or not needs_10_14,
+                    )
+                    if needs_10_14:
+                        version_check.assert_any_call("10.14")
 
     def test_to_copy_validator_rejects_device_transfer(self):
         class DeviceAndDtypeCopy(nn.Module):

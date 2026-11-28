@@ -42,6 +42,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     node_has_dynamic_shapes,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    UINT8_DATA_MOVEMENT_OPS,
     args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
@@ -2534,6 +2535,44 @@ def _float64_copy_dtype(ctx: ConversionContext, dtype: Any) -> Any:
     return dtype
 
 
+_INT8_PASS_THROUGH_OPS = UINT8_DATA_MOVEMENT_OPS | {
+    torch.ops.aten._to_copy.default,
+    torch.ops.aten.clone.default,
+    torch.ops.aten.gather.default,
+    torch.ops.aten.index.Tensor,
+    operator.getitem,
+}
+
+
+def _cast_or_moved_from_int8(value: Argument, inputs_only: bool) -> bool:
+    """Whether value is int8, or made from an int8 value only by casts and data moves.
+
+    TensorRT treats an int8 engine input as quantized, so math on such a value fails
+    the build. Partitioning can make any int8 value an engine input, for example when
+    the op that makes it runs in PyTorch. With inputs_only, only an int8 graph input or
+    one made by an op TensorRT does not convert counts.
+    """
+    stack, seen = [value], set()
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, Node) or node in seen:
+            continue
+        seen.add(node)
+        if getattr(node.meta.get("val"), "dtype", None) == torch.int8 and (
+            not inputs_only
+            or node.op == "placeholder"
+            or (node.op == "call_function" and node not in DYNAMO_CONVERTERS)
+        ):
+            return True
+        # Follow only the operand whose values end up in the result.
+        if node.target is torch.ops.aten.copy.default:
+            stack.append(node.args[1])
+        elif node.target in _INT8_PASS_THROUGH_OPS:
+            data = node.args[0]
+            stack.extend(data if isinstance(data, (list, tuple)) else [data])
+    return False
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
@@ -2573,9 +2612,34 @@ def to_copy_dtype_validator(
             torch.int64,
             torch.bool,
             torch.int8,
+            torch.uint8,
             torch.float16,
             torch.bfloat16,
         }
+
+        source_dtype = getattr(
+            getattr(to_copy_node.args[0], "meta", {}).get("val"), "dtype", None
+        )
+        # The wrap in impl.cast.to_uint8 needs an exact int64 floor division, which
+        # TensorRT before 10.14 does not compute exactly for large values. A bool needs
+        # no wrap.
+        if to_copy_node.kwargs.get("dtype") == torch.uint8 and (
+            source_dtype not in impl.cast.UINT8_CAST_SOURCES
+            or _cast_or_moved_from_int8(
+                to_copy_node.args[0],
+                inputs_only=settings is not None and settings.require_full_compilation,
+            )
+            or (
+                source_dtype is not torch.bool
+                and not is_tensorrt_version_supported("10.14")
+            )
+        ):
+            _LOGGER.debug(
+                f"_to_copy converter rejected node {to_copy_node}: no cast to uint8 "
+                f"from {source_dtype}, from an int8 value, or "
+                "before TensorRT 10.14"
+            )
+            return False
 
         # Validate input node has convertible kwargs
         if "dtype" in to_copy_node.kwargs:
@@ -2635,6 +2699,9 @@ def aten_ops_clone_copy_dtype(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # The validator lets a cast to uint8 through only from impl.cast.UINT8_CAST_SOURCES.
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     return impl.cast.to_copy(
         ctx,
         target,
@@ -2745,6 +2812,8 @@ def aten_ops_clone_copy_placeholder(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if kwargs.get("dtype") == torch.uint8:
+        return impl.cast.to_uint8(ctx, target, SourceIR.ATEN, name, args[0])
     # For clone or copy nodes where the input is also the output,
     # we need to force cast to ensure a layer is added to the TRT engine
     # since TRT engine inputs cannot also be TRT engine outputs
