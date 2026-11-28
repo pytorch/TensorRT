@@ -24,6 +24,15 @@ Implementation Status
     direct network input with a 4-D static shape and write on dim 2,
     otherwise falling back to a concatenation for a contiguous write whose
     source is static on the written dim, and to a scatter sequence otherwise.
+  * ``tensorrt::kv_cache_update(cache, update, write_indices)`` writes
+    ``update[b]`` from position ``write_indices[b]`` of each batch row ``b``,
+    which ``slice_scatter`` (one constant start) and ``index_copy`` (one index
+    shared by every row) cannot express -- batched decoding needs it, each
+    sequence being at its own position. Its converter emits
+    ``IKVCacheUpdateLayer`` with those positions as ``writeIndices`` when the
+    cache is a direct network input, else a scatter. Written to a buffer
+    (``self.cache.copy_(torch.ops.tensorrt.kv_cache_update(self.cache, ...))``),
+    the lifted write is classified engine-aliased like the other two.
   * ``aliased_io`` (mapping ``output_binding -> (input_binding, kind)``) is
     plumbed from the converter through ``TRTInterpreterResult``,
     ``SerializedInterpreterResult``, the Python wrapper, and the serialized
@@ -125,9 +134,11 @@ Tier A — KVCacheUpdate Fast Path
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A pattern-match lowering pass detects scatter-into-static-cache patterns and
-rewrites them to a marker op ``torch_trt.kv_cache_update``. The converter for
+rewrites them to a marker op ``tensorrt::kv_cache_update``. The converter for
 that marker emits ``IKVCacheUpdateLayer``. Aliasing is automatic on the
-TensorRT side; the runtime sees it through ``getAliasedInputTensor``.
+TensorRT side; the runtime sees it through ``getAliasedInputTensor``. (The op
+and its converter exist and models call the op directly; the pattern-match pass
+does not.)
 
 Tier B — General Input/Output Aliasing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -193,7 +204,7 @@ aliased-output nodes:
 * ``writeIndices`` is a ``[b]``-shaped integer tensor.
 * ``s_max`` is static.
 
-Matching nodes are replaced with a ``torch_trt.kv_cache_update`` marker so the
+Matching nodes are replaced with a ``tensorrt::kv_cache_update`` marker so the
 converter can emit ``IKVCacheUpdateLayer`` directly. Non-matching aliased
 outputs fall through to Tier B.
 
@@ -202,7 +213,7 @@ Conversion
 
 Two touch points in ``py/torch_tensorrt/dynamo/conversion/_TRTInterpreter.py``:
 
-1. **New converter** for ``torch_trt.kv_cache_update`` which calls
+1. **New converter** for ``tensorrt::kv_cache_update`` which calls
    ``net.add_kv_cache_update(cache, update, write_indices)``. The cache input
    must already be added via ``net.add_input``; converters look up its
    ``ITensor`` handle via the conversion context.
@@ -613,7 +624,7 @@ Summary of Code Touch Points
 +-------------------------------------------+--------------------------------------------------------------------+
 | ``py/.../lowering/passes/``               | New ``mark_aliased_outputs`` pass; KV-cache pattern matcher.       |
 +-------------------------------------------+--------------------------------------------------------------------+
-| ``py/.../conversion/_TRTInterpreter.py``  | New converter for ``torch_trt.kv_cache_update``; aliased-output    |
+| ``py/.../conversion/_TRTInterpreter.py``  | New converter for ``tensorrt::kv_cache_update``; aliased-output    |
 |                                           | handling in ``output()``; ``aliased_io`` on                        |
 |                                           | ``TRTInterpreterResult``.                                          |
 +-------------------------------------------+--------------------------------------------------------------------+
