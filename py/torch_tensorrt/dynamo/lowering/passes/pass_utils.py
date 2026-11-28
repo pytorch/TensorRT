@@ -140,6 +140,47 @@ def get_tensor_placeholders(
     return placeholders
 
 
+def set_schema_argument(node: torch.fx.Node, name: str, value: Any) -> None:
+    """Set the argument of node that its schema calls name, in args when the call
+    gives it there and as a keyword otherwise."""
+    i = [a.name for a in node.target._schema.arguments].index(name)
+    if i < len(node.args):
+        node.update_arg(i, value)
+    else:
+        node.update_kwarg(name, value)
+
+
+def changes_dtype(node: torch.fx.Node) -> bool:
+    """Whether node is a cast, such as x.float() or x.type_as(y), that gives its input
+    a new dtype, and so copies it."""
+    if not isinstance(node.target, torch._ops.OpOverload) or not (
+        node.target.overloadpacket is torch.ops.aten.to
+        or node.target == torch.ops.aten.type_as.default
+    ):
+        return False
+    src, out = node.args[0].meta.get("val"), node.meta.get("val")
+    return (
+        isinstance(src, torch.Tensor)
+        and isinstance(out, torch.Tensor)
+        and src.dtype != out.dtype
+    )
+
+
+# The op of a type_as that keep_copy made to.other, which autocast_excluded_ops matches.
+TRACED_TARGET = "_torch_tensorrt_traced_target"
+
+
+def keep_copy(node: torch.fx.Node) -> None:
+    """Make node, a cast that changes the dtype, still copy when a pass gives its input
+    that dtype, as autocast can. Then to() and type_as return their input, which an op
+    may write into or need the layout of."""
+    if node.target == torch.ops.aten.type_as.default:
+        # type_as takes no copy argument.
+        node.meta[TRACED_TARGET] = node.target
+        node.target = torch.ops.aten.to.other
+    set_schema_argument(node, "copy", True)
+
+
 def tensors_written_by(node: torch.fx.Node) -> List[torch.fx.Node]:
     """The tensors an op writes into, such as self of add_, out of add.out and each
     tensor of the list self of _foreach_add_."""

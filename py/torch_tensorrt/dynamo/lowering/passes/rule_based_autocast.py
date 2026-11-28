@@ -15,6 +15,7 @@ from .nodeclassifier import NodeClassifier, NodeNameSetRule
 from .pass_utils import (
     _wait_tensor_op,
     clean_up_graph_after_modifications,
+    set_schema_argument,
     tensors_maybe_written_by,
     tensors_written_by,
 )
@@ -59,6 +60,107 @@ def _is_given_a_dtype(n: torch.fx.Node) -> bool:
     return False
 
 
+def _is_cast_to_float32(n: torch.fx.Node) -> bool:
+    """Whether n is a cast to float32, such as x.float(), of a float16 or bfloat16
+    tensor."""
+    if not (
+        _is_given_a_dtype(n)
+        and n.target.overloadpacket in (torch.ops.aten.to, torch.ops.aten._to_copy)
+        and n.args
+        and isinstance(n.args[0], torch.fx.Node)
+    ):
+        return False
+    src, out = n.args[0].meta.get("val"), n.meta.get("val")
+    return (
+        isinstance(src, torch.Tensor)
+        and isinstance(out, torch.Tensor)
+        and src.dtype in (torch.float16, torch.bfloat16)
+        and out.dtype == torch.float32
+    )
+
+
+def _keep_input_dtype(n: torch.fx.Node) -> None:
+    dtype = n.args[0].meta["val"].dtype
+    set_schema_argument(n, "dtype", dtype)
+    n.meta["val"] = n.meta["val"].to(dtype)
+
+
+def _is_2_norm(n: torch.fx.Node) -> bool:
+    """Whether n is a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), as F.normalize
+    uses it."""
+    if n.target != torch.ops.aten.linalg_vector_norm.default:
+        return False
+    order = n.args[1] if len(n.args) > 1 else n.kwargs.get("ord", 2)
+    return bool(order == 2)
+
+
+def _norm_arguments(n: torch.fx.Node) -> tuple[torch.fx.Node, list[int], bool]:
+    """The input x of a 2-norm n, the dims it reduces, and keepdim. No dim, or an empty
+    one, reduces every dim."""
+    names = [a.name for a in n.target._schema.arguments]
+    args = {**dict(zip(names, n.args)), **n.kwargs}
+    x, dim = args["self"], args.get("dim")
+    if isinstance(dim, int):
+        dims = [dim]
+    elif dim:
+        dims = list(dim)
+    else:
+        dims = list(range(x.meta["val"].dim()))
+    return x, dims, args.get("keepdim", False)
+
+
+def _reduces_at_most(n: torch.fx.Node, limit: float) -> bool:
+    """Whether the 2-norm n reduces at least 1 and at most limit values of a known
+    count, of an x with at least 1 dim. amax, which the written out norm needs, rejects
+    a reduction of 0 values."""
+    x, dims, _ = _norm_arguments(n)
+    if x.meta["val"].dim() == 0:
+        # dim can still be 0 or -1, which the shape has no entry for.
+        return False
+    count = 1
+    for d in dims:
+        size = x.meta["val"].shape[d]
+        if not isinstance(size, int):
+            return False
+        count *= size
+    return 0 < count <= limit
+
+
+def _write_out_vector_norm(gm: torch.fx.GraphModule, node: torch.fx.Node) -> None:
+    """Make a 2-norm, linalg_vector_norm(x, 2, dim, keepdim), compute
+    m * sqrt(sum((x / m) ** 2, dim, keepdim)) in the dtype of x, where m is the largest
+    magnitude of x along dim, clamped to the finite positive range of the dtype.
+    PyTorch's decomposition squares and sums a float16 or bfloat16 x in float32, with
+    casts around it. Dividing by m keeps each square at most 1, so the sum stays finite
+    when it adds at most as many values as the largest number of the dtype. node becomes the last mul and keeps its name, which
+    the program's signature can name as an output."""
+    x, dims, keepdim = _norm_arguments(node)
+    finfo = torch.finfo(x.meta["val"].dtype)
+    aten = torch.ops.aten
+
+    def call(target: Any, *call_args: Any) -> torch.fx.Node:
+        with gm.graph.inserting_before(node):
+            n = gm.graph.call_function(target, call_args)
+        # Keep nn_module_stack, which torch_executed_modules and engine layer names read.
+        n.meta.update({k: v for k, v in node.meta.items() if k != "tensor_meta"})
+        n.meta["val"] = target(
+            *(a.meta["val"] if isinstance(a, torch.fx.Node) else a for a in call_args)
+        )
+        return n
+
+    largest = call(aten.amax.default, call(aten.abs.default, x), dims, True)
+    # A zero vector then has a norm of 0, not 0 / 0, and one that holds an inf a norm
+    # of inf, not inf / inf.
+    scale = call(aten.clamp.default, largest, finfo.tiny, finfo.max)
+    scaled = call(aten.div.Tensor, x, scale)
+    square = call(aten.mul.Tensor, scaled, scaled)
+    total = call(aten.sum.dim_IntList, square, dims, keepdim)
+    if not keepdim:
+        scale = call(aten.squeeze.dims, scale, dims)
+    node.target = aten.mul.Tensor
+    node.args, node.kwargs = (call(aten.sqrt.default, total), scale), {}
+
+
 def _has_only_integer_outputs(n: torch.fx.Node) -> bool:
     tensors = [
         v for v in pytree.tree_leaves(n.meta.get("val")) if isinstance(v, torch.Tensor)
@@ -84,6 +186,11 @@ def _returns_its_input(n: torch.fx.Node) -> bool:
     if not isinstance(n.target, torch._ops.OpOverload):
         return False
     schema = n.target._schema
+    if n.target.overloadpacket is torch.ops.aten.to:
+        # Its schema says it may return its input, but with copy=True it never does.
+        i = [a.name for a in schema.arguments].index("copy")
+        if n.args[i] if i < len(n.args) else n.kwargs.get("copy"):
+            return False
     return bool(schema.arguments and schema.returns) and (
         schema.arguments[0].alias_info is not None
         and schema.returns[0].alias_info is not None
@@ -311,6 +418,7 @@ def rule_based_autocast(
                 kept.update(nodes)
     owners = {n for n in kept if not _returns_its_input(n) and n in traced_dtypes}
     wait_tensor = _wait_tensor_op()
+    norms: list[torch.fx.Node] = []
     for node in list(gm.graph.nodes):
         if node.op == "call_function":
             if node in kept and node not in owners:
@@ -365,6 +473,24 @@ def rule_based_autocast(
                 # A factory op such as torch.zeros has no inputs to cast, so its
                 # output keeps the dtype it was created with.
                 continue
+            if (
+                settings.autocast_model_casts == "reclassify"
+                and _is_cast_to_float32(node)
+                and node.name in low_precision_nodes
+                # Each user must cast its input to the low precision type anyway. A user
+                # in FP32 would need a cast back, and an output of the model keeps the
+                # dtype the model gives it. Autocast leaves the input of an op given a
+                # dtype, such as sum(dtype=torch.float32), or of one that makes only
+                # integer or complex values, such as view_as_complex, as it is.
+                and all(
+                    user.name in low_precision_nodes
+                    and user not in kept
+                    and not _is_given_a_dtype(user)
+                    and not _has_only_integer_outputs(user)
+                    for user in node.users
+                )
+            ):
+                _keep_input_dtype(node)
             if _is_given_a_dtype(node):
                 # An op such as x.float() or cumsum(dtype=torch.float32) makes the
                 # dtype it is given, whatever its inputs are.
@@ -395,6 +521,18 @@ def rule_based_autocast(
             ):
                 # With only bool inputs, mask * 0.5 still makes float32.
                 node.meta["val"] = _retype_tensors(node.meta["val"], target_dtype)
+            if (
+                settings.autocast_l2_norm_in_low_precision
+                and _is_2_norm(node)
+                and target_dtype == autocast_low_precision_type
+                and node.name in low_precision_nodes
+                # Its sum adds values of at most 1.
+                and _reduces_at_most(node, torch.finfo(target_dtype).max)
+            ):
+                norms.append(node)
+    # After the loop, which reads tables of the nodes it started with.
+    for node in norms:
+        _write_out_vector_norm(gm, node)
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

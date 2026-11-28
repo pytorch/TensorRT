@@ -3362,7 +3362,7 @@ def test_autocast_model_regions_excludes_a_type_as_by_op():
             torch.ops.aten.type_as.default,
         },
     )
-    # Inlining makes the type_as a to, which the exclusion keeps in float32 too.
+    # pre_export_lowering makes the type_as a to, which the exclusion still matches.
     ep = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
     torch.testing.assert_close(ep.module()(x), torch.full_like(x, 131072.0))
 
@@ -3649,6 +3649,754 @@ def test_autocast_model_regions_rejects_unknown_values():
     assert CompilationSettings().autocast_model_regions == "keep"
     with pytest.raises(ValueError, match="autocast_model_regions"):
         CompilationSettings(autocast_model_regions="inline")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "in_low_precision, low",
+    [(False, torch.float16), (True, torch.float16), (True, torch.bfloat16)],
+)
+def test_autocast_l2_norm_in_low_precision(in_low_precision, low):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            # The 1-norm and the excluded 2-norm keep linalg_vector_norm.
+            scale = torch.linalg.vector_norm(h, 1, dim=1, keepdim=True)
+            kept = torch.linalg.vector_norm(h, dim=(2, 3), keepdim=True)
+            extra = torch.linalg.vector_norm(h, dim=1).unsqueeze(1)
+            extra = extra + torch.linalg.vector_norm(h)
+            # A norm given a dtype computes in that dtype.
+            typed = torch.linalg.vector_norm(h, dim=1, dtype=torch.float32)
+            extra = extra + typed.unsqueeze(1)
+            out = self.conv2(nn.functional.normalize(h, dim=1))
+            return out * scale + kept + extra
+
+    model = Model().cuda().eval()
+    x = torch.randn(2, 4, 16, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    l1, excluded, without_keepdim, without_dim, typed, normalize = [
+        n.name
+        for n in ep.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+        )
+    ]
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=low,
+        autocast_excluded_node_names={f"{excluded}$"},
+        autocast_l2_norm_in_low_precision=in_low_precision,
+    )
+    graph = pre_export_lowering(ep, CompilationSettings(**kwargs)).graph
+    norms = {
+        n.name: n.meta["val"].dtype
+        for n in graph.find_nodes(
+            op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+        )
+    }
+    sums = graph.find_nodes(op="call_function", target=torch.ops.aten.sum.dim_IntList)
+    if in_low_precision:
+        assert norms == {
+            l1: low,
+            excluded: torch.float32,
+            typed: torch.float32,
+        }
+        assert len(sums) == 3
+        for total in sums:
+            assert total.meta["val"].dtype == low
+            # torch_executed_modules reads the module of each op.
+            assert total.meta["nn_module_stack"]
+    else:
+        assert norms == {
+            l1: torch.float16,
+            without_keepdim: torch.float16,
+            without_dim: torch.float16,
+            normalize: torch.float16,
+            excluded: torch.float32,
+            typed: torch.float32,
+        }
+        assert not sums
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    settings = trt_model._run_on_acc_0.settings
+    assert settings.autocast_l2_norm_in_low_precision == in_low_precision
+    ref = model(x)
+    torch.testing.assert_close(
+        trt_model(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value, size", [(1e-4, 8), (1.0, 8), (300.0, 8), (0.0, 8), (1.0, 70000)]
+)
+def test_autocast_l2_norm_in_low_precision_of_small_and_large_values(value, size):
+    class Model(nn.Module):
+        def forward(self, x):
+            return nn.functional.normalize(x, dim=1)
+
+    # In float16 the squares of 1e-4 round to 0, the square of 300 is inf, and so is
+    # a sum of more than 65504 values of 1.
+    x = torch.full((2, size), value, device="cuda")
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_l2_norm_in_low_precision=True,
+    )
+    program = pre_export_lowering(
+        torch.export.export(Model(), (x,)), CompilationSettings(**kwargs)
+    )
+    # A norm of more values than the largest float16 stays as it is.
+    norms = program.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+    )
+    assert bool(norms) == (size > 65504)
+    torch.testing.assert_close(
+        program.module()(x).float(), Model()(x), rtol=1e-2, atol=1e-3
+    )
+    # Eager sums float16 in float32 on CUDA, so check what TensorRT computes too.
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(Model(), (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    torch.testing.assert_close(trt_model(x).float(), Model()(x), rtol=1e-2, atol=1e-3)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value, low",
+    [
+        (float("inf"), torch.float16),
+        (float("-inf"), torch.float16),
+        (70000.0, torch.float16),
+        (float("inf"), torch.bfloat16),
+    ],
+)
+def test_autocast_l2_norm_in_low_precision_of_an_inf(value, low):
+    class Model(nn.Module):
+        def forward(self, x):
+            return nn.functional.normalize(x, dim=1)
+
+    # 70000 becomes inf in float16. A norm of inf makes the other values of the row 0,
+    # and the inf itself NaN.
+    x = torch.tensor([[value, 1.0, 2.0, 3.0], [1.0, 2.0, 3.0, 4.0]], device="cuda")
+
+    def run(in_low_precision):
+        kwargs = dict(
+            enable_autocast=True,
+            autocast_low_precision_type=low,
+            autocast_l2_norm_in_low_precision=in_low_precision,
+        )
+        ep = torch.export.export(Model(), (x,))
+        program = pre_export_lowering(ep, CompilationSettings(**kwargs))
+        norms = program.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+        )
+        assert bool(norms) != in_low_precision
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(Model(), (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            **kwargs,
+        )
+        return program.module()(x).float(), trt_model(x).float()
+
+    (program_off, trt_off), (program_on, trt_on) = run(False), run(True)
+    torch.testing.assert_close(
+        program_on, program_off, equal_nan=True, rtol=1e-2, atol=1e-3
+    )
+    torch.testing.assert_close(trt_on, trt_off, equal_nan=True, rtol=1e-2, atol=1e-3)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("reduced", [False, True])
+def test_autocast_l2_norm_in_low_precision_with_dynamic_shapes(reduced):
+    class Model(nn.Module):
+        def forward(self, x):
+            return nn.functional.normalize(x, dim=1)
+
+    x = torch.randn(4, 8, device="cuda")
+    dynamic = {1 if reduced else 0: torch.export.Dim("n", min=2, max=64)}
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_l2_norm_in_low_precision=True,
+    )
+    program = pre_export_lowering(
+        torch.export.export(Model(), (x,), dynamic_shapes=(dynamic,)), settings
+    )
+    # A norm of a count not known when compiling stays as it is.
+    norms = program.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+    )
+    assert bool(norms) == reduced
+    y = torch.randn((4, 5) if reduced else (3, 8), device="cuda")
+    torch.testing.assert_close(
+        program.module()(y).float(), Model()(y), rtol=1e-2, atol=1e-3
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "case", ["view_owner", "output", "empty_dim", "zero_size", "scalar"]
+)
+def test_autocast_l2_norm_in_low_precision_keeps_the_program_valid(case):
+    class Model(nn.Module):
+        def forward(self, x):
+            if case == "scalar":
+                # PyTorch lets dim 0 or -1 name the only element of a 0-d x.
+                return torch.linalg.vector_norm(x, dim=0) + torch.linalg.vector_norm(
+                    x, dim=-1
+                )
+            if case == "empty_dim":
+                # An empty dim reduces every dim.
+                return torch.linalg.vector_norm(x, dim=())
+            norm = torch.linalg.vector_norm(x, dim=-1)
+            if case in ("output", "zero_size"):
+                return norm
+            before = norm.clone()
+            # A view(dtype) writes into the norm, so it is made in its traced float16.
+            norm.view(torch.int16).fill_(0)
+            return before
+
+    value, dtype = {
+        "view_owner": (300.0, torch.float16),
+        "output": (1.0, torch.float32),
+        "empty_dim": (1.0, torch.float32),
+        "zero_size": (1.0, torch.float32),
+        "scalar": (-3.0, torch.float32),
+    }[case]
+    # A norm of 0 values is 0, while amax of 0 values fails.
+    shape = {"zero_size": (1, 0), "scalar": ()}.get(case, (1, 1))
+    x = torch.full(shape, value, device="cuda", dtype=dtype)
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_l2_norm_in_low_precision=True,
+        autocast_calibration_dataloader=torch.utils.data.DataLoader(
+            [(x,)], batch_size=None
+        ),
+    )
+    program = pre_export_lowering(torch.export.export(Model(), (x,)), settings)
+    # The signature of the program names the output.
+    program.validate()
+    torch.testing.assert_close(program.module()(x), Model()(x), check_dtype=False)
+    # Calibration keeps the view_owner norm out of float16, as its int16 view holds
+    # large values. That norm, a norm of 0 values and one of a 0-d x stay as they are.
+    norms = program.graph.find_nodes(
+        op="call_function", target=torch.ops.aten.linalg_vector_norm.default
+    )
+    assert bool(norms) == (case in ("view_owner", "zero_size", "scalar"))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("cast", ["before", "after"])
+def test_autocast_model_casts_of_an_l2_norm_in_low_precision(cast):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            if cast == "before":
+                return self.conv2(nn.functional.normalize(h.float(), dim=1))
+            n = torch.linalg.vector_norm(h, dim=1, keepdim=True).float()
+            return self.conv2(h / n)
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+        autocast_l2_norm_in_low_precision=True,
+    )
+    graph = pre_export_lowering(
+        torch.export.export(model, (x,)), CompilationSettings(**kwargs)
+    ).graph
+    # The model's cast, before or after the written-out norm, is reclassified like any
+    # other.
+    (root,) = graph.find_nodes(op="call_function", target=torch.ops.aten.sqrt.default)
+    assert root.meta["val"].dtype == torch.float16
+    assert [user.meta["val"].dtype for user in root.users] == [torch.float16]
+    casts = graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    assert all(n.meta["val"].dtype == torch.float16 for n in casts)
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    ref = model(x)
+    torch.testing.assert_close(
+        trt_model(x).float(), ref, rtol=1e-2, atol=1e-2 * ref.abs().max().item()
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("model_casts", ["keep", "reclassify"])
+def test_autocast_model_casts(model_casts):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x).float()
+            g = self.conv2(h).float()
+            return (h + g).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    first, second, last = [
+        n.name
+        for n in ep.graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    ]
+    kwargs = dict(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_excluded_node_names={f"{second}$"},
+        autocast_model_casts=model_casts,
+    )
+    nodes = {
+        n.name: n
+        for n in pre_export_lowering(ep, CompilationSettings(**kwargs)).graph.nodes
+    }
+    expected = torch.float16 if model_casts == "reclassify" else torch.float32
+    assert nodes[first].args[1] == expected
+    assert nodes[first].meta["val"].dtype == expected
+    # An excluded cast, and the cast that makes the output of the model, keep their
+    # dtype.
+    assert nodes[second].meta["val"].dtype == torch.float32
+    assert nodes[last].meta["val"].dtype == torch.float32
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)), arg_inputs=[x], min_block_size=1, **kwargs
+    )
+    assert trt_model._run_on_acc_0.settings.autocast_model_casts == model_casts
+    out = trt_model(x)
+    assert out.dtype == torch.float32
+    torch.testing.assert_close(out, model(x), rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("user", ["linear", "mixed", "view", "owner"])
+def test_autocast_model_casts_keep_a_cast_whose_users_need_fp32(user):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 16, 3, padding=1)
+            self.a = nn.Linear(16, 16)
+            self.b = nn.Linear(16, 16)
+
+        def forward(self, x):
+            h = self.conv(x).float()
+            if user == "view":
+                # view(dtype) reads the bytes of the FP32 tensor.
+                return h.view(torch.int32) + 1
+            if user == "owner":
+                # A view(dtype) writes into g, so g is made in its traced FP32.
+                g = h * 2
+                g.view(torch.int32).add_(1)
+                return g
+            if user == "mixed":
+                return self.a(h) + torch.relu(h)
+            return self.a(h) + self.b(h)
+
+    model = Model().cuda().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda")
+    ep = torch.export.export(model, (x,))
+    (cast,) = ep.graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+
+    def casts(model_casts):
+        settings = CompilationSettings(
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+            autocast_excluded_ops={torch.ops.aten.linear.default},
+            autocast_model_casts=model_casts,
+        )
+        graph = pre_export_lowering(ep, settings).graph
+        nodes = graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+        assert {n.name: n for n in nodes}[cast.name].meta["val"].dtype == torch.float32
+        return len(nodes)
+
+    # A float16 h would need a cast back to FP32 for each such user.
+    assert casts("reclassify") == casts("keep")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("case", ["sum", "view_as_complex", "bool", "long"])
+def test_autocast_model_casts_keep_a_cast_whose_dtype_matters(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv(x)
+            if case == "bool":
+                return (h > 0).float().mean()
+            if case == "long":
+                # A cast to an integer type rounds toward zero.
+                return h.long() * 0.5
+            y = h.float()
+            if case == "sum":
+                # Autocast does not cast the input of an op given a dtype.
+                return y.sum(dim=(2, 3), dtype=torch.float32)
+            # A float16 y would make complex32.
+            return torch.view_as_complex(y)
+
+    model = Model().cuda().half().eval()
+    x = torch.randn(1, 4, 16, 2, device="cuda", dtype=torch.float16)
+    ep = torch.export.export(model, (x,))
+    (cast,) = [
+        n.name
+        for n in ep.graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    ]
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+    )
+    nodes = {n.name: n for n in pre_export_lowering(ep, settings).graph.nodes}
+    expected = torch.int64 if case == "long" else torch.float32
+    assert nodes[cast].meta["val"].dtype == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "case", ["float16_model", "_to_copy", "type_as", "region", "bfloat16"]
+)
+def test_autocast_model_casts_removes_a_round_trip(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.a = nn.Linear(16, 16)
+            self.b = nn.Linear(16, 16)
+
+        def forward(self, x):
+            if case == "float16_model":
+                # In a float16 model, x.float() already casts when traced.
+                return self.b(torch.relu(self.a(x).float()).half())
+            if case == "bfloat16":
+                return self.b(self.a(x).float())
+            if case == "_to_copy":
+                # _to_copy takes dtype as a keyword argument.
+                y = torch.ops.aten._to_copy.default(self.a(x), dtype=torch.float32)
+                return self.b(y)
+            if case == "type_as":
+                # type_as reads only the dtype of its other tensor.
+                y = self.a(x).float()
+                return self.b(y).type_as(y)
+            # Softmax runs in FP32 in a float16 region, so inlining casts its output
+            # to FP32 for b.
+            with torch.autocast("cuda", dtype=torch.float16):
+                y = torch.softmax(self.a(x), -1)
+            return self.b(y)
+
+    dtype = torch.float16 if case == "float16_model" else torch.float32
+    low = torch.bfloat16 if case == "bfloat16" else torch.float16
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(4, 16, device="cuda", dtype=dtype)
+
+    outputs = []
+    for model_casts, round_trips in (("keep", 1), ("reclassify", 0)):
+        settings = CompilationSettings(
+            enable_autocast=True,
+            autocast_low_precision_type=low,
+            autocast_model_regions="reclassify",
+            autocast_model_casts=model_casts,
+        )
+        program = pre_export_lowering(torch.export.export(model, (x,)), settings)
+        casts = [
+            n
+            for n in program.graph.nodes
+            if n.target in (torch.ops.aten.to.dtype, torch.ops.aten._to_copy.default)
+        ]
+        assert round_trips == sum(
+            n.args[0].meta["val"].dtype == low
+            and (n.kwargs.get("dtype") or n.args[1]) == torch.float32
+            for n in casts
+        )
+        outputs.append(program.module()(x))
+        ref = model(x).float()
+        torch.testing.assert_close(
+            outputs[-1].float(),
+            ref,
+            rtol=2e-2,
+            atol=2e-2 * ref.abs().max().item(),
+        )
+    # A cast from float16 or bfloat16 to FP32 is exact.
+    assert outputs[0].dtype == outputs[1].dtype
+    assert torch.equal(outputs[0], outputs[1])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("case", ["type_as", "to_other", "to"])
+def test_autocast_model_casts_keep_the_copy_of_type_as(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv(x)
+            y = h.float()
+            # These copy when traced. Of y, float16 once reclassified, or a view of it,
+            # they would return their input, and the write would reach y.
+            if case == "type_as":
+                z = y.transpose(2, 3).type_as(h)
+            elif case == "to":
+                # y.to(h) exports as to.device, which is given a dtype.
+                z = y.transpose(2, 3).to(h)
+            else:
+                z = torch.ops.aten.to.other(y, h)
+            z.add_(10.0)
+            return y + z
+
+    model = Model().cuda().half().eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=torch.float16)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+    )
+    torch.testing.assert_close(
+        trt_model(x).float(), model(x).float(), rtol=1e-2, atol=5e-2
+    )
+    # h.float() is reclassified, so only its copy keeps the write from reaching h.
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts="reclassify",
+    )
+    program = pre_export_lowering(torch.export.export(model, (x,)), settings)
+    (cast,) = [
+        n
+        for n in program.graph.find_nodes(
+            op="call_function", target=torch.ops.aten.to.dtype
+        )
+        if n.args[0].name == "conv2d"
+    ]
+    assert cast.meta["val"].dtype == torch.float16 and cast.kwargs["copy"]
+
+
+@pytest.mark.unit
+def test_autocast_model_casts_rejects_unknown_values():
+    assert CompilationSettings().autocast_model_casts == "keep"
+    with pytest.raises(ValueError, match="autocast_model_casts"):
+        CompilationSettings(autocast_model_casts="drop")
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "dtype, model_casts",
+    [
+        (torch.float16, "keep"),
+        (torch.float16, "reclassify"),
+        (torch.float32, "reclassify"),
+        pytest.param(
+            torch.float32,
+            "keep",
+            marks=pytest.mark.xfail(
+                raises=AssertionError,
+                strict=True,
+                reason="h.float() returns h when traced, but copies once autocast makes h "
+                "float16, so the write into it no longer reaches g. Also wrong before this "
+                "change.",
+            ),
+        ),
+    ],
+)
+def test_autocast_keeps_the_copy_an_in_place_op_writes(dtype, model_casts):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(4, 8, 3, padding=1)
+            self.conv2 = nn.Conv2d(8, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv1(x)
+            g = h.transpose(2, 3)
+            # h.float() of a float16 h is a copy, so the write must not reach g, a view
+            # of h. Of a float32 h it is h, so in eager the write reaches g. Autocast
+            # gets that right only when it reclassifies the cast.
+            y = h.float()
+            y.add_(10.0)
+            # y.half() is a copy, so this write must not reach y.
+            z = y.half()
+            z.mul_(2.0)
+            return self.conv2(g).float() + y + z
+
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=dtype)
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts=model_casts,
+    )
+    torch.testing.assert_close(
+        trt_model(x).float(), model(x).float(), rtol=1e-2, atol=5e-2
+    )
+    # Each cast that copied when traced keeps copy=True.
+    settings = CompilationSettings(
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+        autocast_model_casts=model_casts,
+    )
+    graph = pre_export_lowering(torch.export.export(model, (x,)), settings).graph
+    casts = graph.find_nodes(op="call_function", target=torch.ops.aten.to.dtype)
+    copied = ["conv2d", "add_", "conv2d_1"] if dtype == torch.float16 else ["add_"]
+    assert [n.args[0].name for n in casts if n.kwargs.get("copy")] == copied
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("case", ["dropout", "atleast_1d", "region"])
+def test_autocast_keeps_the_copy_of_a_cast_an_op_passes_on(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(16, 16)
+            self.drop = nn.Dropout(0.5)
+
+        def forward(self, x):
+            h = self.lin(x)
+            # h.half() is a copy, so the write must not reach h. These ops return their
+            # input, though their schemas do not say so.
+            z = h.half()
+            if case == "dropout":
+                z = self.drop(z)
+            elif case == "atleast_1d":
+                z = torch.atleast_1d(z)
+            else:
+                with torch.autocast("cuda", enabled=False):
+                    z = z[:, :8]
+            z.mul_(2.0)
+            return h + z.sum(-1, keepdim=True).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    settings = CompilationSettings(
+        enable_autocast=True, autocast_low_precision_type=torch.float16
+    )
+    with torch.no_grad():
+        ep = pre_export_lowering(torch.export.export(model, (x,)), settings)
+        torch.testing.assert_close(
+            ep.module()(x).float(), model(x), rtol=1e-2, atol=5e-2
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize(
+    "case",
+    [
+        "written",
+        "input_written",
+        "alias",
+        "no_grad",
+        "view_dtype",
+    ],
+)
+def test_autocast_keeps_the_copy_of_type_as(case):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(4, 8, 3, padding=1)
+
+        def forward(self, x):
+            h = self.conv(x)
+            if case == "no_grad":
+                # In the block, x.half() would assert the dtype that autocast gives x.
+                y = x.half()
+                with torch.no_grad():
+                    z = h.type_as(y)
+                    z.add_(10.0)
+                return h + z
+            if case == "alias":
+                # type_as returns h when traced, so the write must reach g, a view of h.
+                g = h.transpose(2, 3)
+                z = h.type_as(x)
+                z.add_(10.0)
+                return h.float() + g.transpose(2, 3)
+            if case == "view_dtype":
+                # z must stay float32, the dtype view(torch.int32) reads. Adding 1 << 23
+                # to the bits of a float32 adds 1 to its exponent, so it doubles z.
+                z = x[:, :1].half().type_as(h)
+                z.view(torch.int32).add_(1 << 23)
+                return h + z
+            # type_as copies when traced. Of the float16 h that autocast makes, it would
+            # return h, and the write would reach z through h or h through z.
+            z = h.type_as(x.half())
+            (h if case == "input_written" else z).add_(10.0)
+            return h + z
+
+    dtype = torch.float16 if case == "alias" else torch.float32
+    model = Model().cuda().to(dtype).eval()
+    x = torch.randn(1, 4, 16, 16, device="cuda", dtype=dtype)
+    with torch.no_grad():
+        ref = model(x).float()
+    trt_model = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+    with torch.no_grad():
+        torch.testing.assert_close(trt_model(x).float(), ref, rtol=1e-2, atol=5e-2)
+
+
+@pytest.mark.unit
+@pytest.mark.critical
+@pytest.mark.parametrize("op", ["chunk", "split", "unbind"])
+def test_autocast_keeps_the_copy_a_write_into_a_piece_needs(op):
+    class Model(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(16, 16)
+
+        def forward(self, x):
+            a = self.lin(x)
+            # a.half() is a copy, so a write into a piece of it must not reach a.
+            if op == "chunk":
+                pieces = a.half().chunk(2, -1)
+            elif op == "split":
+                pieces = a.half().split(8, -1)
+            else:
+                pieces = a.half().unbind(-1)
+            pieces[0].mul_(2.0)
+            join = torch.stack if op == "unbind" else torch.cat
+            return a.float() + join(pieces, -1).float()
+
+    model = Model().cuda().eval()
+    x = torch.randn(4, 16, device="cuda")
+    # Autograd refuses in-place writes into the pieces of chunk.
+    with torch.no_grad():
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
+            min_block_size=1,
+            enable_autocast=True,
+            autocast_low_precision_type=torch.float16,
+        )
+        torch.testing.assert_close(trt_model(x).float(), model(x), rtol=1e-2, atol=5e-2)
 
 
 @pytest.mark.unit

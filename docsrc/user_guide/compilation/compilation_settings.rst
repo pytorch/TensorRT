@@ -268,6 +268,47 @@ numerically sensitive. Enable it with ``enable_autocast=True``.
        and under ``"reclassify"``, regions with ``enabled=False`` and those nested in
        them, where one in another dtype logs as a warning. ``"reclassify_all"`` logs
        nothing. Regions inside a ``torch.no_grad()`` block do not count.
+   * - ``autocast_model_casts``
+     - ``"keep"``
+     - What autocast does with the casts to FP32 that the model itself writes with a
+       dtype, such as ``x.float()`` or ``x.to(torch.float32)``. ``"keep"`` keeps them. An
+       op that autocast runs in the low precision type still casts its inputs to that
+       type, so such a cast between two of those ops becomes a round trip, for example
+       float16 to FP32 and back.
+       ``"reclassify"`` removes these round trips: a cast that autocast runs in the low
+       precision type, and whose users all cast their input to that type too, keeps the
+       dtype of its input. With ``autocast_model_regions="reclassify"`` or
+       ``"reclassify_all"`` this also covers the casts that inlining adds at the boundary
+       of a region. A reclassified cast that
+       changed the dtype when traced keeps ``copy=True``, so it still makes the copy it
+       made then, and TensorRT adds no layer for it. Other casts still cast to FP32, such
+       as an excluded cast, one with a user in FP32, one with a user given a dtype such as
+       ``sum(dtype=torch.float32)``, or one that makes an output of the model. The values
+       do not change, since a cast from float16 or bfloat16 to FP32 is exact. One case can
+       differ: in an FP32 model, ``x.float()`` returns ``x`` itself, so an op that writes
+       in place into it also changes ``x``. ``"keep"`` makes that cast copy once autocast
+       gives ``x`` the low precision type, while ``"reclassify"`` can keep it returning
+       ``x``, as the model does. To keep an op in FP32, exclude the op, not the cast.
+       ``x.to(y)`` is such a cast too, since export gives it the dtype of ``y``. A
+       ``type_as`` is not: autocast chooses its precision as for other ops.
+   * - ``autocast_l2_norm_in_low_precision``
+     - ``False``
+     - When autocast runs a 2-norm (L2 norm) in float16 or bfloat16, whether to compute it
+       in that type instead of FP32. This covers ``torch.linalg.vector_norm``, which
+       ``F.normalize``, ``torch.norm`` and ``Tensor.norm`` use. The norm is written as
+       ``m * sqrt(sum((x / m) ** 2))``, where ``m`` is the largest magnitude of ``x``,
+       clamped to the finite positive range of the type. So a zero vector has a norm of 0,
+       and one that holds an inf has a norm of inf. Dividing by ``m`` keeps each square at
+       most 1, so the sum does not overflow, though a square much smaller than 1 can still
+       round to 0. By default PyTorch computes the norm in FP32, as eager does, which adds
+       casts around it. These norms stay as they are: other norms such as the 1-norm,
+       ``torch.linalg.norm``, which exports another op, a norm given a ``dtype``, a norm of
+       a 0-d tensor, and a norm of 0 values, of more values than the largest number of the
+       type (65504 in float16), or of a count not known when compiling. The sum still adds
+       its values in the low precision type, so check the accuracy. To keep a norm in FP32,
+       exclude it with ``autocast_excluded_node_names`` or the op
+       ``torch.ops.aten.linalg_vector_norm.default``. Excluding ``sum`` or ``div`` does not
+       keep this norm in FP32.
 
 ----
 
@@ -572,6 +613,8 @@ rebuilt from scratch:
 ``autocast_excluded_nodes``, ``autocast_excluded_node_names``,
 ``autocast_excluded_ops``, ``autocast_max_output_threshold``,
 ``autocast_max_depth_of_reduction``, ``autocast_model_regions``,
+``autocast_model_casts``,
+``autocast_l2_norm_in_low_precision``,
 ``decompose_attention``,
 ``disabled_constant_fold_exclusions``, ``attn_bias_is_causal``,
 ``fold_shared_kv_attention``, ``deduplicate_weights``, ``build_route``,
