@@ -18,12 +18,10 @@ class DummySpec(EdgeSpec):
     def prepare_sample_inputs(self, model, raw, config):
         return {"x": raw["x"]}
 
-    def wrap(self, name, model, sample, config) -> nn.Module:
-        return model.eval()
-
-    def prepare(self, name, model, sample, upstream, config, module) -> ComponentBundle:
+    def prepare(self, name, model, sample, upstream, config) -> ComponentBundle:
         x = sample["x"]
         return ComponentBundle(
+            module=model.eval(),
             trace_args=(x,),
             save_args=(x,),
             input_names=["x"],
@@ -132,10 +130,7 @@ class _PatchSpec(EdgeSpec):
     def prepare_sample_inputs(self, model, raw, config):
         return {"x": raw["x"]}
 
-    def wrap(self, name, model, sample, config) -> nn.Module:
-        return model.eval()
-
-    def prepare(self, name, model, sample, upstream, config, module) -> ComponentBundle:
+    def prepare(self, name, model, sample, upstream, config) -> ComponentBundle:
         x = sample["x"]
 
         def _patch(mod):
@@ -144,6 +139,7 @@ class _PatchSpec(EdgeSpec):
             return [(mod.layer, orig)]
 
         return ComponentBundle(
+            module=model.eval(),
             trace_args=(x,),
             save_args=(x,),
             input_names=["x"],
@@ -177,3 +173,300 @@ def test_edge_exporter_dryrun_keeps_attention_patch(tmp_path):
     with torch.no_grad():
         got = runtime(x=sample["x"])
     assert got.shape == (2, 4)
+
+
+@pytest.mark.unit
+def test_attn_patch_attribute_restores():
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import patch_attribute
+
+    class Owner:
+        def go(self):
+            return 1
+
+    def factory(original):
+        def go(self):
+            return original(self) + 1
+
+        return go
+
+    with patch_attribute(Owner, "go", factory):
+        assert Owner().go() == 2
+    assert Owner().go() == 1
+
+
+@pytest.mark.unit
+def test_language_attn_keeps_hf_forward_without_rope():
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+        _patch_language_attention,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, hidden_states, past_key_values=None, **kwargs):
+            del past_key_values, kwargs
+            return hidden_states * 2, None
+
+    Dummy.forward = _patch_language_attention(Dummy.forward)
+    hidden = torch.ones(1, 2, 4)
+    out, extra = Dummy()(hidden, past_key_values="cache")
+    torch.testing.assert_close(out, hidden * 2)
+    assert extra is None
+
+
+@pytest.mark.unit
+def test_pi05_backend_registers_vision_and_language():
+    from torch_tensorrt.hf.exporters.models.pi05.patches import PI05
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+
+    paths = [p for p, _ in _PATCHES[PI05]]
+    assert any("SiglipAttention.forward" in p for p in paths)
+    assert any("PaliGemmaModel.forward" in p for p in paths)
+    assert any("GemmaAttention.forward" in p for p in paths)
+    assert any("PiGemmaModel.forward" in p for p in paths)
+    assert any("PI05Pytorch.forward" in p for p in paths)
+
+
+@pytest.mark.unit
+def test_paligemma_image_features_patch_returns_tensor():
+    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+        _patch_paligemma_image_features,
+    )
+
+    class _Out:
+        def __init__(self, last_hidden_state):
+            self.last_hidden_state = last_hidden_state
+
+    class Tower(nn.Module):
+        def forward(self, pixel_values, **kwargs):
+            del kwargs
+            return _Out(pixel_values.new_ones(pixel_values.shape[0], 4, 8))
+
+    class Proj(nn.Module):
+        def forward(self, hidden):
+            return hidden
+
+    class DummyPaliGemma(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.vision_tower = Tower()
+            self.multi_modal_projector = Proj()
+
+        def forward(self, *args, **kwargs):
+            raise AssertionError("original PaliGemmaModel.forward should not run")
+
+    DummyPaliGemma.forward = _patch_paligemma_image_features(DummyPaliGemma.forward)
+    pixel_values = torch.randn(2, 3, 8, 8, dtype=torch.float16)
+    out = DummyPaliGemma()(pixel_values)
+    assert out.shape == (2, 4, 8)
+    assert out.dtype == torch.float16
+
+
+@pytest.mark.unit
+def test_pi05_language_model_keeps_hf_forward_without_rope():
+    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+        _patch_pi05_language_model,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, inputs_embeds=None, past_key_values=None, **kwargs):
+            del past_key_values, kwargs
+            return inputs_embeds * 2
+
+    Dummy.forward = _patch_pi05_language_model(Dummy.forward)
+    hidden = torch.ones(1, 2, 4)
+    out = Dummy()(inputs_embeds=hidden, past_key_values="cache")
+    torch.testing.assert_close(out, hidden * 2)
+
+
+@pytest.mark.unit
+def test_pi05_action_keeps_training_forward_without_prefix_kv():
+    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+        _patch_pi05_action_step_forward,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, images, img_masks, tokens, masks, actions, noise, time):
+            del img_masks, tokens, masks, actions, noise, time
+            return images
+
+    Dummy.forward = _patch_pi05_action_step_forward(Dummy.forward)
+    assert Dummy()(7, 0, 0, 0, 0, 0, 0) == 7
+
+
+@pytest.mark.unit
+def test_language_attn_plugin_when_rope_present():
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+        _patch_language_attention,
+    )
+    from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+        _register_attention_plugin_op,
+    )
+
+    _register_attention_plugin_op()
+
+    class Dummy(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.num_heads = 2
+            self.num_key_value_heads = 2
+            self.head_dim = 4
+            self.q_proj = nn.Linear(8, 8)
+            self.k_proj = nn.Linear(8, 8)
+            self.v_proj = nn.Linear(8, 8)
+            self.o_proj = nn.Linear(8, 8)
+
+        def forward(self, hidden_states, **kwargs):
+            raise AssertionError("HF forward should not run for plugin kwargs")
+
+    Dummy.forward = _patch_language_attention(Dummy.forward)
+    hidden = torch.randn(1, 3, 8)
+    rope = torch.randn(1, 3, 4, dtype=torch.float32)
+    kv = torch.zeros(1, 2, 2, 8, 4)
+    ctx = torch.tensor([3], dtype=torch.int32)
+    start = torch.empty(0, dtype=torch.int32)
+    out, present = Dummy()(
+        hidden,
+        rope_rotary_cos_sin=rope,
+        past_key_value=kv,
+        ctx_len=ctx,
+        kvcache_start_index=start,
+    )
+    assert out.shape == hidden.shape
+    assert present.shape == kv.shape
+
+
+@pytest.mark.unit
+def test_groot_backend_registers_components():
+    from torch_tensorrt.hf.exporters.models.groot.patches import GROOT
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+
+    paths = [p for p, _ in _PATCHES[GROOT]]
+    assert any("SiglipAttention.forward" in p for p in paths)
+    assert any("Qwen3Attention.forward" in p for p in paths)
+    assert any("Eagle25VLForConditionalGeneration.forward" in p for p in paths)
+    assert any("Qwen3ForCausalLM.forward" in p for p in paths)
+    assert any("GR00TN15.forward" in p for p in paths)
+    assert any("FlowmatchingActionHead.forward" in p for p in paths)
+    assert any("CategorySpecificLinear.forward" in p for p in paths)
+
+
+@pytest.mark.unit
+def test_nemotron_backend_registers_causal_lm():
+    from torch_tensorrt.hf.exporters.models.nemotron.patches import NEMOTRON
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+
+    paths = [p for p, _ in _PATCHES[NEMOTRON]]
+    assert any("NemotronHForCausalLM.forward" in p for p in paths)
+
+
+@pytest.mark.unit
+def test_eagle_vision_patch_extracts_features():
+    from torch_tensorrt.hf.exporters.models.groot.patches import (
+        _patch_eagle_image_features,
+    )
+
+    class Dummy:
+        def extract_feature(self, pixel_values):
+            return pixel_values + 1
+
+        def forward(self, *args, **kwargs):
+            raise AssertionError("full VLM forward should not run")
+
+    Dummy.forward = _patch_eagle_image_features(Dummy.forward)
+    pixel_values = torch.zeros(1, 3, 4, 4)
+    torch.testing.assert_close(Dummy()(pixel_values), pixel_values + 1)
+
+
+@pytest.mark.unit
+def test_eagle_vision_keeps_vlm_forward_with_input_ids():
+    from torch_tensorrt.hf.exporters.models.groot.patches import (
+        _patch_eagle_image_features,
+    )
+
+    class Dummy:
+        def extract_feature(self, pixel_values):
+            raise AssertionError("extract_feature should not run")
+
+        def forward(self, pixel_values, input_ids=None, **kwargs):
+            del kwargs
+            return (pixel_values, input_ids)
+
+    Dummy.forward = _patch_eagle_image_features(Dummy.forward)
+    pixel_values = torch.zeros(1, 3, 4, 4)
+    input_ids = torch.ones(1, 2, dtype=torch.long)
+    out = Dummy()(pixel_values, input_ids)
+    assert out[1] is input_ids
+
+
+@pytest.mark.unit
+def test_groot_action_keeps_training_forward_without_context():
+    from torch_tensorrt.hf.exporters.models.groot.patches import (
+        _patch_groot_action_step_forward,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, backbone_output, action_input):
+            return backbone_output
+
+    Dummy.forward = _patch_groot_action_step_forward(Dummy.forward)
+    assert Dummy()("backbone", "action") == "backbone"
+
+
+@pytest.mark.unit
+def test_groot_context_keeps_training_forward_without_hidden():
+    from torch_tensorrt.hf.exporters.models.groot.patches import (
+        _patch_groot_context_projection,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, backbone_inputs, action_inputs):
+            return backbone_inputs
+
+    Dummy.forward = _patch_groot_context_projection(Dummy.forward)
+    assert Dummy()("backbone", "action") == "backbone"
+
+
+@pytest.mark.unit
+def test_nemotron_keeps_hf_forward_without_rope():
+    from torch_tensorrt.hf.exporters.models.nemotron.patches import (
+        _patch_nemotron_causal_lm,
+    )
+
+    class Dummy(nn.Module):
+        def forward(self, input_ids=None, inputs_embeds=None, **kwargs):
+            del input_ids, kwargs
+            return inputs_embeds * 2
+
+    Dummy.forward = _patch_nemotron_causal_lm(Dummy.forward)
+    hidden = torch.ones(1, 2, 4)
+    out = Dummy()(inputs_embeds=hidden)
+    torch.testing.assert_close(out, hidden * 2)
+
+
+@pytest.mark.unit
+def test_category_specific_linear_uses_index_select():
+    from torch_tensorrt.hf.exporters.models.groot.patches import (
+        _patch_category_specific_linear,
+    )
+
+    class Dummy(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.W = nn.Parameter(
+                torch.arange(2 * 3 * 4, dtype=torch.float32).reshape(2, 3, 4)
+            )
+            self.b = nn.Parameter(
+                torch.arange(2 * 4, dtype=torch.float32).reshape(2, 4)
+            )
+
+        def forward(self, x, cat_ids):
+            raise AssertionError(
+                "original CategorySpecificLinear.forward should not run"
+            )
+
+    Dummy.forward = _patch_category_specific_linear(Dummy.forward)
+    layer = Dummy()
+    x = torch.ones(2, 5, 3)
+    cat_ids = torch.tensor([1, 0])
+    out = layer(x, cat_ids)
+    expected = torch.bmm(x, layer.W[cat_ids]) + layer.b[cat_ids].unsqueeze(1)
+    torch.testing.assert_close(out, expected)
