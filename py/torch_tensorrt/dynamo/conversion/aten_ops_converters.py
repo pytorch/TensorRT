@@ -22,6 +22,7 @@ from typing import (
 import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
+from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES, _enums
@@ -2240,6 +2241,16 @@ def aten_ops_slice(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    output_shape = None
+    if ctx.current_node is not None:
+        output_val = ctx.current_node.meta.get("val")
+        # Only use export's symbolic metadata, not concrete ShapeProp examples.
+        # In particular, never turn a SymInt's example value into a static size.
+        if isinstance(output_val, FakeTensor):
+            output_shape = tuple(
+                size if isinstance(size, int) else DYNAMIC_DIM
+                for size in output_val.shape
+            )
     return impl.slice.slice_op(
         ctx,
         target,
@@ -2250,6 +2261,7 @@ def aten_ops_slice(
         args_bounds_check(args, 2, replacement=None),
         args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
+        output_shape=output_shape,
     )
 
 
@@ -5848,7 +5860,7 @@ def _pass_through_source(arg: Argument) -> Argument:
 
 def _is_bf16(arg: Argument) -> bool:
     val = arg.meta.get("val") if isinstance(arg, Node) else None
-    return getattr(val, "dtype", None) == torch.bfloat16
+    return bool(getattr(val, "dtype", None) == torch.bfloat16)
 
 
 def _shares_bf16_query_with_another_attention(node: Node) -> bool:

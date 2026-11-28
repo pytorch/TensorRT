@@ -48,6 +48,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     start: Optional[Union[int, TRTTensor]],
     stop: Optional[Union[int, TRTTensor]],
     step: int,
+    output_shape: Optional[Shape] = None,
 ) -> TRTTensor:
     # check if dim is same as dynamic shape dimension
     # this is required when stop is ITensor
@@ -155,7 +156,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
 
     stride_slice = [1] * len(input.shape)
     stride_slice[dim] = step
-    output_shape = list(input.shape)
+    input_shape = list(input.shape)
 
     if input.shape[dim] != -1 and isinstance(start, int) and isinstance(stop, int):
         # Clamp out-of-range bounds like Python slicing instead of wrapping them
@@ -214,7 +215,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
 
             if isinstance(start, int) and start < 0:
                 shape = get_shape_with_dynamic_shape(
-                    ctx, target, source_ir, name, output_shape, input
+                    ctx, target, source_ir, name, input_shape, input
                 )
                 start_slice_tensor = convert_binary_elementwise(
                     ctx,
@@ -229,7 +230,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 (stop < 0) or stop_dynamic_None or stop == sys.maxsize
             ):
                 shape = get_shape_with_dynamic_shape(
-                    ctx, target, source_ir, name, output_shape, input
+                    ctx, target, source_ir, name, input_shape, input
                 )
                 stop_slice_tensor = convert_binary_elementwise(
                     ctx,
@@ -268,6 +269,37 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 output_shape_tensor_neg,
                 -1,
             )
+            if output_shape is not None and any(
+                size != DYNAMIC_DIM for size in output_shape
+            ):
+                # Runtime bound arithmetic can obscure constant extents such as
+                # min(1, n + 12) == 1 or (n + 12) - n == 12. Preserve the sizes
+                # proven by export, while retaining runtime values for symbols.
+                output_shape_tensor = cat(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + "_output_shape",
+                    tuple(
+                        (
+                            np.array([size], dtype=np.int32)
+                            if size != DYNAMIC_DIM
+                            else slice(
+                                ctx,
+                                target,
+                                source_ir,
+                                name + f"_output_dim_{i}",
+                                output_shape_tensor,
+                                (i,),
+                                (1,),
+                                (1,),
+                            )
+                        )
+                        for i, size in enumerate(output_shape)
+                    ),
+                    0,
+                    cast_dtype=trt.int32,
+                )
             layer = ctx.net.add_slice(
                 input, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
             )
@@ -276,9 +308,9 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             layer.set_input(3, stride_slice_tensor)
             return layer.get_output(0)
 
-    output_shape[dim] = max(math.ceil((stop - start) / step), 0)
+    input_shape[dim] = max(math.ceil((stop - start) / step), 0)
     return slice(
-        ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
+        ctx, target, source_ir, name, input, start_slice, input_shape, stride_slice
     )
 
 
